@@ -18,7 +18,7 @@
 	"license": "MIT",
 	"icon": "assets/buildnotes/icon.png",
 
-	"environment": "*",
+	"environment": "client",
 	"entrypoints": {
         "main": [
           "net.atif.buildnotes.Buildnotes"
@@ -33,7 +33,7 @@
 
 	"depends": {
 		"fabricloader": ">=0.17.3",
-		"minecraft": "~1.21.4",
+		"minecraft": "~1.21.11",
 		"java": ">=17",
 		"fabric": "*"
 	},

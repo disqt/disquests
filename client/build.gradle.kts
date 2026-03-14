@@ -1,5 +1,5 @@
 plugins {
-    id("fabric-loom") version "1.9-SNAPSHOT"
+    id("fabric-loom") version "1.14.10"
 }
 
 val minecraft_version: String by project
@@ -15,6 +15,18 @@ dependencies {
 
     implementation(project(":common"))
     include(project(":common"))
+
+    implementation("org.lwjgl:lwjgl-tinyfd:3.3.1")
+    include("org.lwjgl:lwjgl-tinyfd:3.3.1")
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.release.set(17)
 }
 
 tasks.processResources {
