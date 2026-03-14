@@ -1,0 +1,41 @@
+{
+	"schemaVersion": 1,
+	"id": "buildnotes",
+	"version": "${version}",
+
+	"name": "Build Notes ",
+	"description": "An in-game mod for tracking projects, builds, and creating notes.",
+
+	"authors": [
+		"Atif"
+	],
+
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/Atif85/buildnotes-mod"
+	},
+
+	"license": "MIT",
+	"icon": "assets/buildnotes/icon.png",
+
+	"environment": "*",
+	"entrypoints": {
+        "main": [
+          "net.atif.buildnotes.Buildnotes"
+        ],
+        "client": [
+          "net.atif.buildnotes.client.BuildnotesClient"
+        ]
+	},
+	"mixins": [
+		"buildnotes.mixins.json"
+	],
+
+	"depends": {
+		"fabricloader": ">=0.17.3",
+		"minecraft": "~1.21.4",
+		"java": ">=17",
+		"fabric": "*"
+	},
+	"suggests": {}
+}

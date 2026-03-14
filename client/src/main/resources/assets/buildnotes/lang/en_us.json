@@ -1,0 +1,53 @@
+{
+  "key.buildnotes.opengui": "Open BuildNotes",
+  "category.buildnotes.main": "BuildNotes",
+
+  "gui.buildnotes.main_title": "BuildNotes",
+  "gui.buildnotes.notes_tab": "Notes",
+  "gui.buildnotes.builds_tab": "Builds",
+
+  "gui.buildnotes.add_button": "Add",
+  "gui.buildnotes.edit_button": "Edit",
+  "gui.buildnotes.delete_button": "Delete",
+  "gui.buildnotes.open_button": "Open",
+  "gui.buildnotes.save_button": "Save",
+  "gui.buildnotes.close_button": "Close",
+  "gui.buildnotes.cancel_button": "Cancel",
+  "gui.buildnotes.confirm_button": "Confirm",
+
+  "gui.buildnotes.edit_note_title": "Editing Note",
+  "gui.buildnotes.edit_build_title": "Editing Build",
+
+  "gui.buildnotes.edit.coords": "Coords",
+  "gui.buildnotes.edit.dimension": "Dimension",
+  "gui.buildnotes.edit.biome": "Biome",
+  "gui.buildnotes.edit.add_images": "Add Images",
+  "gui.buildnotes.edit.add_field": "Add Field",
+  "gui.buildnotes.edit.remove_field": "X",
+  "gui.buildnotes.edit.scope_button": "Scope: %s",
+  "gui.buildnotes.edit.scope.global": "Global",
+  "gui.buildnotes.edit.scope.server": "Server (Shared)",
+  "gui.buildnotes.edit.scope.world": "World",
+  "gui.buildnotes.edit.scope.per_server": "Per-Server",
+
+  "gui.buildnotes.placeholder.title": "Enter Title Here",
+  "gui.buildnotes.placeholder.note_content": "Enter Text Here",
+  "gui.buildnotes.placeholder.build_name": "Build Name",
+  "gui.buildnotes.placeholder.coords": "X, Y, Z",
+  "gui.buildnotes.placeholder.dimension": "minecraft:overworld",
+  "gui.buildnotes.placeholder.description": "Build Description",
+  "gui.buildnotes.placeholder.credits": "Designer Credits",
+
+  "gui.buildnotes.gallery.previous": "<",
+  "gui.buildnotes.gallery.next": ">",
+  "gui.buildnotes.gallery.delete": "X",
+  "gui.buildnotes.gallery.loading": "Loading image...",
+  "gui.buildnotes.gallery.error": "Error loading image",
+
+  "gui.buildnotes.label.coords": "Coords:",
+  "gui.buildnotes.label.dimension": "Dimension:",
+  "gui.buildnotes.label.description": "Description:",
+  "gui.buildnotes.label.credits": "Designer/Credits:",
+
+  "gui.buildnotes.prompt.field_title": "Enter Field Title"
+}

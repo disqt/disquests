@@ -1,0 +1,130 @@
+package net.atif.buildnotes.gui.widget.list;
+
+import net.atif.buildnotes.data.Note;
+import net.atif.buildnotes.gui.helper.Colors;
+import net.atif.buildnotes.gui.helper.UIHelper;
+import net.atif.buildnotes.gui.screen.MainScreen;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+
+import java.util.List;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+
+public class NoteListWidget extends AbstractListWidget<NoteListWidget.NoteEntry> {
+
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    public NoteListWidget(MainScreen parent, MinecraftClient client, int top, int bottom, int itemHeight) {
+        super(parent, client, top, bottom, itemHeight);
+    }
+
+    public void setNotes(List<Note> notes) {
+        this.clearEntries();
+        notes.forEach(note -> this.addEntry(new NoteEntry(note)));
+    }
+
+    public Note getSelectedNote() {
+        NoteEntry entry = getSelectedOrNull();
+        return entry != null ? entry.getNote() : null;
+    }
+
+    @Override
+    public void setSelected(NoteEntry entry) {
+        super.setSelected(entry);
+        parentScreen.onNoteSelected(); // Notify the parent screen
+    }
+
+    public class NoteEntry extends AbstractListWidget.Entry<NoteEntry> {
+        private final Note note;
+        private final String firstLine;
+        private final String formattedDateTime;
+
+        public NoteEntry(Note note) {
+            this.note = note;
+            String content = note.getContent();
+            // Check if the content is null or just an empty string
+            if (content == null) {
+                this.firstLine = "";
+            } else {
+                // Split the content into lines.
+                String[] lines = content.split("\n");
+                // THE CRUCIAL CHECK: Make sure the resulting array is not empty.
+                if (lines.length > 0) {
+                    this.firstLine = lines[0];
+                } else {
+                    // This handles cases like "" or "\n\n" which result in an empty array.
+                    this.firstLine = "";
+                }
+            }
+
+            LocalDateTime dateTime = LocalDateTime.ofInstant(
+                    Instant.ofEpochSecond(note.getLastModified()), ZoneId.systemDefault()
+            );
+
+            this.formattedDateTime = dateTime.format(DATE_TIME_FORMATTER);
+        }
+
+        public Note getNote() {
+            return this.note;
+        }
+
+
+        @Override
+        public void render(DrawContext context, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float deltaTicks) {
+            int entryX = x;
+            int entryY = y;
+
+            // Prepare Scope indicator to calculate its width
+            Text scopeText = null;
+            int scopeWidth = 0;
+            if (note.getScope() != null) {
+                switch (note.getScope()) {
+                    case GLOBAL -> scopeText = Text.literal("Global").formatted(Formatting.AQUA);
+                    case SERVER -> scopeText = Text.literal("Server").formatted(Formatting.GREEN);
+                    // We don't draw an indicator for WORLD scope to keep the UI clean
+                }
+            }
+
+            if (scopeText != null) {
+                scopeWidth = client.textRenderer.getWidth(scopeText);
+            }
+
+            // Truncate and draw the Title
+            // Calculate available width for the title by subtracting space for the scope indicator and padding
+            int availableTitleWidth = entryWidth - 8; // Base padding
+            if (scopeText != null) {
+                availableTitleWidth -= (scopeWidth + 7); // Account for the scope text and its padding
+            }
+
+            String truncatedTitle = client.textRenderer.trimToWidth(note.getTitle(), availableTitleWidth);
+            context.drawText(client.textRenderer, truncatedTitle, entryX + 4, entryY +  4, Colors.TEXT_PRIMARY, false);
+
+            if (scopeText != null) {
+                context.drawText(client.textRenderer, scopeText, entryX + entryWidth - scopeWidth - 4, entryY +  4, Colors.TEXT_PRIMARY, false);
+            }
+
+            // Truncate and draw the Content Preview
+            Text contentPreview = Text.literal(firstLine).formatted(Formatting.GRAY);
+            String truncatedContent = client.textRenderer.trimToWidth(contentPreview.getString(), entryWidth - 8);
+            context.drawText(client.textRenderer, Text.literal(truncatedContent), entryX + 4, entryY +  14, Colors.TEXT_MUTED, false);
+
+            context.drawText(client.textRenderer, "Last Modified: " + this.formattedDateTime, entryX + 4, entryY +  24, Colors.TEXT_MUTED, false);
+        }
+
+        @Override
+        public boolean mouseClicked(double mouseX, double mouseY, int button) {
+            if (button == 0) {
+                NoteListWidget.this.setSelected(this);
+
+                NoteListWidget.this.handleEntryClick(this);
+                return true;
+            }
+            return false;
+        }
+    }
+}
