@@ -15,10 +15,15 @@ public class Note extends BaseEntry {
         this.content = content;
     }
 
-    private Note(UUID id, long lastModified, Scope scope, String title, String content) {
-        super(id, lastModified, scope); // Passes the existing data up
+    // Package-private for deserialization
+    Note(UUID id, long lastModified, Scope scope, String title, String content) {
+        super(id, lastModified, scope);
         this.title = title;
         this.content = content;
+    }
+
+    public static Note fromNetwork(UUID id, long lastModified, String title, String content) {
+        return new Note(id, lastModified, Scope.SERVER, title, content);
     }
 
     // Getters

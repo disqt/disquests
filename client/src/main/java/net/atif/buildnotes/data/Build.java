@@ -26,7 +26,8 @@ public class Build extends BaseEntry {
         this.imageFileNames = new ArrayList<>();
     }
 
-    private Build(UUID id, long lastModified, Scope scope, String name, String coords, String dim, String desc, String cred, List<String> images, List<CustomField> fields) {
+    // Package-private for deserialization
+    Build(UUID id, long lastModified, Scope scope, String name, String coords, String dim, String desc, String cred, List<String> images, List<CustomField> fields) {
         super(id, lastModified, scope);
         this.name = name;
         this.coordinates = coords;
@@ -35,6 +36,11 @@ public class Build extends BaseEntry {
         this.credits = cred;
         this.imageFileNames = images;
         this.customFields = fields;
+    }
+
+    public static Build fromNetwork(UUID id, long lastModified, String name, String coords,
+            String dim, String desc, String cred, List<String> images, List<CustomField> fields) {
+        return new Build(id, lastModified, Scope.SERVER, name, coords, dim, desc, cred, images, fields);
     }
 
     // --- Getters ---

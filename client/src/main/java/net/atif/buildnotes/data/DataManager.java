@@ -1,15 +1,14 @@
 package net.atif.buildnotes.data;
 
+import com.disqt.buildnotes.common.PacketCodec;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import net.atif.buildnotes.Buildnotes;
 import net.atif.buildnotes.client.ClientCache;
 import net.atif.buildnotes.client.ClientImageTransferManager;
-import net.atif.buildnotes.network.packet.c2s.DeleteBuildC2SPacket;
-import net.atif.buildnotes.network.packet.c2s.DeleteNoteC2SPacket;
-import net.atif.buildnotes.network.packet.c2s.SaveBuildC2SPacket;
-import net.atif.buildnotes.network.packet.c2s.SaveNoteC2SPacket;
+import net.atif.buildnotes.network.ClientPacketHandler;
+import net.atif.buildnotes.network.RawPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
@@ -103,16 +102,14 @@ public class DataManager {
         }
     }
 
-    // --- Private Delete Helpers to prevent duplication ---
+    // --- Private Delete Helpers ---
 
     private void deleteNoteFromLocalFiles(UUID id) {
-        // Delete from Global
         Path globalPath = getGlobalPath();
         List<Note> globalNotes = loadFromFile(globalPath, NOTES_FILE_NAME, new TypeToken<ArrayList<Note>>() {}.getType());
-        if (globalNotes.removeIf(n -> n .getId().equals(id))) {
+        if (globalNotes.removeIf(n -> n.getId().equals(id))) {
             writeToFile(globalNotes, globalPath, NOTES_FILE_NAME);
         }
-        // Delete from World/Per-Server
         Path localPath = getLocalPath();
         List<Note> localNotes = loadFromFile(localPath, NOTES_FILE_NAME, new TypeToken<ArrayList<Note>>() {}.getType());
         if (localNotes.removeIf(n -> n.getId().equals(id))) {
@@ -121,13 +118,11 @@ public class DataManager {
     }
 
     private void deleteBuildFromLocalFiles(UUID id) {
-        // Delete from Global
         Path globalPath = getGlobalPath();
         List<Build> globalBuilds = loadFromFile(globalPath, BUILDS_FILE_NAME, new TypeToken<ArrayList<Build>>() {}.getType());
         if (globalBuilds.removeIf(b -> b.getId().equals(id))) {
             writeToFile(globalBuilds, globalPath, BUILDS_FILE_NAME);
         }
-        // Delete from World/Per-Server
         Path localPath = getLocalPath();
         List<Build> localBuilds = loadFromFile(localPath, BUILDS_FILE_NAME, new TypeToken<ArrayList<Build>>() {}.getType());
         if (localBuilds.removeIf(b -> b.getId().equals(id))) {
@@ -147,25 +142,18 @@ public class DataManager {
     public void saveNote(Note noteToSave) {
         if (noteToSave.getScope() == Scope.SERVER) {
             deleteNoteFromLocalFiles(noteToSave.getId());
-
-            // Use the typed packet
-            ClientPlayNetworking.send(new SaveNoteC2SPacket(noteToSave));
+            ClientPlayNetworking.send(new RawPayload(
+                    PacketCodec.writeSaveNote(ClientPacketHandler.toNoteData(noteToSave))));
             return;
         }
 
-        // --- Handle moving a note AWAY from the server ---
-        // Before saving locally, check if a note with this ID exists in the server cache.
         final UUID noteId = noteToSave.getId();
         boolean wasServerNote = ClientCache.getNotes().stream().anyMatch(n -> n.getId().equals(noteId));
-
         if (wasServerNote) {
-            // If it was a server note, its new scope is now local.
-            // We must tell the server to delete its copy.
-            ClientPlayNetworking.send(new DeleteNoteC2SPacket(noteId));
+            ClientPlayNetworking.send(new RawPayload(PacketCodec.writeDeleteNote(noteId)));
         }
 
         deleteNoteFromLocalFiles(noteId);
-
         Path path = noteToSave.getScope() == Scope.GLOBAL ? getGlobalPath() : getLocalPath();
         Type type = new TypeToken<ArrayList<Note>>() {}.getType();
         List<Note> notes = loadFromFile(path, NOTES_FILE_NAME, type);
@@ -175,8 +163,7 @@ public class DataManager {
 
     public void deleteNote(Note noteToDelete) {
         if (noteToDelete.getScope() == Scope.SERVER) {
-            // Send a C2S packet to the server
-            ClientPlayNetworking.send(new DeleteNoteC2SPacket(noteToDelete.getId()));
+            ClientPlayNetworking.send(new RawPayload(PacketCodec.writeDeleteNote(noteToDelete.getId())));
             return;
         }
         deleteNoteFromLocalFiles(noteToDelete.getId());
@@ -193,41 +180,33 @@ public class DataManager {
 
     public void saveBuild(Build buildToSave) {
         if (buildToSave.getScope() == Scope.SERVER) {
-            // 1. Delete any local copies to handle scope changes
             deleteBuildFromLocalFiles(buildToSave.getId());
 
-            // 2. Identify which of the build's images exist locally and need to be uploaded.
             List<Path> imagesToUpload = new ArrayList<>();
-            // Use the new helper method to get the directory for this build's images
             Path imageDir = getLocalImagePath(buildToSave.getId());
             for (String filename : buildToSave.getImageFileNames()) {
                 Path localPath = imageDir.resolve(filename);
                 if (Files.exists(localPath)) {
                     imagesToUpload.add(localPath);
                 }
-                }
+            }
 
-            // 3. Schedule them for upload. The Transfer Manager will handle the background process.
             if (!imagesToUpload.isEmpty()) {
                 ClientImageTransferManager.scheduleUploads(buildToSave.getId(), imagesToUpload);
             }
 
-            // 4. Send the main build metadata packet immediately.
-            ClientPlayNetworking.send(new SaveBuildC2SPacket(buildToSave));
+            ClientPlayNetworking.send(new RawPayload(
+                    PacketCodec.writeSaveBuild(ClientPacketHandler.toBuildData(buildToSave))));
             return;
         }
-        // --- Handle moving a build AWAY from the server ---
+
         final UUID buildId = buildToSave.getId();
         boolean wasServerBuild = ClientCache.getBuilds().stream().anyMatch(b -> b.getId().equals(buildId));
-
         if (wasServerBuild) {
-            // If it was a server build, tell the server to delete its copy.
-            ClientPlayNetworking.send(new DeleteBuildC2SPacket(buildId));
+            ClientPlayNetworking.send(new RawPayload(PacketCodec.writeDeleteBuild(buildId)));
         }
 
-        // This is the original logic for saving locally.
         deleteBuildFromLocalFiles(buildId);
-
         Path path = buildToSave.getScope() == Scope.GLOBAL ? getGlobalPath() : getLocalPath();
         Type type = new TypeToken<ArrayList<Build>>() {}.getType();
         List<Build> builds = loadFromFile(path, BUILDS_FILE_NAME, type);
@@ -237,8 +216,7 @@ public class DataManager {
 
     public void deleteBuild(Build buildToDelete) {
         if (buildToDelete.getScope() == Scope.SERVER) {
-            // Send a C2S packet to the server
-            ClientPlayNetworking.send(new DeleteBuildC2SPacket(buildToDelete.getId()));
+            ClientPlayNetworking.send(new RawPayload(PacketCodec.writeDeleteBuild(buildToDelete.getId())));
             return;
         }
         deleteBuildFromLocalFiles(buildToDelete.getId());

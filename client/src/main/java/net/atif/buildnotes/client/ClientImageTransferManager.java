@@ -1,11 +1,10 @@
 package net.atif.buildnotes.client;
 
+import com.disqt.buildnotes.common.PacketCodec;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import net.atif.buildnotes.Buildnotes;
-import net.atif.buildnotes.network.NetworkConstants;
-import net.atif.buildnotes.network.packet.c2s.RequestImageC2SPacket;
-import net.atif.buildnotes.network.packet.c2s.UploadImageChunkC2SPacket;
+import net.atif.buildnotes.network.RawPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 
@@ -20,7 +19,6 @@ public class ClientImageTransferManager {
     // --- DOWNLOAD HANDLING ---
     private record FileKey(UUID buildId, String filename) {}
 
-    // A helper class to reassemble chunks in memory
     private static class ImageAssembler {
         private final byte[][] chunks;
         private int receivedChunks = 0;
@@ -47,7 +45,6 @@ public class ClientImageTransferManager {
                 if (chunk == null) return null;
                 totalSize += chunk.length;
             }
-
             byte[] fullData = new byte[totalSize];
             int currentPos = 0;
             for (byte[] chunk : chunks) {
@@ -72,33 +69,23 @@ public class ClientImageTransferManager {
 
     public static void requestImage(UUID buildId, String filename, Runnable onComplete) {
         try {
-            if (buildId == null || filename == null) {
-                return;
-            }
+            if (buildId == null || filename == null) return;
 
             FileKey key = new FileKey(buildId, filename);
 
-            // --- Check if this image has already failed to download ---
             if (FAILED_DOWNLOADS.contains(key)) {
-                // Don't try again. Immediately run the callback to signal completion.
-                if (onComplete != null) {
-                    onComplete.run();
-                }
+                if (onComplete != null) onComplete.run();
                 return;
             }
 
-            if (COMPLETION_CALLBACKS.putIfAbsent(key, onComplete) != null) {
-                return;
-            }
+            if (COMPLETION_CALLBACKS.putIfAbsent(key, onComplete) != null) return;
 
             Buildnotes.LOGGER.info("Requesting image '{}' for build {}", filename, key.buildId);
-            ClientPlayNetworking.send(new RequestImageC2SPacket(buildId, filename));
-
+            ClientPlayNetworking.send(new RawPayload(PacketCodec.writeRequestImage(buildId, filename)));
         } catch (Exception e) {
             Buildnotes.LOGGER.error("[CRITICAL] An unexpected exception occurred inside requestImage!", e);
         }
     }
-
 
     public static void handleChunk(UUID buildId, String filename, int totalChunks, int chunkIndex, byte[] data) {
         FileKey key = new FileKey(buildId, filename);
@@ -117,12 +104,8 @@ public class ClientImageTransferManager {
             }
             IN_PROGRESS_DOWNLOADS.remove(key);
 
-            if (COMPLETION_CALLBACKS.containsKey(key)) {
-                Runnable callback = COMPLETION_CALLBACKS.remove(key);
-                if (callback != null) {
-                    callback.run();
-                }
-            }
+            Runnable callback = COMPLETION_CALLBACKS.remove(key);
+            if (callback != null) callback.run();
         }
     }
 
@@ -145,22 +128,13 @@ public class ClientImageTransferManager {
         }
     }
 
-    // Method to handle a failed download.
     public static void onDownloadFailed(UUID buildId, String filename) {
         FileKey key = new FileKey(buildId, filename);
         Buildnotes.LOGGER.warn("Server reported image not found: '{}' for build {}", filename, buildId);
-
         FAILED_DOWNLOADS.add(key);
-
-        // Remove the download from the in-progress map
         IN_PROGRESS_DOWNLOADS.remove(key);
-
-        if (COMPLETION_CALLBACKS.containsKey(key)) {
-            Runnable callback = COMPLETION_CALLBACKS.remove(key);
-            if (callback != null) {
-                callback.run();
-            }
-        }
+        Runnable callback = COMPLETION_CALLBACKS.remove(key);
+        if (callback != null) callback.run();
     }
 
     // --- Upload Logic ---
@@ -186,30 +160,30 @@ public class ClientImageTransferManager {
 
         if (Files.notExists(localPath)) {
             Buildnotes.LOGGER.warn("Tried to upload non-existent local image: {}", localPath);
-            processUploadQueue(); // Skip to the next item
+            processUploadQueue();
             return;
         }
 
         Buildnotes.LOGGER.info("Starting upload for image: {}", localPath);
 
-        // Run file I/O and networking on a separate thread to avoid blocking the main client thread
         CompletableFuture.runAsync(() -> {
             try {
                 byte[] fullData = Files.readAllBytes(localPath);
-                int totalChunks = (int) Math.ceil((double) fullData.length / NetworkConstants.CHUNK_SIZE);
+                int totalChunks = (int) Math.ceil((double) fullData.length / PacketCodec.CHUNK_SIZE);
 
                 for (int i = 0; i < totalChunks; i++) {
-                    int offset = i * NetworkConstants.CHUNK_SIZE;
-                    int length = Math.min(NetworkConstants.CHUNK_SIZE, fullData.length - offset);
+                    int offset = i * PacketCodec.CHUNK_SIZE;
+                    int length = Math.min(PacketCodec.CHUNK_SIZE, fullData.length - offset);
                     byte[] chunkData = new byte[length];
                     System.arraycopy(fullData, offset, chunkData, 0, length);
 
-                    ClientPlayNetworking.send(new UploadImageChunkC2SPacket(key.buildId, key.filename, totalChunks, i, chunkData));
+                    ClientPlayNetworking.send(new RawPayload(
+                            PacketCodec.writeUploadImageChunk(key.buildId, key.filename, totalChunks, i, chunkData)));
                 }
                 Buildnotes.LOGGER.info("Finished sending {} chunks for image '{}'", totalChunks, key.filename);
             } catch (IOException e) {
                 Buildnotes.LOGGER.error("Failed to read and chunk local image for upload: {}", localPath, e);
             }
-        }).thenRun(ClientImageTransferManager::processUploadQueue); // When this async task is done, trigger the next upload
+        }).thenRun(ClientImageTransferManager::processUploadQueue);
     }
 }
