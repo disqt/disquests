@@ -1,0 +1,11 @@
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+run/
+logs/
+.DS_Store
+Thumbs.db
