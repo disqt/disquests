@@ -1,0 +1,14 @@
+name: BuildNotes
+version: '0.1.0'
+main: com.disqt.buildnotes.paper.BuildNotesPlugin
+api-version: '1.21'
+description: Shared notes and build tracking
+commands:
+  buildnotes:
+    description: BuildNotes management
+    usage: /<command> [subcommand]
+    permission: buildnotes.admin
+permissions:
+  buildnotes.admin:
+    description: Manage BuildNotes settings
+    default: op
