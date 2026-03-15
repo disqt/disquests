@@ -3,7 +3,8 @@
   "package": "com.disqt.disquests.client.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "InGameHudMixin"
+    "InGameHudMixin",
+    "InventoryBadgeMixin"
   ],
   "injectors": {
     "defaultRequire": 1
