@@ -39,7 +39,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
             if (player.isOnline()) {
                 sendToPlayer(player, PacketCodec.writeHandshake(permissionManager.getPermission(player)));
             }
-        }, 5L);
+        }, 40L); // 2 seconds — wait for Fabric client to register plugin channels
     }
 
     @EventHandler
