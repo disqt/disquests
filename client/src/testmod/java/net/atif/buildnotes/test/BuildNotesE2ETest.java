@@ -15,8 +15,8 @@ public class BuildNotesE2ETest implements FabricClientGameTest {
 
     @Override
     public void runTest(ClientGameTestContext context) {
-        test1_smokeTest(context);
-        test2_serverHandshake(context);
+        test1_serverHandshake(context);
+        test2_smokeTest(context);
         test3_noteCrud(context);
         test4_buildCrud(context);
         test5_serverSync(context);
@@ -24,16 +24,7 @@ public class BuildNotesE2ETest implements FabricClientGameTest {
         test7_permissions(context);
     }
 
-    private void test1_smokeTest(ClientGameTestContext context) {
-        context.getInput().pressKey(KeyBinds.openGuiKey);
-        context.waitTicks(5);
-        context.waitForScreen(MainScreen.class);
-        context.takeScreenshot("01_main_screen_empty");
-        context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
-        context.waitTicks(5);
-    }
-
-    private void test2_serverHandshake(ClientGameTestContext context) {
+    private void test1_serverHandshake(ClientGameTestContext context) {
         TestHelper.connectToServer(context);
         TestHelper.waitForHandshake(context);
 
@@ -42,6 +33,16 @@ public class BuildNotesE2ETest implements FabricClientGameTest {
 
         boolean canEdit = context.computeOnClient(client -> ClientSession.hasEditPermission());
         if (!canEdit) throw new AssertionError("Expected CAN_EDIT permission by default");
+    }
+
+    private void test2_smokeTest(ClientGameTestContext context) {
+        // Keybind only works in-game (currentScreen == null), so must be connected first
+        context.getInput().pressKey(KeyBinds.openGuiKey);
+        context.waitTicks(5);
+        context.waitForScreen(MainScreen.class);
+        context.takeScreenshot("01_main_screen_empty");
+        context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+        context.waitTicks(5);
     }
 
     private void test3_noteCrud(ClientGameTestContext context) {
