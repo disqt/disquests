@@ -56,6 +56,13 @@ public class ClientCache {
         serverBuilds.add(build);
     }
 
+    public static Note getNoteById(UUID id) {
+        for (Note n : serverNotes) {
+            if (n.getId().equals(id)) return n;
+        }
+        return null;
+    }
+
     // More specific removal methods
     public static void removeNoteById(UUID id) {
         serverNotes.removeIf(n -> n.getId().equals(id));
