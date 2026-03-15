@@ -1,9 +1,9 @@
 {
 	"schemaVersion": 1,
-	"id": "buildnotes",
+	"id": "disquests",
 	"version": "${version}",
 
-	"name": "Build Notes ",
+	"name": "Disquests",
 	"description": "An in-game mod for tracking projects, builds, and creating notes.",
 
 	"authors": [
@@ -20,15 +20,12 @@
 
 	"environment": "client",
 	"entrypoints": {
-        "main": [
-          "net.atif.buildnotes.Buildnotes"
-        ],
         "client": [
-          "net.atif.buildnotes.client.BuildnotesClient"
+          "com.disqt.disquests.client.DisquestsClient"
         ]
 	},
 	"mixins": [
-		"buildnotes.mixins.json"
+		"disquests.mixins.json"
 	],
 
 	"depends": {
