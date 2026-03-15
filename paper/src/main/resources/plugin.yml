@@ -1,14 +1,13 @@
-name: BuildNotes
+name: Disquests
 version: '0.1.0'
-main: com.disqt.buildnotes.paper.BuildNotesPlugin
+main: com.disqt.disquests.paper.DisquestsPlugin
 api-version: '1.21'
-description: Shared notes and build tracking
 commands:
-  buildnotes:
-    description: BuildNotes management
-    usage: /<command> [subcommand]
-    permission: buildnotes.admin
+  disquests:
+    description: Disquests admin commands
+    permission: disquests.admin
+    usage: /disquests <reload>
 permissions:
-  buildnotes.admin:
-    description: Manage BuildNotes settings
+  disquests.admin:
+    description: Admin access to Disquests commands
     default: op
