@@ -12,6 +12,8 @@ val paper_api_version: String by project
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:$paper_api_version")
+    compileOnly("org.xerial:sqlite-jdbc:3.49.1.0")
+    testImplementation("org.xerial:sqlite-jdbc:3.49.1.0")
     implementation(project(":common"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.3")
 }
