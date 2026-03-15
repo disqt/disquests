@@ -35,30 +35,13 @@ jobs:
           key: loom-${{ hashFiles('gradle.properties') }}
           restore-keys: loom-
 
-      - name: Cache Paper server
-        id: paper-cache
-        uses: actions/cache@v4
-        with:
-          path: .ci/paper/paper.jar
-          key: paper-1.21.11
-
       - name: Build all JARs
         run: ./gradlew build
 
-      - name: Download Paper server
-        if: steps.paper-cache.outputs.cache-hit != 'true'
+      - name: Configure server
         run: |
-          mkdir -p .ci/paper
-          BUILDS_JSON=$(curl -s "https://api.papermc.io/v2/projects/paper/versions/1.21.11/builds")
-          BUILD=$(echo "$BUILDS_JSON" | jq '.builds[-1].build')
-          curl -sL "https://api.papermc.io/v2/projects/paper/versions/1.21.11/builds/${BUILD}/downloads/paper-1.21.11-${BUILD}.jar" -o .ci/paper/paper.jar
-
-      - name: Configure Paper server
-        run: |
-          mkdir -p .ci/paper/plugins
-          cp paper/build/libs/*.jar .ci/paper/plugins/BuildNotes.jar
-          echo "eula=true" > .ci/paper/eula.txt
-          cat > .ci/paper/server.properties << 'PROPS'
+          mkdir -p paper/run
+          cat > paper/run/server.properties << 'PROPS'
           online-mode=false
           enable-rcon=true
           rcon.password=testpassword
@@ -70,10 +53,9 @@ jobs:
 
       - name: Start Paper server
         run: |
-          cd .ci/paper
-          java -Xmx512m -jar paper.jar --nogui > server-stdout.log 2>&1 &
-          echo $! > server.pid
-          timeout 120 bash -c 'until grep -q "Done" logs/latest.log 2>/dev/null; do sleep 2; done'
+          ./gradlew :paper:runServer --no-daemon -x test > paper/run/server-stdout.log 2>&1 &
+          echo $! > paper/run/server.pid
+          timeout 120 bash -c 'until grep -q "Done" paper/run/logs/latest.log 2>/dev/null; do sleep 2; done'
           echo "Paper server started"
 
       - name: Run E2E tests
@@ -87,8 +69,8 @@ jobs:
       - name: Stop Paper server
         if: always()
         run: |
-          if [ -f .ci/paper/server.pid ]; then
-            kill "$(cat .ci/paper/server.pid)" 2>/dev/null || true
+          if [ -f paper/run/server.pid ]; then
+            kill "$(cat paper/run/server.pid)" 2>/dev/null || true
           fi
 
       - name: Upload test artifacts
@@ -99,6 +81,6 @@ jobs:
           path: |
             client/build/run/clientGameTest/screenshots/
             client/build/run/clientGameTest/logs/
-            .ci/paper/logs/
-            .ci/paper/server-stdout.log
+            paper/run/logs/
+            paper/run/server-stdout.log
           retention-days: 14

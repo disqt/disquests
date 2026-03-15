@@ -52,6 +52,13 @@ loom {
     }
 }
 
+tasks.named("runClientGameTest") {
+    doFirst {
+        val requireFreeRam = rootProject.extra["requireFreeRam"] as (String, Long) -> Unit
+        requireFreeRam("runClientGameTest", 4096L)
+    }
+}
+
 tasks.processResources {
     inputs.property("version", project.version)
     filesMatching("fabric.mod.json") {

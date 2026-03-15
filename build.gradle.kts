@@ -2,6 +2,23 @@ plugins {
     java
 }
 
+fun requireFreeRam(taskName: String, requiredMb: Long = 4096L) {
+    val factory = Class.forName("java.lang.management.ManagementFactory")
+    val bean = factory.getMethod("getOperatingSystemMXBean").invoke(null)
+    val clazz = Class.forName("com.sun.management.OperatingSystemMXBean")
+    val freeMemMb = if (clazz.isInstance(bean)) {
+        clazz.getMethod("getFreeMemorySize").invoke(bean) as Long / (1024 * 1024)
+    } else { Long.MAX_VALUE }
+    if (freeMemMb < requiredMb) {
+        throw GradleException(
+            "$taskName needs at least ${requiredMb}MB free RAM, but only ${freeMemMb}MB available. " +
+            "Skip with: -x $taskName"
+        )
+    }
+}
+
+extra["requireFreeRam"] = ::requireFreeRam
+
 subprojects {
     // Client uses Fabric Loom which manages its own Java config
     if (name != "client") {
