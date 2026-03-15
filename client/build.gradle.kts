@@ -28,6 +28,38 @@ dependencies {
     include("org.commonmark:commonmark-ext-task-list-items:0.24.0")
 }
 
+sourceSets {
+    create("testmod") {
+        compileClasspath += sourceSets.main.get().output
+        compileClasspath += sourceSets.main.get().compileClasspath
+        runtimeClasspath += sourceSets.main.get().output
+        runtimeClasspath += sourceSets.main.get().runtimeClasspath
+    }
+}
+
+loom {
+    runs {
+        create("clientGameTest") {
+            client()
+            configName = "Client Game Test"
+            source(sourceSets.getByName("testmod"))
+            vmArg("-Dfabric.client.gametest")
+            vmArg("-Dfabric.client.gametest.disableNetworkSynchronizer=true")
+            vmArg("-Ddisquests.test.server.host=localhost")
+            vmArg("-Ddisquests.test.server.port=25565")
+            vmArg("-Ddisquests.test.rcon.port=25575")
+            vmArg("-Ddisquests.test.rcon.password=testpassword")
+        }
+    }
+}
+
+tasks.named("runClientGameTest") {
+    doFirst {
+        val requireFreeRam = rootProject.extra["requireFreeRam"] as (String, Long) -> Unit
+        requireFreeRam("runClientGameTest", 4096L)
+    }
+}
+
 java {
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
