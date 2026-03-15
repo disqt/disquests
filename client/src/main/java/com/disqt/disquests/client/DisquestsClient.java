@@ -10,12 +10,17 @@ import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 
 @Environment(EnvType.CLIENT)
 public class DisquestsClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         KeyBinds.register();
+
+        // Register payload types before registering receivers
+        PayloadTypeRegistry.playS2C().register(RawPayload.ID, RawPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(RawPayload.ID, RawPayload.CODEC);
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (KeyBinds.openGuiKey.wasPressed()) {
