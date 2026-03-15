@@ -37,38 +37,6 @@ tasks.withType<JavaCompile>().configureEach {
     options.release.set(21)
 }
 
-sourceSets {
-    create("testmod") {
-        compileClasspath += sourceSets.main.get().output
-        compileClasspath += sourceSets.main.get().compileClasspath
-        runtimeClasspath += sourceSets.main.get().output
-        runtimeClasspath += sourceSets.main.get().runtimeClasspath
-    }
-}
-
-loom {
-    runs {
-        create("clientGameTest") {
-            client()
-            configName = "Client Game Test"
-            source(sourceSets.getByName("testmod"))
-            vmArg("-Dfabric.client.gametest")
-            vmArg("-Dfabric.client.gametest.disableNetworkSynchronizer=true")
-            vmArg("-Dbuildnotes.test.server.host=localhost")
-            vmArg("-Dbuildnotes.test.server.port=25565")
-            vmArg("-Dbuildnotes.test.rcon.port=25575")
-            vmArg("-Dbuildnotes.test.rcon.password=testpassword")
-        }
-    }
-}
-
-tasks.named("runClientGameTest") {
-    doFirst {
-        val requireFreeRam = rootProject.extra["requireFreeRam"] as (String, Long) -> Unit
-        requireFreeRam("runClientGameTest", 4096L)
-    }
-}
-
 tasks.processResources {
     inputs.property("version", project.version)
     filesMatching("fabric.mod.json") {
