@@ -2,9 +2,10 @@ package com.disqt.disquests.test;
 
 import com.disqt.disquests.client.ClientSession;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
-import net.minecraft.client.gui.screen.ConnectScreen;
+import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
 import net.minecraft.client.network.ServerAddress;
 import net.minecraft.client.network.ServerInfo;
+import net.minecraft.text.Text;
 
 import java.io.IOException;
 
@@ -51,7 +52,7 @@ public class TestHelper {
     public static void disconnect(ClientGameTestContext context) {
         context.runOnClient(client -> {
             if (client.world != null) {
-                client.world.disconnect();
+                client.world.disconnect(Text.literal("Test disconnect"));
             }
         });
         // Wait for disconnect to complete
