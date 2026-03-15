@@ -27,7 +27,10 @@ All versions (MC, Fabric, Paper, Java) are in `gradle.properties` — that is th
 ./gradlew :common:test       # run codec unit tests (JUnit 5)
 ./gradlew :client:build      # build Fabric mod jar
 ./gradlew :paper:build       # build Paper plugin jar
+./gradlew :paper:runServer   # start Paper dev server (auto-downloads Paper, places plugin jar)
 ```
+
+`runServer` and `runClientGameTest` have a 4GB free RAM gate — they will refuse to start on low-memory machines (Pi, VPS). The check and threshold are in `build.gradle.kts` via `requireFreeRam`.
 
 ## E2E Tests
 
@@ -61,6 +64,11 @@ Channel: `buildnotes:main`. First byte = PacketType ID.
 | `paper/src/main/java/com/disqt/buildnotes/paper/BuildNotesPlugin.java` | Plugin entry, channel registration |
 | `paper/src/main/java/com/disqt/buildnotes/paper/ServerPacketHandler.java` | Handles C2S, broadcasts S2C |
 | `paper/src/main/java/com/disqt/buildnotes/paper/DataManager.java` | SQLite persistence |
+
+## Gotchas
+
+- **Gradle Kotlin DSL shadows `java` package** — `java.lang.management.*` won't resolve in `.gradle.kts` because `java` is a Gradle DSL accessor. Use `Class.forName("java.lang.management.ManagementFactory")` instead.
+- **PR target** — `gh pr create` defaults to upstream (`Atif85`). Use `--repo disqt/buildnotes --base main` explicitly.
 
 ## Upstream
 
