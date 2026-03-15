@@ -1,5 +1,6 @@
 package com.disqt.disquests.client.gui.screen;
 
+import com.disqt.disquests.client.BlueMapHelper;
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
@@ -61,7 +62,7 @@ public class ViewQuestScreen extends BaseScreen {
         int metadataHeight = hasCoords ? 24 : 0;
 
         // Check if BlueMap link is available
-        String bluemapUrl = buildBlueMapUrl();
+        String bluemapUrl = BlueMapHelper.buildUrl(quest);
         boolean hasBluemap = bluemapUrl != null;
 
         // Bottom buttons
@@ -181,22 +182,6 @@ public class ViewQuestScreen extends BaseScreen {
         if (ClientCache.getQuestById(quest.getId()) == null) {
             this.close();
         }
-    }
-
-    // --- BLUEMAP URL ---
-
-    private String buildBlueMapUrl() {
-        if (!ClientSession.hasBluemap() || quest.getCoordinates() == null) return null;
-        String base = ClientSession.getBluemapUrl();
-        String map = quest.getMap() != null ? quest.getMap() : "world";
-        CoordinatesData c = quest.getCoordinates();
-        if (quest.isRegion() && quest.getCoordinates2() != null) {
-            CoordinatesData c2 = quest.getCoordinates2();
-            return String.format("%s/#%s:%.0f:%.0f:%.0f:50:0:0:0:0:flat",
-                    base, map, (c.x() + c2.x()) / 2, (c.y() + c2.y()) / 2, (c.z() + c2.z()) / 2);
-        }
-        return String.format("%s/#%s:%.0f:%.0f:%.0f:50:0:0:0:0:flat",
-                base, map, c.x(), c.y(), c.z());
     }
 
     // --- RENDERING ---
