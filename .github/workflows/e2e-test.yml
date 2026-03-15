@@ -44,16 +44,18 @@ jobs:
 
       - name: Configure server
         run: |
-          mkdir -p paper/run
+          mkdir -p paper/run/plugins/BuildNotes
           cat > paper/run/server.properties << 'PROPS'
           online-mode=false
           enable-rcon=true
           rcon.password=testpassword
           rcon.port=25575
           level-type=flat
+          difficulty=peaceful
           spawn-protection=0
           max-players=2
           PROPS
+          echo '{"allowAll":true,"editors":[]}' > paper/run/plugins/BuildNotes/permissions.json
 
       - name: Start Paper server
         run: |

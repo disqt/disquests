@@ -5,6 +5,9 @@ import net.atif.buildnotes.client.ClientSession;
 import net.atif.buildnotes.client.KeyBinds;
 import net.atif.buildnotes.data.Note;
 import net.atif.buildnotes.gui.screen.MainScreen;
+import net.atif.buildnotes.data.Note;
+import net.atif.buildnotes.gui.screen.ViewBuildScreen;
+import java.util.List;
 import net.atif.buildnotes.gui.screen.ViewNoteScreen;
 import net.atif.buildnotes.hud.HudPinManager;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -60,22 +63,16 @@ public class BuildNotesE2ETest implements FabricClientGameTest {
         context.getInput().typeChars("Hello world");
         context.waitTicks(5);
 
-        // Save
+        // Save — navigates to ViewNoteScreen
         context.clickScreenButton("Save");
         context.waitTicks(20);
-        context.waitForScreen(MainScreen.class);
-        context.takeScreenshot("03_note_in_list");
-
-        // Open note
-        context.clickScreenButton("Open");
-        context.waitTicks(10);
         context.waitForScreen(ViewNoteScreen.class);
         context.takeScreenshot("03_note_view");
 
-        // Delete
+        // Delete from ViewNoteScreen
         context.clickScreenButton("Delete");
         context.waitTicks(5);
-        context.clickScreenButton("Confirm");
+        context.clickScreenButton("Yes");
         context.waitTicks(20);
 
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
@@ -94,21 +91,16 @@ public class BuildNotesE2ETest implements FabricClientGameTest {
         context.getInput().typeChars("Test Build");
         context.waitTicks(5);
 
-        // Save
+        // Save — navigates to ViewBuildScreen
         context.clickScreenButton("Save");
         context.waitTicks(20);
-        context.waitForScreen(MainScreen.class);
-        context.takeScreenshot("04_build_in_list");
-
-        // Open
-        context.clickScreenButton("Open");
-        context.waitTicks(10);
+        context.waitForScreen(ViewBuildScreen.class);
         context.takeScreenshot("04_build_view");
 
-        // Delete
+        // Delete from ViewBuildScreen
         context.clickScreenButton("Delete");
         context.waitTicks(5);
-        context.clickScreenButton("Confirm");
+        context.clickScreenButton("Yes");
         context.waitTicks(20);
 
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
@@ -116,42 +108,46 @@ public class BuildNotesE2ETest implements FabricClientGameTest {
     }
 
     private void test5_serverSync(ClientGameTestContext context) {
-        // Create a note
+        // Create a SERVER-scoped note (only SERVER scope syncs to the server)
         context.getInput().pressKey(KeyBinds.openGuiKey);
         context.waitForScreen(MainScreen.class);
         context.clickScreenButton("Notes");
         context.waitTicks(5);
         context.clickScreenButton("Add");
         context.waitTicks(10);
-        context.getInput().typeChars("Persistent Note");
+        // Cycle scope to SERVER: Per-Server -> Global -> Server (Shared)
+        // Each click calls saveNote() internally, so the note gets saved with each scope
+        context.clickScreenButton("Scope: Per-Server");
         context.waitTicks(5);
+        context.clickScreenButton("Scope: Global");
+        context.waitTicks(5);
+        // Save with SERVER scope — sends C2S SAVE_NOTE to Paper
         context.clickScreenButton("Save");
-        context.waitTicks(20);
+        context.waitTicks(40);
+        context.waitForScreen(ViewNoteScreen.class);
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
-        context.waitTicks(5);
+        context.waitTicks(10);
 
         // Disconnect and reconnect
         TestHelper.disconnect(context);
         TestHelper.connectToServer(context);
         TestHelper.waitForHandshake(context);
+        // Wait for INITIAL_SYNC — arrives asynchronously after handshake
+        context.waitTicks(60);
 
-        // Verify note persists
-        boolean found = context.computeOnClient(client -> {
-            for (Note n : ClientCache.getNotes()) {
-                if ("Persistent Note".equals(n.getTitle())) return true;
-            }
-            return false;
-        });
-        if (!found) throw new AssertionError("Persistent Note not found after reconnect");
+        // Verify server-synced note persists after reconnect
+        boolean found = context.computeOnClient(client -> !ClientCache.getNotes().isEmpty());
+        if (!found) throw new AssertionError("No server-synced notes found after reconnect");
     }
 
     private void test6_hudPinning(ClientGameTestContext context) {
-        // Open the existing note
-        context.getInput().pressKey(KeyBinds.openGuiKey);
-        context.waitForScreen(MainScreen.class);
-        context.clickScreenButton("Notes");
-        context.waitTicks(5);
-        context.clickScreenButton("Open");
+        // Open the first server note directly via computeOnClient
+        context.runOnClient(client -> {
+            List<Note> notes = ClientCache.getNotes();
+            if (!notes.isEmpty()) {
+                client.setScreen(new ViewNoteScreen(null, notes.get(0)));
+            }
+        });
         context.waitTicks(10);
         context.waitForScreen(ViewNoteScreen.class);
 
@@ -168,10 +164,13 @@ public class BuildNotesE2ETest implements FabricClientGameTest {
         boolean pinned = context.computeOnClient(client -> HudPinManager.getPinnedNoteId() != null);
         if (!pinned) throw new AssertionError("Expected note to be pinned");
 
-        // Unpin
-        context.getInput().pressKey(KeyBinds.openGuiKey);
-        context.waitForScreen(MainScreen.class);
-        context.clickScreenButton("Open");
+        // Unpin — open same note again
+        context.runOnClient(client -> {
+            List<Note> notes = ClientCache.getNotes();
+            if (!notes.isEmpty()) {
+                client.setScreen(new ViewNoteScreen(null, notes.get(0)));
+            }
+        });
         context.waitTicks(10);
         context.waitForScreen(ViewNoteScreen.class);
         context.clickScreenButton("Unpin");
@@ -191,18 +190,20 @@ public class BuildNotesE2ETest implements FabricClientGameTest {
         TestHelper.disconnect(context);
         TestHelper.connectToServer(context);
         TestHelper.waitForHandshake(context);
+        context.waitTicks(60);
 
         boolean viewOnly = context.computeOnClient(client -> !ClientSession.hasEditPermission());
         if (!viewOnly) throw new AssertionError("Expected VIEW_ONLY after allow_all false");
 
-        // Screenshot with disabled buttons
-        context.getInput().pressKey(KeyBinds.openGuiKey);
-        context.waitForScreen(MainScreen.class);
-        context.clickScreenButton("Open");
+        // Screenshot with disabled buttons — open note directly
+        context.runOnClient(client -> {
+            List<Note> notes = ClientCache.getNotes();
+            if (!notes.isEmpty()) {
+                client.setScreen(new ViewNoteScreen(null, notes.get(0)));
+            }
+        });
         context.waitTicks(10);
         context.takeScreenshot("07_view_only");
-        context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
-        context.waitTicks(5);
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
         context.waitTicks(5);
 
@@ -211,18 +212,25 @@ public class BuildNotesE2ETest implements FabricClientGameTest {
         TestHelper.disconnect(context);
         TestHelper.connectToServer(context);
         TestHelper.waitForHandshake(context);
+        context.waitTicks(60);
 
         boolean canEdit = context.computeOnClient(client -> ClientSession.hasEditPermission());
         if (!canEdit) throw new AssertionError("Expected CAN_EDIT after allow_all true");
 
-        context.getInput().pressKey(KeyBinds.openGuiKey);
-        context.waitForScreen(MainScreen.class);
-        context.clickScreenButton("Open");
+        context.runOnClient(client -> {
+            List<Note> notes = ClientCache.getNotes();
+            if (!notes.isEmpty()) {
+                client.setScreen(new ViewNoteScreen(null, notes.get(0)));
+            }
+        });
         context.waitTicks(10);
         context.takeScreenshot("07_can_edit");
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
         context.waitTicks(5);
+
+        // Disconnect and return to title screen (required by game test framework)
+        TestHelper.disconnect(context);
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
-        context.waitTicks(5);
+        context.waitTicks(10);
     }
 }

@@ -134,7 +134,7 @@ public class ClientPacketHandler {
     }
 
     public static NoteData toNoteData(Note note) {
-        return new NoteData(note.getId(), note.getLastModified(), null, note.getTitle(), note.getContent());
+        return new NoteData(note.getId(), note.getLastModified(), new UUID(0, 0), note.getTitle(), note.getContent());
     }
 
     public static Build toBuild(BuildData data) {
@@ -153,7 +153,7 @@ public class ClientPacketHandler {
         for (CustomField f : build.getCustomFields()) {
             fields.add(new CustomFieldData(f.getTitle(), f.getContent()));
         }
-        return new BuildData(build.getId(), build.getLastModified(), null,
+        return new BuildData(build.getId(), build.getLastModified(), new UUID(0, 0),
                 build.getName(), build.getCoordinates(), build.getDimension(),
                 build.getDescription(), build.getCredits(),
                 build.getImageFileNames(), fields);

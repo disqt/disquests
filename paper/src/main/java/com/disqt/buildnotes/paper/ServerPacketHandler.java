@@ -86,8 +86,9 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
             return;
         }
         NoteData note = PacketCodec.readNote(r);
-        dataManager.saveNote(note);
-        broadcast(PacketCodec.writeUpdateNote(note));
+        NoteData owned = new NoteData(note.id(), note.lastModified(), player.getUniqueId(), note.title(), note.content());
+        dataManager.saveNote(owned);
+        broadcast(PacketCodec.writeUpdateNote(owned));
     }
 
     private void handleDeleteNote(Player player, ByteBufReader r) {
@@ -105,8 +106,11 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
             return;
         }
         BuildData build = PacketCodec.readBuild(r);
-        dataManager.saveBuild(build);
-        broadcast(PacketCodec.writeUpdateBuild(build));
+        BuildData owned = new BuildData(build.id(), build.lastModified(), player.getUniqueId(),
+                build.name(), build.coordinates(), build.dimension(),
+                build.description(), build.credits(), build.imageFileNames(), build.customFields());
+        dataManager.saveBuild(owned);
+        broadcast(PacketCodec.writeUpdateBuild(owned));
     }
 
     private void handleDeleteBuild(Player player, ByteBufReader r) {
