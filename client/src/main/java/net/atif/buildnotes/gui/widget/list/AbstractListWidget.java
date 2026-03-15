@@ -4,6 +4,7 @@ import net.atif.buildnotes.gui.helper.Colors;
 import net.atif.buildnotes.gui.screen.MainScreen;
 
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 import net.minecraft.client.gui.widget.EntryListWidget;
@@ -38,26 +39,26 @@ public abstract class AbstractListWidget<E extends AbstractListWidget.Entry<E>> 
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(Click click, boolean simulated) {
         if (!this.visible) return false;
 
-        if (this.isMouseOver(mouseX, mouseY) && mouseX >= this.getScrollbarX() && mouseX < this.getScrollbarX() + SCROLLBAR_WIDTH) {
+        if (this.isMouseOver(click.x(), click.y()) && click.x() >= this.getScrollbarX() && click.x() < this.getScrollbarX() + SCROLLBAR_WIDTH) {
             this.isDraggingScrollbar = true;
             return true;
         }
 
         this.isDraggingScrollbar = false;
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(click, simulated);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(Click click) {
         isDraggingScrollbar = false;
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleased(click);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+    public boolean mouseDragged(Click click, double deltaX, double deltaY) {
         if (this.isDraggingScrollbar) {
             int trackHeight = this.getHeight();
             float maxScroll = this.getMaxScrollY();
@@ -74,7 +75,7 @@ public abstract class AbstractListWidget<E extends AbstractListWidget.Entry<E>> 
 
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+        return super.mouseDragged(click, deltaX, deltaY);
     }
 
     @Override

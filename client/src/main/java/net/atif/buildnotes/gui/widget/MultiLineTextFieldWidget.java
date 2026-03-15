@@ -10,6 +10,8 @@ import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.*;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
+import net.minecraft.client.input.CharInput;
+import net.minecraft.client.input.KeyInput;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.Arrays;
@@ -445,7 +447,10 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
 
     // ---------- Mouse handling ----------
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(Click click, boolean simulated) {
+        double mouseX = click.x();
+        double mouseY = click.y();
+        int button = click.button();
         if (isMouseOver(mouseX, mouseY)) {
             boolean vNeeded = this.scrollingEnabled && isScrollbarNeededV();
             boolean hNeeded = this.scrollingEnabled && isScrollbarNeededH();
@@ -498,7 +503,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
                 this.isDraggingText = false;
             } else { // This is a single click
                 clickCount = 1;
-                if (Screen.hasShiftDown()) {
+                if (this.shiftDown) {
                     setSelectionAbsolute(selectionAnchor, clickedAbs);
                     setCursorFromAbsolute(clickedAbs);
                 } else {
@@ -515,15 +520,17 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(Click click) {
         isDraggingVScrollbar = false;
         isDraggingHScrollbar = false;
         isDraggingText = false;
-        return Element.super.mouseReleased(mouseX, mouseY, button);
+        return Element.super.mouseReleased(click);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+    public boolean mouseDragged(Click click, double deltaX, double deltaY) {
+        double mouseX = click.x();
+        double mouseY = click.y();
         if (this.scrollingEnabled && isDraggingVScrollbar) {
             double dragDelta = mouseY - this.vScrollbarDragStartY;
             int trackHeight = this.height - 10 - (isScrollbarNeededH() ? (SCROLLBAR_THICKNESS + 2) : 0);
@@ -603,7 +610,10 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
 
     // ---------- Keyboard ----------
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(KeyInput keyInput) {
+        int keyCode = keyInput.key();
+        int scanCode = keyInput.scancode();
+        int modifiers = keyInput.modifiers();
         boolean hasShift = (modifiers & GLFW.GLFW_MOD_SHIFT) != 0;
         boolean hasCtrl = (modifiers & GLFW.GLFW_MOD_CONTROL) != 0;
 
@@ -775,7 +785,8 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
     }
 
     @Override
-    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
+    public boolean keyReleased(KeyInput keyInput) {
+        int keyCode = keyInput.key();
         if (keyCode == GLFW.GLFW_KEY_LEFT_SHIFT || keyCode == GLFW.GLFW_KEY_RIGHT_SHIFT) {
             this.shiftDown = false;
         }
@@ -786,10 +797,10 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
     }
 
     @Override
-    public boolean charTyped(char chr, int modifiers) {
+    public boolean charTyped(CharInput charInput) {
         if (this.focused) {
-            if (chr >= ' ') {
-                insertText(String.valueOf(chr));
+            if (charInput.isValidChar()) {
+                insertText(charInput.asString());
                 return true;
             }
         }

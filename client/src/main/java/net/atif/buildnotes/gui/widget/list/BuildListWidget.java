@@ -4,6 +4,7 @@ import net.atif.buildnotes.data.Build;
 import net.atif.buildnotes.gui.helper.Colors;
 import net.atif.buildnotes.gui.screen.MainScreen;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
@@ -54,9 +55,10 @@ public class BuildListWidget extends AbstractListWidget<BuildListWidget.BuildEnt
         }
 
         @Override
-        public void render(DrawContext context, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float deltaTicks) {
-            int entryX = x;
-            int entryY = y;
+        public void render(DrawContext context, int index, int mouseY, boolean hovered, float deltaTicks) {
+            int entryX = this.getX();
+            int entryY = this.getY();
+            int entryWidth = this.getWidth();
 
             // Prepare Scope indicator to calculate its width
             Text scopeText = null;
@@ -100,8 +102,8 @@ public class BuildListWidget extends AbstractListWidget<BuildListWidget.BuildEnt
         }
 
         @Override
-        public boolean mouseClicked(double mouseX, double mouseY, int button) {
-            if (button == 0) { // Check for left-click
+        public boolean mouseClicked(Click click, boolean simulated) {
+            if (click.button() == 0) { // Check for left-click
                 BuildListWidget.this.setSelected(this);
 
                 BuildListWidget.this.handleEntryClick(this);

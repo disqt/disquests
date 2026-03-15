@@ -21,11 +21,13 @@ public record RawPayload(byte[] data) implements CustomPayload {
     );
 
     private void write(PacketByteBuf buf) {
-        buf.writeByteArray(data);
+        buf.writeBytes(data);
     }
 
     private static RawPayload read(PacketByteBuf buf) {
-        return new RawPayload(buf.readByteArray());
+        byte[] bytes = new byte[buf.readableBytes()];
+        buf.readBytes(bytes);
+        return new RawPayload(bytes);
     }
 
     @Override

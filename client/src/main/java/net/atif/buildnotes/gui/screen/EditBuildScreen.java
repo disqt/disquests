@@ -17,7 +17,6 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.NativeImageBackedTexture;
 import net.minecraft.registry.RegistryKey;
@@ -260,7 +259,7 @@ public class EditBuildScreen extends ScrollableScreen {
                     }
                     int renderX = contentX + 2 + (boxWidth - renderWidth) / 2;
                     int renderY = yPos + 2 + (boxHeight - renderHeight) / 2;
-                    context.drawTexture(RenderLayer::getGuiTextured, data.textureId, renderX, renderY, 0, 0, renderWidth, renderHeight, renderWidth, renderHeight);
+                    context.drawTexturedQuad(data.textureId, renderX, renderY, renderX + renderWidth, renderY + renderHeight, 0f, 0f, 1f, 1f);
                 } else {
                     context.drawCenteredTextWithShadow(textRenderer, Text.translatable("gui.buildnotes.gallery.error").formatted(Formatting.RED), this.width / 2, yPos + galleryBoxHeight / 2 - 4, Colors.TEXT_PRIMARY);
                 }
@@ -325,7 +324,7 @@ public class EditBuildScreen extends ScrollableScreen {
                     NativeImage image = NativeImage.read(stream);
 
                     Identifier textureId = Identifier.of(Buildnotes.MOD_ID, "buildnotes_image_" + build.getId() + "_" + fileName.hashCode());
-                    NativeImageBackedTexture texture = new NativeImageBackedTexture(image);
+                    NativeImageBackedTexture texture = new NativeImageBackedTexture(() -> "buildnotes_image", image);
 
                     this.client.getTextureManager().registerTexture(textureId, texture);
 

@@ -9,3 +9,12 @@ run/
 logs/
 .DS_Store
 Thumbs.db
+
+# CI artifacts
+.ci/
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/

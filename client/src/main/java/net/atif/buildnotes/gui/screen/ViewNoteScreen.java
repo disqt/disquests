@@ -6,10 +6,12 @@ import net.atif.buildnotes.gui.helper.NoteScreenLayouts;
 import net.atif.buildnotes.gui.helper.UIHelper;
 import net.atif.buildnotes.gui.widget.DarkButtonWidget;
 import net.atif.buildnotes.gui.widget.ReadOnlyMultiLineTextFieldWidget;
+import net.atif.buildnotes.hud.HudPinManager;
 import net.minecraft.client.gui.DrawContext;
 import net.atif.buildnotes.client.ClientSession;
 import net.atif.buildnotes.data.Scope;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
 
 public class ViewNoteScreen extends BaseScreen {
@@ -31,8 +33,8 @@ public class ViewNoteScreen extends BaseScreen {
         boolean canEdit = !(this.note.getScope() == Scope.SERVER && !ClientSession.hasEditPermission());
 
         int buttonsY = UIHelper.getBottomButtonY(this);
-        UIHelper.createButtonRow(this, buttonsY, 3, x -> {
-            int idx = (x - UIHelper.getCenteredButtonStartX(this.width, 3)) / (UIHelper.BUTTON_WIDTH + UIHelper.BUTTON_SPACING);
+        UIHelper.createButtonRow(this, buttonsY, 4, x -> {
+            int idx = (x - UIHelper.getCenteredButtonStartX(this.width, 4)) / (UIHelper.BUTTON_WIDTH + UIHelper.BUTTON_SPACING);
             switch (idx) {
                 case 0 -> {
                     DarkButtonWidget deleteButton = new DarkButtonWidget(x, buttonsY, UIHelper.BUTTON_WIDTH, UIHelper.BUTTON_HEIGHT, Text.translatable("gui.buildnotes.delete_button"), button -> confirmDelete());
@@ -44,7 +46,15 @@ public class ViewNoteScreen extends BaseScreen {
                     editButton.active = canEdit;
                     this.addDrawableChild(editButton);
                 }
-                case 2 -> this.addDrawableChild(new DarkButtonWidget(x, buttonsY, UIHelper.BUTTON_WIDTH, UIHelper.BUTTON_HEIGHT,
+                case 2 -> {
+                    boolean pinned = HudPinManager.isPinned(this.note.getId());
+                    Text pinText = Text.literal(pinned ? "Unpin" : "Pin to HUD");
+                    this.addDrawableChild(new DarkButtonWidget(x, buttonsY, UIHelper.BUTTON_WIDTH, UIHelper.BUTTON_HEIGHT, pinText, button -> {
+                        HudPinManager.toggle(this.note.getId());
+                        this.clearAndInit();
+                    }));
+                }
+                case 3 -> this.addDrawableChild(new DarkButtonWidget(x, buttonsY, UIHelper.BUTTON_WIDTH, UIHelper.BUTTON_HEIGHT,
                         Text.translatable("gui.buildnotes.close_button"), button -> this.client.setScreen(parent)));
             }
         });
@@ -112,10 +122,10 @@ public class ViewNoteScreen extends BaseScreen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (this.titleArea.keyPressed(keyCode, scanCode, modifiers)) return true;
-        if (this.contentArea.keyPressed(keyCode, scanCode, modifiers)) return true;
-        return super.keyPressed(keyCode, scanCode, modifiers);
+    public boolean keyPressed(KeyInput keyInput) {
+        if (this.titleArea.keyPressed(keyInput)) return true;
+        if (this.contentArea.keyPressed(keyInput)) return true;
+        return super.keyPressed(keyInput);
     }
 
     // --- Delegate scrolling to the widget ---

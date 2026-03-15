@@ -49,5 +49,7 @@
   "gui.buildnotes.label.description": "Description:",
   "gui.buildnotes.label.credits": "Designer/Credits:",
 
-  "gui.buildnotes.prompt.field_title": "Enter Field Title"
+  "gui.buildnotes.prompt.field_title": "Enter Field Title",
+
+  "key.buildnotes.togglepin": "Toggle HUD Pin"
 }
