@@ -21,12 +21,35 @@ dependencies {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    options.release.set(17)
+    options.release.set(21)
+}
+
+sourceSets {
+    create("testmod") {
+        compileClasspath += sourceSets.main.get().output
+        compileClasspath += sourceSets.main.get().compileClasspath
+        runtimeClasspath += sourceSets.main.get().output
+        runtimeClasspath += sourceSets.main.get().runtimeClasspath
+    }
+}
+
+loom {
+    runs {
+        create("clientGameTest") {
+            client()
+            configName = "Client Game Test"
+            source(sourceSets.getByName("testmod"))
+            vmArg("-Dbuildnotes.test.server.host=localhost")
+            vmArg("-Dbuildnotes.test.server.port=25565")
+            vmArg("-Dbuildnotes.test.rcon.port=25575")
+            vmArg("-Dbuildnotes.test.rcon.password=testpassword")
+        }
+    }
 }
 
 tasks.processResources {
