@@ -7,7 +7,10 @@ import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.helper.ScreenLayouts;
 import com.disqt.disquests.client.gui.helper.UIHelper;
 import com.disqt.disquests.client.gui.widget.DarkButtonWidget;
+import com.disqt.disquests.client.gui.widget.MarkdownWidget;
 import com.disqt.disquests.client.gui.widget.ReadOnlyMultiLineTextFieldWidget;
+import com.disqt.disquests.client.markdown.MarkdownRenderer;
+import com.disqt.disquests.client.markdown.RenderedLine;
 import com.disqt.disquests.client.network.PacketSender;
 import com.disqt.disquests.common.model.CoordinatesData;
 import net.minecraft.client.MinecraftClient;
@@ -20,6 +23,7 @@ import net.minecraft.util.Util;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 public class ViewQuestScreen extends BaseScreen {
@@ -27,7 +31,7 @@ public class ViewQuestScreen extends BaseScreen {
     private final Quest quest;
 
     private ReadOnlyMultiLineTextFieldWidget titleArea;
-    private ReadOnlyMultiLineTextFieldWidget contentArea;
+    private MarkdownWidget contentArea;
 
     // Buttons that need state tracking
     private DarkButtonWidget editButton;
@@ -119,11 +123,11 @@ public class ViewQuestScreen extends BaseScreen {
         }
         int contentPanelHeight = contentPanelBottom - contentPanelY;
 
-        this.contentArea = new ReadOnlyMultiLineTextFieldWidget(
+        List<RenderedLine> rendered = MarkdownRenderer.render(
+                Objects.requireNonNullElse(quest.getContent(), ""));
+        this.contentArea = new MarkdownWidget(
                 this.textRenderer, contentX, contentPanelY,
-                contentWidth, contentPanelHeight,
-                quest.getContent() != null ? quest.getContent() : "",
-                Integer.MAX_VALUE, true
+                contentWidth, contentPanelHeight, rendered
         );
         this.addSelectableChild(this.contentArea);
 
@@ -275,7 +279,6 @@ public class ViewQuestScreen extends BaseScreen {
     @Override
     public boolean keyPressed(KeyInput keyInput) {
         if (this.titleArea.keyPressed(keyInput)) return true;
-        if (this.contentArea.keyPressed(keyInput)) return true;
         return super.keyPressed(keyInput);
     }
 
