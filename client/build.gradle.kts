@@ -44,6 +44,8 @@ loom {
             client()
             configName = "Client Game Test"
             source(sourceSets.getByName("testmod"))
+            vmArg("-Dfabric.client.gametest")
+            vmArg("-Dfabric.client.gametest.disableNetworkSynchronizer=true")
             vmArg("-Dbuildnotes.test.server.host=localhost")
             vmArg("-Dbuildnotes.test.server.port=25565")
             vmArg("-Dbuildnotes.test.rcon.port=25575")
