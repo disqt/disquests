@@ -369,6 +369,7 @@ Server only sends packets to players who have registered the `disquests:main` ch
 | RESPOND_COLLABORATION | requestId: UUID, approved: boolean |
 | UPDATE_CONTRIBUTORS | questId: UUID, ops: List<{action: ADD\|REMOVE\|UPDATE, playerUuid: UUID, canEdit: boolean?}> |
 | UPDATE_VISIBILITY | questId: UUID, visibility: PRIVATE\|CLOSED\|OPEN |
+| PIN_QUEST | questId: UUID? (null = unpin) |
 
 **S2C (Server to Client):**
 
