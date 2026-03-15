@@ -3,6 +3,7 @@ plugins {
 }
 
 fun requireFreeRam(taskName: String, requiredMb: Long = 4096L) {
+    if (System.getenv("CI") != null) return
     val factory = Class.forName("java.lang.management.ManagementFactory")
     val bean = factory.getMethod("getOperatingSystemMXBean").invoke(null)
     val clazz = Class.forName("com.sun.management.OperatingSystemMXBean")
