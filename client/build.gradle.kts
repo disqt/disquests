@@ -18,6 +18,14 @@ dependencies {
 
     implementation("org.lwjgl:lwjgl-tinyfd:3.3.1")
     include("org.lwjgl:lwjgl-tinyfd:3.3.1")
+
+    // Markdown rendering
+    implementation("org.commonmark:commonmark:0.24.0")
+    implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.24.0")
+    implementation("org.commonmark:commonmark-ext-task-list-items:0.24.0")
+    include("org.commonmark:commonmark:0.24.0")
+    include("org.commonmark:commonmark-ext-gfm-strikethrough:0.24.0")
+    include("org.commonmark:commonmark-ext-task-list-items:0.24.0")
 }
 
 java {
