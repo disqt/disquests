@@ -13,7 +13,7 @@ public class DarkButtonWidget extends ButtonWidget {
     }
 
     @Override
-    protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+    protected void drawIcon(DrawContext context, int x, int y, float delta) {
         int color;
         if (!this.active) {
             color = Colors.BUTTON_DISABLED;
@@ -22,12 +22,12 @@ public class DarkButtonWidget extends ButtonWidget {
         } else {
             color = Colors.PANEL_BACKGROUND;
         }
-
         context.fill(this.getX(), this.getY(), this.getX() + this.width, this.getY() + this.height, color);
-
         TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
         int textColor = this.active ? Colors.TEXT_PRIMARY : Colors.TEXT_DISABLED;
-
         context.drawCenteredTextWithShadow(textRenderer, this.getMessage(), this.getX() + this.width / 2, this.getY() + (this.height - 8) / 2, textColor);
     }
+
+    @Override
+    protected void drawLabel(net.minecraft.client.font.DrawnTextConsumer consumer) {}
 }

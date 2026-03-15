@@ -1,6 +1,8 @@
 package net.atif.buildnotes.gui.widget;
 
 import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.input.CharInput;
+import net.minecraft.client.input.KeyInput;
 import org.lwjgl.glfw.GLFW;
 
 public class ReadOnlyMultiLineTextFieldWidget extends MultiLineTextFieldWidget {
@@ -15,7 +17,7 @@ public class ReadOnlyMultiLineTextFieldWidget extends MultiLineTextFieldWidget {
      * Block all character input. This is a read-only field.
      */
     @Override
-    public boolean charTyped(char chr, int modifiers) {
+    public boolean charTyped(CharInput charInput) {
         return false;
     }
 
@@ -32,7 +34,9 @@ public class ReadOnlyMultiLineTextFieldWidget extends MultiLineTextFieldWidget {
      * Allows only navigation (arrows, home, end), copying, and selecting all.
      */
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(KeyInput keyInput) {
+        int keyCode = keyInput.key();
+        int modifiers = keyInput.modifiers();
         boolean hasCtrl = (modifiers & GLFW.GLFW_MOD_CONTROL) != 0;
         // These keys modify text, so we block them by "handling" the event (returning true)
         // but performing no action.
@@ -46,6 +50,6 @@ public class ReadOnlyMultiLineTextFieldWidget extends MultiLineTextFieldWidget {
 
         // For all other keys (which include navigation, copy, and select all),
         // we let the parent widget handle them as usual.
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(keyInput);
     }
 }
