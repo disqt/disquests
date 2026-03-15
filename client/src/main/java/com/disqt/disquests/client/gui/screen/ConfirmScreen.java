@@ -1,0 +1,57 @@
+package com.disqt.disquests.client.gui.screen;
+
+import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.helper.UIHelper;
+import com.disqt.disquests.client.gui.widget.DarkButtonWidget;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.text.Text;
+
+public class ConfirmScreen extends BaseScreen {
+
+    private final Text message;
+    private final Runnable onConfirm;
+    private final Runnable onCancel;
+
+    public ConfirmScreen(Screen parent, Text message, Runnable onConfirm, Runnable onCancel) {
+        super(Text.of("Confirm"), parent);
+        this.message = message;
+        this.onConfirm = onConfirm;
+        this.onCancel = onCancel;
+    }
+
+    @Override
+    protected void init() {
+        super.init();
+
+        int panelH = 100;
+        int panelY = (this.height - panelH) / 2;
+
+        int btnY = panelY + panelH - UIHelper.BUTTON_HEIGHT - UIHelper.OUTER_PADDING;
+
+        UIHelper.createButtonRow(this, btnY, 2, x -> {
+            boolean isLeft = x == UIHelper.getCenteredButtonStartX(this.width, 2);
+            this.addDrawableChild(new DarkButtonWidget(
+                    x, btnY, UIHelper.BUTTON_WIDTH, UIHelper.BUTTON_HEIGHT,
+                    Text.of(isLeft ? "Yes" : "No"),
+                    b -> { if (isLeft) onConfirm.run(); else onCancel.run(); }
+            ));
+        });
+    }
+
+    @Override
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        int panelW = Math.min(this.width - 80, 360);
+        int panelH = 100;
+        int panelX = (this.width - panelW) / 2;
+        int panelY = (this.height - panelH) / 2;
+
+        panelH = panelH - (UIHelper.BUTTON_HEIGHT + (UIHelper.OUTER_PADDING * 2));
+        UIHelper.drawPanel(context, panelX, panelY, panelW, panelH);
+        super.render(context, mouseX, mouseY, delta);
+
+        int textMaxWidth = panelW - 24; // 12px padding on each side
+        String trimmedMessage = this.textRenderer.trimToWidth(this.message.getString(), textMaxWidth);
+        context.drawTextWithShadow(this.textRenderer, Text.literal(trimmedMessage), panelX + 12, panelY + 12, Colors.TEXT_PRIMARY);
+    }
+}
