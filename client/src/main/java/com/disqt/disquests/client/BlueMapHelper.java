@@ -6,9 +6,13 @@ import com.disqt.disquests.common.model.CoordinatesData;
 public class BlueMapHelper {
 
     public static String buildUrl(Quest quest) {
-        if (!ClientSession.hasBluemap() || quest.getCoordinates() == null) return null;
         String base = ClientSession.getBluemapUrl();
-        String map = quest.getMap() != null ? quest.getMap() : "world";
+        if (base == null || base.isEmpty()) return null;
+        if (quest.getCoordinates() == null) return null;
+
+        // Validate base URL scheme
+        if (!base.startsWith("http://") && !base.startsWith("https://")) return null;
+
         double x, y, z;
         if (quest.isRegion() && quest.getCoordinates2() != null) {
             CoordinatesData c1 = quest.getCoordinates();
@@ -22,6 +26,8 @@ public class BlueMapHelper {
             y = c.y();
             z = c.z();
         }
-        return String.format("%s/#%s:%.0f:%.0f:%.0f:50:0:0:0:0:flat", base, map, x, y, z);
+        String map = quest.getMap() != null ? quest.getMap() : "world";
+        String encodedMap = java.net.URLEncoder.encode(map, java.nio.charset.StandardCharsets.UTF_8);
+        return String.format("%s/#%s:%.0f:%.0f:%.0f:50:0:0:0:0:flat", base, encodedMap, x, y, z);
     }
 }
