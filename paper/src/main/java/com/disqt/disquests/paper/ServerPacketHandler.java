@@ -29,20 +29,25 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
     @Override
     public void onPluginMessageReceived(String channel, Player player, byte[] data) {
         if (!CHANNEL.equals(channel)) return;
-        ByteBufReader buf = new ByteBufReader(data);
-        PacketType type = PacketType.fromId(buf.readByte());
+        try {
+            ByteBufReader buf = new ByteBufReader(data);
+            PacketType type = PacketType.fromId(buf.readByte());
 
-        switch (type) {
-            case REQUEST_SYNC -> handleRequestSync(player);
-            case SAVE_QUEST -> handleSaveQuest(player, PacketCodec.readSaveQuest(buf));
-            case DELETE_QUEST -> handleDeleteQuest(player, PacketCodec.readDeleteQuest(buf));
-            case JOIN_QUEST -> handleJoinQuest(player, PacketCodec.readJoinQuest(buf));
-            case REQUEST_COLLABORATION -> handleRequestCollaboration(player, PacketCodec.readRequestCollaboration(buf));
-            case RESPOND_COLLABORATION -> handleRespondCollaboration(player, PacketCodec.readRespondCollaboration(buf));
-            case UPDATE_CONTRIBUTORS -> handleUpdateContributors(player, PacketCodec.readUpdateContributors(buf));
-            case UPDATE_VISIBILITY -> handleUpdateVisibility(player, PacketCodec.readUpdateVisibility(buf));
-            case PIN_QUEST -> handlePinQuest(player, PacketCodec.readPinQuest(buf));
-            default -> plugin.getLogger().warning("Unknown C2S packet from " + player.getName() + ": " + type);
+            switch (type) {
+                case REQUEST_SYNC -> handleRequestSync(player);
+                case SAVE_QUEST -> handleSaveQuest(player, PacketCodec.readSaveQuest(buf));
+                case DELETE_QUEST -> handleDeleteQuest(player, PacketCodec.readDeleteQuest(buf));
+                case JOIN_QUEST -> handleJoinQuest(player, PacketCodec.readJoinQuest(buf));
+                case REQUEST_COLLABORATION -> handleRequestCollaboration(player, PacketCodec.readRequestCollaboration(buf));
+                case RESPOND_COLLABORATION -> handleRespondCollaboration(player, PacketCodec.readRespondCollaboration(buf));
+                case UPDATE_CONTRIBUTORS -> handleUpdateContributors(player, PacketCodec.readUpdateContributors(buf));
+                case UPDATE_VISIBILITY -> handleUpdateVisibility(player, PacketCodec.readUpdateVisibility(buf));
+                case PIN_QUEST -> handlePinQuest(player, PacketCodec.readPinQuest(buf));
+                default -> plugin.getLogger().warning("Unknown C2S packet from " + player.getName() + ": " + type);
+            }
+        } catch (Exception e) {
+            plugin.getLogger().log(java.util.logging.Level.WARNING,
+                "Malformed packet from " + player.getName(), e);
         }
     }
 
