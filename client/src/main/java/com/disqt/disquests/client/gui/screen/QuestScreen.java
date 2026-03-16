@@ -22,6 +22,7 @@ import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
 import net.minecraft.util.Util;
@@ -52,6 +53,9 @@ public class QuestScreen extends BaseScreen {
     // --- Edit mode widgets ---
     private MultiLineTextFieldWidget editTitleField;
     private MultiLineTextFieldWidget editContentField;
+    private DarkButtonWidget visibilityButton;
+    private DarkButtonWidget contributorsButton;
+    private DarkButtonWidget regionButton;
     private boolean regionEnabled;
 
     // Dirty tracking (edit mode)
@@ -172,6 +176,10 @@ public class QuestScreen extends BaseScreen {
                         b -> this.close()));
             }
         });
+
+        this.editButton.setTooltip(Tooltip.of(Text.literal("Edit this quest")));
+        this.deleteButton.setTooltip(Tooltip.of(Text.literal("Permanently delete this quest")));
+        this.pinButton.setTooltip(Tooltip.of(Text.literal("Pin/unpin this quest to your HUD")));
 
         // --- TITLE AREA ---
         int titleY = ScreenLayouts.TOP_MARGIN + 5;
@@ -455,9 +463,10 @@ public class QuestScreen extends BaseScreen {
         String regionText = regionEnabled ? "[x] Region" : "[ ] Region";
         int regionBtnWidth = this.textRenderer.getWidth(regionText) + UIHelper.BUTTON_TEXT_PADDING;
         int regionBtnX = setPosX + btnWidth + spacing;
-        this.addDrawableChild(new DarkButtonWidget(
+        this.regionButton = this.addDrawableChild(new DarkButtonWidget(
                 regionBtnX, rowY, regionBtnWidth, btnHeight,
                 Text.literal(regionText), b -> toggleRegion()));
+        this.regionButton.setTooltip(Tooltip.of(Text.literal("Define a rectangular area with two corners")));
 
         int clearX = regionBtnX + regionBtnWidth + spacing;
         this.addDrawableChild(new DarkButtonWidget(
@@ -519,17 +528,25 @@ public class QuestScreen extends BaseScreen {
         String visText = "Visibility: " + quest.getVisibility().name();
         int visBtnWidth = this.textRenderer.getWidth(visText) + UIHelper.BUTTON_TEXT_PADDING * 2;
         visBtnWidth = Math.max(visBtnWidth, UIHelper.MIN_BUTTON_WIDTH);
-        this.addDrawableChild(new DarkButtonWidget(
+        this.visibilityButton = this.addDrawableChild(new DarkButtonWidget(
                 panelX, settingsY, visBtnWidth, btnHeight,
                 Text.literal(visText), b -> cycleVisibility()));
+
+        String visTooltip = switch (quest.getVisibility()) {
+            case PRIVATE -> "Only you can see this quest";
+            case CLOSED -> "Visible to all, join by request";
+            case OPEN -> "Visible to all, anyone can join";
+        };
+        this.visibilityButton.setTooltip(Tooltip.of(Text.literal(visTooltip)));
 
         int contribCount = quest.getContributors() != null ? quest.getContributors().size() : 0;
         String contribText = "Contributors (" + contribCount + ")";
         int contribBtnWidth = this.textRenderer.getWidth(contribText) + UIHelper.BUTTON_TEXT_PADDING * 2;
         contribBtnWidth = Math.max(contribBtnWidth, UIHelper.MIN_BUTTON_WIDTH);
-        this.addDrawableChild(new DarkButtonWidget(
+        this.contributorsButton = this.addDrawableChild(new DarkButtonWidget(
                 panelX + visBtnWidth + spacing, settingsY, contribBtnWidth, btnHeight,
                 Text.literal(contribText), b -> openContributors()));
+        this.contributorsButton.setTooltip(Tooltip.of(Text.literal("Manage who can view/edit this quest")));
     }
 
     // ===================== EDIT MODE ACTIONS =====================

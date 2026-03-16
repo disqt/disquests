@@ -15,6 +15,7 @@ import com.disqt.disquests.client.network.PacketSender;
 import com.disqt.disquests.common.model.Visibility;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.text.Text;
 
 import java.util.ArrayList;
@@ -120,6 +121,10 @@ public class MainScreen extends BaseScreen {
                 filterStartX + (filterBtnWidth + filterBtnSpacing) * 2, subFilterY, filterBtnWidth, filterBtnHeight,
                 Text.literal("Closed"), b -> selectServerFilter(FILTER_CLOSED)
         ));
+
+        this.filterAllButton.setTooltip(Tooltip.of(Text.literal("Show all visible quests")));
+        this.filterOpenButton.setTooltip(Tooltip.of(Text.literal("Quests anyone can join")));
+        this.filterClosedButton.setTooltip(Tooltip.of(Text.literal("Quests that require access request")));
 
         // --- LISTS ---
         int myListTop = ScreenLayouts.TOP_MARGIN;
