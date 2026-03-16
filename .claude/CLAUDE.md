@@ -68,8 +68,8 @@ Channel: `disquests:main`. First byte = PacketType ID.
 
 ## Dependencies
 
-- **commonmark-java** (`org.commonmark:commonmark:0.24.0` + ext-gfm-strikethrough + ext-task-list-items): Markdown rendering in the client. Bundled via Loom `include`.
-- **sqlite-jdbc** (`org.xerial:sqlite-jdbc:3.49.1.0`): Paper-side SQLite. `compileOnly` (bundled in Paper env).
+- **commonmark-java** (`org.commonmark:commonmark:0.27.1` + ext-gfm-strikethrough + ext-task-list-items): Markdown rendering in the client. Bundled via Loom `include`.
+- **sqlite-jdbc** (`org.xerial:sqlite-jdbc:3.51.2.0`): Paper-side SQLite. `compileOnly` (bundled in Paper env).
 
 ## Gotchas
 
