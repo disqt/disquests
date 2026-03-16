@@ -60,6 +60,7 @@ public class MainScreen extends BaseScreen {
     // State
     private int currentTab;
     private int serverFilter;
+    private int tickCounter = 0;
 
     public MainScreen() {
         super(Text.literal("Disquests"), null);
@@ -378,11 +379,41 @@ public class MainScreen extends BaseScreen {
         }
     }
 
+    // --- TICK ---
+
+    @Override
+    public void tick() {
+        super.tick();
+        tickCounter++;
+    }
+
     // --- RENDERING ---
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
+
+        // Render rainbow title
+        String titleStr = "Disquests";
+        int titleWidth = this.textRenderer.getWidth(titleStr);
+        int titleX = (this.width - titleWidth) / 2;
+        int titleY = (ScreenLayouts.TOP_MARGIN - this.textRenderer.fontHeight) / 2;
+
+        boolean hovering = mouseX >= titleX && mouseX <= titleX + titleWidth
+                && mouseY >= titleY && mouseY <= titleY + this.textRenderer.fontHeight;
+
+        if (hovering) {
+            int charX = titleX;
+            for (int i = 0; i < titleStr.length(); i++) {
+                float hue = ((tickCounter * 3 + i * 30) % 360) / 360.0f;
+                int color = hsbToRgb(hue, 0.8f, 1.0f);
+                String ch = String.valueOf(titleStr.charAt(i));
+                context.drawTextWithShadow(this.textRenderer, ch, charX, titleY, color);
+                charX += this.textRenderer.getWidth(ch);
+            }
+        } else {
+            context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, titleY, Colors.TEXT_PRIMARY);
+        }
 
         // Render active list
         if (currentTab == TAB_MY_QUESTS) {
@@ -401,6 +432,24 @@ public class MainScreen extends BaseScreen {
         if (pendingCount > 0) {
             renderNotificationBadge(context, pendingCount);
         }
+    }
+
+    private static int hsbToRgb(float hue, float saturation, float brightness) {
+        float h = (hue - (float) Math.floor(hue)) * 6.0f;
+        float f = h - (float) Math.floor(h);
+        float p = brightness * (1.0f - saturation);
+        float q = brightness * (1.0f - saturation * f);
+        float t = brightness * (1.0f - (saturation * (1.0f - f)));
+        int r, g, b;
+        switch ((int) h) {
+            case 0 -> { r = (int)(brightness * 255); g = (int)(t * 255); b = (int)(p * 255); }
+            case 1 -> { r = (int)(q * 255); g = (int)(brightness * 255); b = (int)(p * 255); }
+            case 2 -> { r = (int)(p * 255); g = (int)(brightness * 255); b = (int)(t * 255); }
+            case 3 -> { r = (int)(p * 255); g = (int)(q * 255); b = (int)(brightness * 255); }
+            case 4 -> { r = (int)(t * 255); g = (int)(p * 255); b = (int)(brightness * 255); }
+            default -> { r = (int)(brightness * 255); g = (int)(p * 255); b = (int)(q * 255); }
+        }
+        return 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 
     private void renderNotificationBadge(DrawContext context, int count) {
