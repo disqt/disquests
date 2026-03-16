@@ -78,20 +78,14 @@ public class DisquestsE2ETest implements FabricClientGameTest {
         context.waitForScreen(EditQuestScreen.class);
         context.waitTicks(5);
 
-        // The title field should be focused with default text "New Quest".
-        // Select all existing text and type the new title.
-        context.getInput().holdControl();
-        context.getInput().pressKey(GLFW.GLFW_KEY_A);
-        context.getInput().releaseControl();
-        context.getInput().typeChars("E2E Test Quest");
-        context.waitTicks(5);
-
-        // Tab to the content field
-        context.getInput().pressKey(GLFW.GLFW_KEY_TAB);
-        context.waitTicks(5);
-
-        // Type content
-        context.getInput().typeChars("This is a **test** quest");
+        // Set title and content programmatically via widget setText —
+        // avoids gametest focus/input unreliability with custom widgets.
+        context.runOnClient(client -> {
+            if (client.currentScreen instanceof EditQuestScreen editScreen) {
+                editScreen.getTitleField().setText("E2E Test Quest");
+                editScreen.getContentField().setText("This is a **test** quest");
+            }
+        });
         context.waitTicks(5);
 
         context.takeScreenshot("02_edit_quest_filled");

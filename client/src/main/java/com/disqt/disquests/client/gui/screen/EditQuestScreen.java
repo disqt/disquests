@@ -41,6 +41,18 @@ public class EditQuestScreen extends BaseScreen {
         this.regionEnabled = quest.isRegion();
     }
 
+    public Quest getQuest() {
+        return quest;
+    }
+
+    public MultiLineTextFieldWidget getTitleField() {
+        return titleField;
+    }
+
+    public MultiLineTextFieldWidget getContentField() {
+        return contentField;
+    }
+
     @Override
     protected void init() {
         super.init();
