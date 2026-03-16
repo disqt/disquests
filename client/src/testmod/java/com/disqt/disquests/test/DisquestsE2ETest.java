@@ -4,10 +4,10 @@ import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.minecraft.client.gui.screen.TitleScreen;
 import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
 import net.minecraft.client.network.ServerAddress;
 import net.minecraft.client.network.ServerInfo;
-import net.minecraft.text.Text;
 
 /**
  * E2E smoke test: connects to an external Paper server, waits for the Disquests
@@ -59,9 +59,9 @@ public class DisquestsE2ETest implements FabricClientGameTest {
         context.setScreen(() -> null);
         context.waitForScreen(null);
 
-        // --- Step 6: Disconnect from server ---
-        context.runOnClient(client -> client.disconnect(Text.literal("E2E test complete")));
-        context.waitFor(client -> client.player == null, CONNECT_TIMEOUT_TICKS);
+        // --- Step 6: Disconnect and return to title screen ---
+        context.runOnClient(client -> client.disconnect(new TitleScreen(), false));
+        context.waitForScreen(TitleScreen.class);
 
         // TODO: Add quest CRUD smoke test (create, save, verify in list, delete)
         // TODO: Add multi-pin test (pin multiple quests, verify HUD shows them all)
