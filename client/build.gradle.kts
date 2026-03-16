@@ -1,5 +1,5 @@
 plugins {
-    id("fabric-loom") version "1.14.10"
+    id("fabric-loom") version "1.15.5"
 }
 
 val minecraft_version: String by project
@@ -16,22 +16,22 @@ dependencies {
     implementation(project(":common"))
     include(project(":common"))
 
-    implementation("org.lwjgl:lwjgl-tinyfd:3.3.1")
-    include("org.lwjgl:lwjgl-tinyfd:3.3.1")
+    implementation("org.lwjgl:lwjgl-tinyfd:3.3.3")
+    include("org.lwjgl:lwjgl-tinyfd:3.3.3")
 
     // Native libraries for file dialogs
     listOf("natives-linux", "natives-windows", "natives-macos", "natives-macos-arm64").forEach { classifier ->
-        runtimeOnly("org.lwjgl:lwjgl-tinyfd:3.3.1:$classifier")
-        include("org.lwjgl:lwjgl-tinyfd:3.3.1:$classifier")
+        runtimeOnly("org.lwjgl:lwjgl-tinyfd:3.3.3:$classifier")
+        include("org.lwjgl:lwjgl-tinyfd:3.3.3:$classifier")
     }
 
     // Markdown rendering
-    implementation("org.commonmark:commonmark:0.24.0")
-    implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.24.0")
-    implementation("org.commonmark:commonmark-ext-task-list-items:0.24.0")
-    include("org.commonmark:commonmark:0.24.0")
-    include("org.commonmark:commonmark-ext-gfm-strikethrough:0.24.0")
-    include("org.commonmark:commonmark-ext-task-list-items:0.24.0")
+    implementation("org.commonmark:commonmark:0.27.1")
+    implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.27.1")
+    implementation("org.commonmark:commonmark-ext-task-list-items:0.27.1")
+    include("org.commonmark:commonmark:0.27.1")
+    include("org.commonmark:commonmark-ext-gfm-strikethrough:0.27.1")
+    include("org.commonmark:commonmark-ext-task-list-items:0.27.1")
 }
 
 sourceSets {

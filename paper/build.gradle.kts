@@ -12,11 +12,11 @@ val paper_api_version: String by project
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:$paper_api_version")
-    implementation("org.xerial:sqlite-jdbc:3.49.1.0")
-    testImplementation("org.xerial:sqlite-jdbc:3.49.1.0")
+    implementation("org.xerial:sqlite-jdbc:3.51.2.0")
+    testImplementation("org.xerial:sqlite-jdbc:3.51.2.0")
     implementation(project(":common"))
-    testImplementation("org.junit.jupiter:junit-jupiter:5.11.3")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.3")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.14.2")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.14.2")
 }
 
 tasks.test {
