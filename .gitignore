@@ -21,3 +21,6 @@ bin/
 
 # Brainstorming mockups
 .superpowers/
+
+# Claude Code
+.claude/.lsp.json
