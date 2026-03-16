@@ -1,0 +1,553 @@
+package com.disqt.disquests.paper;
+
+import com.disqt.disquests.common.model.CollaborationRequestData;
+import com.disqt.disquests.common.model.ContributorData;
+import com.disqt.disquests.common.model.CoordinatesData;
+import com.disqt.disquests.common.model.QuestData;
+import com.disqt.disquests.common.model.Visibility;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+public class DataManager {
+
+    private Connection connection;
+    private final Path dataDir;
+
+    public DataManager(Path dataDir) {
+        this.dataDir = dataDir;
+    }
+
+    public void initialize() {
+        try {
+            Files.createDirectories(dataDir);
+            String url = "jdbc:sqlite:" + dataDir.resolve("disquests.db");
+            connection = DriverManager.getConnection(url);
+            try (Statement stmt = connection.createStatement()) {
+                stmt.executeUpdate("PRAGMA foreign_keys = ON");
+            }
+            createTables();
+        } catch (SQLException | IOException e) {
+            throw new RuntimeException("Failed to initialize database", e);
+        }
+    }
+
+    private void createTables() throws SQLException {
+        try (Statement stmt = connection.createStatement()) {
+            stmt.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS quests (
+                        id TEXT PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        content TEXT NOT NULL DEFAULT '',
+                        owner_uuid TEXT NOT NULL,
+                        visibility TEXT NOT NULL DEFAULT 'PRIVATE',
+                        coord_x REAL,
+                        coord_y REAL,
+                        coord_z REAL,
+                        is_region INTEGER NOT NULL DEFAULT 0,
+                        coord2_x REAL,
+                        coord2_y REAL,
+                        coord2_z REAL,
+                        map TEXT,
+                        last_modified INTEGER NOT NULL
+                    )""");
+
+            stmt.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS contributors (
+                        quest_id TEXT NOT NULL,
+                        player_uuid TEXT NOT NULL,
+                        can_edit INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY (quest_id, player_uuid),
+                        FOREIGN KEY (quest_id) REFERENCES quests(id) ON DELETE CASCADE
+                    )""");
+
+            stmt.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS collaboration_requests (
+                        id TEXT PRIMARY KEY,
+                        quest_id TEXT NOT NULL,
+                        requester_uuid TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        UNIQUE(quest_id, requester_uuid),
+                        FOREIGN KEY (quest_id) REFERENCES quests(id) ON DELETE CASCADE
+                    )""");
+
+            stmt.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS pinned_quests (
+                        player_uuid TEXT PRIMARY KEY,
+                        quest_id TEXT NOT NULL,
+                        FOREIGN KEY (quest_id) REFERENCES quests(id) ON DELETE CASCADE
+                    )""");
+
+            stmt.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS player_names (
+                        uuid TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        last_seen INTEGER NOT NULL
+                    )""");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Quests
+    // -------------------------------------------------------------------------
+
+    public void saveQuest(QuestData quest) {
+        try (PreparedStatement stmt = connection.prepareStatement("""
+                INSERT INTO quests (id, title, content, owner_uuid, visibility,
+                    coord_x, coord_y, coord_z, is_region,
+                    coord2_x, coord2_y, coord2_z, map, last_modified)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    title = excluded.title,
+                    content = excluded.content,
+                    owner_uuid = excluded.owner_uuid,
+                    visibility = excluded.visibility,
+                    coord_x = excluded.coord_x,
+                    coord_y = excluded.coord_y,
+                    coord_z = excluded.coord_z,
+                    is_region = excluded.is_region,
+                    coord2_x = excluded.coord2_x,
+                    coord2_y = excluded.coord2_y,
+                    coord2_z = excluded.coord2_z,
+                    map = excluded.map,
+                    last_modified = excluded.last_modified
+                """)) {
+            stmt.setString(1, quest.id().toString());
+            stmt.setString(2, quest.title());
+            stmt.setString(3, quest.content());
+            stmt.setString(4, quest.ownerUuid().toString());
+            stmt.setString(5, quest.visibility().name());
+            if (quest.coordinates() != null) {
+                stmt.setDouble(6, quest.coordinates().x());
+                stmt.setDouble(7, quest.coordinates().y());
+                stmt.setDouble(8, quest.coordinates().z());
+            } else {
+                stmt.setNull(6, Types.REAL);
+                stmt.setNull(7, Types.REAL);
+                stmt.setNull(8, Types.REAL);
+            }
+            stmt.setInt(9, quest.isRegion() ? 1 : 0);
+            if (quest.coordinates2() != null) {
+                stmt.setDouble(10, quest.coordinates2().x());
+                stmt.setDouble(11, quest.coordinates2().y());
+                stmt.setDouble(12, quest.coordinates2().z());
+            } else {
+                stmt.setNull(10, Types.REAL);
+                stmt.setNull(11, Types.REAL);
+                stmt.setNull(12, Types.REAL);
+            }
+            stmt.setString(13, quest.map());
+            stmt.setLong(14, quest.lastModified());
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to save quest", e);
+        }
+    }
+
+    public boolean deleteQuest(UUID id) {
+        try (PreparedStatement stmt = connection.prepareStatement("DELETE FROM quests WHERE id = ?")) {
+            stmt.setString(1, id.toString());
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to delete quest", e);
+        }
+    }
+
+    public QuestData getQuest(UUID id) {
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "SELECT q.*, pn.name as owner_name FROM quests q LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid WHERE q.id = ?")) {
+            stmt.setString(1, id.toString());
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                QuestData quest = mapQuestRow(rs);
+                return withContributors(quest);
+            }
+            return null;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to get quest", e);
+        }
+    }
+
+    public List<QuestData> getQuestsForPlayer(UUID playerUuid) {
+        List<QuestData> quests = new ArrayList<>();
+        try (PreparedStatement stmt = connection.prepareStatement("""
+                SELECT q.*, pn.name as owner_name FROM quests q
+                LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid
+                WHERE q.owner_uuid = ?
+                   OR q.id IN (SELECT quest_id FROM contributors WHERE player_uuid = ?)
+                """)) {
+            stmt.setString(1, playerUuid.toString());
+            stmt.setString(2, playerUuid.toString());
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                quests.add(mapQuestRow(rs));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to get quests for player", e);
+        }
+        return withContributorsAll(quests);
+    }
+
+    public List<QuestData> getServerQuests(UUID excludePlayerUuid) {
+        List<QuestData> quests = new ArrayList<>();
+        try (PreparedStatement stmt = connection.prepareStatement("""
+                SELECT q.*, pn.name as owner_name FROM quests q
+                LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid
+                WHERE q.visibility IN ('OPEN', 'CLOSED')
+                  AND q.owner_uuid != ?
+                  AND q.id NOT IN (SELECT quest_id FROM contributors WHERE player_uuid = ?)
+                """)) {
+            stmt.setString(1, excludePlayerUuid.toString());
+            stmt.setString(2, excludePlayerUuid.toString());
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                quests.add(mapQuestRow(rs));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to get server quests", e);
+        }
+        return withContributorsAll(quests);
+    }
+
+    public void updateVisibility(UUID questId, Visibility visibility) {
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "UPDATE quests SET visibility = ? WHERE id = ?")) {
+            stmt.setString(1, visibility.name());
+            stmt.setString(2, questId.toString());
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to update visibility", e);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Contributors
+    // -------------------------------------------------------------------------
+
+    public void addContributor(UUID questId, UUID playerUuid, boolean canEdit) {
+        try (PreparedStatement stmt = connection.prepareStatement("""
+                INSERT INTO contributors (quest_id, player_uuid, can_edit) VALUES (?, ?, ?)
+                ON CONFLICT(quest_id, player_uuid) DO UPDATE SET can_edit = excluded.can_edit
+                """)) {
+            stmt.setString(1, questId.toString());
+            stmt.setString(2, playerUuid.toString());
+            stmt.setInt(3, canEdit ? 1 : 0);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to add contributor", e);
+        }
+    }
+
+    public void removeContributor(UUID questId, UUID playerUuid) {
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "DELETE FROM contributors WHERE quest_id = ? AND player_uuid = ?")) {
+            stmt.setString(1, questId.toString());
+            stmt.setString(2, playerUuid.toString());
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to remove contributor", e);
+        }
+    }
+
+    public void updateContributor(UUID questId, UUID playerUuid, boolean canEdit) {
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "UPDATE contributors SET can_edit = ? WHERE quest_id = ? AND player_uuid = ?")) {
+            stmt.setInt(1, canEdit ? 1 : 0);
+            stmt.setString(2, questId.toString());
+            stmt.setString(3, playerUuid.toString());
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to update contributor", e);
+        }
+    }
+
+    public List<ContributorData> getContributors(UUID questId) {
+        List<ContributorData> contributors = new ArrayList<>();
+        try (PreparedStatement stmt = connection.prepareStatement("""
+                SELECT c.player_uuid, c.can_edit, pn.name FROM contributors c
+                LEFT JOIN player_names pn ON c.player_uuid = pn.uuid
+                WHERE c.quest_id = ?
+                """)) {
+            stmt.setString(1, questId.toString());
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                contributors.add(new ContributorData(
+                        UUID.fromString(rs.getString("player_uuid")),
+                        rs.getString("name"),
+                        rs.getInt("can_edit") != 0
+                ));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to get contributors", e);
+        }
+        return contributors;
+    }
+
+    public boolean isContributor(UUID questId, UUID playerUuid) {
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "SELECT 1 FROM contributors WHERE quest_id = ? AND player_uuid = ?")) {
+            stmt.setString(1, questId.toString());
+            stmt.setString(2, playerUuid.toString());
+            ResultSet rs = stmt.executeQuery();
+            return rs.next();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to check contributor", e);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Collaboration Requests
+    // -------------------------------------------------------------------------
+
+    public UUID createCollaborationRequest(UUID questId, UUID requesterUuid) {
+        UUID requestId = UUID.randomUUID();
+        long now = System.currentTimeMillis() / 1000L;
+        try (PreparedStatement stmt = connection.prepareStatement("""
+                INSERT INTO collaboration_requests (id, quest_id, requester_uuid, timestamp)
+                VALUES (?, ?, ?, ?)
+                """)) {
+            stmt.setString(1, requestId.toString());
+            stmt.setString(2, questId.toString());
+            stmt.setString(3, requesterUuid.toString());
+            stmt.setLong(4, now);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to create collaboration request", e);
+        }
+        return requestId;
+    }
+
+    public void deleteCollaborationRequest(UUID requestId) {
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "DELETE FROM collaboration_requests WHERE id = ?")) {
+            stmt.setString(1, requestId.toString());
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to delete collaboration request", e);
+        }
+    }
+
+    public List<CollaborationRequestData> getPendingRequestsForOwner(UUID ownerUuid) {
+        List<CollaborationRequestData> requests = new ArrayList<>();
+        try (PreparedStatement stmt = connection.prepareStatement("""
+                SELECT cr.id, cr.quest_id, cr.requester_uuid, cr.timestamp,
+                       q.title as quest_title, pn.name as requester_name
+                FROM collaboration_requests cr
+                JOIN quests q ON cr.quest_id = q.id
+                LEFT JOIN player_names pn ON cr.requester_uuid = pn.uuid
+                WHERE q.owner_uuid = ?
+                """)) {
+            stmt.setString(1, ownerUuid.toString());
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                requests.add(new CollaborationRequestData(
+                        UUID.fromString(rs.getString("id")),
+                        UUID.fromString(rs.getString("quest_id")),
+                        rs.getString("quest_title"),
+                        UUID.fromString(rs.getString("requester_uuid")),
+                        rs.getString("requester_name"),
+                        rs.getLong("timestamp")
+                ));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to get pending requests", e);
+        }
+        return requests;
+    }
+
+    public int getPendingRequestCount(UUID ownerUuid) {
+        try (PreparedStatement stmt = connection.prepareStatement("""
+                SELECT COUNT(*) FROM collaboration_requests cr
+                JOIN quests q ON cr.quest_id = q.id
+                WHERE q.owner_uuid = ?
+                """)) {
+            stmt.setString(1, ownerUuid.toString());
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return rs.getInt(1);
+            return 0;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to count pending requests", e);
+        }
+    }
+
+    public CollaborationRequestData getCollaborationRequest(UUID requestId) {
+        try (PreparedStatement stmt = connection.prepareStatement("""
+                SELECT cr.id, cr.quest_id, cr.requester_uuid, cr.timestamp,
+                       q.title as quest_title, pn.name as requester_name
+                FROM collaboration_requests cr
+                JOIN quests q ON cr.quest_id = q.id
+                LEFT JOIN player_names pn ON cr.requester_uuid = pn.uuid
+                WHERE cr.id = ?
+                """)) {
+            stmt.setString(1, requestId.toString());
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return new CollaborationRequestData(
+                        UUID.fromString(rs.getString("id")),
+                        UUID.fromString(rs.getString("quest_id")),
+                        rs.getString("quest_title"),
+                        UUID.fromString(rs.getString("requester_uuid")),
+                        rs.getString("requester_name"),
+                        rs.getLong("timestamp")
+                );
+            }
+            return null;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to get collaboration request", e);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Pins
+    // -------------------------------------------------------------------------
+
+    public void pinQuest(UUID playerUuid, UUID questId) {
+        try (PreparedStatement stmt = connection.prepareStatement("""
+                INSERT INTO pinned_quests (player_uuid, quest_id) VALUES (?, ?)
+                ON CONFLICT(player_uuid) DO UPDATE SET quest_id = excluded.quest_id
+                """)) {
+            stmt.setString(1, playerUuid.toString());
+            stmt.setString(2, questId.toString());
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to pin quest", e);
+        }
+    }
+
+    public void unpinQuest(UUID playerUuid) {
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "DELETE FROM pinned_quests WHERE player_uuid = ?")) {
+            stmt.setString(1, playerUuid.toString());
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to unpin quest", e);
+        }
+    }
+
+    public UUID getPinnedQuestId(UUID playerUuid) {
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "SELECT quest_id FROM pinned_quests WHERE player_uuid = ?")) {
+            stmt.setString(1, playerUuid.toString());
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return UUID.fromString(rs.getString("quest_id"));
+            return null;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to get pinned quest", e);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Player Names
+    // -------------------------------------------------------------------------
+
+    public void upsertPlayerName(UUID uuid, String name) {
+        long now = System.currentTimeMillis() / 1000L;
+        try (PreparedStatement stmt = connection.prepareStatement("""
+                INSERT INTO player_names (uuid, name, last_seen) VALUES (?, ?, ?)
+                ON CONFLICT(uuid) DO UPDATE SET name = excluded.name, last_seen = excluded.last_seen
+                """)) {
+            stmt.setString(1, uuid.toString());
+            stmt.setString(2, name);
+            stmt.setLong(3, now);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to upsert player name", e);
+        }
+    }
+
+    public String getPlayerName(UUID uuid) {
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "SELECT name FROM player_names WHERE uuid = ?")) {
+            stmt.setString(1, uuid.toString());
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return rs.getString("name");
+            return null;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to get player name", e);
+        }
+    }
+
+    public UUID getPlayerUuidByName(String name) {
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "SELECT uuid FROM player_names WHERE name = ?")) {
+            stmt.setString(1, name);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return UUID.fromString(rs.getString("uuid"));
+            return null;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to get player uuid by name", e);
+        }
+    }
+
+    public void close() {
+        if (connection != null) {
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                // ignore on shutdown
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private QuestData mapQuestRow(ResultSet rs) throws SQLException {
+        String coordX = rs.getString("coord_x");
+        CoordinatesData coords = coordX != null
+                ? new CoordinatesData(rs.getDouble("coord_x"), rs.getDouble("coord_y"), rs.getDouble("coord_z"))
+                : null;
+
+        String coord2X = rs.getString("coord2_x");
+        CoordinatesData coords2 = coord2X != null
+                ? new CoordinatesData(rs.getDouble("coord2_x"), rs.getDouble("coord2_y"), rs.getDouble("coord2_z"))
+                : null;
+
+        return new QuestData(
+                UUID.fromString(rs.getString("id")),
+                rs.getString("title"),
+                rs.getString("content"),
+                UUID.fromString(rs.getString("owner_uuid")),
+                rs.getString("owner_name"),
+                Visibility.valueOf(rs.getString("visibility")),
+                new ArrayList<>(),
+                rs.getLong("last_modified"),
+                coords,
+                rs.getInt("is_region") != 0,
+                coords2,
+                rs.getString("map")
+        );
+    }
+
+    private QuestData withContributors(QuestData quest) {
+        List<ContributorData> contributors = getContributors(quest.id());
+        return new QuestData(
+                quest.id(),
+                quest.title(),
+                quest.content(),
+                quest.ownerUuid(),
+                quest.ownerName(),
+                quest.visibility(),
+                contributors,
+                quest.lastModified(),
+                quest.coordinates(),
+                quest.isRegion(),
+                quest.coordinates2(),
+                quest.map()
+        );
+    }
+
+    private List<QuestData> withContributorsAll(List<QuestData> quests) {
+        List<QuestData> result = new ArrayList<>(quests.size());
+        for (QuestData quest : quests) {
+            result.add(withContributors(quest));
+        }
+        return result;
+    }
+}

@@ -18,15 +18,14 @@ dependencies {
 
     implementation("org.lwjgl:lwjgl-tinyfd:3.3.1")
     include("org.lwjgl:lwjgl-tinyfd:3.3.1")
-}
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-}
-
-tasks.withType<JavaCompile>().configureEach {
-    options.release.set(21)
+    // Markdown rendering
+    implementation("org.commonmark:commonmark:0.24.0")
+    implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.24.0")
+    implementation("org.commonmark:commonmark-ext-task-list-items:0.24.0")
+    include("org.commonmark:commonmark:0.24.0")
+    include("org.commonmark:commonmark-ext-gfm-strikethrough:0.24.0")
+    include("org.commonmark:commonmark-ext-task-list-items:0.24.0")
 }
 
 sourceSets {
@@ -46,10 +45,10 @@ loom {
             source(sourceSets.getByName("testmod"))
             vmArg("-Dfabric.client.gametest")
             vmArg("-Dfabric.client.gametest.disableNetworkSynchronizer=true")
-            vmArg("-Dbuildnotes.test.server.host=localhost")
-            vmArg("-Dbuildnotes.test.server.port=25565")
-            vmArg("-Dbuildnotes.test.rcon.port=25575")
-            vmArg("-Dbuildnotes.test.rcon.password=testpassword")
+            vmArg("-Ddisquests.test.server.host=localhost")
+            vmArg("-Ddisquests.test.server.port=25565")
+            vmArg("-Ddisquests.test.rcon.port=25575")
+            vmArg("-Ddisquests.test.rcon.password=testpassword")
         }
     }
 }
@@ -59,6 +58,15 @@ tasks.named("runClientGameTest") {
         val requireFreeRam = rootProject.extra["requireFreeRam"] as (String, Long) -> Unit
         requireFreeRam("runClientGameTest", 4096L)
     }
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.release.set(21)
 }
 
 tasks.processResources {

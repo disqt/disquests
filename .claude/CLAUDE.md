@@ -4,19 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Fork of [BuildNotes](https://github.com/Atif85/buildnotes-mod) (MIT) split into a Fabric client mod + PaperMC server plugin, communicating via vanilla plugin messages on `buildnotes:main`.
+**Disquests** — a Fabric client mod + PaperMC server plugin for tracking in-game quests. Communicates via vanilla plugin messages on `disquests:main`.
+
+Originally forked from [BuildNotes](https://github.com/Atif85/buildnotes-mod) (MIT), but fully rewritten as its own project with a new data model, networking protocol, and feature set.
 
 ## Architecture
 
 ```
 common/   — shared PacketCodec, data models, no platform deps
-client/   — Fabric mod (forked from upstream), networking rewritten to RawPayload
+client/   — Fabric mod, networking via RawPayload, markdown rendering via commonmark-java
 paper/    — Paper plugin: SQLite storage, permissions, packet handler, commands
 ```
 
 Both `client` and `paper` depend on `common`. The client registers a single `RawPayload` CustomPayload type that wraps raw bytes; the Paper plugin uses `Messenger.registerIncomingPluginChannel()`. Both sides use `PacketCodec` from common for serialization.
 
-**Package namespaces differ between modules** — client keeps the upstream namespace `net.atif.buildnotes.*`, while paper and common use `com.disqt.buildnotes.*`. Watch imports when working across modules.
+**All modules share the same package namespace**: `com.disqt.disquests.*`
+- Common: `com.disqt.disquests.common.*`
+- Paper: `com.disqt.disquests.paper.*`
+- Client: `com.disqt.disquests.client.*`
 
 ## Build
 
@@ -30,51 +35,48 @@ All versions (MC, Fabric, Paper, Java) are in `gradle.properties` — that is th
 ./gradlew :paper:runServer   # start Paper dev server (auto-downloads Paper, places plugin jar)
 ```
 
-`runServer` and `runClientGameTest` have a 4GB free RAM gate — they will refuse to start on low-memory machines (Pi, VPS). The check and threshold are in `build.gradle.kts` via `requireFreeRam`.
+`runServer` has a 4GB free RAM gate — it will refuse to start on low-memory machines (Pi, VPS). The check and threshold are in `build.gradle.kts` via `requireFreeRam`.
 
 ## E2E Tests
 
-Uses Fabric's `FabricClientGameTest` API — the test runs inside a real Minecraft client that connects to a Paper server. Not headless; requires a display (Xvfb in CI).
-
-```bash
-# 1. Start a Paper server with BuildNotes plugin + RCON enabled (see .github/workflows/e2e-test.yml)
-# 2. Run the game test:
-./gradlew runClientGameTest
-```
-
-Test source is in `client/src/testmod/` — this is a separate Loom source set with its own `fabric.mod.json` that registers the test entrypoint via `fabric-client-gametest`. Tests use RCON (`TestHelper.rconCommand()`) to control server state (e.g. toggling permissions). CI workflow: `.github/workflows/e2e-test.yml`.
+The old testmod (`client/src/testmod/`) was deleted as part of the Disquests rewrite. E2E tests need to be rewritten against the new protocol and quest model. The `runClientGameTest` Loom run config has been removed from `client/build.gradle.kts`.
 
 ## Networking Protocol
 
-Channel: `buildnotes:main`. First byte = PacketType ID.
+Channel: `disquests:main`. First byte = PacketType ID.
 
-**C2S**: REQUEST_DATA, SAVE_NOTE, DELETE_NOTE, SAVE_BUILD, DELETE_BUILD, UPLOAD_IMAGE_CHUNK, REQUEST_IMAGE
-**S2C**: HANDSHAKE, INITIAL_SYNC, UPDATE_NOTE, DELETE_NOTE_S2C, UPDATE_BUILD, DELETE_BUILD_S2C, IMAGE_CHUNK, IMAGE_NOT_FOUND, UPDATE_PERMISSION
+**C2S**: REQUEST_SYNC, SAVE_QUEST, DELETE_QUEST, JOIN_QUEST, REQUEST_COLLABORATION, RESPOND_COLLABORATION, UPDATE_CONTRIBUTORS, UPDATE_VISIBILITY, PIN_QUEST
+
+**S2C**: HANDSHAKE, SYNC_MY_QUESTS, SYNC_SERVER_QUESTS, UPDATE_QUEST, DELETE_QUEST_S2C, COLLABORATION_REQUEST, COLLABORATION_RESPONSE
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `common/src/main/java/com/disqt/buildnotes/common/PacketCodec.java` | All 16 packet encode/decode methods |
-| `common/src/main/java/com/disqt/buildnotes/common/model/` | NoteData, BuildData, PermissionLevel, CustomFieldData |
-| `client/src/main/java/net/atif/buildnotes/network/RawPayload.java` | Single CustomPayload wrapper |
-| `client/src/main/java/net/atif/buildnotes/network/ClientPacketHandler.java` | Dispatches S2C packets, Note/Build converters |
-| `client/src/main/java/net/atif/buildnotes/data/DataManager.java` | Client-side data manager (3-scope merge + send C2S) |
-| `client/src/main/java/net/atif/buildnotes/hud/HudPinManager.java` | Server-scoped HUD pin state |
-| `paper/src/main/java/com/disqt/buildnotes/paper/BuildNotesPlugin.java` | Plugin entry, channel registration |
-| `paper/src/main/java/com/disqt/buildnotes/paper/ServerPacketHandler.java` | Handles C2S, broadcasts S2C |
-| `paper/src/main/java/com/disqt/buildnotes/paper/DataManager.java` | SQLite persistence |
+| `common/src/main/java/com/disqt/disquests/common/PacketCodec.java` | All packet encode/decode methods |
+| `common/src/main/java/com/disqt/disquests/common/PacketType.java` | Packet type enum with byte IDs |
+| `common/src/main/java/com/disqt/disquests/common/model/` | QuestData, Visibility, ContributorData, ContributorOp, CoordinatesData, CollaborationRequestData |
+| `client/src/main/java/com/disqt/disquests/client/DisquestsClient.java` | Fabric mod entrypoint, keybinds, channel registration |
+| `client/src/main/java/com/disqt/disquests/client/ClientSession.java` | Tracks connection state, dispatches S2C packets |
+| `client/src/main/java/com/disqt/disquests/client/ClientCache.java` | Client-side quest cache |
+| `client/src/main/java/com/disqt/disquests/client/gui/screen/` | MainScreen, EditQuestScreen, ViewQuestScreen, ContributorScreen, ConfirmScreen |
+| `client/src/main/java/com/disqt/disquests/client/gui/helper/ColorConfig.java` | Color config loader (parses hex/rgb/rgba strings) |
+| `paper/src/main/java/com/disqt/disquests/paper/DisquestsPlugin.java` | Plugin entry, channel registration |
+| `paper/src/main/java/com/disqt/disquests/paper/ServerPacketHandler.java` | Handles C2S, broadcasts S2C |
+| `paper/src/main/java/com/disqt/disquests/paper/DataManager.java` | SQLite persistence |
+| `paper/src/main/java/com/disqt/disquests/paper/PlayerNameTracker.java` | Tracks online player display names |
+
+## Dependencies
+
+- **commonmark-java** (`org.commonmark:commonmark:0.24.0` + ext-gfm-strikethrough + ext-task-list-items): Markdown rendering in the client. Bundled via Loom `include`.
+- **sqlite-jdbc** (`org.xerial:sqlite-jdbc:3.49.1.0`): Paper-side SQLite. `compileOnly` (bundled in Paper env).
 
 ## Gotchas
 
 - **Gradle Kotlin DSL shadows `java` package** — `java.lang.management.*` won't resolve in `.gradle.kts` because `java` is a Gradle DSL accessor. Use `Class.forName("java.lang.management.ManagementFactory")` instead.
 - **PR target** — `gh pr create` defaults to upstream (`Atif85`). Use `--repo disqt/buildnotes --base main` explicitly.
 
-## Upstream
-
-Remote `upstream` points to `https://github.com/Atif85/buildnotes-mod.git`. The upstream's networking is completely rewritten — only UI, data model, and bug fix changes can be cherry-picked.
-
 ## Deploy
 
-- **Paper plugin**: `scp paper/build/libs/*.jar minecraft:~/server/plugins/BuildNotes.jar`
-- **Client mod**: distribute jar to players for Fabric `mods/` directory
+- **Paper plugin**: `scp paper/build/libs/disquests-paper-*.jar minecraft:~/server/plugins/Disquests.jar`
+- **Client mod**: distribute `client/build/libs/disquests-*.jar` to players for Fabric `mods/` directory

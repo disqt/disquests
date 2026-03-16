@@ -6,5 +6,5 @@ pluginManagement {
     }
 }
 
-rootProject.name = "buildnotes"
+rootProject.name = "disquests"
 include("common", "client", "paper")
