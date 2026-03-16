@@ -30,6 +30,13 @@ tasks.jar {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
+tasks.processResources {
+    inputs.property("version", project.version)
+    filesMatching("plugin.yml") {
+        expand("version" to project.version)
+    }
+}
+
 tasks.runServer {
     minecraftVersion(minecraft_version)
     jvmArgs("-Xmx512m")
