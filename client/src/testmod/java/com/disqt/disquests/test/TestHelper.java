@@ -57,7 +57,12 @@ public class TestHelper {
         });
         // Wait for disconnect to complete
         context.waitFor(client -> client.world == null, 200);
-        context.waitTicks(20);
+        context.waitTicks(10);
+        // Navigate back to title screen (DisconnectedScreen shows after disconnect)
+        context.runOnClient(client -> {
+            client.setScreen(new net.minecraft.client.gui.screen.TitleScreen());
+        });
+        context.waitForScreen(net.minecraft.client.gui.screen.TitleScreen.class);
     }
 
     /**
