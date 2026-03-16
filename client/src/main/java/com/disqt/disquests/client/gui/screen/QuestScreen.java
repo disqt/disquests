@@ -53,6 +53,9 @@ public class QuestScreen extends BaseScreen {
     // --- Edit mode widgets ---
     private MultiLineTextFieldWidget editTitleField;
     private MultiLineTextFieldWidget editContentField;
+    private MultiLineTextFieldWidget coordXField;
+    private MultiLineTextFieldWidget coordYField;
+    private MultiLineTextFieldWidget coordZField;
     private DarkButtonWidget visibilityButton;
     private DarkButtonWidget contributorsButton;
     private DarkButtonWidget regionButton;
@@ -420,12 +423,26 @@ public class QuestScreen extends BaseScreen {
 
         int rowY = optPanelY + 4;
 
-        // Coords label + value
-        context.drawText(this.textRenderer, "Coords: ", contentX + 5, rowY + 3, Colors.TEXT_MUTED, false);
-        int labelWidth = this.textRenderer.getWidth("Coords: ");
-        String coordsText = getCoordsDisplayText();
-        int coordsColor = quest.getCoordinates() != null ? Colors.TEXT_PRIMARY : Colors.TEXT_DISABLED;
-        context.drawText(this.textRenderer, coordsText, contentX + 5 + labelWidth, rowY + 3, coordsColor, false);
+        // Coords: editable X/Y/Z fields with labels
+        int curX = contentX + 5;
+        int coordFieldWidth = 50;
+        int coordSpacing = 4;
+
+        int xLabelWidth = this.textRenderer.getWidth("X:");
+        context.drawText(this.textRenderer, "X:", curX, rowY + 3, Colors.TEXT_MUTED, false);
+        curX += xLabelWidth + 2;
+        if (this.coordXField != null) this.coordXField.render(context, mouseX, mouseY, delta);
+        curX += coordFieldWidth + coordSpacing;
+
+        int yLabelWidth = this.textRenderer.getWidth("Y:");
+        context.drawText(this.textRenderer, "Y:", curX, rowY + 3, Colors.TEXT_MUTED, false);
+        curX += yLabelWidth + 2;
+        if (this.coordYField != null) this.coordYField.render(context, mouseX, mouseY, delta);
+        curX += coordFieldWidth + coordSpacing;
+
+        int zLabelWidth = this.textRenderer.getWidth("Z:");
+        context.drawText(this.textRenderer, "Z:", curX, rowY + 3, Colors.TEXT_MUTED, false);
+        if (this.coordZField != null) this.coordZField.render(context, mouseX, mouseY, delta);
         rowY += 18;
 
         // Corner 2 row (if region)
@@ -450,38 +467,64 @@ public class QuestScreen extends BaseScreen {
     // ===================== EDIT MODE ROWS =====================
 
     private void buildCoordsRow(int panelX, int rowY, int panelWidth) {
-        int labelWidth = this.textRenderer.getWidth("Coords: ");
         int btnWidth = 50;
         int btnHeight = 14;
+        int fieldWidth = 50;
+        int fieldHeight = 14;
         int spacing = 4;
 
-        int setPosX = panelX + labelWidth + getDisplayedCoordsWidth() + spacing;
-        this.addDrawableChild(new DarkButtonWidget(
-                setPosX, rowY, btnWidth, btnHeight,
-                Text.literal("Set Pos"), b -> setPlayerPosition()));
+        int curX = panelX + 5;
 
+        // X label + field
+        int xLabelWidth = this.textRenderer.getWidth("X:");
+        curX += xLabelWidth + 2;
+        CoordinatesData c = quest.getCoordinates();
+        String xText = c != null ? String.valueOf((int) c.x()) : "";
+        this.coordXField = new MultiLineTextFieldWidget(
+                this.textRenderer, curX, rowY, fieldWidth, fieldHeight,
+                xText, "X", 1, false);
+        this.addSelectableChild(this.coordXField);
+        curX += fieldWidth + spacing;
+
+        // Y label + field
+        int yLabelWidth = this.textRenderer.getWidth("Y:");
+        curX += yLabelWidth + 2;
+        String yText = c != null ? String.valueOf((int) c.y()) : "";
+        this.coordYField = new MultiLineTextFieldWidget(
+                this.textRenderer, curX, rowY, fieldWidth, fieldHeight,
+                yText, "Y", 1, false);
+        this.addSelectableChild(this.coordYField);
+        curX += fieldWidth + spacing;
+
+        // Z label + field
+        int zLabelWidth = this.textRenderer.getWidth("Z:");
+        curX += zLabelWidth + 2;
+        String zText = c != null ? String.valueOf((int) c.z()) : "";
+        this.coordZField = new MultiLineTextFieldWidget(
+                this.textRenderer, curX, rowY, fieldWidth, fieldHeight,
+                zText, "Z", 1, false);
+        this.addSelectableChild(this.coordZField);
+        curX += fieldWidth + spacing;
+
+        // Set Pos button
+        this.addDrawableChild(new DarkButtonWidget(
+                curX, rowY, btnWidth, btnHeight,
+                Text.literal("Set Pos"), b -> setPlayerPosition()));
+        curX += btnWidth + spacing;
+
+        // Region toggle button
         String regionText = regionEnabled ? "[x] Region" : "[ ] Region";
         int regionBtnWidth = this.textRenderer.getWidth(regionText) + UIHelper.BUTTON_TEXT_PADDING;
-        int regionBtnX = setPosX + btnWidth + spacing;
         this.regionButton = this.addDrawableChild(new DarkButtonWidget(
-                regionBtnX, rowY, regionBtnWidth, btnHeight,
+                curX, rowY, regionBtnWidth, btnHeight,
                 Text.literal(regionText), b -> toggleRegion()));
         this.regionButton.setTooltip(Tooltip.of(Text.literal("Define a rectangular area with two corners")));
+        curX += regionBtnWidth + spacing;
 
-        int clearX = regionBtnX + regionBtnWidth + spacing;
+        // Clear button
         this.addDrawableChild(new DarkButtonWidget(
-                clearX, rowY, btnWidth, btnHeight,
+                curX, rowY, btnWidth, btnHeight,
                 Text.literal("Clear"), b -> clearCoords()));
-    }
-
-    private int getDisplayedCoordsWidth() {
-        return this.textRenderer.getWidth(getCoordsDisplayText());
-    }
-
-    private String getCoordsDisplayText() {
-        CoordinatesData c = quest.getCoordinates();
-        if (c == null) return "Not set";
-        return String.format("X:%.0f Y:%.0f Z:%.0f", c.x(), c.y(), c.z());
     }
 
     private void buildCorner2Row(int panelX, int rowY, int panelWidth) {
@@ -553,6 +596,7 @@ public class QuestScreen extends BaseScreen {
 
     private void setPlayerPosition() {
         if (client != null && client.player != null) {
+            persistFieldValues();
             quest.setCoordinates(new CoordinatesData(
                     client.player.getX(), client.player.getY(), client.player.getZ()));
             if (quest.getMap() == null && client.world != null) {
@@ -564,6 +608,7 @@ public class QuestScreen extends BaseScreen {
 
     private void setCorner2Position() {
         if (client != null && client.player != null) {
+            persistFieldValues();
             quest.setCoordinates2(new CoordinatesData(
                     client.player.getX(), client.player.getY(), client.player.getZ()));
             this.clearAndInit();
@@ -581,11 +626,17 @@ public class QuestScreen extends BaseScreen {
     }
 
     private void clearCoords() {
+        // Persist title/content before clearing coords
+        if (this.editTitleField != null) {
+            quest.setTitle(this.editTitleField.getText());
+        }
+        if (this.editContentField != null) {
+            quest.setContent(this.editContentField.getText());
+        }
         quest.setCoordinates(null);
         quest.setCoordinates2(null);
         this.regionEnabled = false;
         quest.setRegion(false);
-        persistFieldValues();
         this.clearAndInit();
     }
 
@@ -713,6 +764,20 @@ public class QuestScreen extends BaseScreen {
         }
         if (this.editContentField != null) {
             quest.setContent(this.editContentField.getText());
+        }
+        if (this.coordXField != null) {
+            try {
+                double x = Double.parseDouble(coordXField.getText().trim());
+                double y = Double.parseDouble(coordYField.getText().trim());
+                double z = Double.parseDouble(coordZField.getText().trim());
+                quest.setCoordinates(new CoordinatesData(x, y, z));
+            } catch (NumberFormatException e) {
+                if (coordXField.getText().trim().isEmpty()
+                        && coordYField.getText().trim().isEmpty()
+                        && coordZField.getText().trim().isEmpty()) {
+                    quest.setCoordinates(null);
+                }
+            }
         }
     }
 
