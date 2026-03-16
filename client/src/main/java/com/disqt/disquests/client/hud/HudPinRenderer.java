@@ -1,6 +1,7 @@
 package com.disqt.disquests.client.hud;
 
 import com.disqt.disquests.client.data.Quest;
+import com.disqt.disquests.client.gui.helper.DisquestsConfig;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
@@ -12,13 +13,14 @@ import java.util.List;
 public class HudPinRenderer {
 
     private static final int PADDING = 6;
-    private static final int MAX_WIDTH = 200;
     private static final int MAX_LINES = 12;
     private static final int MARGIN = 4;
     private static final int GAP = 4;
     private static final int BG_COLOR = 0x80000000;
     private static final int TITLE_COLOR = 0xFFFFFFFF;
     private static final int CONTENT_COLOR = 0xFFBBBBBB;
+
+    private static int getMaxWidth() { return DisquestsConfig.getPinnedWidth(); }
 
     public static void render(DrawContext context) {
         List<Quest> pinnedQuests = HudPinManager.getPinnedQuests();
@@ -40,11 +42,11 @@ public class HudPinRenderer {
         int lineHeight = tr.fontHeight + 1;
 
         // Wrap title
-        List<String> titleLines = wrapText(tr, quest.getTitle(), MAX_WIDTH - PADDING * 2);
+        List<String> titleLines = wrapText(tr, quest.getTitle(), getMaxWidth() - PADDING * 2);
 
         // Strip markdown from content for plain text HUD display
         String plainContent = MarkdownRenderer.stripToPlainText(quest.getContent());
-        List<String> contentLines = wrapText(tr, plainContent, MAX_WIDTH - PADDING * 2);
+        List<String> contentLines = wrapText(tr, plainContent, getMaxWidth() - PADDING * 2);
 
         // Truncate content if too many lines
         int maxContentLines = MAX_LINES - titleLines.size();
@@ -55,7 +57,7 @@ public class HudPinRenderer {
         }
 
         int totalLines = titleLines.size() + contentLines.size() + (truncated ? 1 : 0);
-        int boxWidth = MAX_WIDTH;
+        int boxWidth = getMaxWidth();
         int boxHeight = PADDING * 2 + totalLines * lineHeight;
 
         // Background

@@ -1,6 +1,7 @@
 package com.disqt.disquests.client;
 
 import com.disqt.disquests.client.gui.helper.ColorConfig;
+import com.disqt.disquests.client.gui.helper.DisquestsConfig;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.network.ClientPacketHandler;
 import com.disqt.disquests.client.network.PacketSender;
@@ -18,6 +19,7 @@ public class DisquestsClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         ColorConfig.loadColors();
+        DisquestsConfig.load();
         KeyBinds.register();
 
         // Register payload types before registering receivers
