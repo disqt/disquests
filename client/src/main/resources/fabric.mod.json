@@ -1,38 +1,37 @@
 {
-	"schemaVersion": 1,
-	"id": "disquests",
-	"version": "${version}",
+    "schemaVersion": 1,
+    "id": "disquests",
+    "version": "${version}",
 
-	"name": "Disquests",
-	"description": "An in-game mod for tracking projects, builds, and creating notes.",
+    "name": "Disquests",
+    "description": "Track in-game quests with your friends. Create, share, and collaborate on quests with coordinates, markdown notes, and BlueMap integration.",
 
-	"authors": [
-		"Atif"
-	],
+    "authors": [
+        "disqt"
+    ],
 
-	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/Atif85/buildnotes-mod"
-	},
+    "contact": {
+        "sources": "https://github.com/disqt/disquests"
+    },
 
-	"license": "MIT",
-	"icon": "assets/buildnotes/icon.png",
+    "license": "MIT",
+    "icon": "assets/disquests/icon.png",
 
-	"environment": "client",
-	"entrypoints": {
+    "environment": "client",
+    "entrypoints": {
         "client": [
-          "com.disqt.disquests.client.DisquestsClient"
+            "com.disqt.disquests.client.DisquestsClient"
         ]
-	},
-	"mixins": [
-		"disquests.mixins.json"
-	],
+    },
+    "mixins": [
+        "disquests.mixins.json"
+    ],
 
-	"depends": {
-		"fabricloader": ">=0.17.3",
-		"minecraft": "~1.21.11",
-		"java": ">=17",
-		"fabric": "*"
-	},
-	"suggests": {}
+    "depends": {
+        "fabricloader": ">=0.17.3",
+        "minecraft": "~1.21.11",
+        "java": ">=21",
+        "fabric": "*"
+    },
+    "suggests": {}
 }
