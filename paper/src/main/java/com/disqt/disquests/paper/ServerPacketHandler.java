@@ -14,6 +14,9 @@ import java.util.*;
 
 public class ServerPacketHandler implements PluginMessageListener, Listener {
     private static final String CHANNEL = "disquests:main";
+    private static final int MAX_TITLE_LENGTH = 256;
+    private static final int MAX_CONTENT_LENGTH = 65536;
+    private static final int MAX_MAP_LENGTH = 256;
     private final DisquestsPlugin plugin;
     private final DataManager dataManager;
     private final Config config;
@@ -80,6 +83,12 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
     }
 
     private void handleSaveQuest(Player player, PacketCodec.SaveQuestPayload payload) {
+        if (payload.title().length() > MAX_TITLE_LENGTH ||
+            payload.content().length() > MAX_CONTENT_LENGTH ||
+            (payload.map() != null && payload.map().length() > MAX_MAP_LENGTH)) {
+            plugin.getLogger().warning("Quest field too long from " + player.getName());
+            return;
+        }
         UUID playerUuid = player.getUniqueId();
         QuestData existing = dataManager.getQuest(payload.questId());
 
@@ -165,7 +174,11 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
                     requestId, questId, quest.title(), player.getName()));
             }
         } catch (RuntimeException e) {
-            // Duplicate request - silently ignore
+            if (e.getCause() instanceof java.sql.SQLException) {
+                // Duplicate request - silently ignore
+            } else {
+                plugin.getLogger().warning("Failed to create collaboration request: " + e.getMessage());
+            }
         }
     }
 
@@ -214,7 +227,9 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
                     if (targetUuid == null && op.playerName() != null) {
                         targetUuid = dataManager.getPlayerUuidByName(op.playerName());
                     }
-                    if (targetUuid != null && !dataManager.isContributor(payload.questId(), targetUuid)) {
+                    if (targetUuid != null
+                        && !targetUuid.equals(quest.ownerUuid())
+                        && !dataManager.isContributor(payload.questId(), targetUuid)) {
                         dataManager.addContributor(payload.questId(), targetUuid, op.canEdit());
                         // Notify the added player
                         Player added = Bukkit.getPlayer(targetUuid);
@@ -286,7 +301,14 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
 
     private void handlePinQuest(Player player, UUID questId) {
         if (questId != null) {
-            dataManager.pinQuest(player.getUniqueId(), questId);
+            QuestData quest = dataManager.getQuest(questId);
+            if (quest == null) return;
+            UUID playerUuid = player.getUniqueId();
+            boolean canSee = quest.ownerUuid().equals(playerUuid)
+                || quest.contributors().stream().anyMatch(c -> c.uuid().equals(playerUuid))
+                || quest.visibility() == Visibility.OPEN;
+            if (!canSee) return;
+            dataManager.pinQuest(playerUuid, questId);
         } else {
             dataManager.unpinQuest(player.getUniqueId());
         }
