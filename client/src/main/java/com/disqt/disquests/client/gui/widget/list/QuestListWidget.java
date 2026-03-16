@@ -21,7 +21,7 @@ import java.util.UUID;
 
 public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEntry> {
 
-    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm dd MM yyyy");
 
     private QuestSelectionListener selectionListener;
 
