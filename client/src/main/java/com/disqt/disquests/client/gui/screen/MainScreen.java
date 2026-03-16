@@ -246,9 +246,8 @@ public class MainScreen extends BaseScreen {
             }
 
             // Sort: pinned first, then by lastModified descending
-            UUID pinnedId = ClientSession.getPinnedQuestId();
             quests.sort(Comparator
-                    .<Quest, Boolean>comparing(q -> pinnedId != null && pinnedId.equals(q.getId()), Comparator.reverseOrder())
+                    .<Quest, Boolean>comparing(q -> ClientSession.isPinned(q.getId()), Comparator.reverseOrder())
                     .thenComparing(Quest::getLastModified, Comparator.reverseOrder()));
 
             myQuestListWidget.setQuests(quests);

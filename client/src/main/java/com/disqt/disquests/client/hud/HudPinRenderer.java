@@ -15,18 +15,28 @@ public class HudPinRenderer {
     private static final int MAX_WIDTH = 200;
     private static final int MAX_LINES = 12;
     private static final int MARGIN = 4;
+    private static final int GAP = 4;
     private static final int BG_COLOR = 0x80000000;
     private static final int TITLE_COLOR = 0xFFFFFFFF;
     private static final int CONTENT_COLOR = 0xFFBBBBBB;
 
     public static void render(DrawContext context) {
-        Quest quest = HudPinManager.getPinnedQuest();
-        if (quest == null) return;
+        List<Quest> pinnedQuests = HudPinManager.getPinnedQuests();
+        if (pinnedQuests.isEmpty()) return;
 
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.inGameHud.getDebugHud().shouldShowDebugHud()) return;
 
         TextRenderer tr = client.textRenderer;
+        int y = MARGIN;
+
+        for (Quest quest : pinnedQuests) {
+            y = renderSinglePin(context, tr, quest, MARGIN, y);
+            y += GAP;
+        }
+    }
+
+    private static int renderSinglePin(DrawContext context, TextRenderer tr, Quest quest, int x, int y) {
         int lineHeight = tr.fontHeight + 1;
 
         // Wrap title
@@ -48,10 +58,6 @@ public class HudPinRenderer {
         int boxWidth = MAX_WIDTH;
         int boxHeight = PADDING * 2 + totalLines * lineHeight;
 
-        // Position: top-left with margin
-        int x = MARGIN;
-        int y = MARGIN;
-
         // Background
         context.fill(x, y, x + boxWidth, y + boxHeight, BG_COLOR);
 
@@ -71,6 +77,8 @@ public class HudPinRenderer {
         if (truncated) {
             context.drawText(tr, "...", x + PADDING, textY, CONTENT_COLOR, true);
         }
+
+        return y + boxHeight;
     }
 
     private static List<String> wrapText(TextRenderer tr, String text, int maxWidth) {

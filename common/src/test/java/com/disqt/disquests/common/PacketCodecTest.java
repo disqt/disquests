@@ -79,13 +79,13 @@ class PacketCodecTest {
         }
     }
 
-    // ---- 1. testHandshakeRoundTrip ----
+    // ---- 1. testHandshakeRoundTrip (multi-pin) ----
 
     @Test
     void testHandshakeRoundTrip() {
-        UUID pinnedQuestId = UUID.randomUUID();
+        List<UUID> pinnedIds = List.of(UUID.randomUUID(), UUID.randomUUID());
         UUID playerUuid = UUID.randomUUID();
-        byte[] packet = PacketCodec.writeHandshake("https://bluemap.disqt.com/", 3, pinnedQuestId, playerUuid);
+        byte[] packet = PacketCodec.writeHandshake("https://bluemap.disqt.com/", 3, pinnedIds, playerUuid);
         ByteBufReader reader = new ByteBufReader(packet);
 
         assertEquals(PacketType.HANDSHAKE, PacketCodec.readType(reader));
@@ -93,17 +93,17 @@ class PacketCodecTest {
 
         assertEquals("https://bluemap.disqt.com/", payload.bluemapUrl());
         assertEquals(3, payload.pendingRequestCount());
-        assertEquals(pinnedQuestId, payload.pinnedQuestId());
+        assertEquals(pinnedIds, payload.pinnedQuestIds());
         assertEquals(playerUuid, payload.playerUuid());
         assertEquals(0, reader.remaining());
     }
 
-    // ---- 2. testHandshakeNoPinnedQuest ----
+    // ---- 2. testHandshakeEmptyPinnedList ----
 
     @Test
-    void testHandshakeNoPinnedQuest() {
+    void testHandshakeEmptyPinnedList() {
         UUID playerUuid = UUID.randomUUID();
-        byte[] packet = PacketCodec.writeHandshake("", 0, null, playerUuid);
+        byte[] packet = PacketCodec.writeHandshake("", 0, List.of(), playerUuid);
         ByteBufReader reader = new ByteBufReader(packet);
 
         assertEquals(PacketType.HANDSHAKE, PacketCodec.readType(reader));
@@ -111,7 +111,7 @@ class PacketCodecTest {
 
         assertEquals("", payload.bluemapUrl());
         assertEquals(0, payload.pendingRequestCount());
-        assertNull(payload.pinnedQuestId());
+        assertTrue(payload.pinnedQuestIds().isEmpty());
         assertEquals(playerUuid, payload.playerUuid());
         assertEquals(0, reader.remaining());
     }
@@ -421,11 +421,12 @@ class PacketCodecTest {
     @Test
     void testHandshakeNullBluemapUrl() {
         UUID playerUuid = UUID.randomUUID();
-        byte[] packet = PacketCodec.writeHandshake(null, 0, null, playerUuid);
+        byte[] packet = PacketCodec.writeHandshake(null, 0, List.of(), playerUuid);
         ByteBufReader reader = new ByteBufReader(packet);
         assertEquals(PacketType.HANDSHAKE, PacketCodec.readType(reader));
         PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(reader);
         assertNull(payload.bluemapUrl());
+        assertTrue(payload.pinnedQuestIds().isEmpty());
         assertEquals(playerUuid, payload.playerUuid());
         assertEquals(0, reader.remaining());
     }

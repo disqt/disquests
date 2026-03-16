@@ -1,5 +1,7 @@
 package com.disqt.disquests.client;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 public class ClientSession {
@@ -7,7 +9,7 @@ public class ClientSession {
     private static boolean onServer = false;
     private static String bluemapUrl = null;
     private static int pendingRequestCount = 0;
-    private static UUID pinnedQuestId = null;
+    private static final List<UUID> pinnedQuestIds = new ArrayList<>();
     private static UUID playerUuid = null;
 
     // UI state
@@ -15,11 +17,12 @@ public class ClientSession {
     private static String searchTerm = "";
     private static int serverQuestsFilter = 0; // 0=All, 1=Open, 2=Closed
 
-    public static void joinServer(String bluemapUrl, int pendingCount, UUID pinnedId, UUID playerUuid) {
+    public static void joinServer(String bluemapUrl, int pendingCount, List<UUID> pinnedIds, UUID playerUuid) {
         onServer = true;
         ClientSession.bluemapUrl = bluemapUrl;
         pendingRequestCount = pendingCount;
-        pinnedQuestId = pinnedId;
+        pinnedQuestIds.clear();
+        pinnedQuestIds.addAll(pinnedIds);
         ClientSession.playerUuid = playerUuid;
     }
 
@@ -27,7 +30,7 @@ public class ClientSession {
         onServer = false;
         bluemapUrl = null;
         pendingRequestCount = 0;
-        pinnedQuestId = null;
+        pinnedQuestIds.clear();
         playerUuid = null;
         activeTab = 0;
         searchTerm = "";
@@ -62,12 +65,22 @@ public class ClientSession {
         pendingRequestCount++;
     }
 
-    public static UUID getPinnedQuestId() {
-        return pinnedQuestId;
+    public static List<UUID> getPinnedQuestIds() {
+        return pinnedQuestIds;
     }
 
-    public static void setPinnedQuestId(UUID id) {
-        pinnedQuestId = id;
+    public static boolean isPinned(UUID questId) {
+        return questId != null && pinnedQuestIds.contains(questId);
+    }
+
+    public static void addPinnedQuest(UUID questId) {
+        if (!pinnedQuestIds.contains(questId)) {
+            pinnedQuestIds.add(questId);
+        }
+    }
+
+    public static void removePinnedQuest(UUID questId) {
+        pinnedQuestIds.remove(questId);
     }
 
     public static UUID getPlayerUuid() {

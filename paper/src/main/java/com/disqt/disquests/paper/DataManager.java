@@ -32,6 +32,7 @@ public class DataManager {
                 stmt.executeUpdate("PRAGMA foreign_keys = ON");
             }
             createTables();
+            migratePinnedQuests();
         } catch (SQLException | IOException e) {
             throw new RuntimeException("Failed to initialize database", e);
         }
@@ -78,8 +79,10 @@ public class DataManager {
 
             stmt.executeUpdate("""
                     CREATE TABLE IF NOT EXISTS pinned_quests (
-                        player_uuid TEXT PRIMARY KEY,
+                        player_uuid TEXT NOT NULL,
                         quest_id TEXT NOT NULL,
+                        pinned_at INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY (player_uuid, quest_id),
                         FOREIGN KEY (quest_id) REFERENCES quests(id) ON DELETE CASCADE
                     )""");
 
@@ -408,37 +411,53 @@ public class DataManager {
 
     public synchronized void pinQuest(UUID playerUuid, UUID questId) {
         try (PreparedStatement stmt = connection.prepareStatement("""
-                INSERT INTO pinned_quests (player_uuid, quest_id) VALUES (?, ?)
-                ON CONFLICT(player_uuid) DO UPDATE SET quest_id = excluded.quest_id
+                INSERT OR IGNORE INTO pinned_quests (player_uuid, quest_id, pinned_at) VALUES (?, ?, ?)
                 """)) {
             stmt.setString(1, playerUuid.toString());
             stmt.setString(2, questId.toString());
+            stmt.setLong(3, System.currentTimeMillis());
             stmt.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to pin quest", e);
         }
     }
 
-    public synchronized void unpinQuest(UUID playerUuid) {
+    public synchronized void unpinQuest(UUID playerUuid, UUID questId) {
         try (PreparedStatement stmt = connection.prepareStatement(
-                "DELETE FROM pinned_quests WHERE player_uuid = ?")) {
+                "DELETE FROM pinned_quests WHERE player_uuid = ? AND quest_id = ?")) {
             stmt.setString(1, playerUuid.toString());
+            stmt.setString(2, questId.toString());
             stmt.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to unpin quest", e);
         }
     }
 
-    public synchronized UUID getPinnedQuestId(UUID playerUuid) {
+    public synchronized boolean isQuestPinned(UUID playerUuid, UUID questId) {
         try (PreparedStatement stmt = connection.prepareStatement(
-                "SELECT quest_id FROM pinned_quests WHERE player_uuid = ?")) {
+                "SELECT 1 FROM pinned_quests WHERE player_uuid = ? AND quest_id = ?")) {
+            stmt.setString(1, playerUuid.toString());
+            stmt.setString(2, questId.toString());
+            ResultSet rs = stmt.executeQuery();
+            return rs.next();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to check pinned quest", e);
+        }
+    }
+
+    public synchronized List<UUID> getPinnedQuestIds(UUID playerUuid) {
+        List<UUID> ids = new ArrayList<>();
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "SELECT quest_id FROM pinned_quests WHERE player_uuid = ? ORDER BY pinned_at ASC")) {
             stmt.setString(1, playerUuid.toString());
             ResultSet rs = stmt.executeQuery();
-            if (rs.next()) return UUID.fromString(rs.getString("quest_id"));
-            return null;
+            while (rs.next()) {
+                ids.add(UUID.fromString(rs.getString("quest_id")));
+            }
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to get pinned quest", e);
+            throw new RuntimeException("Failed to get pinned quests", e);
         }
+        return ids;
     }
 
     // -------------------------------------------------------------------------
@@ -490,6 +509,43 @@ public class DataManager {
                 connection.close();
             } catch (SQLException e) {
                 // ignore on shutdown
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Migrations
+    // -------------------------------------------------------------------------
+
+    private void migratePinnedQuests() throws SQLException {
+        // Check if the pinned_quests table has the old schema (player_uuid as PRIMARY KEY only)
+        // by looking for the pinned_at column
+        boolean hasPinnedAt = false;
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery("PRAGMA table_info(pinned_quests)")) {
+            while (rs.next()) {
+                if ("pinned_at".equals(rs.getString("name"))) {
+                    hasPinnedAt = true;
+                    break;
+                }
+            }
+        }
+        if (!hasPinnedAt) {
+            try (Statement stmt = connection.createStatement()) {
+                stmt.executeUpdate("ALTER TABLE pinned_quests RENAME TO pinned_quests_old");
+                stmt.executeUpdate("""
+                        CREATE TABLE pinned_quests (
+                            player_uuid TEXT NOT NULL,
+                            quest_id TEXT NOT NULL,
+                            pinned_at INTEGER NOT NULL DEFAULT 0,
+                            PRIMARY KEY (player_uuid, quest_id),
+                            FOREIGN KEY (quest_id) REFERENCES quests(id) ON DELETE CASCADE
+                        )""");
+                stmt.executeUpdate("""
+                        INSERT INTO pinned_quests (player_uuid, quest_id, pinned_at)
+                        SELECT player_uuid, quest_id, 0 FROM pinned_quests_old
+                        """);
+                stmt.executeUpdate("DROP TABLE pinned_quests_old");
             }
         }
     }

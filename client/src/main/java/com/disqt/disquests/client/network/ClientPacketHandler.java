@@ -46,7 +46,7 @@ public class ClientPacketHandler {
 
     private static void handleHandshake(ByteBufReader r) {
         PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(r);
-        ClientSession.joinServer(payload.bluemapUrl(), payload.pendingRequestCount(), payload.pinnedQuestId(), payload.playerUuid());
+        ClientSession.joinServer(payload.bluemapUrl(), payload.pendingRequestCount(), payload.pinnedQuestIds(), payload.playerUuid());
         PacketSender.requestSync();
     }
 
@@ -87,9 +87,7 @@ public class ClientPacketHandler {
     private static void handleDeleteQuestS2C(ByteBufReader r) {
         UUID questId = PacketCodec.readDeleteQuestS2C(r);
         ClientCache.removeQuestById(questId);
-        if (questId.equals(ClientSession.getPinnedQuestId())) {
-            ClientSession.setPinnedQuestId(null);
-        }
+        ClientSession.removePinnedQuest(questId);
     }
 
     private static void handleCollaborationRequest(ByteBufReader r) {

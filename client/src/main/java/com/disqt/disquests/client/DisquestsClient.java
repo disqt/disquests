@@ -31,9 +31,11 @@ public class DisquestsClient implements ClientModInitializer {
                 }
             }
             while (KeyBinds.pinKey.wasPressed()) {
-                if (ClientSession.getPinnedQuestId() != null) {
-                    PacketSender.pinQuest(null);
-                    ClientSession.setPinnedQuestId(null);
+                if (!ClientSession.getPinnedQuestIds().isEmpty()) {
+                    for (java.util.UUID pinnedId : new java.util.ArrayList<>(ClientSession.getPinnedQuestIds())) {
+                        PacketSender.pinQuest(pinnedId);
+                    }
+                    ClientSession.getPinnedQuestIds().clear();
                 }
             }
         });
