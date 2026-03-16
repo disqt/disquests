@@ -158,6 +158,7 @@ public class ViewQuestScreen extends BaseScreen {
 
     private void confirmDelete() {
         showConfirm(Text.literal("Delete quest \"" + quest.getTitle() + "\"?"), () -> {
+            ClientCache.removeQuestById(quest.getId());
             PacketSender.deleteQuest(quest.getId());
             this.close();
         });
