@@ -71,13 +71,16 @@ public class ClientPacketHandler {
     private static void handleUpdateQuest(ByteBufReader r) {
         QuestData data = PacketCodec.readUpdateQuest(r);
         Quest quest = Quest.fromNetwork(data);
-        UUID myUuid = MinecraftClient.getInstance().getSession().getUuidOrNull();
+        UUID sessionUuid = ClientSession.getPlayerUuid();
+        final UUID myUuid = sessionUuid != null ? sessionUuid : MinecraftClient.getInstance().getSession().getUuidOrNull();
         boolean isMine = data.ownerUuid().equals(myUuid) ||
                 data.contributors().stream().anyMatch(c -> c.uuid().equals(myUuid));
         if (isMine) {
             ClientCache.addOrUpdateMyQuest(quest);
+            ClientCache.removeFromServerQuests(quest.getId());
         } else {
             ClientCache.addOrUpdateServerQuest(quest);
+            ClientCache.removeFromMyQuests(quest.getId());
         }
     }
 
