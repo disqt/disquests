@@ -5,6 +5,9 @@ import java.util.UUID;
 
 public class ByteBufReader {
 
+    public static final int MAX_STRING_LENGTH = 65536;
+    public static final int MAX_BYTES_LENGTH = 1048576;
+
     private final byte[] data;
     private int pos;
 
@@ -22,18 +25,33 @@ public class ByteBufReader {
         int shift = 0;
         byte current;
         do {
+            if (pos >= data.length) {
+                throw new IllegalArgumentException("VarInt extends past end of buffer");
+            }
             current = data[pos++];
             value |= (current & 0x7F) << shift;
             shift += 7;
             if (shift > 35) {
-                throw new RuntimeException("VarInt too large");
+                throw new IllegalArgumentException("VarInt too large");
             }
         } while ((current & 0x80) != 0);
         return value;
     }
 
     public String readString() {
+        return readString(MAX_STRING_LENGTH);
+    }
+
+    public String readString(int maxLength) {
         int length = readVarInt();
+        if (length < 0 || length > maxLength) {
+            throw new IllegalArgumentException(
+                    "String length " + length + " outside bounds [0, " + maxLength + "]");
+        }
+        if (pos + length > data.length) {
+            throw new IllegalArgumentException(
+                    "String length " + length + " exceeds remaining buffer");
+        }
         String str = new String(data, pos, length, StandardCharsets.UTF_8);
         pos += length;
         return str;
@@ -59,6 +77,14 @@ public class ByteBufReader {
 
     public byte[] readBytes() {
         int length = readVarInt();
+        if (length < 0 || length > MAX_BYTES_LENGTH) {
+            throw new IllegalArgumentException(
+                    "Bytes length " + length + " outside bounds [0, " + MAX_BYTES_LENGTH + "]");
+        }
+        if (pos + length > data.length) {
+            throw new IllegalArgumentException(
+                    "Bytes length " + length + " exceeds remaining buffer");
+        }
         byte[] result = new byte[length];
         System.arraycopy(data, pos, result, 0, length);
         pos += length;
