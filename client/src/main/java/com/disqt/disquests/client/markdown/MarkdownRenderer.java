@@ -58,6 +58,8 @@ public class MarkdownRenderer {
             sb.append(code.getLiteral());
         } else if (node instanceof IndentedCodeBlock code) {
             sb.append(code.getLiteral());
+        } else if (node instanceof TaskListItemMarker marker) {
+            sb.append(marker.isChecked() ? "[x] " : "[ ] ");
         } else if (node instanceof Paragraph) {
             Node child = node.getFirstChild();
             while (child != null) {
