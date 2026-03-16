@@ -10,6 +10,7 @@ import com.disqt.disquests.client.gui.widget.DarkButtonWidget;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.client.gui.widget.TabButtonWidget;
 import com.disqt.disquests.client.gui.widget.list.QuestListWidget;
+import com.disqt.disquests.client.hud.HudPinManager;
 import com.disqt.disquests.client.network.PacketSender;
 import com.disqt.disquests.common.model.Visibility;
 import net.minecraft.client.MinecraftClient;
@@ -45,6 +46,7 @@ public class MainScreen extends BaseScreen {
     private DarkButtonWidget openButton;
     private DarkButtonWidget joinButton;
     private DarkButtonWidget requestAccessButton;
+    private DarkButtonWidget pinButton;
     private DarkButtonWidget closeButton;
 
     // Lists
@@ -90,10 +92,12 @@ public class MainScreen extends BaseScreen {
                 ScreenLayouts.TAB_WIDTH, ScreenLayouts.TAB_HEIGHT,
                 Text.literal("My Quests"), b -> selectTab(TAB_MY_QUESTS)
         ));
+        int questBoardTabWidth = Math.max(ScreenLayouts.TAB_WIDTH,
+                MinecraftClient.getInstance().textRenderer.getWidth("Quest Board") + 12);
         this.serverQuestsTab = this.addDrawableChild(new TabButtonWidget(
                 (this.width / 2) + 2, tabY,
-                ScreenLayouts.TAB_WIDTH, ScreenLayouts.TAB_HEIGHT,
-                Text.literal("Server"), b -> selectTab(TAB_SERVER_QUESTS)
+                questBoardTabWidth, ScreenLayouts.TAB_HEIGHT,
+                Text.literal("Quest Board"), b -> selectTab(TAB_SERVER_QUESTS)
         ));
 
         // --- SUB-FILTER BUTTONS (Server Quests) ---
@@ -145,8 +149,8 @@ public class MainScreen extends BaseScreen {
         // My Quests tab: New Quest, Open, Close
         // Server Quests tab: Join, Request Access, Open, Close
         // We create all buttons but show/hide based on tab
-        UIHelper.createButtonRow(this, buttonsY, 5, x -> {
-            int index = (x - UIHelper.getCenteredButtonStartX(this.width, 5)) / (UIHelper.BUTTON_WIDTH + UIHelper.BUTTON_SPACING);
+        UIHelper.createButtonRow(this, buttonsY, 6, x -> {
+            int index = (x - UIHelper.getCenteredButtonStartX(this.width, 6)) / (UIHelper.BUTTON_WIDTH + UIHelper.BUTTON_SPACING);
             switch (index) {
                 case 0 -> this.newQuestButton = this.addDrawableChild(new DarkButtonWidget(
                         x, buttonsY, UIHelper.BUTTON_WIDTH, UIHelper.BUTTON_HEIGHT,
@@ -157,10 +161,13 @@ public class MainScreen extends BaseScreen {
                 case 2 -> this.requestAccessButton = this.addDrawableChild(new DarkButtonWidget(
                         x, buttonsY, UIHelper.BUTTON_WIDTH, UIHelper.BUTTON_HEIGHT,
                         Text.literal("Request"), b -> requestAccess()));
-                case 3 -> this.openButton = this.addDrawableChild(new DarkButtonWidget(
+                case 3 -> this.pinButton = this.addDrawableChild(new DarkButtonWidget(
+                        x, buttonsY, UIHelper.BUTTON_WIDTH, UIHelper.BUTTON_HEIGHT,
+                        Text.literal("Pin"), b -> togglePinSelected()));
+                case 4 -> this.openButton = this.addDrawableChild(new DarkButtonWidget(
                         x, buttonsY, UIHelper.BUTTON_WIDTH, UIHelper.BUTTON_HEIGHT,
                         Text.literal("Open"), b -> openSelected()));
-                case 4 -> this.closeButton = this.addDrawableChild(new DarkButtonWidget(
+                case 5 -> this.closeButton = this.addDrawableChild(new DarkButtonWidget(
                         x, buttonsY, UIHelper.BUTTON_WIDTH, UIHelper.BUTTON_HEIGHT,
                         Text.literal("Close"), b -> this.client.setScreen(null)));
             }
@@ -197,6 +204,7 @@ public class MainScreen extends BaseScreen {
         newQuestButton.visible = isMyQuests;
         joinButton.visible = !isMyQuests;
         requestAccessButton.visible = !isMyQuests;
+        pinButton.visible = true;
 
         if (!isMyQuests) {
             selectServerFilter(this.serverFilter);
@@ -300,6 +308,16 @@ public class MainScreen extends BaseScreen {
             joinButton.active = hasSelection && selected.getVisibility() == Visibility.OPEN;
             requestAccessButton.active = hasSelection && selected.getVisibility() == Visibility.CLOSED;
         }
+
+        Quest pinSel = currentTab == TAB_MY_QUESTS
+                ? myQuestListWidget.getSelectedQuest()
+                : serverQuestListWidget.getSelectedQuest();
+        pinButton.active = pinSel != null;
+        if (pinSel != null && HudPinManager.isPinned(pinSel.getId())) {
+            pinButton.setMessage(Text.literal("Unpin"));
+        } else {
+            pinButton.setMessage(Text.literal("Pin"));
+        }
     }
 
     // --- ACTIONS ---
@@ -346,6 +364,17 @@ public class MainScreen extends BaseScreen {
         Quest sel = serverQuestListWidget.getSelectedQuest();
         if (sel != null && sel.getVisibility() == Visibility.CLOSED) {
             PacketSender.requestCollaboration(sel.getId());
+        }
+    }
+
+    private void togglePinSelected() {
+        Quest sel = currentTab == TAB_MY_QUESTS
+                ? myQuestListWidget.getSelectedQuest()
+                : serverQuestListWidget.getSelectedQuest();
+        if (sel != null) {
+            HudPinManager.toggle(sel.getId());
+            refreshListContents();
+            updateActionButtons();
         }
     }
 
