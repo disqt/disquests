@@ -84,10 +84,7 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
             this.isPinned = ClientSession.isPinned(quest.getId());
 
             // Check ownership
-            UUID playerUuid = ClientSession.getPlayerUuid();
-            if (playerUuid == null) {
-                playerUuid = MinecraftClient.getInstance().getSession().getUuidOrNull();
-            }
+            UUID playerUuid = ClientSession.getEffectivePlayerUuid();
             this.isOwnedByPlayer = playerUuid != null && playerUuid.equals(quest.getOwnerUuid());
         }
 

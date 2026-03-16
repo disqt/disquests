@@ -8,8 +8,6 @@ import com.disqt.disquests.common.PacketCodec;
 import com.disqt.disquests.common.PacketType;
 import com.disqt.disquests.common.model.QuestData;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.client.MinecraftClient;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -71,8 +69,7 @@ public class ClientPacketHandler {
     private static void handleUpdateQuest(ByteBufReader r) {
         QuestData data = PacketCodec.readUpdateQuest(r);
         Quest quest = Quest.fromNetwork(data);
-        UUID sessionUuid = ClientSession.getPlayerUuid();
-        final UUID myUuid = sessionUuid != null ? sessionUuid : MinecraftClient.getInstance().getSession().getUuidOrNull();
+        final UUID myUuid = ClientSession.getEffectivePlayerUuid();
         boolean isMine = data.ownerUuid().equals(myUuid) ||
                 data.contributors().stream().anyMatch(c -> c.uuid().equals(myUuid));
         if (isMine) {

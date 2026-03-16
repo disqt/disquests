@@ -1,6 +1,7 @@
 package com.disqt.disquests.client;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -66,7 +67,7 @@ public class ClientSession {
     }
 
     public static List<UUID> getPinnedQuestIds() {
-        return pinnedQuestIds;
+        return Collections.unmodifiableList(pinnedQuestIds);
     }
 
     public static boolean isPinned(UUID questId) {
@@ -85,6 +86,17 @@ public class ClientSession {
 
     public static UUID getPlayerUuid() {
         return playerUuid;
+    }
+
+    /**
+     * Returns the server-assigned player UUID, falling back to the client session UUID.
+     */
+    public static UUID getEffectivePlayerUuid() {
+        UUID uuid = playerUuid;
+        if (uuid == null) {
+            uuid = net.minecraft.client.MinecraftClient.getInstance().getSession().getUuidOrNull();
+        }
+        return uuid;
     }
 
     public static int getActiveTab() {

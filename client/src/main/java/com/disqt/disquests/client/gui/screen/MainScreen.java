@@ -334,11 +334,7 @@ public class MainScreen extends BaseScreen {
         newQuest.setTitle("New Quest");
         newQuest.setContent("");
         newQuest.setVisibility(Visibility.PRIVATE);
-        UUID myUuid = ClientSession.getPlayerUuid();
-        if (myUuid == null) {
-            myUuid = MinecraftClient.getInstance().getSession().getUuidOrNull();
-        }
-        newQuest.setOwnerUuid(myUuid);
+        newQuest.setOwnerUuid(ClientSession.getEffectivePlayerUuid());
         newQuest.setOwnerName(MinecraftClient.getInstance().getSession().getUsername());
         newQuest.setLastModified(System.currentTimeMillis() / 1000);
         newQuest.setContributors(new ArrayList<>());

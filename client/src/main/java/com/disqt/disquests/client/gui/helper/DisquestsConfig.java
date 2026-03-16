@@ -2,6 +2,7 @@ package com.disqt.disquests.client.gui.helper;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,8 +12,8 @@ import java.nio.file.Path;
 
 public class DisquestsConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger("Disquests");
-    private static final Path CONFIG_PATH = Path.of(
-            System.getProperty("user.home"), ".fabric", "config", "disquests", "config.json");
+    private static final Path CONFIG_PATH = FabricLoader.getInstance().getConfigDir()
+            .resolve("disquests").resolve("config.json");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private static int pinnedWidth = 200;

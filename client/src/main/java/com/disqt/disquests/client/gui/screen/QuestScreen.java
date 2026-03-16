@@ -17,10 +17,8 @@ import com.disqt.disquests.client.markdown.RenderedLine;
 import com.disqt.disquests.client.network.PacketSender;
 import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.Visibility;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.input.KeyInput;
@@ -77,6 +75,11 @@ public class QuestScreen extends BaseScreen {
     private int contentAreaWidth;
     private int contentAreaHeight;
 
+    // --- Pre-computed view mode strings (set in initViewMode, used in renderViewMode) ---
+    private String viewOwnerInfo;
+    private String viewCoordsText;
+    private String viewMapText;
+
     /**
      * Open in view mode for an existing quest.
      */
@@ -115,7 +118,7 @@ public class QuestScreen extends BaseScreen {
     protected void init() {
         super.init();
 
-        UUID myUuid = getMyUuid();
+        UUID myUuid = ClientSession.getEffectivePlayerUuid();
         this.isOwner = quest.getOwnerUuid().equals(myUuid);
         this.canEdit = isOwner || quest.getContributors().stream()
                 .anyMatch(c -> c.getUuid().equals(myUuid) && c.canEdit());
@@ -236,6 +239,15 @@ public class QuestScreen extends BaseScreen {
                     }
             ));
         }
+
+        // --- Pre-compute view mode render strings ---
+        String ownerInfo = "by " + quest.getOwnerName();
+        if (quest.getVisibility() != null) {
+            ownerInfo += "  [" + quest.getVisibility().name() + "]";
+        }
+        this.viewOwnerInfo = ownerInfo;
+        this.viewCoordsText = hasCoords ? buildCoordsText() : null;
+        this.viewMapText = (hasCoords && quest.getMap() != null) ? "Map: " + quest.getMap() : null;
     }
 
     private void renderViewMode(DrawContext context, int mouseX, int mouseY, float delta) {
@@ -249,13 +261,9 @@ public class QuestScreen extends BaseScreen {
         // --- Screen title ---
         context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 8, Colors.TEXT_PRIMARY);
 
-        // --- Owner & visibility info ---
-        String ownerInfo = "by " + quest.getOwnerName();
-        if (quest.getVisibility() != null) {
-            ownerInfo += "  [" + quest.getVisibility().name() + "]";
-        }
-        int ownerInfoWidth = this.textRenderer.getWidth(ownerInfo);
-        context.drawText(this.textRenderer, ownerInfo,
+        // --- Owner & visibility info (pre-computed in initViewMode) ---
+        int ownerInfoWidth = this.textRenderer.getWidth(viewOwnerInfo);
+        context.drawText(this.textRenderer, viewOwnerInfo,
                 contentX + contentWidth - ownerInfoWidth,
                 ScreenLayouts.TOP_MARGIN - 2,
                 Colors.TEXT_MUTED, false);
@@ -275,22 +283,19 @@ public class QuestScreen extends BaseScreen {
                 contentWidth, contentPanelBottom - contentPanelY);
         this.viewContentArea.render(context, mouseX, mouseY, delta);
 
-        // --- Metadata bar ---
+        // --- Metadata bar (pre-computed in initViewMode) ---
         if (hasCoords) {
             int metaY = contentPanelBottom + ScreenLayouts.PANEL_SPACING;
             UIHelper.drawPanel(context, contentX, metaY, contentWidth, metadataHeight);
 
-            String coordsText = buildCoordsText();
             int textY = metaY + (metadataHeight - 8) / 2;
             int textX = contentX + 5;
 
-            context.drawText(this.textRenderer, coordsText, textX, textY, Colors.TEXT_MUTED, false);
+            context.drawText(this.textRenderer, viewCoordsText, textX, textY, Colors.TEXT_MUTED, false);
 
-            // Map name
-            if (quest.getMap() != null) {
-                String mapText = "Map: " + quest.getMap();
-                int coordsWidth = this.textRenderer.getWidth(coordsText);
-                context.drawText(this.textRenderer, mapText,
+            if (viewMapText != null) {
+                int coordsWidth = this.textRenderer.getWidth(viewCoordsText);
+                context.drawText(this.textRenderer, viewMapText,
                         textX + coordsWidth + 12, textY, Colors.TEXT_MUTED, false);
             }
         }
@@ -384,22 +389,22 @@ public class QuestScreen extends BaseScreen {
         int rowY = optPanelY + 4;
 
         // Coords row
-        buildCoordsRow(contentX, rowY, contentWidth);
+        buildCoordsRow(contentX, rowY);
         rowY += 18;
 
         // Region corner 2 row (if region enabled)
         if (regionEnabled) {
-            buildCorner2Row(contentX, rowY, contentWidth);
+            buildCorner2Row(contentX, rowY);
             rowY += 18;
         }
 
         // Map row
-        buildMapRow(contentX, rowY, contentWidth);
+        buildMapRow(contentX, rowY);
 
         // --- SETTINGS ROW (owner only) ---
         if (isOwner) {
             int settingsY = optPanelY + optionalFieldsHeight + ScreenLayouts.PANEL_SPACING;
-            buildSettingsRow(contentX, settingsY, contentWidth);
+            buildSettingsRow(contentX, settingsY);
         }
 
         this.setInitialFocus(this.editTitleField);
@@ -519,7 +524,7 @@ public class QuestScreen extends BaseScreen {
 
     // ===================== EDIT MODE ROWS =====================
 
-    private void buildCoordsRow(int panelX, int rowY, int panelWidth) {
+    private void buildCoordsRow(int panelX, int rowY) {
         int btnWidth = 50;
         int btnHeight = 14;
         int fieldWidth = 50;
@@ -580,7 +585,7 @@ public class QuestScreen extends BaseScreen {
                 Text.literal("Clear"), b -> clearCoords()));
     }
 
-    private void buildCorner2Row(int panelX, int rowY, int panelWidth) {
+    private void buildCorner2Row(int panelX, int rowY) {
         int labelWidth = this.textRenderer.getWidth("Corner 2: ");
         int btnWidth = 50;
         int btnHeight = 14;
@@ -598,7 +603,7 @@ public class QuestScreen extends BaseScreen {
                 Text.literal("Set"), b -> setCorner2Position()));
     }
 
-    private void buildMapRow(int panelX, int rowY, int panelWidth) {
+    private void buildMapRow(int panelX, int rowY) {
         int labelWidth = this.textRenderer.getWidth("Map: ");
         String mapText = quest.getMap() != null ? quest.getMap() : "Any";
         int mapTextWidth = this.textRenderer.getWidth(mapText);
@@ -617,7 +622,7 @@ public class QuestScreen extends BaseScreen {
                 Text.literal("Clear"), b -> clearMap()));
     }
 
-    private void buildSettingsRow(int panelX, int settingsY, int panelWidth) {
+    private void buildSettingsRow(int panelX, int settingsY) {
         int btnHeight = 16;
         int spacing = 8;
 
@@ -679,13 +684,7 @@ public class QuestScreen extends BaseScreen {
     }
 
     private void clearCoords() {
-        // Persist title/content before clearing coords
-        if (this.editTitleField != null) {
-            quest.setTitle(this.editTitleField.getText());
-        }
-        if (this.editContentField != null) {
-            quest.setContent(this.editContentField.getText());
-        }
+        persistFieldValues();
         quest.setCoordinates(null);
         quest.setCoordinates2(null);
         this.regionEnabled = false;
@@ -777,7 +776,7 @@ public class QuestScreen extends BaseScreen {
                 quest.getMap()
         );
         // Also send visibility update if owner
-        UUID myUuid = getMyUuid();
+        UUID myUuid = ClientSession.getEffectivePlayerUuid();
         if (quest.getOwnerUuid().equals(myUuid)) {
             PacketSender.updateVisibility(quest.getId(), quest.getVisibility());
         }
@@ -805,11 +804,6 @@ public class QuestScreen extends BaseScreen {
 
     // ===================== SHARED HELPERS =====================
 
-    private UUID getMyUuid() {
-        UUID sessionUuid = ClientSession.getPlayerUuid();
-        if (sessionUuid != null) return sessionUuid;
-        return MinecraftClient.getInstance().getSession().getUuidOrNull();
-    }
 
     private void persistFieldValues() {
         if (this.editTitleField != null) {
@@ -926,8 +920,4 @@ public class QuestScreen extends BaseScreen {
         return false;
     }
 
-    @Override
-    public void setFocused(Element focused) {
-        super.setFocused(focused);
-    }
 }

@@ -9,6 +9,7 @@ import net.minecraft.client.gui.DrawContext;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class HudPinRenderer {
 
@@ -22,62 +23,84 @@ public class HudPinRenderer {
 
     private static int getMaxWidth() { return DisquestsConfig.getPinnedWidth(); }
 
+    // --- Cache ---
+    private record CachedPin(Quest quest, List<String> titleLines, List<String> contentLines, boolean truncated) {}
+
+    private static List<UUID> lastPinnedIds = List.of();
+    private static List<CachedPin> cachedPins = List.of();
+
     public static void render(DrawContext context) {
-        List<Quest> pinnedQuests = HudPinManager.getPinnedQuests();
-        if (pinnedQuests.isEmpty()) return;
+        List<Quest> quests = HudPinManager.getPinnedQuests();
+        if (quests.isEmpty()) {
+            lastPinnedIds = List.of();
+            cachedPins = List.of();
+            return;
+        }
 
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.inGameHud.getDebugHud().shouldShowDebugHud()) return;
 
-        TextRenderer tr = client.textRenderer;
-        int y = MARGIN;
+        // Rebuild cache if pin list changed
+        List<UUID> currentIds = quests.stream().map(Quest::getId).toList();
+        if (!currentIds.equals(lastPinnedIds)) {
+            rebuildCache(client.textRenderer, quests);
+            lastPinnedIds = currentIds;
+        }
 
-        for (Quest quest : pinnedQuests) {
-            y = renderSinglePin(context, tr, quest, MARGIN, y);
+        // Render from cache
+        TextRenderer tr = client.textRenderer;
+        int lineHeight = tr.fontHeight + 1;
+        int y = MARGIN;
+        for (CachedPin pin : cachedPins) {
+            y = renderCachedPin(context, tr, pin, y, lineHeight);
             y += GAP;
         }
     }
 
-    private static int renderSinglePin(DrawContext context, TextRenderer tr, Quest quest, int x, int y) {
-        int lineHeight = tr.fontHeight + 1;
+    private static void rebuildCache(TextRenderer tr, List<Quest> quests) {
+        int maxWidth = getMaxWidth() - PADDING * 2;
+        List<CachedPin> pins = new ArrayList<>(quests.size());
+        for (Quest quest : quests) {
+            List<String> titleLines = wrapText(tr, quest.getTitle(), maxWidth);
 
-        // Wrap title
-        List<String> titleLines = wrapText(tr, quest.getTitle(), getMaxWidth() - PADDING * 2);
+            String plainContent = MarkdownRenderer.stripToPlainText(quest.getContent());
+            List<String> contentLines = wrapText(tr, plainContent, maxWidth);
 
-        // Strip markdown from content for plain text HUD display
-        String plainContent = MarkdownRenderer.stripToPlainText(quest.getContent());
-        List<String> contentLines = wrapText(tr, plainContent, getMaxWidth() - PADDING * 2);
+            int maxContentLines = MAX_LINES - titleLines.size();
+            boolean truncated = false;
+            if (contentLines.size() > maxContentLines) {
+                contentLines = new ArrayList<>(contentLines.subList(0, maxContentLines));
+                truncated = true;
+            }
 
-        // Truncate content if too many lines
-        int maxContentLines = MAX_LINES - titleLines.size();
-        boolean truncated = false;
-        if (contentLines.size() > maxContentLines) {
-            contentLines = new ArrayList<>(contentLines.subList(0, maxContentLines));
-            truncated = true;
+            pins.add(new CachedPin(quest, titleLines, contentLines, truncated));
         }
+        cachedPins = pins;
+    }
 
-        int totalLines = titleLines.size() + contentLines.size() + (truncated ? 1 : 0);
+    private static int renderCachedPin(DrawContext context, TextRenderer tr, CachedPin pin, int y, int lineHeight) {
+        int totalLines = pin.titleLines.size() + pin.contentLines.size() + (pin.truncated ? 1 : 0);
         int boxWidth = getMaxWidth();
         int boxHeight = PADDING * 2 + totalLines * lineHeight;
 
         // Background
-        context.fill(x, y, x + boxWidth, y + boxHeight, BG_COLOR);
+        context.fill(MARGIN, y, MARGIN + boxWidth, y + boxHeight, BG_COLOR);
 
         // Title (white)
         int textY = y + PADDING;
-        for (String line : titleLines) {
-            context.drawText(tr, line, x + PADDING, textY, TITLE_COLOR, true);
+        for (String line : pin.titleLines) {
+            context.drawText(tr, line, MARGIN + PADDING, textY, TITLE_COLOR, true);
             textY += lineHeight;
         }
 
         // Content (gray)
-        for (String line : contentLines) {
-            context.drawText(tr, line, x + PADDING, textY, CONTENT_COLOR, true);
+        for (String line : pin.contentLines) {
+            context.drawText(tr, line, MARGIN + PADDING, textY, CONTENT_COLOR, true);
             textY += lineHeight;
         }
 
-        if (truncated) {
-            context.drawText(tr, "...", x + PADDING, textY, CONTENT_COLOR, true);
+        if (pin.truncated) {
+            context.drawText(tr, "...", MARGIN + PADDING, textY, CONTENT_COLOR, true);
         }
 
         return y + boxHeight;
