@@ -74,9 +74,18 @@ Channel: `disquests:main`. First byte = PacketType ID.
 ## Gotchas
 
 - **Gradle Kotlin DSL shadows `java` package** — `java.lang.management.*` won't resolve in `.gradle.kts` because `java` is a Gradle DSL accessor. Use `Class.forName("java.lang.management.ManagementFactory")` instead.
-- **PR target** — `gh pr create` defaults to upstream (`Atif85`). Use `--repo disqt/buildnotes --base main` explicitly.
+- **PR target** — origin is `disqt/disquests`. No upstream remote.
 
 ## Deploy
 
 - **Paper plugin**: `scp paper/build/libs/disquests-paper-*.jar minecraft:~/server/plugins/Disquests.jar`
 - **Client mod**: distribute `client/build/libs/disquests-*.jar` to players for Fabric `mods/` directory
+
+## Release
+
+Tag-triggered via GitHub Actions (`.github/workflows/release.yml`). Pushes a `v*` tag, runs E2E tests, generates changelog from conventional commits, creates GitHub release with `disquests-client-{version}.jar` and `disquests-paper-{version}.jar`.
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
