@@ -109,21 +109,22 @@ public class MarkdownRenderer {
                 item = item.getNext();
             }
         } else if (node instanceof ListItem) {
-            // Check for task list
+            // Check for task list.
+            // TaskListItemsExtension prepends TaskListItemMarker as the first child of
+            // ListItem (not inside the Paragraph), so the structure is:
+            //   ListItem > [TaskListItemMarker, Paragraph > Text("...")]
             Node firstChild = node.getFirstChild();
-            if (firstChild instanceof Paragraph para) {
-                Node inlineFirst = para.getFirstChild();
-                if (inlineFirst instanceof TaskListItemMarker marker) {
+            if (firstChild instanceof TaskListItemMarker marker) {
+                Node secondChild = firstChild.getNext();
+                if (secondChild instanceof Paragraph para) {
                     String checkbox = marker.isChecked() ? "[x] " : "[ ] ";
                     MutableText prefix = Text.literal(checkbox).setStyle(
                             marker.isChecked() ? Style.EMPTY.withColor(Formatting.GREEN) : Style.EMPTY.withColor(Formatting.GRAY));
-                    MutableText content = collectInlineText(para, style, inlineFirst.getNext());
+                    MutableText content = collectInlineText(para, style);
                     if (marker.isChecked()) {
                         content = content.formatted(Formatting.STRIKETHROUGH, Formatting.GRAY);
                     }
                     lines.add(RenderedLine.normal(prefix.append(content), indent));
-                } else {
-                    renderListItem(node, lines, indent, style, "* ");
                 }
             } else {
                 renderListItem(node, lines, indent, style, "* ");
