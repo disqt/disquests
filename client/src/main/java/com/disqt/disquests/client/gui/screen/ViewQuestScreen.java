@@ -164,11 +164,12 @@ public class ViewQuestScreen extends BaseScreen {
     }
 
     private void togglePin() {
-        PacketSender.pinQuest(quest.getId());
         UUID currentPinned = ClientSession.getPinnedQuestId();
         if (currentPinned != null && currentPinned.equals(quest.getId())) {
+            PacketSender.pinQuest(null);
             ClientSession.setPinnedQuestId(null);
         } else {
+            PacketSender.pinQuest(quest.getId());
             ClientSession.setPinnedQuestId(quest.getId());
         }
         this.clearAndInit();

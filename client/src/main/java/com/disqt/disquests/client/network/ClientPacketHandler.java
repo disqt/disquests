@@ -26,15 +26,20 @@ public class ClientPacketHandler {
         }
 
         context.client().execute(() -> {
-            switch (type) {
-                case HANDSHAKE -> handleHandshake(r);
-                case SYNC_MY_QUESTS -> handleSyncMyQuests(r);
-                case SYNC_SERVER_QUESTS -> handleSyncServerQuests(r);
-                case UPDATE_QUEST -> handleUpdateQuest(r);
-                case DELETE_QUEST_S2C -> handleDeleteQuestS2C(r);
-                case COLLABORATION_REQUEST -> handleCollaborationRequest(r);
-                case COLLABORATION_RESPONSE -> handleCollaborationResponse(r);
-                default -> {}
+            try {
+                switch (type) {
+                    case HANDSHAKE -> handleHandshake(r);
+                    case SYNC_MY_QUESTS -> handleSyncMyQuests(r);
+                    case SYNC_SERVER_QUESTS -> handleSyncServerQuests(r);
+                    case UPDATE_QUEST -> handleUpdateQuest(r);
+                    case DELETE_QUEST_S2C -> handleDeleteQuestS2C(r);
+                    case COLLABORATION_REQUEST -> handleCollaborationRequest(r);
+                    case COLLABORATION_RESPONSE -> handleCollaborationResponse(r);
+                    default -> {}
+                }
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger("Disquests")
+                    .warn("Failed to handle S2C packet {}", type, e);
             }
         });
     }

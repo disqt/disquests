@@ -358,6 +358,72 @@ class PacketCodecTest {
         assertEquals(0, reader.remaining());
     }
 
+    // ---- bounds / error tests ----
+
+    @Test
+    void readQuest_invalidVisibilityOrdinal_throws() {
+        ByteBufWriter w = new ByteBufWriter();
+        w.writeUUID(UUID.randomUUID());
+        w.writeString("title");
+        w.writeString("content");
+        w.writeUUID(UUID.randomUUID());
+        w.writeString("owner");
+        w.writeVarInt(99); // invalid visibility ordinal
+        w.writeVarInt(0);
+        w.writeLong(1000L);
+        w.writeBoolean(false);
+        w.writeBoolean(false);
+        w.writeBoolean(false);
+        w.writeBoolean(false);
+        ByteBufReader r = new ByteBufReader(w.toByteArray());
+        assertThrows(IllegalArgumentException.class, () -> PacketCodec.readQuest(r));
+    }
+
+    @Test
+    void readUpdateContributors_invalidOpOrdinal_throws() {
+        ByteBufWriter w = new ByteBufWriter();
+        w.writeUUID(UUID.randomUUID());
+        w.writeVarInt(1);
+        w.writeVarInt(99); // invalid ContributorOp ordinal
+        w.writeBoolean(false);
+        w.writeBoolean(false);
+        w.writeBoolean(false);
+        ByteBufReader r = new ByteBufReader(w.toByteArray());
+        assertThrows(IllegalArgumentException.class, () -> PacketCodec.readUpdateContributors(r));
+    }
+
+    @Test
+    void readQuest_negativeContributorCount_throws() {
+        ByteBufWriter w = new ByteBufWriter();
+        w.writeUUID(UUID.randomUUID());
+        w.writeString("title");
+        w.writeString("content");
+        w.writeUUID(UUID.randomUUID());
+        w.writeString("owner");
+        w.writeVarInt(0);
+        w.writeVarInt(-1); // negative
+        ByteBufReader r = new ByteBufReader(w.toByteArray());
+        assertThrows(IllegalArgumentException.class, () -> PacketCodec.readQuest(r));
+    }
+
+    @Test
+    void readType_unknownPacketId_throws() {
+        ByteBufWriter w = new ByteBufWriter();
+        w.writeByte(0xFF);
+        ByteBufReader r = new ByteBufReader(w.toByteArray());
+        assertThrows(IllegalArgumentException.class, () -> PacketCodec.readType(r));
+    }
+
+    @Test
+    void testHandshakeNullBluemapUrl() {
+        byte[] packet = PacketCodec.writeHandshake(null, 0, null);
+        ByteBufReader reader = new ByteBufReader(packet);
+        assertEquals(PacketType.HANDSHAKE, PacketCodec.readType(reader));
+        PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(reader);
+        assertNull(payload.bluemapUrl());
+        assertEquals(0, reader.remaining());
+    }
+
     // ---- 16. testUpdateContributorsRoundTrip ----
 
     @Test
@@ -392,6 +458,146 @@ class PacketCodecTest {
         assertEquals("bob", op2.playerName());
         assertFalse(op2.canEdit());
 
+        assertEquals(0, reader.remaining());
+    }
+
+    // ---- 17. testRequestSyncRoundTrip ----
+
+    @Test
+    void testRequestSyncRoundTrip() {
+        byte[] packet = PacketCodec.writeRequestSync();
+        ByteBufReader reader = new ByteBufReader(packet);
+        assertEquals(PacketType.REQUEST_SYNC, PacketCodec.readType(reader));
+        assertEquals(0, reader.remaining());
+    }
+
+    // ---- 18. testJoinQuestRoundTrip ----
+
+    @Test
+    void testJoinQuestRoundTrip() {
+        UUID questId = UUID.randomUUID();
+        byte[] packet = PacketCodec.writeJoinQuest(questId);
+        ByteBufReader reader = new ByteBufReader(packet);
+        assertEquals(PacketType.JOIN_QUEST, PacketCodec.readType(reader));
+        UUID decoded = PacketCodec.readJoinQuest(reader);
+        assertEquals(questId, decoded);
+        assertEquals(0, reader.remaining());
+    }
+
+    // ---- 19. testRequestCollaborationRoundTrip ----
+
+    @Test
+    void testRequestCollaborationRoundTrip() {
+        UUID questId = UUID.randomUUID();
+        byte[] packet = PacketCodec.writeRequestCollaboration(questId);
+        ByteBufReader reader = new ByteBufReader(packet);
+        assertEquals(PacketType.REQUEST_COLLABORATION, PacketCodec.readType(reader));
+        UUID decoded = PacketCodec.readRequestCollaboration(reader);
+        assertEquals(questId, decoded);
+        assertEquals(0, reader.remaining());
+    }
+
+    // ---- 20. testSyncServerQuestsRoundTrip ----
+
+    @Test
+    void testSyncServerQuestsRoundTrip() {
+        QuestData q1 = makeQuest(false, false, false);
+        List<QuestData> quests = List.of(q1);
+        byte[] packet = PacketCodec.writeSyncServerQuests(quests);
+        ByteBufReader reader = new ByteBufReader(packet);
+        assertEquals(PacketType.SYNC_SERVER_QUESTS, PacketCodec.readType(reader));
+        List<QuestData> decoded = PacketCodec.readSyncServerQuests(reader);
+        assertEquals(1, decoded.size());
+        assertQuestsEqual(q1, decoded.get(0));
+        assertEquals(0, reader.remaining());
+    }
+
+    // ---- 21. testUpdateQuestRoundTrip ----
+
+    @Test
+    void testUpdateQuestRoundTrip() {
+        QuestData quest = makeQuest(true, false, true);
+        byte[] packet = PacketCodec.writeUpdateQuest(quest);
+        ByteBufReader reader = new ByteBufReader(packet);
+        assertEquals(PacketType.UPDATE_QUEST, PacketCodec.readType(reader));
+        QuestData decoded = PacketCodec.readUpdateQuest(reader);
+        assertQuestsEqual(quest, decoded);
+        assertEquals(0, reader.remaining());
+    }
+
+    // ---- 22. testDeleteQuestS2CRoundTrip ----
+
+    @Test
+    void testDeleteQuestS2CRoundTrip() {
+        UUID questId = UUID.randomUUID();
+        byte[] packet = PacketCodec.writeDeleteQuestS2C(questId);
+        ByteBufReader reader = new ByteBufReader(packet);
+        assertEquals(PacketType.DELETE_QUEST_S2C, PacketCodec.readType(reader));
+        UUID decoded = PacketCodec.readDeleteQuestS2C(reader);
+        assertEquals(questId, decoded);
+        assertEquals(0, reader.remaining());
+    }
+
+    // ---- 23. testUpdateContributorsWithUpdateOp ----
+
+    @Test
+    void testUpdateContributorsWithUpdateOp() {
+        UUID questId = UUID.randomUUID();
+        UUID playerUuid = UUID.randomUUID();
+        List<PacketCodec.ContributorOpEntry> ops = List.of(
+            new PacketCodec.ContributorOpEntry(ContributorOp.UPDATE, playerUuid, null, true)
+        );
+        byte[] packet = PacketCodec.writeUpdateContributors(questId, ops);
+        ByteBufReader reader = new ByteBufReader(packet);
+        assertEquals(PacketType.UPDATE_CONTRIBUTORS, PacketCodec.readType(reader));
+        PacketCodec.UpdateContributorsPayload payload = PacketCodec.readUpdateContributors(reader);
+        assertEquals(ContributorOp.UPDATE, payload.ops().get(0).action());
+        assertEquals(0, reader.remaining());
+    }
+
+    // ---- 24. testQuestWithClosedVisibility ----
+
+    @Test
+    void testQuestWithClosedVisibility() {
+        QuestData quest = new QuestData(
+            UUID.randomUUID(), "Closed Quest", "Only collaborators.",
+            UUID.randomUUID(), "owner",
+            Visibility.CLOSED,
+            List.of(new ContributorData(UUID.randomUUID(), "helper", true)),
+            1000L, null, false, null, null
+        );
+        ByteBufWriter w = new ByteBufWriter();
+        PacketCodec.writeQuest(w, quest);
+        ByteBufReader r = new ByteBufReader(w.toByteArray());
+        QuestData decoded = PacketCodec.readQuest(r);
+        assertEquals(Visibility.CLOSED, decoded.visibility());
+        assertQuestsEqual(quest, decoded);
+    }
+
+    // ---- 25. testUnicodeStringRoundTrip ----
+
+    @Test
+    void testUnicodeStringRoundTrip() {
+        UUID questId = UUID.randomUUID();
+        byte[] packet = PacketCodec.writeSaveQuest(
+            questId, "Quest: \u9F8D Dragon", "Description with unicode: \u00E9\u00E8\u00EA and CJK: \u4E16\u754C",
+            null, false, null, null);
+        ByteBufReader reader = new ByteBufReader(packet);
+        PacketCodec.readType(reader);
+        PacketCodec.SaveQuestPayload payload = PacketCodec.readSaveQuest(reader);
+        assertEquals("Quest: \u9F8D Dragon", payload.title());
+        assertEquals("Description with unicode: \u00E9\u00E8\u00EA and CJK: \u4E16\u754C", payload.content());
+    }
+
+    // ---- 26. testEmptySyncMyQuests ----
+
+    @Test
+    void testEmptySyncMyQuests() {
+        byte[] packet = PacketCodec.writeSyncMyQuests(List.of());
+        ByteBufReader reader = new ByteBufReader(packet);
+        assertEquals(PacketType.SYNC_MY_QUESTS, PacketCodec.readType(reader));
+        List<QuestData> decoded = PacketCodec.readSyncMyQuests(reader);
+        assertTrue(decoded.isEmpty());
         assertEquals(0, reader.remaining());
     }
 }

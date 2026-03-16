@@ -15,6 +15,29 @@ public final class PacketCodec {
     private PacketCodec() {
     }
 
+    private static final int MAX_CONTRIBUTORS = 256;
+    private static final int MAX_OPS = 256;
+    private static final int MAX_QUEST_LIST = 10000;
+
+    private static <T extends Enum<T>> T readEnum(ByteBufReader buf, Class<T> enumClass) {
+        int ordinal = buf.readVarInt();
+        T[] values = enumClass.getEnumConstants();
+        if (ordinal < 0 || ordinal >= values.length) {
+            throw new IllegalArgumentException(
+                    "Invalid " + enumClass.getSimpleName() + " ordinal: " + ordinal);
+        }
+        return values[ordinal];
+    }
+
+    private static int readCount(ByteBufReader buf, int max, String label) {
+        int count = buf.readVarInt();
+        if (count < 0 || count > max) {
+            throw new IllegalArgumentException(
+                    label + " count " + count + " outside bounds [0, " + max + "]");
+        }
+        return count;
+    }
+
     // ---- Nested payload records ----
 
     public record SaveQuestPayload(UUID questId, String title, String content,
@@ -121,7 +144,7 @@ public final class PacketCodec {
     public static byte[] writeHandshake(String bluemapUrl, int pendingRequestCount, UUID pinnedQuestId) {
         ByteBufWriter buf = new ByteBufWriter();
         buf.writeByte(PacketType.HANDSHAKE.getId());
-        buf.writeString(bluemapUrl);
+        writeNullableString(buf, bluemapUrl);
         buf.writeVarInt(pendingRequestCount);
         writeNullableUUID(buf, pinnedQuestId);
         return buf.toByteArray();
@@ -209,8 +232,8 @@ public final class PacketCodec {
         String content = buf.readString();
         UUID ownerUuid = buf.readUUID();
         String ownerName = buf.readString();
-        Visibility visibility = Visibility.values()[buf.readVarInt()];
-        int contributorCount = buf.readVarInt();
+        Visibility visibility = readEnum(buf, Visibility.class);
+        int contributorCount = readCount(buf, MAX_CONTRIBUTORS, "Contributor");
         List<ContributorData> contributors = new ArrayList<>(contributorCount);
         for (int i = 0; i < contributorCount; i++) {
             UUID uuid = buf.readUUID();
@@ -264,10 +287,10 @@ public final class PacketCodec {
 
     public static UpdateContributorsPayload readUpdateContributors(ByteBufReader buf) {
         UUID questId = buf.readUUID();
-        int count = buf.readVarInt();
+        int count = readCount(buf, MAX_OPS, "ContributorOp");
         List<ContributorOpEntry> ops = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            ContributorOp action = ContributorOp.values()[buf.readVarInt()];
+            ContributorOp action = readEnum(buf, ContributorOp.class);
             UUID playerUuid = readNullableUUID(buf);
             String playerName = readNullableString(buf);
             boolean canEdit = buf.readBoolean();
@@ -278,7 +301,7 @@ public final class PacketCodec {
 
     public static UpdateVisibilityPayload readUpdateVisibility(ByteBufReader buf) {
         UUID questId = buf.readUUID();
-        Visibility visibility = Visibility.values()[buf.readVarInt()];
+        Visibility visibility = readEnum(buf, Visibility.class);
         return new UpdateVisibilityPayload(questId, visibility);
     }
 
@@ -289,14 +312,14 @@ public final class PacketCodec {
     // ---- S2C decode ----
 
     public static HandshakePayload readHandshake(ByteBufReader buf) {
-        String bluemapUrl = buf.readString();
+        String bluemapUrl = readNullableString(buf);
         int pendingRequestCount = buf.readVarInt();
         UUID pinnedQuestId = readNullableUUID(buf);
         return new HandshakePayload(bluemapUrl, pendingRequestCount, pinnedQuestId);
     }
 
     public static List<QuestData> readSyncMyQuests(ByteBufReader buf) {
-        int count = buf.readVarInt();
+        int count = readCount(buf, MAX_QUEST_LIST, "Quest");
         List<QuestData> quests = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             quests.add(readQuest(buf));
@@ -305,7 +328,7 @@ public final class PacketCodec {
     }
 
     public static List<QuestData> readSyncServerQuests(ByteBufReader buf) {
-        int count = buf.readVarInt();
+        int count = readCount(buf, MAX_QUEST_LIST, "Quest");
         List<QuestData> quests = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             quests.add(readQuest(buf));

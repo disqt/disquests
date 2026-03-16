@@ -1,5 +1,5 @@
 name: Disquests
-version: '0.1.0'
+version: '${version}'
 main: com.disqt.disquests.paper.DisquestsPlugin
 api-version: '1.21'
 commands:

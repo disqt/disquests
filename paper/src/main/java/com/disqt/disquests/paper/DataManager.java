@@ -23,7 +23,7 @@ public class DataManager {
         this.dataDir = dataDir;
     }
 
-    public void initialize() {
+    public synchronized void initialize() {
         try {
             Files.createDirectories(dataDir);
             String url = "jdbc:sqlite:" + dataDir.resolve("disquests.db");
@@ -96,7 +96,7 @@ public class DataManager {
     // Quests
     // -------------------------------------------------------------------------
 
-    public void saveQuest(QuestData quest) {
+    public synchronized void saveQuest(QuestData quest) {
         try (PreparedStatement stmt = connection.prepareStatement("""
                 INSERT INTO quests (id, title, content, owner_uuid, visibility,
                     coord_x, coord_y, coord_z, is_region,
@@ -149,7 +149,7 @@ public class DataManager {
         }
     }
 
-    public boolean deleteQuest(UUID id) {
+    public synchronized boolean deleteQuest(UUID id) {
         try (PreparedStatement stmt = connection.prepareStatement("DELETE FROM quests WHERE id = ?")) {
             stmt.setString(1, id.toString());
             return stmt.executeUpdate() > 0;
@@ -158,7 +158,7 @@ public class DataManager {
         }
     }
 
-    public QuestData getQuest(UUID id) {
+    public synchronized QuestData getQuest(UUID id) {
         try (PreparedStatement stmt = connection.prepareStatement(
                 "SELECT q.*, pn.name as owner_name FROM quests q LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid WHERE q.id = ?")) {
             stmt.setString(1, id.toString());
@@ -173,7 +173,7 @@ public class DataManager {
         }
     }
 
-    public List<QuestData> getQuestsForPlayer(UUID playerUuid) {
+    public synchronized List<QuestData> getQuestsForPlayer(UUID playerUuid) {
         List<QuestData> quests = new ArrayList<>();
         try (PreparedStatement stmt = connection.prepareStatement("""
                 SELECT q.*, pn.name as owner_name FROM quests q
@@ -193,7 +193,7 @@ public class DataManager {
         return withContributorsAll(quests);
     }
 
-    public List<QuestData> getServerQuests(UUID excludePlayerUuid) {
+    public synchronized List<QuestData> getServerQuests(UUID excludePlayerUuid) {
         List<QuestData> quests = new ArrayList<>();
         try (PreparedStatement stmt = connection.prepareStatement("""
                 SELECT q.*, pn.name as owner_name FROM quests q
@@ -214,7 +214,7 @@ public class DataManager {
         return withContributorsAll(quests);
     }
 
-    public void updateVisibility(UUID questId, Visibility visibility) {
+    public synchronized void updateVisibility(UUID questId, Visibility visibility) {
         try (PreparedStatement stmt = connection.prepareStatement(
                 "UPDATE quests SET visibility = ? WHERE id = ?")) {
             stmt.setString(1, visibility.name());
@@ -229,7 +229,7 @@ public class DataManager {
     // Contributors
     // -------------------------------------------------------------------------
 
-    public void addContributor(UUID questId, UUID playerUuid, boolean canEdit) {
+    public synchronized void addContributor(UUID questId, UUID playerUuid, boolean canEdit) {
         try (PreparedStatement stmt = connection.prepareStatement("""
                 INSERT INTO contributors (quest_id, player_uuid, can_edit) VALUES (?, ?, ?)
                 ON CONFLICT(quest_id, player_uuid) DO UPDATE SET can_edit = excluded.can_edit
@@ -243,7 +243,7 @@ public class DataManager {
         }
     }
 
-    public void removeContributor(UUID questId, UUID playerUuid) {
+    public synchronized void removeContributor(UUID questId, UUID playerUuid) {
         try (PreparedStatement stmt = connection.prepareStatement(
                 "DELETE FROM contributors WHERE quest_id = ? AND player_uuid = ?")) {
             stmt.setString(1, questId.toString());
@@ -254,7 +254,7 @@ public class DataManager {
         }
     }
 
-    public void updateContributor(UUID questId, UUID playerUuid, boolean canEdit) {
+    public synchronized void updateContributor(UUID questId, UUID playerUuid, boolean canEdit) {
         try (PreparedStatement stmt = connection.prepareStatement(
                 "UPDATE contributors SET can_edit = ? WHERE quest_id = ? AND player_uuid = ?")) {
             stmt.setInt(1, canEdit ? 1 : 0);
@@ -266,7 +266,7 @@ public class DataManager {
         }
     }
 
-    public List<ContributorData> getContributors(UUID questId) {
+    public synchronized List<ContributorData> getContributors(UUID questId) {
         List<ContributorData> contributors = new ArrayList<>();
         try (PreparedStatement stmt = connection.prepareStatement("""
                 SELECT c.player_uuid, c.can_edit, pn.name FROM contributors c
@@ -288,7 +288,7 @@ public class DataManager {
         return contributors;
     }
 
-    public boolean isContributor(UUID questId, UUID playerUuid) {
+    public synchronized boolean isContributor(UUID questId, UUID playerUuid) {
         try (PreparedStatement stmt = connection.prepareStatement(
                 "SELECT 1 FROM contributors WHERE quest_id = ? AND player_uuid = ?")) {
             stmt.setString(1, questId.toString());
@@ -304,7 +304,7 @@ public class DataManager {
     // Collaboration Requests
     // -------------------------------------------------------------------------
 
-    public UUID createCollaborationRequest(UUID questId, UUID requesterUuid) {
+    public synchronized UUID createCollaborationRequest(UUID questId, UUID requesterUuid) {
         UUID requestId = UUID.randomUUID();
         long now = System.currentTimeMillis() / 1000L;
         try (PreparedStatement stmt = connection.prepareStatement("""
@@ -322,7 +322,7 @@ public class DataManager {
         return requestId;
     }
 
-    public void deleteCollaborationRequest(UUID requestId) {
+    public synchronized void deleteCollaborationRequest(UUID requestId) {
         try (PreparedStatement stmt = connection.prepareStatement(
                 "DELETE FROM collaboration_requests WHERE id = ?")) {
             stmt.setString(1, requestId.toString());
@@ -332,7 +332,7 @@ public class DataManager {
         }
     }
 
-    public List<CollaborationRequestData> getPendingRequestsForOwner(UUID ownerUuid) {
+    public synchronized List<CollaborationRequestData> getPendingRequestsForOwner(UUID ownerUuid) {
         List<CollaborationRequestData> requests = new ArrayList<>();
         try (PreparedStatement stmt = connection.prepareStatement("""
                 SELECT cr.id, cr.quest_id, cr.requester_uuid, cr.timestamp,
@@ -360,7 +360,7 @@ public class DataManager {
         return requests;
     }
 
-    public int getPendingRequestCount(UUID ownerUuid) {
+    public synchronized int getPendingRequestCount(UUID ownerUuid) {
         try (PreparedStatement stmt = connection.prepareStatement("""
                 SELECT COUNT(*) FROM collaboration_requests cr
                 JOIN quests q ON cr.quest_id = q.id
@@ -375,7 +375,7 @@ public class DataManager {
         }
     }
 
-    public CollaborationRequestData getCollaborationRequest(UUID requestId) {
+    public synchronized CollaborationRequestData getCollaborationRequest(UUID requestId) {
         try (PreparedStatement stmt = connection.prepareStatement("""
                 SELECT cr.id, cr.quest_id, cr.requester_uuid, cr.timestamp,
                        q.title as quest_title, pn.name as requester_name
@@ -406,7 +406,7 @@ public class DataManager {
     // Pins
     // -------------------------------------------------------------------------
 
-    public void pinQuest(UUID playerUuid, UUID questId) {
+    public synchronized void pinQuest(UUID playerUuid, UUID questId) {
         try (PreparedStatement stmt = connection.prepareStatement("""
                 INSERT INTO pinned_quests (player_uuid, quest_id) VALUES (?, ?)
                 ON CONFLICT(player_uuid) DO UPDATE SET quest_id = excluded.quest_id
@@ -419,7 +419,7 @@ public class DataManager {
         }
     }
 
-    public void unpinQuest(UUID playerUuid) {
+    public synchronized void unpinQuest(UUID playerUuid) {
         try (PreparedStatement stmt = connection.prepareStatement(
                 "DELETE FROM pinned_quests WHERE player_uuid = ?")) {
             stmt.setString(1, playerUuid.toString());
@@ -429,7 +429,7 @@ public class DataManager {
         }
     }
 
-    public UUID getPinnedQuestId(UUID playerUuid) {
+    public synchronized UUID getPinnedQuestId(UUID playerUuid) {
         try (PreparedStatement stmt = connection.prepareStatement(
                 "SELECT quest_id FROM pinned_quests WHERE player_uuid = ?")) {
             stmt.setString(1, playerUuid.toString());
@@ -445,7 +445,7 @@ public class DataManager {
     // Player Names
     // -------------------------------------------------------------------------
 
-    public void upsertPlayerName(UUID uuid, String name) {
+    public synchronized void upsertPlayerName(UUID uuid, String name) {
         long now = System.currentTimeMillis() / 1000L;
         try (PreparedStatement stmt = connection.prepareStatement("""
                 INSERT INTO player_names (uuid, name, last_seen) VALUES (?, ?, ?)
@@ -460,7 +460,7 @@ public class DataManager {
         }
     }
 
-    public String getPlayerName(UUID uuid) {
+    public synchronized String getPlayerName(UUID uuid) {
         try (PreparedStatement stmt = connection.prepareStatement(
                 "SELECT name FROM player_names WHERE uuid = ?")) {
             stmt.setString(1, uuid.toString());
@@ -472,7 +472,7 @@ public class DataManager {
         }
     }
 
-    public UUID getPlayerUuidByName(String name) {
+    public synchronized UUID getPlayerUuidByName(String name) {
         try (PreparedStatement stmt = connection.prepareStatement(
                 "SELECT uuid FROM player_names WHERE name = ?")) {
             stmt.setString(1, name);
@@ -484,7 +484,7 @@ public class DataManager {
         }
     }
 
-    public void close() {
+    public synchronized void close() {
         if (connection != null) {
             try {
                 connection.close();
