@@ -358,6 +358,62 @@ class PacketCodecTest {
         assertEquals(0, reader.remaining());
     }
 
+    // ---- bounds / error tests ----
+
+    @Test
+    void readQuest_invalidVisibilityOrdinal_throws() {
+        ByteBufWriter w = new ByteBufWriter();
+        w.writeUUID(UUID.randomUUID());
+        w.writeString("title");
+        w.writeString("content");
+        w.writeUUID(UUID.randomUUID());
+        w.writeString("owner");
+        w.writeVarInt(99); // invalid visibility ordinal
+        w.writeVarInt(0);
+        w.writeLong(1000L);
+        w.writeBoolean(false);
+        w.writeBoolean(false);
+        w.writeBoolean(false);
+        w.writeBoolean(false);
+        ByteBufReader r = new ByteBufReader(w.toByteArray());
+        assertThrows(IllegalArgumentException.class, () -> PacketCodec.readQuest(r));
+    }
+
+    @Test
+    void readUpdateContributors_invalidOpOrdinal_throws() {
+        ByteBufWriter w = new ByteBufWriter();
+        w.writeUUID(UUID.randomUUID());
+        w.writeVarInt(1);
+        w.writeVarInt(99); // invalid ContributorOp ordinal
+        w.writeBoolean(false);
+        w.writeBoolean(false);
+        w.writeBoolean(false);
+        ByteBufReader r = new ByteBufReader(w.toByteArray());
+        assertThrows(IllegalArgumentException.class, () -> PacketCodec.readUpdateContributors(r));
+    }
+
+    @Test
+    void readQuest_negativeContributorCount_throws() {
+        ByteBufWriter w = new ByteBufWriter();
+        w.writeUUID(UUID.randomUUID());
+        w.writeString("title");
+        w.writeString("content");
+        w.writeUUID(UUID.randomUUID());
+        w.writeString("owner");
+        w.writeVarInt(0);
+        w.writeVarInt(-1); // negative
+        ByteBufReader r = new ByteBufReader(w.toByteArray());
+        assertThrows(IllegalArgumentException.class, () -> PacketCodec.readQuest(r));
+    }
+
+    @Test
+    void readType_unknownPacketId_throws() {
+        ByteBufWriter w = new ByteBufWriter();
+        w.writeByte(0xFF);
+        ByteBufReader r = new ByteBufReader(w.toByteArray());
+        assertThrows(IllegalArgumentException.class, () -> PacketCodec.readType(r));
+    }
+
     // ---- 16. testUpdateContributorsRoundTrip ----
 
     @Test
