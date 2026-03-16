@@ -21,7 +21,7 @@ import java.util.UUID;
 
 public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEntry> {
 
-    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm dd MM yyyy");
 
     private QuestSelectionListener selectionListener;
 
@@ -81,11 +81,10 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
             this.formattedDateTime = dateTime.format(DATE_TIME_FORMATTER);
 
             // Check if this quest is pinned
-            UUID pinnedId = ClientSession.getPinnedQuestId();
-            this.isPinned = pinnedId != null && pinnedId.equals(quest.getId());
+            this.isPinned = ClientSession.isPinned(quest.getId());
 
             // Check ownership
-            UUID playerUuid = MinecraftClient.getInstance().getSession().getUuidOrNull();
+            UUID playerUuid = ClientSession.getEffectivePlayerUuid();
             this.isOwnedByPlayer = playerUuid != null && playerUuid.equals(quest.getOwnerUuid());
         }
 

@@ -307,33 +307,61 @@ class DataManagerTest {
     // -------------------------------------------------------------------------
 
     @Test
-    void pinAndUnpinQuest() {
-        UUID questId = UUID.randomUUID();
-        dm.upsertPlayerName(OWNER, "Alice");
-        dm.saveQuest(makeQuest(questId, OWNER, "Quest", Visibility.OPEN));
-
-        assertNull(dm.getPinnedQuestId(OWNER));
-
-        dm.pinQuest(OWNER, questId);
-        assertEquals(questId, dm.getPinnedQuestId(OWNER));
-
-        dm.unpinQuest(OWNER);
-        assertNull(dm.getPinnedQuestId(OWNER));
-    }
-
-    @Test
-    void pinQuest_overwritesPrevious() {
+    void multiPin_addAndList() {
         UUID questA = UUID.randomUUID();
         UUID questB = UUID.randomUUID();
         dm.upsertPlayerName(OWNER, "Alice");
         dm.saveQuest(makeQuest(questA, OWNER, "Quest A", Visibility.OPEN));
         dm.saveQuest(makeQuest(questB, OWNER, "Quest B", Visibility.OPEN));
 
-        dm.pinQuest(OWNER, questA);
-        assertEquals(questA, dm.getPinnedQuestId(OWNER));
+        assertTrue(dm.getPinnedQuestIds(OWNER).isEmpty());
 
+        dm.pinQuest(OWNER, questA);
         dm.pinQuest(OWNER, questB);
-        assertEquals(questB, dm.getPinnedQuestId(OWNER));
+
+        List<UUID> pinned = dm.getPinnedQuestIds(OWNER);
+        assertEquals(2, pinned.size());
+        assertEquals(questA, pinned.get(0));
+        assertEquals(questB, pinned.get(1));
+    }
+
+    @Test
+    void multiPin_toggleUnpin() {
+        UUID questId = UUID.randomUUID();
+        dm.upsertPlayerName(OWNER, "Alice");
+        dm.saveQuest(makeQuest(questId, OWNER, "Quest", Visibility.OPEN));
+
+        dm.pinQuest(OWNER, questId);
+        assertTrue(dm.isQuestPinned(OWNER, questId));
+        assertEquals(1, dm.getPinnedQuestIds(OWNER).size());
+
+        dm.unpinQuest(OWNER, questId);
+        assertFalse(dm.isQuestPinned(OWNER, questId));
+        assertTrue(dm.getPinnedQuestIds(OWNER).isEmpty());
+    }
+
+    @Test
+    void isQuestPinned() {
+        UUID questId = UUID.randomUUID();
+        dm.upsertPlayerName(OWNER, "Alice");
+        dm.saveQuest(makeQuest(questId, OWNER, "Quest", Visibility.OPEN));
+
+        assertFalse(dm.isQuestPinned(OWNER, questId));
+        dm.pinQuest(OWNER, questId);
+        assertTrue(dm.isQuestPinned(OWNER, questId));
+    }
+
+    @Test
+    void pinQuest_duplicateIgnored() {
+        UUID questId = UUID.randomUUID();
+        dm.upsertPlayerName(OWNER, "Alice");
+        dm.saveQuest(makeQuest(questId, OWNER, "Quest", Visibility.OPEN));
+
+        dm.pinQuest(OWNER, questId);
+        dm.pinQuest(OWNER, questId); // should be silently ignored
+
+        List<UUID> pinned = dm.getPinnedQuestIds(OWNER);
+        assertEquals(1, pinned.size());
     }
 
     // -------------------------------------------------------------------------
@@ -400,10 +428,11 @@ class DataManagerTest {
         dm.upsertPlayerName(OWNER, "Alice");
         dm.saveQuest(makeQuest(questId, OWNER, "Quest", Visibility.OPEN));
         dm.pinQuest(OWNER, questId);
-        assertEquals(questId, dm.getPinnedQuestId(OWNER));
+        assertTrue(dm.isQuestPinned(OWNER, questId));
 
         dm.deleteQuest(questId);
 
-        assertNull(dm.getPinnedQuestId(OWNER));
+        assertFalse(dm.isQuestPinned(OWNER, questId));
+        assertTrue(dm.getPinnedQuestIds(OWNER).isEmpty());
     }
 }

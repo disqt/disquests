@@ -5,34 +5,33 @@ import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.network.PacketSender;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 public class HudPinManager {
 
-    public static void pin(UUID questId) {
-        ClientSession.setPinnedQuestId(questId);
+    public static void toggle(UUID questId) {
+        if (isPinned(questId)) {
+            ClientSession.removePinnedQuest(questId);
+        } else {
+            ClientSession.addPinnedQuest(questId);
+        }
         PacketSender.pinQuest(questId);
     }
 
-    public static void unpin() {
-        ClientSession.setPinnedQuestId(null);
-        PacketSender.pinQuest(null);
-    }
-
-    public static void toggle(UUID questId) {
-        if (questId.equals(ClientSession.getPinnedQuestId())) {
-            unpin();
-        } else {
-            pin(questId);
-        }
-    }
-
     public static boolean isPinned(UUID questId) {
-        return questId != null && questId.equals(ClientSession.getPinnedQuestId());
+        return ClientSession.isPinned(questId);
     }
 
-    public static Quest getPinnedQuest() {
-        UUID id = ClientSession.getPinnedQuestId();
-        return id != null ? ClientCache.getQuestById(id) : null;
+    public static List<Quest> getPinnedQuests() {
+        List<Quest> result = new ArrayList<>();
+        for (UUID id : ClientSession.getPinnedQuestIds()) {
+            Quest quest = ClientCache.getQuestById(id);
+            if (quest != null) {
+                result.add(quest);
+            }
+        }
+        return result;
     }
 }

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "disquests-test",
+  "version": "1.0.0",
+  "name": "Disquests E2E Tests",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-client-gametest": [
+      "com.disqt.disquests.test.DisquestsE2ETest"
+    ]
+  },
+  "depends": {
+    "disquests": "*",
+    "fabric-client-gametest-api-v1": "*"
+  }
+}

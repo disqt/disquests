@@ -8,8 +8,6 @@ import com.disqt.disquests.common.PacketCodec;
 import com.disqt.disquests.common.PacketType;
 import com.disqt.disquests.common.model.QuestData;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.client.MinecraftClient;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -46,7 +44,7 @@ public class ClientPacketHandler {
 
     private static void handleHandshake(ByteBufReader r) {
         PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(r);
-        ClientSession.joinServer(payload.bluemapUrl(), payload.pendingRequestCount(), payload.pinnedQuestId());
+        ClientSession.joinServer(payload.bluemapUrl(), payload.pendingRequestCount(), payload.pinnedQuestIds(), payload.playerUuid());
         PacketSender.requestSync();
     }
 
@@ -71,22 +69,22 @@ public class ClientPacketHandler {
     private static void handleUpdateQuest(ByteBufReader r) {
         QuestData data = PacketCodec.readUpdateQuest(r);
         Quest quest = Quest.fromNetwork(data);
-        UUID myUuid = MinecraftClient.getInstance().getSession().getUuidOrNull();
+        final UUID myUuid = ClientSession.getEffectivePlayerUuid();
         boolean isMine = data.ownerUuid().equals(myUuid) ||
                 data.contributors().stream().anyMatch(c -> c.uuid().equals(myUuid));
         if (isMine) {
             ClientCache.addOrUpdateMyQuest(quest);
+            ClientCache.removeFromServerQuests(quest.getId());
         } else {
             ClientCache.addOrUpdateServerQuest(quest);
+            ClientCache.removeFromMyQuests(quest.getId());
         }
     }
 
     private static void handleDeleteQuestS2C(ByteBufReader r) {
         UUID questId = PacketCodec.readDeleteQuestS2C(r);
         ClientCache.removeQuestById(questId);
-        if (questId.equals(ClientSession.getPinnedQuestId())) {
-            ClientSession.setPinnedQuestId(null);
-        }
+        ClientSession.removePinnedQuest(questId);
     }
 
     private static void handleCollaborationRequest(ByteBufReader r) {

@@ -52,7 +52,7 @@ public final class PacketCodec {
 
     public record UpdateVisibilityPayload(UUID questId, Visibility visibility) {}
 
-    public record HandshakePayload(String bluemapUrl, int pendingRequestCount, UUID pinnedQuestId) {}
+    public record HandshakePayload(String bluemapUrl, int pendingRequestCount, List<UUID> pinnedQuestIds, UUID playerUuid) {}
 
     public record CollaborationRequestPayload(UUID requestId, UUID questId,
             String questTitle, String requesterName) {}
@@ -141,12 +141,16 @@ public final class PacketCodec {
 
     // ---- S2C encode ----
 
-    public static byte[] writeHandshake(String bluemapUrl, int pendingRequestCount, UUID pinnedQuestId) {
+    public static byte[] writeHandshake(String bluemapUrl, int pendingRequestCount, List<UUID> pinnedQuestIds, UUID playerUuid) {
         ByteBufWriter buf = new ByteBufWriter();
         buf.writeByte(PacketType.HANDSHAKE.getId());
         writeNullableString(buf, bluemapUrl);
         buf.writeVarInt(pendingRequestCount);
-        writeNullableUUID(buf, pinnedQuestId);
+        buf.writeVarInt(pinnedQuestIds.size());
+        for (UUID id : pinnedQuestIds) {
+            buf.writeUUID(id);
+        }
+        buf.writeUUID(playerUuid);
         return buf.toByteArray();
     }
 
@@ -314,8 +318,13 @@ public final class PacketCodec {
     public static HandshakePayload readHandshake(ByteBufReader buf) {
         String bluemapUrl = readNullableString(buf);
         int pendingRequestCount = buf.readVarInt();
-        UUID pinnedQuestId = readNullableUUID(buf);
-        return new HandshakePayload(bluemapUrl, pendingRequestCount, pinnedQuestId);
+        int pinnedCount = buf.readVarInt();
+        List<UUID> pinnedQuestIds = new ArrayList<>(pinnedCount);
+        for (int i = 0; i < pinnedCount; i++) {
+            pinnedQuestIds.add(buf.readUUID());
+        }
+        UUID playerUuid = buf.readUUID();
+        return new HandshakePayload(bluemapUrl, pendingRequestCount, pinnedQuestIds, playerUuid);
     }
 
     public static List<QuestData> readSyncMyQuests(ByteBufReader buf) {

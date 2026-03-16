@@ -10,10 +10,12 @@ import com.disqt.disquests.client.gui.widget.DarkButtonWidget;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.client.gui.widget.TabButtonWidget;
 import com.disqt.disquests.client.gui.widget.list.QuestListWidget;
+import com.disqt.disquests.client.hud.HudPinManager;
 import com.disqt.disquests.client.network.PacketSender;
 import com.disqt.disquests.common.model.Visibility;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.text.Text;
 
 import java.util.ArrayList;
@@ -45,6 +47,7 @@ public class MainScreen extends BaseScreen {
     private DarkButtonWidget openButton;
     private DarkButtonWidget joinButton;
     private DarkButtonWidget requestAccessButton;
+    private DarkButtonWidget pinButton;
     private DarkButtonWidget closeButton;
 
     // Lists
@@ -58,6 +61,7 @@ public class MainScreen extends BaseScreen {
     // State
     private int currentTab;
     private int serverFilter;
+    private int tickCounter = 0;
 
     public MainScreen() {
         super(Text.literal("Disquests"), null);
@@ -90,10 +94,12 @@ public class MainScreen extends BaseScreen {
                 ScreenLayouts.TAB_WIDTH, ScreenLayouts.TAB_HEIGHT,
                 Text.literal("My Quests"), b -> selectTab(TAB_MY_QUESTS)
         ));
+        int questBoardTabWidth = Math.max(ScreenLayouts.TAB_WIDTH,
+                MinecraftClient.getInstance().textRenderer.getWidth("Quest Board") + 12);
         this.serverQuestsTab = this.addDrawableChild(new TabButtonWidget(
                 (this.width / 2) + 2, tabY,
-                ScreenLayouts.TAB_WIDTH, ScreenLayouts.TAB_HEIGHT,
-                Text.literal("Server"), b -> selectTab(TAB_SERVER_QUESTS)
+                questBoardTabWidth, ScreenLayouts.TAB_HEIGHT,
+                Text.literal("Quest Board"), b -> selectTab(TAB_SERVER_QUESTS)
         ));
 
         // --- SUB-FILTER BUTTONS (Server Quests) ---
@@ -115,6 +121,10 @@ public class MainScreen extends BaseScreen {
                 filterStartX + (filterBtnWidth + filterBtnSpacing) * 2, subFilterY, filterBtnWidth, filterBtnHeight,
                 Text.literal("Closed"), b -> selectServerFilter(FILTER_CLOSED)
         ));
+
+        this.filterAllButton.setTooltip(Tooltip.of(Text.literal("Show all visible quests")));
+        this.filterOpenButton.setTooltip(Tooltip.of(Text.literal("Quests anyone can join")));
+        this.filterClosedButton.setTooltip(Tooltip.of(Text.literal("Quests that require access request")));
 
         // --- LISTS ---
         int myListTop = ScreenLayouts.TOP_MARGIN;
@@ -145,8 +155,8 @@ public class MainScreen extends BaseScreen {
         // My Quests tab: New Quest, Open, Close
         // Server Quests tab: Join, Request Access, Open, Close
         // We create all buttons but show/hide based on tab
-        UIHelper.createButtonRow(this, buttonsY, 5, x -> {
-            int index = (x - UIHelper.getCenteredButtonStartX(this.width, 5)) / (UIHelper.BUTTON_WIDTH + UIHelper.BUTTON_SPACING);
+        UIHelper.createButtonRow(this, buttonsY, 6, x -> {
+            int index = (x - UIHelper.getCenteredButtonStartX(this.width, 6)) / (UIHelper.BUTTON_WIDTH + UIHelper.BUTTON_SPACING);
             switch (index) {
                 case 0 -> this.newQuestButton = this.addDrawableChild(new DarkButtonWidget(
                         x, buttonsY, UIHelper.BUTTON_WIDTH, UIHelper.BUTTON_HEIGHT,
@@ -157,10 +167,13 @@ public class MainScreen extends BaseScreen {
                 case 2 -> this.requestAccessButton = this.addDrawableChild(new DarkButtonWidget(
                         x, buttonsY, UIHelper.BUTTON_WIDTH, UIHelper.BUTTON_HEIGHT,
                         Text.literal("Request"), b -> requestAccess()));
-                case 3 -> this.openButton = this.addDrawableChild(new DarkButtonWidget(
+                case 3 -> this.pinButton = this.addDrawableChild(new DarkButtonWidget(
+                        x, buttonsY, UIHelper.BUTTON_WIDTH, UIHelper.BUTTON_HEIGHT,
+                        Text.literal("Pin"), b -> togglePinSelected()));
+                case 4 -> this.openButton = this.addDrawableChild(new DarkButtonWidget(
                         x, buttonsY, UIHelper.BUTTON_WIDTH, UIHelper.BUTTON_HEIGHT,
                         Text.literal("Open"), b -> openSelected()));
-                case 4 -> this.closeButton = this.addDrawableChild(new DarkButtonWidget(
+                case 5 -> this.closeButton = this.addDrawableChild(new DarkButtonWidget(
                         x, buttonsY, UIHelper.BUTTON_WIDTH, UIHelper.BUTTON_HEIGHT,
                         Text.literal("Close"), b -> this.client.setScreen(null)));
             }
@@ -197,6 +210,7 @@ public class MainScreen extends BaseScreen {
         newQuestButton.visible = isMyQuests;
         joinButton.visible = !isMyQuests;
         requestAccessButton.visible = !isMyQuests;
+        pinButton.visible = true;
 
         if (!isMyQuests) {
             selectServerFilter(this.serverFilter);
@@ -246,9 +260,8 @@ public class MainScreen extends BaseScreen {
             }
 
             // Sort: pinned first, then by lastModified descending
-            UUID pinnedId = ClientSession.getPinnedQuestId();
             quests.sort(Comparator
-                    .<Quest, Boolean>comparing(q -> pinnedId != null && pinnedId.equals(q.getId()), Comparator.reverseOrder())
+                    .<Quest, Boolean>comparing(q -> ClientSession.isPinned(q.getId()), Comparator.reverseOrder())
                     .thenComparing(Quest::getLastModified, Comparator.reverseOrder()));
 
             myQuestListWidget.setQuests(quests);
@@ -301,6 +314,16 @@ public class MainScreen extends BaseScreen {
             joinButton.active = hasSelection && selected.getVisibility() == Visibility.OPEN;
             requestAccessButton.active = hasSelection && selected.getVisibility() == Visibility.CLOSED;
         }
+
+        Quest pinSel = currentTab == TAB_MY_QUESTS
+                ? myQuestListWidget.getSelectedQuest()
+                : serverQuestListWidget.getSelectedQuest();
+        pinButton.active = pinSel != null;
+        if (pinSel != null && HudPinManager.isPinned(pinSel.getId())) {
+            pinButton.setMessage(Text.literal("Unpin"));
+        } else {
+            pinButton.setMessage(Text.literal("Pin"));
+        }
     }
 
     // --- ACTIONS ---
@@ -311,23 +334,23 @@ public class MainScreen extends BaseScreen {
         newQuest.setTitle("New Quest");
         newQuest.setContent("");
         newQuest.setVisibility(Visibility.PRIVATE);
-        newQuest.setOwnerUuid(MinecraftClient.getInstance().getSession().getUuidOrNull());
+        newQuest.setOwnerUuid(ClientSession.getEffectivePlayerUuid());
         newQuest.setOwnerName(MinecraftClient.getInstance().getSession().getUsername());
         newQuest.setLastModified(System.currentTimeMillis() / 1000);
         newQuest.setContributors(new ArrayList<>());
-        open(new EditQuestScreen(this, newQuest));
+        open(new QuestScreen(this, newQuest, true));
     }
 
     public void openSelected() {
         if (currentTab == TAB_MY_QUESTS) {
             Quest sel = myQuestListWidget.getSelectedQuest();
             if (sel != null) {
-                open(new ViewQuestScreen(this, sel));
+                open(new QuestScreen(this, sel));
             }
         } else {
             Quest sel = serverQuestListWidget.getSelectedQuest();
             if (sel != null) {
-                open(new ViewQuestScreen(this, sel));
+                open(new QuestScreen(this, sel));
             }
         }
     }
@@ -346,11 +369,52 @@ public class MainScreen extends BaseScreen {
         }
     }
 
+    private void togglePinSelected() {
+        Quest sel = currentTab == TAB_MY_QUESTS
+                ? myQuestListWidget.getSelectedQuest()
+                : serverQuestListWidget.getSelectedQuest();
+        if (sel != null) {
+            HudPinManager.toggle(sel.getId());
+            refreshListContents();
+            updateActionButtons();
+        }
+    }
+
+    // --- TICK ---
+
+    @Override
+    public void tick() {
+        super.tick();
+        tickCounter++;
+    }
+
     // --- RENDERING ---
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
+
+        // Render rainbow title
+        String titleStr = "Disquests";
+        int titleWidth = this.textRenderer.getWidth(titleStr);
+        int titleX = (this.width - titleWidth) / 2;
+        int titleY = (ScreenLayouts.TOP_MARGIN - this.textRenderer.fontHeight) / 2;
+
+        boolean hovering = mouseX >= titleX && mouseX <= titleX + titleWidth
+                && mouseY >= titleY && mouseY <= titleY + this.textRenderer.fontHeight;
+
+        if (hovering) {
+            int charX = titleX;
+            for (int i = 0; i < titleStr.length(); i++) {
+                float hue = ((tickCounter * 3 + i * 30) % 360) / 360.0f;
+                int color = hsbToRgb(hue, 0.8f, 1.0f);
+                String ch = String.valueOf(titleStr.charAt(i));
+                context.drawTextWithShadow(this.textRenderer, ch, charX, titleY, color);
+                charX += this.textRenderer.getWidth(ch);
+            }
+        } else {
+            context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, titleY, Colors.TEXT_PRIMARY);
+        }
 
         // Render active list
         if (currentTab == TAB_MY_QUESTS) {
@@ -369,6 +433,24 @@ public class MainScreen extends BaseScreen {
         if (pendingCount > 0) {
             renderNotificationBadge(context, pendingCount);
         }
+    }
+
+    private static int hsbToRgb(float hue, float saturation, float brightness) {
+        float h = (hue - (float) Math.floor(hue)) * 6.0f;
+        float f = h - (float) Math.floor(h);
+        float p = brightness * (1.0f - saturation);
+        float q = brightness * (1.0f - saturation * f);
+        float t = brightness * (1.0f - (saturation * (1.0f - f)));
+        int r, g, b;
+        switch ((int) h) {
+            case 0 -> { r = (int)(brightness * 255); g = (int)(t * 255); b = (int)(p * 255); }
+            case 1 -> { r = (int)(q * 255); g = (int)(brightness * 255); b = (int)(p * 255); }
+            case 2 -> { r = (int)(p * 255); g = (int)(brightness * 255); b = (int)(t * 255); }
+            case 3 -> { r = (int)(p * 255); g = (int)(q * 255); b = (int)(brightness * 255); }
+            case 4 -> { r = (int)(t * 255); g = (int)(p * 255); b = (int)(brightness * 255); }
+            default -> { r = (int)(brightness * 255); g = (int)(p * 255); b = (int)(q * 255); }
+        }
+        return 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 
     private void renderNotificationBadge(DrawContext context, int count) {

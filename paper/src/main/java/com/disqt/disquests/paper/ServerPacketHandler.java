@@ -300,27 +300,28 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
     }
 
     private void handlePinQuest(Player player, UUID questId) {
-        if (questId != null) {
+        if (questId == null) return;
+        UUID playerUuid = player.getUniqueId();
+        if (dataManager.isQuestPinned(playerUuid, questId)) {
+            dataManager.unpinQuest(playerUuid, questId);
+        } else {
             QuestData quest = dataManager.getQuest(questId);
             if (quest == null) return;
-            UUID playerUuid = player.getUniqueId();
             boolean canSee = quest.ownerUuid().equals(playerUuid)
                 || quest.contributors().stream().anyMatch(c -> c.uuid().equals(playerUuid))
                 || quest.visibility() == Visibility.OPEN;
             if (!canSee) return;
             dataManager.pinQuest(playerUuid, questId);
-        } else {
-            dataManager.unpinQuest(player.getUniqueId());
         }
     }
 
     // --- Helpers ---
 
     private void sendHandshake(Player player) {
-        UUID pinnedId = dataManager.getPinnedQuestId(player.getUniqueId());
+        List<UUID> pinnedIds = dataManager.getPinnedQuestIds(player.getUniqueId());
         int pendingCount = dataManager.getPendingRequestCount(player.getUniqueId());
         sendPacket(player, PacketCodec.writeHandshake(
-            config.getBluemapUrl(), pendingCount, pinnedId));
+            config.getBluemapUrl(), pendingCount, pinnedIds, player.getUniqueId()));
     }
 
     private void sendPacket(Player player, byte[] data) {
