@@ -19,6 +19,12 @@ dependencies {
     implementation("org.lwjgl:lwjgl-tinyfd:3.3.1")
     include("org.lwjgl:lwjgl-tinyfd:3.3.1")
 
+    // Native libraries for file dialogs
+    listOf("natives-linux", "natives-windows", "natives-macos", "natives-macos-arm64").forEach { classifier ->
+        runtimeOnly("org.lwjgl:lwjgl-tinyfd:3.3.1:$classifier")
+        include("org.lwjgl:lwjgl-tinyfd:3.3.1:$classifier")
+    }
+
     // Markdown rendering
     implementation("org.commonmark:commonmark:0.24.0")
     implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.24.0")
