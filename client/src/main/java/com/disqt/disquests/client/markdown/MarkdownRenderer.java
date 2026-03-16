@@ -98,7 +98,8 @@ public class MarkdownRenderer {
         } else if (node instanceof BulletList) {
             renderChildren(node, lines, indent, style);
         } else if (node instanceof OrderedList orderedList) {
-            int num = orderedList.getStartNumber();
+            Integer startNumber = orderedList.getMarkerStartNumber();
+            int num = startNumber != null ? startNumber : 1;
             Node item = node.getFirstChild();
             while (item != null) {
                 if (item instanceof ListItem) {
