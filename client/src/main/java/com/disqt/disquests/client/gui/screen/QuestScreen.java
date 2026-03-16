@@ -60,6 +60,8 @@ public class QuestScreen extends BaseScreen {
     private DarkButtonWidget contributorsButton;
     private DarkButtonWidget regionButton;
     private boolean regionEnabled;
+    private boolean showFormattingHelp = false;
+    private static final int FORMATTING_PANEL_WIDTH = 120;
 
     // Dirty tracking (edit mode)
     private String originalTitle;
@@ -351,13 +353,31 @@ public class QuestScreen extends BaseScreen {
                 - settingsRowHeight - (settingsRowHeight > 0 ? ScreenLayouts.PANEL_SPACING : 0);
         int contentPanelHeight = Math.max(30, contentPanelBottom - contentPanelY);
 
+        int editorWidth = contentWidth;
+        if (showFormattingHelp) {
+            editorWidth -= FORMATTING_PANEL_WIDTH + ScreenLayouts.PANEL_SPACING;
+        }
+
         this.editContentField = new MultiLineTextFieldWidget(
                 this.textRenderer, contentX, contentPanelY,
-                contentWidth, contentPanelHeight,
+                editorWidth, contentPanelHeight,
                 quest.getContent() != null ? quest.getContent() : "",
                 "Quest content...", Integer.MAX_VALUE, true
         );
         this.addSelectableChild(this.editContentField);
+
+        // --- FORMATTING HELP TOGGLE BUTTON ---
+        int helpBtnSize = 14;
+        this.addDrawableChild(new DarkButtonWidget(
+                contentX + contentWidth - helpBtnSize - 2,
+                contentPanelY + 2,
+                helpBtnSize, helpBtnSize,
+                Text.literal("?"), b -> {
+                    persistFieldValues();
+                    showFormattingHelp = !showFormattingHelp;
+                    this.clearAndInit();
+                }
+        ));
 
         // --- OPTIONAL FIELDS PANEL ---
         int optPanelY = contentPanelY + contentPanelHeight + ScreenLayouts.PANEL_SPACING;
@@ -414,8 +434,41 @@ public class QuestScreen extends BaseScreen {
                 - settingsRowHeight - (settingsRowHeight > 0 ? ScreenLayouts.PANEL_SPACING : 0);
         int contentPanelHeight = Math.max(30, contentPanelBottom - contentPanelY);
 
-        UIHelper.drawPanel(context, contentX, contentPanelY, contentWidth, contentPanelHeight);
+        int editorWidth = contentWidth;
+        if (showFormattingHelp) {
+            editorWidth -= FORMATTING_PANEL_WIDTH + ScreenLayouts.PANEL_SPACING;
+        }
+
+        UIHelper.drawPanel(context, contentX, contentPanelY, editorWidth, contentPanelHeight);
         this.editContentField.render(context, mouseX, mouseY, delta);
+
+        // Formatting help side panel
+        if (showFormattingHelp) {
+            int panelX = contentX + contentWidth - FORMATTING_PANEL_WIDTH;
+            UIHelper.drawPanel(context, panelX, contentPanelY, FORMATTING_PANEL_WIDTH, contentPanelHeight);
+
+            int textX = panelX + 5;
+            int textY = contentPanelY + 5;
+            int lineH = this.textRenderer.fontHeight + 2;
+
+            context.drawText(this.textRenderer, "Formatting", textX, textY, Colors.TEXT_PRIMARY, false);
+            textY += lineH + 2;
+
+            String[][] help = {
+                    {"**text**", "bold"},
+                    {"*text*", "italic"},
+                    {"~~text~~", "strikethrough"},
+                    {"# Heading", "heading"},
+                    {"- [ ] task", "checkbox"},
+                    {"- [x] done", "checked"},
+                    {"> text", "quote"},
+                    {"[text](url)", "link"},
+            };
+            for (String[] entry : help) {
+                context.drawText(this.textRenderer, entry[0], textX, textY, Colors.TEXT_MUTED, false);
+                textY += lineH;
+            }
+        }
 
         // Optional fields panel
         int optPanelY = contentPanelY + contentPanelHeight + ScreenLayouts.PANEL_SPACING;
