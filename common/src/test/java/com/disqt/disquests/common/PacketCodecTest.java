@@ -84,7 +84,8 @@ class PacketCodecTest {
     @Test
     void testHandshakeRoundTrip() {
         UUID pinnedQuestId = UUID.randomUUID();
-        byte[] packet = PacketCodec.writeHandshake("https://bluemap.disqt.com/", 3, pinnedQuestId);
+        UUID playerUuid = UUID.randomUUID();
+        byte[] packet = PacketCodec.writeHandshake("https://bluemap.disqt.com/", 3, pinnedQuestId, playerUuid);
         ByteBufReader reader = new ByteBufReader(packet);
 
         assertEquals(PacketType.HANDSHAKE, PacketCodec.readType(reader));
@@ -93,6 +94,7 @@ class PacketCodecTest {
         assertEquals("https://bluemap.disqt.com/", payload.bluemapUrl());
         assertEquals(3, payload.pendingRequestCount());
         assertEquals(pinnedQuestId, payload.pinnedQuestId());
+        assertEquals(playerUuid, payload.playerUuid());
         assertEquals(0, reader.remaining());
     }
 
@@ -100,7 +102,8 @@ class PacketCodecTest {
 
     @Test
     void testHandshakeNoPinnedQuest() {
-        byte[] packet = PacketCodec.writeHandshake("", 0, null);
+        UUID playerUuid = UUID.randomUUID();
+        byte[] packet = PacketCodec.writeHandshake("", 0, null, playerUuid);
         ByteBufReader reader = new ByteBufReader(packet);
 
         assertEquals(PacketType.HANDSHAKE, PacketCodec.readType(reader));
@@ -109,6 +112,7 @@ class PacketCodecTest {
         assertEquals("", payload.bluemapUrl());
         assertEquals(0, payload.pendingRequestCount());
         assertNull(payload.pinnedQuestId());
+        assertEquals(playerUuid, payload.playerUuid());
         assertEquals(0, reader.remaining());
     }
 
@@ -416,11 +420,13 @@ class PacketCodecTest {
 
     @Test
     void testHandshakeNullBluemapUrl() {
-        byte[] packet = PacketCodec.writeHandshake(null, 0, null);
+        UUID playerUuid = UUID.randomUUID();
+        byte[] packet = PacketCodec.writeHandshake(null, 0, null, playerUuid);
         ByteBufReader reader = new ByteBufReader(packet);
         assertEquals(PacketType.HANDSHAKE, PacketCodec.readType(reader));
         PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(reader);
         assertNull(payload.bluemapUrl());
+        assertEquals(playerUuid, payload.playerUuid());
         assertEquals(0, reader.remaining());
     }
 

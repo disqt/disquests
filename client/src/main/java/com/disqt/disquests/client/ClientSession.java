@@ -8,17 +8,19 @@ public class ClientSession {
     private static String bluemapUrl = null;
     private static int pendingRequestCount = 0;
     private static UUID pinnedQuestId = null;
+    private static UUID playerUuid = null;
 
     // UI state
     private static int activeTab = 0; // 0=My Quests, 1=Server Quests
     private static String searchTerm = "";
     private static int serverQuestsFilter = 0; // 0=All, 1=Open, 2=Closed
 
-    public static void joinServer(String bluemapUrl, int pendingCount, UUID pinnedId) {
+    public static void joinServer(String bluemapUrl, int pendingCount, UUID pinnedId, UUID playerUuid) {
         onServer = true;
         ClientSession.bluemapUrl = bluemapUrl;
         pendingRequestCount = pendingCount;
         pinnedQuestId = pinnedId;
+        ClientSession.playerUuid = playerUuid;
     }
 
     public static void leaveServer() {
@@ -26,6 +28,7 @@ public class ClientSession {
         bluemapUrl = null;
         pendingRequestCount = 0;
         pinnedQuestId = null;
+        playerUuid = null;
         activeTab = 0;
         searchTerm = "";
         serverQuestsFilter = 0;
@@ -65,6 +68,10 @@ public class ClientSession {
 
     public static void setPinnedQuestId(UUID id) {
         pinnedQuestId = id;
+    }
+
+    public static UUID getPlayerUuid() {
+        return playerUuid;
     }
 
     public static int getActiveTab() {

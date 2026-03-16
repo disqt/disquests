@@ -52,7 +52,7 @@ public final class PacketCodec {
 
     public record UpdateVisibilityPayload(UUID questId, Visibility visibility) {}
 
-    public record HandshakePayload(String bluemapUrl, int pendingRequestCount, UUID pinnedQuestId) {}
+    public record HandshakePayload(String bluemapUrl, int pendingRequestCount, UUID pinnedQuestId, UUID playerUuid) {}
 
     public record CollaborationRequestPayload(UUID requestId, UUID questId,
             String questTitle, String requesterName) {}
@@ -141,12 +141,13 @@ public final class PacketCodec {
 
     // ---- S2C encode ----
 
-    public static byte[] writeHandshake(String bluemapUrl, int pendingRequestCount, UUID pinnedQuestId) {
+    public static byte[] writeHandshake(String bluemapUrl, int pendingRequestCount, UUID pinnedQuestId, UUID playerUuid) {
         ByteBufWriter buf = new ByteBufWriter();
         buf.writeByte(PacketType.HANDSHAKE.getId());
         writeNullableString(buf, bluemapUrl);
         buf.writeVarInt(pendingRequestCount);
         writeNullableUUID(buf, pinnedQuestId);
+        buf.writeUUID(playerUuid);
         return buf.toByteArray();
     }
 
@@ -315,7 +316,8 @@ public final class PacketCodec {
         String bluemapUrl = readNullableString(buf);
         int pendingRequestCount = buf.readVarInt();
         UUID pinnedQuestId = readNullableUUID(buf);
-        return new HandshakePayload(bluemapUrl, pendingRequestCount, pinnedQuestId);
+        UUID playerUuid = buf.readUUID();
+        return new HandshakePayload(bluemapUrl, pendingRequestCount, pinnedQuestId, playerUuid);
     }
 
     public static List<QuestData> readSyncMyQuests(ByteBufReader buf) {

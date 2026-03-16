@@ -320,7 +320,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
         UUID pinnedId = dataManager.getPinnedQuestId(player.getUniqueId());
         int pendingCount = dataManager.getPendingRequestCount(player.getUniqueId());
         sendPacket(player, PacketCodec.writeHandshake(
-            config.getBluemapUrl(), pendingCount, pinnedId));
+            config.getBluemapUrl(), pendingCount, pinnedId, player.getUniqueId()));
     }
 
     private void sendPacket(Player player, byte[] data) {
