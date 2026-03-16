@@ -311,23 +311,27 @@ public class MainScreen extends BaseScreen {
         newQuest.setTitle("New Quest");
         newQuest.setContent("");
         newQuest.setVisibility(Visibility.PRIVATE);
-        newQuest.setOwnerUuid(MinecraftClient.getInstance().getSession().getUuidOrNull());
+        UUID myUuid = ClientSession.getPlayerUuid();
+        if (myUuid == null) {
+            myUuid = MinecraftClient.getInstance().getSession().getUuidOrNull();
+        }
+        newQuest.setOwnerUuid(myUuid);
         newQuest.setOwnerName(MinecraftClient.getInstance().getSession().getUsername());
         newQuest.setLastModified(System.currentTimeMillis() / 1000);
         newQuest.setContributors(new ArrayList<>());
-        open(new EditQuestScreen(this, newQuest));
+        open(new QuestScreen(this, newQuest, true));
     }
 
     public void openSelected() {
         if (currentTab == TAB_MY_QUESTS) {
             Quest sel = myQuestListWidget.getSelectedQuest();
             if (sel != null) {
-                open(new ViewQuestScreen(this, sel));
+                open(new QuestScreen(this, sel));
             }
         } else {
             Quest sel = serverQuestListWidget.getSelectedQuest();
             if (sel != null) {
-                open(new ViewQuestScreen(this, sel));
+                open(new QuestScreen(this, sel));
             }
         }
     }
