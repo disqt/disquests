@@ -320,6 +320,9 @@ public class EditQuestScreen extends BaseScreen {
 
     private void saveAndView() {
         persistFieldValues();
+        // Optimistically add to cache so ViewQuestScreen.tick() won't auto-close
+        // before the server's UPDATE_QUEST response arrives.
+        ClientCache.addOrUpdateMyQuest(quest);
         PacketSender.saveQuest(
                 quest.getId(),
                 quest.getTitle(),
