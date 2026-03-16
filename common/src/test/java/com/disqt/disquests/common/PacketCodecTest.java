@@ -414,6 +414,16 @@ class PacketCodecTest {
         assertThrows(IllegalArgumentException.class, () -> PacketCodec.readType(r));
     }
 
+    @Test
+    void testHandshakeNullBluemapUrl() {
+        byte[] packet = PacketCodec.writeHandshake(null, 0, null);
+        ByteBufReader reader = new ByteBufReader(packet);
+        assertEquals(PacketType.HANDSHAKE, PacketCodec.readType(reader));
+        PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(reader);
+        assertNull(payload.bluemapUrl());
+        assertEquals(0, reader.remaining());
+    }
+
     // ---- 16. testUpdateContributorsRoundTrip ----
 
     @Test

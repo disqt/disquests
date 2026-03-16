@@ -144,7 +144,7 @@ public final class PacketCodec {
     public static byte[] writeHandshake(String bluemapUrl, int pendingRequestCount, UUID pinnedQuestId) {
         ByteBufWriter buf = new ByteBufWriter();
         buf.writeByte(PacketType.HANDSHAKE.getId());
-        buf.writeString(bluemapUrl);
+        writeNullableString(buf, bluemapUrl);
         buf.writeVarInt(pendingRequestCount);
         writeNullableUUID(buf, pinnedQuestId);
         return buf.toByteArray();
@@ -312,7 +312,7 @@ public final class PacketCodec {
     // ---- S2C decode ----
 
     public static HandshakePayload readHandshake(ByteBufReader buf) {
-        String bluemapUrl = buf.readString();
+        String bluemapUrl = readNullableString(buf);
         int pendingRequestCount = buf.readVarInt();
         UUID pinnedQuestId = readNullableUUID(buf);
         return new HandshakePayload(bluemapUrl, pendingRequestCount, pinnedQuestId);
