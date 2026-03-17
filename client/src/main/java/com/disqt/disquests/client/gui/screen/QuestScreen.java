@@ -11,7 +11,6 @@ import com.disqt.disquests.client.gui.widget.DarkButtonWidget;
 import com.disqt.disquests.client.gui.widget.MarkdownWidget;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.client.gui.widget.ReadOnlyMultiLineTextFieldWidget;
-import com.disqt.disquests.client.hud.HudPinManager;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.client.markdown.RenderedLine;
 import com.disqt.disquests.client.network.PacketSender;
@@ -46,7 +45,6 @@ public class QuestScreen extends BaseScreen {
     private MarkdownWidget viewContentArea;
     private DarkButtonWidget editButton;
     private DarkButtonWidget deleteButton;
-    private DarkButtonWidget pinButton;
 
     // --- Edit mode widgets ---
     private MultiLineTextFieldWidget editTitleField;
@@ -152,8 +150,6 @@ public class QuestScreen extends BaseScreen {
         List<Text> buttonTexts = new ArrayList<>();
         buttonTexts.add(Text.literal("Edit"));
         buttonTexts.add(Text.literal("Delete"));
-        boolean isPinned = HudPinManager.isPinned(quest.getId());
-        buttonTexts.add(Text.literal(isPinned ? "Unpin" : "Pin to HUD"));
         buttonTexts.add(Text.literal("Close"));
 
         UIHelper.createButtonRow(this, buttonsY, buttonTexts, (index, x, width) -> {
@@ -172,22 +168,15 @@ public class QuestScreen extends BaseScreen {
                             b -> confirmDelete()));
                     this.deleteButton.active = isOwner;
                 }
-                case 2 -> {
-                    this.pinButton = this.addDrawableChild(new DarkButtonWidget(
-                            x, buttonsY, width, UIHelper.BUTTON_HEIGHT,
-                            buttonTexts.get(2),
-                            b -> togglePin()));
-                }
-                case 3 -> this.addDrawableChild(new DarkButtonWidget(
+                case 2 -> this.addDrawableChild(new DarkButtonWidget(
                         x, buttonsY, width, UIHelper.BUTTON_HEIGHT,
-                        buttonTexts.get(3),
+                        buttonTexts.get(2),
                         b -> this.close()));
             }
         });
 
         this.editButton.setTooltip(Tooltip.of(Text.literal("Edit this quest")));
         this.deleteButton.setTooltip(Tooltip.of(Text.literal("Permanently delete this quest")));
-        this.pinButton.setTooltip(Tooltip.of(Text.literal("Pin/unpin this quest to your HUD")));
 
         // --- TITLE AREA ---
         int titleY = ScreenLayouts.TOP_MARGIN + 5;
@@ -796,11 +785,6 @@ public class QuestScreen extends BaseScreen {
             PacketSender.deleteQuest(quest.getId());
             this.close();
         });
-    }
-
-    private void togglePin() {
-        HudPinManager.toggle(quest.getId());
-        this.clearAndInit();
     }
 
     // ===================== SHARED HELPERS =====================
