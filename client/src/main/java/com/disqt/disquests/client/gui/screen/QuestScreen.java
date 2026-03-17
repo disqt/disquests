@@ -373,9 +373,9 @@ public class QuestScreen extends BaseScreen {
 
         // --- FORMATTING HELP TOGGLE BUTTON ---
         int helpBtnSize = 14;
-        this.addDrawableChild(new DarkButtonWidget(
+        DarkButtonWidget helpBtn = this.addDrawableChild(new DarkButtonWidget(
                 contentX + contentWidth - helpBtnSize - 2,
-                contentPanelY + 2,
+                titleY + (ScreenLayouts.TITLE_PANEL_HEIGHT - helpBtnSize) / 2,
                 helpBtnSize, helpBtnSize,
                 Text.literal("?"), b -> {
                     persistFieldValues();
@@ -383,6 +383,7 @@ public class QuestScreen extends BaseScreen {
                     this.clearAndInit();
                 }
         ));
+        helpBtn.setTooltip(Tooltip.of(Text.literal("Toggle formatting reference")));
 
         // --- OPTIONAL FIELDS PANEL ---
         int optPanelY = contentPanelY + contentPanelHeight + ScreenLayouts.PANEL_SPACING;
