@@ -79,9 +79,23 @@ jobs:
           timeout 120 bash -c 'until grep -q "Done" logs/latest.log 2>/dev/null; do sleep 2; done'
           echo "Paper server started"
 
+      - name: Seed test data
+        run: |
+          DB_PATH="paper/run/plugins/Disquests/disquests.db"
+          timeout 30 bash -c "until [ -f '$DB_PATH' ]; do sleep 1; done"
+          sqlite3 "$DB_PATH" "
+          INSERT INTO quests (id, title, content, owner_uuid, visibility, last_modified)
+          VALUES ('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'Test Open Quest', '- [ ] Task one\n- [x] Task two\n\nA **public** quest.', '11111111-2222-3333-4444-555555555555', 'OPEN', strftime('%s','now'));
+          INSERT INTO quests (id, title, content, owner_uuid, visibility, last_modified)
+          VALUES ('ffffffff-aaaa-bbbb-cccc-dddddddddddd', 'Test Closed Quest', '- [ ] Secret task\n\n*Request access* needed.', '11111111-2222-3333-4444-555555555555', 'CLOSED', strftime('%s','now'));
+          INSERT INTO player_names (uuid, name, last_seen) VALUES ('11111111-2222-3333-4444-555555555555', 'TestPlayer', strftime('%s','now'))
+          ON CONFLICT(uuid) DO UPDATE SET name = 'TestPlayer', last_seen = strftime('%s','now');
+          "
+          echo "Test data seeded"
+
       - name: Run E2E tests
         run: |
-          sudo apt-get install -y xvfb
+          sudo apt-get install -y xvfb sqlite3
           Xvfb :99 -ac -screen 0 854x480x24 &
           sleep 2
           DISPLAY=:99 ./gradlew runClientGameTest

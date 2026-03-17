@@ -2,7 +2,7 @@ package com.disqt.disquests.client.gui.helper;
 
 public class ScreenLayouts {
     // Main screen
-    public static final int TOP_MARGIN = 30;
+    public static final int TOP_MARGIN = 45;
     public static final int TAB_WIDTH = 80;
     public static final int TAB_HEIGHT = 20;
     public static final int SEARCH_BAR_HEIGHT = 16;

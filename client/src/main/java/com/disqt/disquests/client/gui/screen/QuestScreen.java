@@ -11,7 +11,6 @@ import com.disqt.disquests.client.gui.widget.DarkButtonWidget;
 import com.disqt.disquests.client.gui.widget.MarkdownWidget;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.client.gui.widget.ReadOnlyMultiLineTextFieldWidget;
-import com.disqt.disquests.client.hud.HudPinManager;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.client.markdown.RenderedLine;
 import com.disqt.disquests.client.network.PacketSender;
@@ -46,7 +45,6 @@ public class QuestScreen extends BaseScreen {
     private MarkdownWidget viewContentArea;
     private DarkButtonWidget editButton;
     private DarkButtonWidget deleteButton;
-    private DarkButtonWidget pinButton;
 
     // --- Edit mode widgets ---
     private MultiLineTextFieldWidget editTitleField;
@@ -54,6 +52,9 @@ public class QuestScreen extends BaseScreen {
     private MultiLineTextFieldWidget coordXField;
     private MultiLineTextFieldWidget coordYField;
     private MultiLineTextFieldWidget coordZField;
+    private MultiLineTextFieldWidget coord2XField;
+    private MultiLineTextFieldWidget coord2YField;
+    private MultiLineTextFieldWidget coord2ZField;
     private DarkButtonWidget visibilityButton;
     private DarkButtonWidget contributorsButton;
     private DarkButtonWidget regionButton;
@@ -152,8 +153,6 @@ public class QuestScreen extends BaseScreen {
         List<Text> buttonTexts = new ArrayList<>();
         buttonTexts.add(Text.literal("Edit"));
         buttonTexts.add(Text.literal("Delete"));
-        boolean isPinned = HudPinManager.isPinned(quest.getId());
-        buttonTexts.add(Text.literal(isPinned ? "Unpin" : "Pin to HUD"));
         buttonTexts.add(Text.literal("Close"));
 
         UIHelper.createButtonRow(this, buttonsY, buttonTexts, (index, x, width) -> {
@@ -172,22 +171,15 @@ public class QuestScreen extends BaseScreen {
                             b -> confirmDelete()));
                     this.deleteButton.active = isOwner;
                 }
-                case 2 -> {
-                    this.pinButton = this.addDrawableChild(new DarkButtonWidget(
-                            x, buttonsY, width, UIHelper.BUTTON_HEIGHT,
-                            buttonTexts.get(2),
-                            b -> togglePin()));
-                }
-                case 3 -> this.addDrawableChild(new DarkButtonWidget(
+                case 2 -> this.addDrawableChild(new DarkButtonWidget(
                         x, buttonsY, width, UIHelper.BUTTON_HEIGHT,
-                        buttonTexts.get(3),
+                        buttonTexts.get(2),
                         b -> this.close()));
             }
         });
 
         this.editButton.setTooltip(Tooltip.of(Text.literal("Edit this quest")));
         this.deleteButton.setTooltip(Tooltip.of(Text.literal("Permanently delete this quest")));
-        this.pinButton.setTooltip(Tooltip.of(Text.literal("Pin/unpin this quest to your HUD")));
 
         // --- TITLE AREA ---
         int titleY = ScreenLayouts.TOP_MARGIN + 5;
@@ -218,6 +210,17 @@ public class QuestScreen extends BaseScreen {
                 this.textRenderer, contentX, contentPanelY,
                 contentWidth, contentPanelHeight, rendered
         );
+        this.viewContentArea.setCheckboxToggleListener((checkboxIndex, nowChecked) -> {
+            String content = quest.getContent();
+            if (content == null) return;
+            String updated = toggleCheckbox(content, checkboxIndex, nowChecked);
+            quest.setContent(updated);
+            List<RenderedLine> rerendered = MarkdownRenderer.render(updated);
+            this.viewContentArea.setContent(rerendered);
+            PacketSender.saveQuest(quest.getId(), quest.getTitle(), updated,
+                    quest.getCoordinates(), quest.isRegion(), quest.getCoordinates2(), quest.getMap());
+            ClientCache.addOrUpdateMyQuest(quest);
+        });
         this.addSelectableChild(this.viewContentArea);
 
         // --- BLUEMAP BUTTON (if applicable) ---
@@ -373,9 +376,9 @@ public class QuestScreen extends BaseScreen {
 
         // --- FORMATTING HELP TOGGLE BUTTON ---
         int helpBtnSize = 14;
-        this.addDrawableChild(new DarkButtonWidget(
+        DarkButtonWidget helpBtn = this.addDrawableChild(new DarkButtonWidget(
                 contentX + contentWidth - helpBtnSize - 2,
-                contentPanelY + 2,
+                titleY + (ScreenLayouts.TITLE_PANEL_HEIGHT - helpBtnSize) / 2,
                 helpBtnSize, helpBtnSize,
                 Text.literal("?"), b -> {
                     persistFieldValues();
@@ -383,6 +386,7 @@ public class QuestScreen extends BaseScreen {
                     this.clearAndInit();
                 }
         ));
+        helpBtn.setTooltip(Tooltip.of(Text.literal("Toggle formatting reference")));
 
         // --- OPTIONAL FIELDS PANEL ---
         int optPanelY = contentPanelY + contentPanelHeight + ScreenLayouts.PANEL_SPACING;
@@ -505,12 +509,22 @@ public class QuestScreen extends BaseScreen {
 
         // Corner 2 row (if region)
         if (regionEnabled) {
-            context.drawText(this.textRenderer, "Corner 2: ", contentX + 5, rowY + 3, Colors.TEXT_MUTED, false);
-            int corner2LabelWidth = this.textRenderer.getWidth("Corner 2: ");
-            CoordinatesData c2 = quest.getCoordinates2();
-            String corner2Text = c2 != null ? String.format("X:%.0f Y:%.0f Z:%.0f", c2.x(), c2.y(), c2.z()) : "Not set";
-            int c2Color = c2 != null ? Colors.TEXT_PRIMARY : Colors.TEXT_DISABLED;
-            context.drawText(this.textRenderer, corner2Text, contentX + 5 + corner2LabelWidth, rowY + 3, c2Color, false);
+            int c2CurX = contentX + 5;
+            context.drawText(this.textRenderer, "C2 ", c2CurX, rowY + 3, Colors.TEXT_MUTED, false);
+            c2CurX += this.textRenderer.getWidth("C2 ");
+
+            context.drawText(this.textRenderer, "X:", c2CurX, rowY + 3, Colors.TEXT_MUTED, false);
+            c2CurX += this.textRenderer.getWidth("X:") + 2;
+            if (this.coord2XField != null) this.coord2XField.render(context, mouseX, mouseY, delta);
+            c2CurX += 50 + 4;
+
+            context.drawText(this.textRenderer, "Y:", c2CurX, rowY + 3, Colors.TEXT_MUTED, false);
+            c2CurX += this.textRenderer.getWidth("Y:") + 2;
+            if (this.coord2YField != null) this.coord2YField.render(context, mouseX, mouseY, delta);
+            c2CurX += 50 + 4;
+
+            context.drawText(this.textRenderer, "Z:", c2CurX, rowY + 3, Colors.TEXT_MUTED, false);
+            if (this.coord2ZField != null) this.coord2ZField.render(context, mouseX, mouseY, delta);
             rowY += 18;
         }
 
@@ -586,21 +600,54 @@ public class QuestScreen extends BaseScreen {
     }
 
     private void buildCorner2Row(int panelX, int rowY) {
-        int labelWidth = this.textRenderer.getWidth("Corner 2: ");
+        int fieldWidth = 50;
+        int fieldHeight = 14;
+        int spacing = 4;
         int btnWidth = 50;
         int btnHeight = 14;
-        int spacing = 4;
+
+        int curX = panelX + 5;
+
+        // "C2" label
+        int labelWidth = this.textRenderer.getWidth("C2 ");
+        curX += labelWidth;
 
         CoordinatesData c2 = quest.getCoordinates2();
-        String corner2Text = c2 != null
-                ? String.format("X:%.0f Y:%.0f Z:%.0f", c2.x(), c2.y(), c2.z())
-                : "Not set";
-        int corner2TextWidth = this.textRenderer.getWidth(corner2Text);
 
-        int setBtnX = panelX + labelWidth + corner2TextWidth + spacing;
+        // X field
+        int xLabelWidth = this.textRenderer.getWidth("X:");
+        curX += xLabelWidth + 2;
+        String xText = c2 != null ? String.valueOf((int) c2.x()) : "";
+        this.coord2XField = new MultiLineTextFieldWidget(
+                this.textRenderer, curX, rowY, fieldWidth, fieldHeight,
+                xText, "X", 1, false);
+        this.addSelectableChild(this.coord2XField);
+        curX += fieldWidth + spacing;
+
+        // Y field
+        int yLabelWidth = this.textRenderer.getWidth("Y:");
+        curX += yLabelWidth + 2;
+        String yText = c2 != null ? String.valueOf((int) c2.y()) : "";
+        this.coord2YField = new MultiLineTextFieldWidget(
+                this.textRenderer, curX, rowY, fieldWidth, fieldHeight,
+                yText, "Y", 1, false);
+        this.addSelectableChild(this.coord2YField);
+        curX += fieldWidth + spacing;
+
+        // Z field
+        int zLabelWidth = this.textRenderer.getWidth("Z:");
+        curX += zLabelWidth + 2;
+        String zText = c2 != null ? String.valueOf((int) c2.z()) : "";
+        this.coord2ZField = new MultiLineTextFieldWidget(
+                this.textRenderer, curX, rowY, fieldWidth, fieldHeight,
+                zText, "Z", 1, false);
+        this.addSelectableChild(this.coord2ZField);
+        curX += fieldWidth + spacing;
+
+        // Set Pos button
         this.addDrawableChild(new DarkButtonWidget(
-                setBtnX, rowY, btnWidth, btnHeight,
-                Text.literal("Set"), b -> setCorner2Position()));
+                curX, rowY, btnWidth, btnHeight,
+                Text.literal("Set Pos"), b -> setCorner2Position()));
     }
 
     private void buildMapRow(int panelX, int rowY) {
@@ -797,11 +844,6 @@ public class QuestScreen extends BaseScreen {
         });
     }
 
-    private void togglePin() {
-        HudPinManager.toggle(quest.getId());
-        this.clearAndInit();
-    }
-
     // ===================== SHARED HELPERS =====================
 
 
@@ -826,6 +868,20 @@ public class QuestScreen extends BaseScreen {
                 }
             }
         }
+        if (this.coord2XField != null && this.coord2YField != null && this.coord2ZField != null) {
+            try {
+                double x2 = Double.parseDouble(coord2XField.getText().trim());
+                double y2 = Double.parseDouble(coord2YField.getText().trim());
+                double z2 = Double.parseDouble(coord2ZField.getText().trim());
+                quest.setCoordinates2(new CoordinatesData(x2, y2, z2));
+            } catch (NumberFormatException e) {
+                if (coord2XField.getText().trim().isEmpty()
+                        && coord2YField.getText().trim().isEmpty()
+                        && coord2ZField.getText().trim().isEmpty()) {
+                    quest.setCoordinates2(null);
+                }
+            }
+        }
     }
 
     private boolean isDirty() {
@@ -834,6 +890,33 @@ public class QuestScreen extends BaseScreen {
         if (currentTitle == null) currentTitle = "";
         if (currentContent == null) currentContent = "";
         return !currentTitle.equals(originalTitle) || !currentContent.equals(originalContent);
+    }
+
+    /**
+     * Toggle the Nth checkbox in the raw markdown content.
+     */
+    private String toggleCheckbox(String content, int index, boolean nowChecked) {
+        int count = 0;
+        int i = 0;
+        while (i < content.length() - 2) {
+            int idx = content.indexOf("[ ]", i);
+            int idx2 = content.indexOf("[x]", i);
+            if (idx < 0 && idx2 < 0) break;
+            int found;
+            if (idx < 0) found = idx2;
+            else if (idx2 < 0) found = idx;
+            else found = Math.min(idx, idx2);
+            // Verify it's part of a task list: preceded by "- "
+            if (found >= 2 && content.substring(found - 2, found).equals("- ")) {
+                if (count == index) {
+                    String replacement = nowChecked ? "[x]" : "[ ]";
+                    return content.substring(0, found) + replacement + content.substring(found + 3);
+                }
+                count++;
+            }
+            i = found + 3;
+        }
+        return content;
     }
 
     private String buildCoordsText() {
@@ -879,7 +962,13 @@ public class QuestScreen extends BaseScreen {
 
     @Override
     public boolean mouseClicked(Click click, boolean simulated) {
-        // In view mode, clicking the content area enters edit mode if the user has permission
+        // Let MarkdownWidget handle checkbox clicks first
+        if (!editing && this.viewContentArea != null) {
+            if (this.viewContentArea.mouseClicked(click, simulated)) {
+                return true;
+            }
+        }
+        // Click-to-edit for content area (only if not a checkbox click)
         if (!editing && canEdit) {
             double mx = click.x();
             double my = click.y();

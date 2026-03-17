@@ -61,7 +61,7 @@ public class HudPinRenderer {
         int maxWidth = getMaxWidth() - PADDING * 2;
         List<CachedPin> pins = new ArrayList<>(quests.size());
         for (Quest quest : quests) {
-            List<String> titleLines = wrapText(tr, quest.getTitle(), maxWidth);
+            List<String> titleLines = wrapText(tr, MarkdownRenderer.stripToPlainText(quest.getTitle()), maxWidth);
 
             String plainContent = MarkdownRenderer.stripToPlainText(quest.getContent());
             List<String> contentLines = wrapText(tr, plainContent, maxWidth);
