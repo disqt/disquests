@@ -88,7 +88,7 @@ public class MainScreen extends BaseScreen {
         // We'll handle this dynamically in selectTab
 
         // --- TABS ---
-        int tabY = (ScreenLayouts.TOP_MARGIN - ScreenLayouts.TAB_HEIGHT) / 2;
+        int tabY = ScreenLayouts.TOP_MARGIN - ScreenLayouts.TAB_HEIGHT - 2;
         this.myQuestsTab = this.addDrawableChild(new TabButtonWidget(
                 (this.width / 2) - ScreenLayouts.TAB_WIDTH - 2, tabY,
                 ScreenLayouts.TAB_WIDTH, ScreenLayouts.TAB_HEIGHT,
@@ -398,7 +398,7 @@ public class MainScreen extends BaseScreen {
         String titleStr = "Disquests";
         int titleWidth = this.textRenderer.getWidth(titleStr);
         int titleX = (this.width - titleWidth) / 2;
-        int titleY = (ScreenLayouts.TOP_MARGIN - this.textRenderer.fontHeight) / 2;
+        int titleY = 4;
 
         boolean hovering = mouseX >= titleX && mouseX <= titleX + titleWidth
                 && mouseY >= titleY && mouseY <= titleY + this.textRenderer.fontHeight;
