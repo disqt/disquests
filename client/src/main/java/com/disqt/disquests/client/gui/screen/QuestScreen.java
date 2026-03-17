@@ -210,6 +210,17 @@ public class QuestScreen extends BaseScreen {
                 this.textRenderer, contentX, contentPanelY,
                 contentWidth, contentPanelHeight, rendered
         );
+        this.viewContentArea.setCheckboxToggleListener((checkboxIndex, nowChecked) -> {
+            String content = quest.getContent();
+            if (content == null) return;
+            String updated = toggleCheckbox(content, checkboxIndex, nowChecked);
+            quest.setContent(updated);
+            List<RenderedLine> rerendered = MarkdownRenderer.render(updated);
+            this.viewContentArea.setContent(rerendered);
+            PacketSender.saveQuest(quest.getId(), quest.getTitle(), updated,
+                    quest.getCoordinates(), quest.isRegion(), quest.getCoordinates2(), quest.getMap());
+            ClientCache.addOrUpdateMyQuest(quest);
+        });
         this.addSelectableChild(this.viewContentArea);
 
         // --- BLUEMAP BUTTON (if applicable) ---
@@ -881,6 +892,33 @@ public class QuestScreen extends BaseScreen {
         return !currentTitle.equals(originalTitle) || !currentContent.equals(originalContent);
     }
 
+    /**
+     * Toggle the Nth checkbox in the raw markdown content.
+     */
+    private String toggleCheckbox(String content, int index, boolean nowChecked) {
+        int count = 0;
+        int i = 0;
+        while (i < content.length() - 2) {
+            int idx = content.indexOf("[ ]", i);
+            int idx2 = content.indexOf("[x]", i);
+            if (idx < 0 && idx2 < 0) break;
+            int found;
+            if (idx < 0) found = idx2;
+            else if (idx2 < 0) found = idx;
+            else found = Math.min(idx, idx2);
+            // Verify it's part of a task list: preceded by "- "
+            if (found >= 2 && content.substring(found - 2, found).equals("- ")) {
+                if (count == index) {
+                    String replacement = nowChecked ? "[x]" : "[ ]";
+                    return content.substring(0, found) + replacement + content.substring(found + 3);
+                }
+                count++;
+            }
+            i = found + 3;
+        }
+        return content;
+    }
+
     private String buildCoordsText() {
         CoordinatesData c = quest.getCoordinates();
         if (quest.isRegion() && quest.getCoordinates2() != null) {
@@ -924,7 +962,13 @@ public class QuestScreen extends BaseScreen {
 
     @Override
     public boolean mouseClicked(Click click, boolean simulated) {
-        // In view mode, clicking the content area enters edit mode if the user has permission
+        // Let MarkdownWidget handle checkbox clicks first
+        if (!editing && this.viewContentArea != null) {
+            if (this.viewContentArea.mouseClicked(click, simulated)) {
+                return true;
+            }
+        }
+        // Click-to-edit for content area (only if not a checkbox click)
         if (!editing && canEdit) {
             double mx = click.x();
             double my = click.y();

@@ -3,6 +3,7 @@ package com.disqt.disquests.client.gui.widget;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.markdown.RenderedLine;
 import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.Drawable;
 import net.minecraft.client.gui.Element;
@@ -30,14 +31,27 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
     private static final int SCROLLBAR_THICKNESS = 6;
 
     private final List<WrappedEntry> wrappedLines = new ArrayList<>();
+    private final List<CheckboxHitbox> checkboxHitboxes = new ArrayList<>();
     private int totalContentHeight = 0;
     private double scrollOffset = 0;
     private boolean focused = false;
+    private CheckboxToggleListener checkboxToggleListener;
+
+    @FunctionalInterface
+    public interface CheckboxToggleListener {
+        void onCheckboxToggled(int checkboxIndex, boolean nowChecked);
+    }
+
+    public void setCheckboxToggleListener(CheckboxToggleListener listener) {
+        this.checkboxToggleListener = listener;
+    }
+
+    private record CheckboxHitbox(int x, int y, int width, int height, int checkboxIndex, boolean checked) {}
 
     /**
      * A single visual line after word-wrapping, with its indent and scale.
      */
-    private record WrappedEntry(OrderedText text, int indent, float scale) {
+    private record WrappedEntry(OrderedText text, int indent, float scale, int checkboxIndex, boolean checked) {
         int height(TextRenderer tr) {
             return Math.round(tr.fontHeight * scale);
         }
@@ -62,7 +76,9 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
 
     private void rebuildWrappedLines(List<RenderedLine> lines) {
         wrappedLines.clear();
+        checkboxHitboxes.clear();
         totalContentHeight = 0;
+        int checkboxIndex = 0;
 
         int availableWidth = width - PADDING * 2 - SCROLLBAR_THICKNESS - 2;
 
@@ -73,21 +89,29 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
 
             if (lineAvailWidth <= 0) lineAvailWidth = availableWidth;
 
+            // Detect checkbox lines
+            String lineStr = line.text().getString();
+            boolean isCheckbox = lineStr.startsWith("[x] ") || lineStr.startsWith("[ ] ");
+            boolean checked = lineStr.startsWith("[x] ");
+            int cbIdx = isCheckbox ? checkboxIndex++ : -1;
+
             // Empty lines produce one blank entry
-            if (line.text().getString().isEmpty()) {
-                wrappedLines.add(new WrappedEntry(OrderedText.EMPTY, indent, 1.0f));
+            if (lineStr.isEmpty()) {
+                wrappedLines.add(new WrappedEntry(OrderedText.EMPTY, indent, 1.0f, -1, false));
                 totalContentHeight += textRenderer.fontHeight;
                 continue;
             }
 
             List<OrderedText> wrapped = textRenderer.wrapLines(line.text(), lineAvailWidth);
             if (wrapped.isEmpty()) {
-                wrappedLines.add(new WrappedEntry(OrderedText.EMPTY, indent, scale));
+                wrappedLines.add(new WrappedEntry(OrderedText.EMPTY, indent, scale, -1, false));
                 totalContentHeight += Math.round(textRenderer.fontHeight * scale);
             } else {
+                boolean first = true;
                 for (OrderedText ot : wrapped) {
-                    wrappedLines.add(new WrappedEntry(ot, indent, scale));
+                    wrappedLines.add(new WrappedEntry(ot, indent, scale, first ? cbIdx : -1, first && checked));
                     totalContentHeight += Math.round(textRenderer.fontHeight * scale);
+                    first = false;
                 }
             }
         }
@@ -99,6 +123,7 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         context.enableScissor(x, y, x + width, y + height);
 
+        checkboxHitboxes.clear();
         int contentX = x + PADDING;
         int contentY = y + PADDING;
         int drawY = contentY - (int) scrollOffset;
@@ -119,6 +144,14 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
                     context.getMatrices().popMatrix();
                 } else {
                     context.drawText(textRenderer, entry.text, drawX, drawY, Colors.TEXT_PRIMARY, false);
+                }
+
+                // Record checkbox hitbox for click detection
+                if (entry.checkboxIndex >= 0) {
+                    int cbWidth = textRenderer.getWidth("[x] ");
+                    checkboxHitboxes.add(new CheckboxHitbox(
+                            drawX, drawY, cbWidth, lineHeight,
+                            entry.checkboxIndex, entry.checked));
                 }
             }
 
@@ -172,6 +205,22 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
         scrollOffset -= verticalAmount * 10.0;
         clampScroll();
         return true;
+    }
+
+    // --- Click handling ---
+
+    @Override
+    public boolean mouseClicked(Click click, boolean simulated) {
+        if (checkboxToggleListener == null) return false;
+        double mx = click.x();
+        double my = click.y();
+        for (CheckboxHitbox cb : checkboxHitboxes) {
+            if (mx >= cb.x && mx < cb.x + cb.width && my >= cb.y && my < cb.y + cb.height) {
+                checkboxToggleListener.onCheckboxToggled(cb.checkboxIndex, !cb.checked);
+                return true;
+            }
+        }
+        return false;
     }
 
     // --- Element ---
