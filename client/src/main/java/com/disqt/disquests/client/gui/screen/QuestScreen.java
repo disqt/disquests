@@ -52,6 +52,9 @@ public class QuestScreen extends BaseScreen {
     private MultiLineTextFieldWidget coordXField;
     private MultiLineTextFieldWidget coordYField;
     private MultiLineTextFieldWidget coordZField;
+    private MultiLineTextFieldWidget coord2XField;
+    private MultiLineTextFieldWidget coord2YField;
+    private MultiLineTextFieldWidget coord2ZField;
     private DarkButtonWidget visibilityButton;
     private DarkButtonWidget contributorsButton;
     private DarkButtonWidget regionButton;
@@ -495,12 +498,22 @@ public class QuestScreen extends BaseScreen {
 
         // Corner 2 row (if region)
         if (regionEnabled) {
-            context.drawText(this.textRenderer, "Corner 2: ", contentX + 5, rowY + 3, Colors.TEXT_MUTED, false);
-            int corner2LabelWidth = this.textRenderer.getWidth("Corner 2: ");
-            CoordinatesData c2 = quest.getCoordinates2();
-            String corner2Text = c2 != null ? String.format("X:%.0f Y:%.0f Z:%.0f", c2.x(), c2.y(), c2.z()) : "Not set";
-            int c2Color = c2 != null ? Colors.TEXT_PRIMARY : Colors.TEXT_DISABLED;
-            context.drawText(this.textRenderer, corner2Text, contentX + 5 + corner2LabelWidth, rowY + 3, c2Color, false);
+            int c2CurX = contentX + 5;
+            context.drawText(this.textRenderer, "C2 ", c2CurX, rowY + 3, Colors.TEXT_MUTED, false);
+            c2CurX += this.textRenderer.getWidth("C2 ");
+
+            context.drawText(this.textRenderer, "X:", c2CurX, rowY + 3, Colors.TEXT_MUTED, false);
+            c2CurX += this.textRenderer.getWidth("X:") + 2;
+            if (this.coord2XField != null) this.coord2XField.render(context, mouseX, mouseY, delta);
+            c2CurX += 50 + 4;
+
+            context.drawText(this.textRenderer, "Y:", c2CurX, rowY + 3, Colors.TEXT_MUTED, false);
+            c2CurX += this.textRenderer.getWidth("Y:") + 2;
+            if (this.coord2YField != null) this.coord2YField.render(context, mouseX, mouseY, delta);
+            c2CurX += 50 + 4;
+
+            context.drawText(this.textRenderer, "Z:", c2CurX, rowY + 3, Colors.TEXT_MUTED, false);
+            if (this.coord2ZField != null) this.coord2ZField.render(context, mouseX, mouseY, delta);
             rowY += 18;
         }
 
@@ -576,21 +589,54 @@ public class QuestScreen extends BaseScreen {
     }
 
     private void buildCorner2Row(int panelX, int rowY) {
-        int labelWidth = this.textRenderer.getWidth("Corner 2: ");
+        int fieldWidth = 50;
+        int fieldHeight = 14;
+        int spacing = 4;
         int btnWidth = 50;
         int btnHeight = 14;
-        int spacing = 4;
+
+        int curX = panelX + 5;
+
+        // "C2" label
+        int labelWidth = this.textRenderer.getWidth("C2 ");
+        curX += labelWidth;
 
         CoordinatesData c2 = quest.getCoordinates2();
-        String corner2Text = c2 != null
-                ? String.format("X:%.0f Y:%.0f Z:%.0f", c2.x(), c2.y(), c2.z())
-                : "Not set";
-        int corner2TextWidth = this.textRenderer.getWidth(corner2Text);
 
-        int setBtnX = panelX + labelWidth + corner2TextWidth + spacing;
+        // X field
+        int xLabelWidth = this.textRenderer.getWidth("X:");
+        curX += xLabelWidth + 2;
+        String xText = c2 != null ? String.valueOf((int) c2.x()) : "";
+        this.coord2XField = new MultiLineTextFieldWidget(
+                this.textRenderer, curX, rowY, fieldWidth, fieldHeight,
+                xText, "X", 1, false);
+        this.addSelectableChild(this.coord2XField);
+        curX += fieldWidth + spacing;
+
+        // Y field
+        int yLabelWidth = this.textRenderer.getWidth("Y:");
+        curX += yLabelWidth + 2;
+        String yText = c2 != null ? String.valueOf((int) c2.y()) : "";
+        this.coord2YField = new MultiLineTextFieldWidget(
+                this.textRenderer, curX, rowY, fieldWidth, fieldHeight,
+                yText, "Y", 1, false);
+        this.addSelectableChild(this.coord2YField);
+        curX += fieldWidth + spacing;
+
+        // Z field
+        int zLabelWidth = this.textRenderer.getWidth("Z:");
+        curX += zLabelWidth + 2;
+        String zText = c2 != null ? String.valueOf((int) c2.z()) : "";
+        this.coord2ZField = new MultiLineTextFieldWidget(
+                this.textRenderer, curX, rowY, fieldWidth, fieldHeight,
+                zText, "Z", 1, false);
+        this.addSelectableChild(this.coord2ZField);
+        curX += fieldWidth + spacing;
+
+        // Set Pos button
         this.addDrawableChild(new DarkButtonWidget(
-                setBtnX, rowY, btnWidth, btnHeight,
-                Text.literal("Set"), b -> setCorner2Position()));
+                curX, rowY, btnWidth, btnHeight,
+                Text.literal("Set Pos"), b -> setCorner2Position()));
     }
 
     private void buildMapRow(int panelX, int rowY) {
@@ -808,6 +854,20 @@ public class QuestScreen extends BaseScreen {
                         && coordYField.getText().trim().isEmpty()
                         && coordZField.getText().trim().isEmpty()) {
                     quest.setCoordinates(null);
+                }
+            }
+        }
+        if (this.coord2XField != null && this.coord2YField != null && this.coord2ZField != null) {
+            try {
+                double x2 = Double.parseDouble(coord2XField.getText().trim());
+                double y2 = Double.parseDouble(coord2YField.getText().trim());
+                double z2 = Double.parseDouble(coord2ZField.getText().trim());
+                quest.setCoordinates2(new CoordinatesData(x2, y2, z2));
+            } catch (NumberFormatException e) {
+                if (coord2XField.getText().trim().isEmpty()
+                        && coord2YField.getText().trim().isEmpty()
+                        && coord2ZField.getText().trim().isEmpty()) {
+                    quest.setCoordinates2(null);
                 }
             }
         }
