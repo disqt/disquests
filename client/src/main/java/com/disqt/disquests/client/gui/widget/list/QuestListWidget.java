@@ -3,6 +3,8 @@ package com.disqt.disquests.client.gui.widget.list;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.screen.MainScreen;
+import com.disqt.disquests.client.hud.HudPinManager;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.Visibility;
@@ -177,9 +179,16 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
             }
 
             // --- Row 2: Content preview ---
-            String truncatedContent = client.textRenderer.trimToWidth(firstLine, entryWidth - 8);
+            String truncatedContent = client.textRenderer.trimToWidth(firstLine, entryWidth - 22);
             context.drawText(client.textRenderer, Text.literal(truncatedContent).formatted(Formatting.GRAY),
                     entryX + 4, entryY + 14, Colors.TEXT_MUTED, false);
+
+            // Pin icon (right side of row 2)
+            int pinIconX = entryX + entryWidth - 14;
+            int pinIconY = entryY + 14;
+            String pinGlyph = "*";
+            int pinColor = isPinned ? 0xFFFFD700 : 0xFF666666;
+            context.drawText(client.textRenderer, pinGlyph, pinIconX, pinIconY, pinColor, false);
 
             // --- Row 3: Last modified + map/coords ---
             context.drawText(client.textRenderer, "Last Modified: " + this.formattedDateTime,
@@ -227,6 +236,20 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
         @Override
         public boolean mouseClicked(Click click, boolean simulated) {
             if (click.button() == 0) {
+                // Check pin icon area (rightmost 14px, row 2)
+                int entryX = this.getX();
+                int entryY = this.getY();
+                int entryWidth = this.getWidth();
+                int pinIconX = entryX + entryWidth - 14;
+                int pinIconY = entryY + 12;
+                if (click.x() >= pinIconX && click.x() <= entryX + entryWidth
+                        && click.y() >= pinIconY && click.y() <= pinIconY + 12) {
+                    HudPinManager.toggle(quest.getId());
+                    if (QuestListWidget.this.parentScreen instanceof MainScreen mainScreen) {
+                        mainScreen.refreshAfterPinToggle();
+                    }
+                    return true;
+                }
                 QuestListWidget.this.setSelected(this);
                 QuestListWidget.this.handleEntryClick(this);
                 return true;
