@@ -3,6 +3,7 @@ package com.disqt.disquests.client.gui.widget.list;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.Visibility;
 import net.minecraft.client.MinecraftClient;
@@ -70,7 +71,8 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
             if (content == null || content.isEmpty()) {
                 this.firstLine = "";
             } else {
-                String[] lines = content.split("\n");
+                String plain = MarkdownRenderer.stripToPlainText(content);
+                String[] lines = plain.split("\n");
                 this.firstLine = lines.length > 0 ? lines[0] : "";
             }
 
