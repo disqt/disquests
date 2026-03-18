@@ -151,25 +151,10 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
                 availableTitleWidth -= rightSideWidth;
             }
 
-            // Draw pinned indicator + title
-            String titlePrefix = isPinned ? "* " : "";
-            String fullTitle = titlePrefix + quest.getTitle();
-            String truncatedTitle = client.textRenderer.trimToWidth(fullTitle, availableTitleWidth);
-
-            if (isPinned) {
-                // Draw the star in gold
-                int starWidth = client.textRenderer.getWidth("* ");
-                context.drawText(client.textRenderer,
-                        Text.literal("*").formatted(Formatting.GOLD),
-                        entryX + 4, entryY + 4, Colors.TEXT_PRIMARY, false);
-                // Draw rest of title
-                String titlePart = truncatedTitle.length() > 2 ? truncatedTitle.substring(2) : "";
-                context.drawText(client.textRenderer, titlePart,
-                        entryX + 4 + starWidth, entryY + 4, Colors.TEXT_PRIMARY, false);
-            } else {
-                context.drawText(client.textRenderer, truncatedTitle,
-                        entryX + 4, entryY + 4, Colors.TEXT_PRIMARY, false);
-            }
+            // Draw title
+            String truncatedTitle = client.textRenderer.trimToWidth(quest.getTitle(), availableTitleWidth);
+            context.drawText(client.textRenderer, truncatedTitle,
+                    entryX + 4, entryY + 4, Colors.TEXT_PRIMARY, false);
 
             // Draw visibility badge + owner on the right
             int rightX = entryX + entryWidth - 4;

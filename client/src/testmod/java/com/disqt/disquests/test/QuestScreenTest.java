@@ -2,6 +2,7 @@ package com.disqt.disquests.test;
 
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
+import com.disqt.disquests.client.gui.helper.ScreenLayouts;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.common.model.Visibility;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -66,11 +67,12 @@ public class QuestScreenTest implements FabricClientGameTest {
         // Compute the help button center position
         double[] btnCenter = context.computeOnClient(client -> {
             QuestScreen screen = (QuestScreen) client.currentScreen;
-            int contentWidth = (int) (screen.width * 0.85f);
+            int contentWidth = (int) (screen.width * ScreenLayouts.CONTENT_WIDTH_RATIO);
             int contentX = (screen.width - contentWidth) / 2;
             int helpBtnSize = 14;
+            int titleY = ScreenLayouts.TOP_MARGIN + 5;
             double x = contentX + contentWidth - helpBtnSize - 2 + helpBtnSize / 2.0;
-            double y = 50 + (22 - helpBtnSize) / 2.0 + helpBtnSize / 2.0;
+            double y = titleY + (ScreenLayouts.TITLE_PANEL_HEIGHT - helpBtnSize) / 2.0 + helpBtnSize / 2.0;
             return new double[]{x, y};
         });
 

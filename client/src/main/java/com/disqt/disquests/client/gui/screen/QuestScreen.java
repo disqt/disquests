@@ -381,11 +381,7 @@ public class QuestScreen extends BaseScreen {
                 contentX + contentWidth - helpBtnSize - 2,
                 titleY + (ScreenLayouts.TITLE_PANEL_HEIGHT - helpBtnSize) / 2,
                 helpBtnSize, helpBtnSize,
-                Text.literal("?"), b -> {
-                    persistFieldValues();
-                    showFormattingHelp = !showFormattingHelp;
-                    this.clearAndInit();
-                }
+                Text.literal("?"), b -> toggleFormattingHelp()
         ));
         this.helpButton.setTooltip(Tooltip.of(Text.literal("Toggle formatting reference")));
 
@@ -848,6 +844,12 @@ public class QuestScreen extends BaseScreen {
     // ===================== SHARED HELPERS =====================
 
 
+    private void toggleFormattingHelp() {
+        persistFieldValues();
+        showFormattingHelp = !showFormattingHelp;
+        this.clearAndInit();
+    }
+
     private void persistFieldValues() {
         if (this.editTitleField != null) {
             quest.setTitle(this.editTitleField.getText());
@@ -969,9 +971,7 @@ public class QuestScreen extends BaseScreen {
             double my = click.y();
             if (mx >= helpButton.getX() && mx < helpButton.getX() + helpButton.getWidth()
                     && my >= helpButton.getY() && my < helpButton.getY() + helpButton.getHeight()) {
-                persistFieldValues();
-                showFormattingHelp = !showFormattingHelp;
-                this.clearAndInit();
+                toggleFormattingHelp();
                 return true;
             }
         }
