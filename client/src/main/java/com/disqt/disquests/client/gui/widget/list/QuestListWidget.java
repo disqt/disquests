@@ -12,8 +12,10 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -25,6 +27,8 @@ import java.util.UUID;
 public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEntry> {
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm dd MM yyyy");
+    private static final Identifier PIN_ICON = Identifier.of("disquests", "icon/pin");
+    private static final Identifier PIN_ACTIVE_ICON = Identifier.of("disquests", "icon/pin_active");
 
     private QuestSelectionListener selectionListener;
 
@@ -183,12 +187,12 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
             context.drawText(client.textRenderer, Text.literal(truncatedContent).formatted(Formatting.GRAY),
                     entryX + 4, entryY + 14, Colors.TEXT_MUTED, false);
 
-            // Pin icon (right side of row 2)
-            int pinIconX = entryX + entryWidth - 14;
+            // Pin icon (right side of row 2) -- GUI sprite
+            int pinIconSize = 10;
+            int pinIconX = entryX + entryWidth - pinIconSize - 4;
             int pinIconY = entryY + 14;
-            String pinGlyph = "*";
-            int pinColor = isPinned ? 0xFFFFD700 : 0xFF666666;
-            context.drawText(client.textRenderer, pinGlyph, pinIconX, pinIconY, pinColor, false);
+            Identifier pinIcon = isPinned ? PIN_ACTIVE_ICON : PIN_ICON;
+            context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, pinIcon, pinIconX, pinIconY, pinIconSize, pinIconSize);
 
             // --- Row 3: Last modified + map/coords ---
             context.drawText(client.textRenderer, "Last Modified: " + this.formattedDateTime,
@@ -236,14 +240,14 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
         @Override
         public boolean mouseClicked(Click click, boolean simulated) {
             if (click.button() == 0) {
-                // Check pin icon area (rightmost 14px, row 2)
+                // Check pin icon area (rightmost 20px, row 2)
                 int entryX = this.getX();
                 int entryY = this.getY();
                 int entryWidth = this.getWidth();
-                int pinIconX = entryX + entryWidth - 14;
+                int pinHitX = entryX + entryWidth - 20;
                 int pinIconY = entryY + 12;
-                if (click.x() >= pinIconX && click.x() <= entryX + entryWidth
-                        && click.y() >= pinIconY && click.y() <= pinIconY + 12) {
+                if (click.x() >= pinHitX && click.x() <= entryX + entryWidth
+                        && click.y() >= pinIconY && click.y() <= pinIconY + 14) {
                     HudPinManager.toggle(quest.getId());
                     if (QuestListWidget.this.parentScreen instanceof MainScreen mainScreen) {
                         mainScreen.refreshAfterPinToggle();
