@@ -114,6 +114,10 @@ public class QuestScreen extends BaseScreen {
         return editContentField;
     }
 
+    public DarkButtonWidget getHelpButton() {
+        return helpButton;
+    }
+
     // --- Lifecycle ---
 
     @Override

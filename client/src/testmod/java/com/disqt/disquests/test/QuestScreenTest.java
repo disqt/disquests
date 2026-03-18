@@ -2,8 +2,8 @@ package com.disqt.disquests.test;
 
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
-import com.disqt.disquests.client.gui.helper.ScreenLayouts;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
+import com.disqt.disquests.client.gui.widget.DarkButtonWidget;
 import com.disqt.disquests.common.model.Visibility;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.TestInput;
@@ -64,15 +64,12 @@ public class QuestScreenTest implements FabricClientGameTest {
             return screen.getContentField().width;
         });
 
-        // Compute the help button center position
+        // Read the actual help button position from the screen
         double[] btnCenter = context.computeOnClient(client -> {
             QuestScreen screen = (QuestScreen) client.currentScreen;
-            int contentWidth = (int) (screen.width * ScreenLayouts.CONTENT_WIDTH_RATIO);
-            int contentX = (screen.width - contentWidth) / 2;
-            int helpBtnSize = 14;
-            int titleY = ScreenLayouts.TOP_MARGIN + 5;
-            double x = contentX + contentWidth - helpBtnSize - 2 + helpBtnSize / 2.0;
-            double y = titleY + (ScreenLayouts.TITLE_PANEL_HEIGHT - helpBtnSize) / 2.0 + helpBtnSize / 2.0;
+            DarkButtonWidget btn = screen.getHelpButton();
+            double x = btn.getX() + btn.getWidth() / 2.0;
+            double y = btn.getY() + btn.getHeight() / 2.0;
             return new double[]{x, y};
         });
 
