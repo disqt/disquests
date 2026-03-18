@@ -24,3 +24,4 @@ bin/
 
 # Claude Code
 .claude/.lsp.json
+.claude/worktrees/

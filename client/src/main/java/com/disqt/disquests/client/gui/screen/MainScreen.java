@@ -13,6 +13,7 @@ import com.disqt.disquests.client.gui.widget.list.QuestListWidget;
 import com.disqt.disquests.client.network.PacketSender;
 import com.disqt.disquests.common.model.Visibility;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.text.Text;
@@ -62,7 +63,11 @@ public class MainScreen extends BaseScreen {
     private int tickCounter = 0;
 
     public MainScreen() {
-        super(Text.literal("Disquests"), null);
+        this(null);
+    }
+
+    public MainScreen(Screen parent) {
+        super(Text.literal("Disquests"), parent);
         this.currentTab = ClientSession.getActiveTab();
         this.searchTerm = ClientSession.getSearchTerm();
         this.serverFilter = ClientSession.getServerQuestsFilter();
@@ -239,7 +244,7 @@ public class MainScreen extends BaseScreen {
 
     // --- DATA REFRESH ---
 
-    private void refreshListContents() {
+    public void refreshListContents() {
         if (currentTab == TAB_MY_QUESTS) {
             List<Quest> quests = ClientCache.getMyQuests();
 
@@ -312,6 +317,9 @@ public class MainScreen extends BaseScreen {
             openButton.active = hasSelection;
             joinButton.active = hasSelection && selected.getVisibility() == Visibility.OPEN;
             requestAccessButton.active = hasSelection && selected.getVisibility() == Visibility.CLOSED;
+            if (selected != null && ClientSession.isRequested(selected.getId())) {
+                markRequestButtonAsRequested();
+            }
         }
 
     }
@@ -352,10 +360,19 @@ public class MainScreen extends BaseScreen {
         }
     }
 
+    private void markRequestButtonAsRequested() {
+        requestAccessButton.setMessage(Text.literal("Requested"));
+        requestAccessButton.active = false;
+    }
+
     private void requestAccess() {
         Quest sel = serverQuestListWidget.getSelectedQuest();
         if (sel != null && sel.getVisibility() == Visibility.CLOSED) {
             PacketSender.requestCollaboration(sel.getId());
+            ClientSession.markRequested(sel.getId());
+            markRequestButtonAsRequested();
+            MinecraftClient.getInstance().inGameHud.setOverlayMessage(
+                    Text.literal("Request sent to " + sel.getOwnerName()), false);
         }
     }
 

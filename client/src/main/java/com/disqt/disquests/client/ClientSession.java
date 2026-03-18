@@ -2,7 +2,9 @@ package com.disqt.disquests.client;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public class ClientSession {
@@ -11,6 +13,7 @@ public class ClientSession {
     private static String bluemapUrl = null;
     private static int pendingRequestCount = 0;
     private static final List<UUID> pinnedQuestIds = new ArrayList<>();
+    private static final Set<UUID> requestedQuestIds = new HashSet<>();
     private static UUID playerUuid = null;
 
     // UI state
@@ -32,6 +35,7 @@ public class ClientSession {
         bluemapUrl = null;
         pendingRequestCount = 0;
         pinnedQuestIds.clear();
+        requestedQuestIds.clear();
         playerUuid = null;
         activeTab = 0;
         searchTerm = "";
@@ -82,6 +86,14 @@ public class ClientSession {
 
     public static void removePinnedQuest(UUID questId) {
         pinnedQuestIds.remove(questId);
+    }
+
+    public static void markRequested(UUID questId) {
+        requestedQuestIds.add(questId);
+    }
+
+    public static boolean isRequested(UUID questId) {
+        return requestedQuestIds.contains(questId);
     }
 
     public static UUID getPlayerUuid() {
