@@ -58,6 +58,7 @@ public class QuestScreen extends BaseScreen {
     private DarkButtonWidget visibilityButton;
     private DarkButtonWidget contributorsButton;
     private DarkButtonWidget regionButton;
+    private DarkButtonWidget helpButton;
     private boolean regionEnabled;
     private boolean showFormattingHelp = false;
     private static final int FORMATTING_PANEL_WIDTH = 120;
@@ -376,7 +377,7 @@ public class QuestScreen extends BaseScreen {
 
         // --- FORMATTING HELP TOGGLE BUTTON ---
         int helpBtnSize = 14;
-        DarkButtonWidget helpBtn = this.addDrawableChild(new DarkButtonWidget(
+        this.helpButton = this.addDrawableChild(new DarkButtonWidget(
                 contentX + contentWidth - helpBtnSize - 2,
                 titleY + (ScreenLayouts.TITLE_PANEL_HEIGHT - helpBtnSize) / 2,
                 helpBtnSize, helpBtnSize,
@@ -386,7 +387,7 @@ public class QuestScreen extends BaseScreen {
                     this.clearAndInit();
                 }
         ));
-        helpBtn.setTooltip(Tooltip.of(Text.literal("Toggle formatting reference")));
+        this.helpButton.setTooltip(Tooltip.of(Text.literal("Toggle formatting reference")));
 
         // --- OPTIONAL FIELDS PANEL ---
         int optPanelY = contentPanelY + contentPanelHeight + ScreenLayouts.PANEL_SPACING;
@@ -962,6 +963,18 @@ public class QuestScreen extends BaseScreen {
 
     @Override
     public boolean mouseClicked(Click click, boolean simulated) {
+        // Intercept help button clicks before title field can swallow them
+        if (editing && helpButton != null && click.button() == 0) {
+            double mx = click.x();
+            double my = click.y();
+            if (mx >= helpButton.getX() && mx < helpButton.getX() + helpButton.getWidth()
+                    && my >= helpButton.getY() && my < helpButton.getY() + helpButton.getHeight()) {
+                persistFieldValues();
+                showFormattingHelp = !showFormattingHelp;
+                this.clearAndInit();
+                return true;
+            }
+        }
         // Let MarkdownWidget handle checkbox clicks first
         if (!editing && this.viewContentArea != null) {
             if (this.viewContentArea.mouseClicked(click, simulated)) {
