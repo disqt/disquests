@@ -269,7 +269,7 @@ public class QuestScreen extends BaseScreen {
         int ownerInfoWidth = this.textRenderer.getWidth(viewOwnerInfo);
         context.drawText(this.textRenderer, viewOwnerInfo,
                 contentX + contentWidth - ownerInfoWidth,
-                ScreenLayouts.TOP_MARGIN - 2,
+                8,
                 Colors.TEXT_MUTED, false);
 
         // --- Title Panel ---
