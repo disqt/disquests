@@ -239,7 +239,7 @@ public class MainScreen extends BaseScreen {
 
     // --- DATA REFRESH ---
 
-    private void refreshListContents() {
+    public void refreshListContents() {
         if (currentTab == TAB_MY_QUESTS) {
             List<Quest> quests = ClientCache.getMyQuests();
 
