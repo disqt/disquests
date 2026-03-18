@@ -312,6 +312,10 @@ public class MainScreen extends BaseScreen {
             openButton.active = hasSelection;
             joinButton.active = hasSelection && selected.getVisibility() == Visibility.OPEN;
             requestAccessButton.active = hasSelection && selected.getVisibility() == Visibility.CLOSED;
+            if (selected != null && ClientSession.isRequested(selected.getId())) {
+                requestAccessButton.setMessage(Text.literal("Requested"));
+                requestAccessButton.active = false;
+            }
         }
 
     }
@@ -356,6 +360,11 @@ public class MainScreen extends BaseScreen {
         Quest sel = serverQuestListWidget.getSelectedQuest();
         if (sel != null && sel.getVisibility() == Visibility.CLOSED) {
             PacketSender.requestCollaboration(sel.getId());
+            ClientSession.markRequested(sel.getId());
+            requestAccessButton.setMessage(Text.literal("Requested"));
+            requestAccessButton.active = false;
+            MinecraftClient.getInstance().inGameHud.setOverlayMessage(
+                    Text.literal("Request sent to " + sel.getOwnerName()), false);
         }
     }
 
