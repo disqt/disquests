@@ -848,7 +848,7 @@ public class QuestScreen extends BaseScreen {
     // ===================== SHARED HELPERS =====================
 
 
-    private void toggleFormattingHelp() {
+    public void toggleFormattingHelp() {
         persistFieldValues();
         showFormattingHelp = !showFormattingHelp;
         this.clearAndInit();
