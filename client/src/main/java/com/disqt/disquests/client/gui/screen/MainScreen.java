@@ -13,6 +13,7 @@ import com.disqt.disquests.client.gui.widget.list.QuestListWidget;
 import com.disqt.disquests.client.network.PacketSender;
 import com.disqt.disquests.common.model.Visibility;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.text.Text;
@@ -62,7 +63,11 @@ public class MainScreen extends BaseScreen {
     private int tickCounter = 0;
 
     public MainScreen() {
-        super(Text.literal("Disquests"), null);
+        this(null);
+    }
+
+    public MainScreen(Screen parent) {
+        super(Text.literal("Disquests"), parent);
         this.currentTab = ClientSession.getActiveTab();
         this.searchTerm = ClientSession.getSearchTerm();
         this.serverFilter = ClientSession.getServerQuestsFilter();
