@@ -2,6 +2,10 @@ plugins {
     id("fabric-loom") version "1.15.5"
 }
 
+repositories {
+    maven("https://maven.terraformersmc.com/releases/")
+}
+
 val minecraft_version: String by project
 val yarn_mappings: String by project
 val fabric_loader_version: String by project
@@ -24,6 +28,10 @@ dependencies {
         runtimeOnly("org.lwjgl:lwjgl-tinyfd:3.3.3:$classifier")
         include("org.lwjgl:lwjgl-tinyfd:3.3.3:$classifier")
     }
+
+    // Mod Menu (optional at runtime)
+    val modmenu_version: String by project
+    modCompileOnly("com.terraformersmc:modmenu:$modmenu_version")
 
     // Markdown rendering
     implementation("org.commonmark:commonmark:0.27.1")
