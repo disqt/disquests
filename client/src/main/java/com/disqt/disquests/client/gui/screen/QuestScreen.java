@@ -71,12 +71,6 @@ public class QuestScreen extends BaseScreen {
     private boolean canEdit;
     private boolean isOwner;
 
-    // --- Content area bounds (for click-to-edit in view mode) ---
-    private int contentAreaX;
-    private int contentAreaY;
-    private int contentAreaWidth;
-    private int contentAreaHeight;
-
     // --- Pre-computed view mode strings (set in initViewMode, used in renderViewMode) ---
     private String viewOwnerInfo;
     private String viewCoordsText;
@@ -202,12 +196,6 @@ public class QuestScreen extends BaseScreen {
             contentPanelBottom -= ScreenLayouts.PANEL_SPACING;
         }
         int contentPanelHeight = contentPanelBottom - contentPanelY;
-
-        // Save bounds for click-to-edit detection
-        this.contentAreaX = contentX;
-        this.contentAreaY = contentPanelY;
-        this.contentAreaWidth = contentWidth;
-        this.contentAreaHeight = contentPanelHeight;
 
         List<RenderedLine> rendered = MarkdownRenderer.render(
                 Objects.requireNonNullElse(quest.getContent(), ""));
@@ -982,16 +970,6 @@ public class QuestScreen extends BaseScreen {
         // Let MarkdownWidget handle checkbox clicks first
         if (!editing && this.viewContentArea != null) {
             if (this.viewContentArea.mouseClicked(click, simulated)) {
-                return true;
-            }
-        }
-        // Click-to-edit for content area (only if not a checkbox click)
-        if (!editing && canEdit) {
-            double mx = click.x();
-            double my = click.y();
-            if (mx >= contentAreaX && mx < contentAreaX + contentAreaWidth
-                    && my >= contentAreaY && my < contentAreaY + contentAreaHeight) {
-                enterEditMode();
                 return true;
             }
         }
