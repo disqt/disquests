@@ -33,8 +33,14 @@ public class HudPinRenderer {
     private static long lastContentHash = 0;
     private static int lastWidth = 0;
     private static List<CachedPin> cachedPins = List.of();
+    private static boolean visible = true;
+
+    public static void toggleVisibility() {
+        visible = !visible;
+    }
 
     public static void render(DrawContext context) {
+        if (!visible) return;
         List<Quest> quests = HudPinManager.getPinnedQuests();
         if (quests.isEmpty()) {
             lastPinnedIds = List.of();
