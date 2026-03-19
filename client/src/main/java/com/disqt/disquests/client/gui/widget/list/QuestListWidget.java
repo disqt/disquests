@@ -66,7 +66,6 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
         private final Quest quest;
         private final String firstLine;
         private final String formattedDateTime;
-        private final boolean isPinned;
         private final boolean isOwnedByPlayer;
         private final boolean hideContent;
 
@@ -103,8 +102,7 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
             );
             this.formattedDateTime = dateTime.format(DATE_TIME_FORMATTER);
 
-            // Check if this quest is pinned
-            this.isPinned = ClientSession.isPinned(quest.getId());
+            // isPinned read live in render() so pin toggle updates icon immediately
         }
 
         public Quest getQuest() {
@@ -193,7 +191,8 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
             int pinIconSize = 10;
             int pinIconX = entryX + entryWidth - pinIconSize - 4;
             int pinIconY = entryY + 14;
-            Identifier pinIcon = isPinned ? PIN_ACTIVE_ICON : PIN_ICON;
+            boolean pinned = ClientSession.isPinned(quest.getId());
+            Identifier pinIcon = pinned ? PIN_ACTIVE_ICON : PIN_ICON;
             context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, pinIcon, pinIconX, pinIconY, pinIconSize, pinIconSize);
 
             // --- Row 3: Last modified + map/coords ---

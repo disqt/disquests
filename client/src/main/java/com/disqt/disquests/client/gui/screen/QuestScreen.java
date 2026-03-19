@@ -23,6 +23,8 @@ import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+
+import java.util.stream.Collectors;
 import net.minecraft.util.Util;
 
 import java.net.URI;
@@ -63,6 +65,13 @@ public class QuestScreen extends BaseScreen {
     private boolean regionEnabled;
     private boolean showFormattingHelp = true;
     private static final int FORMATTING_PANEL_WIDTH = 160;
+
+    // Pre-built formatting preview Text objects (avoid per-frame allocation)
+    private static final Text FMT_BOLD = Text.literal("text").formatted(Formatting.BOLD);
+    private static final Text FMT_ITALIC = Text.literal("text").formatted(Formatting.ITALIC);
+    private static final Text FMT_STRIKE = Text.literal("text").formatted(Formatting.STRIKETHROUGH);
+    private static final Text FMT_HEADING = Text.literal("Heading").formatted(Formatting.BOLD);
+    private static final Text FMT_LINK = Text.literal("a").formatted(Formatting.UNDERLINE);
 
     // Dirty tracking (edit mode)
     private String originalTitle;
@@ -257,7 +266,7 @@ public class QuestScreen extends BaseScreen {
         this.viewContributorsText = quest.getContributors().isEmpty() ? null
                 : quest.getContributors().stream()
                         .map(c -> c.getName())
-                        .collect(java.util.stream.Collectors.joining(", "));
+                        .collect(Collectors.joining(", "));
     }
 
     private void renderViewMode(DrawContext context, int mouseX, int mouseY, float delta) {
@@ -480,22 +489,22 @@ public class QuestScreen extends BaseScreen {
 
             // Bold
             context.drawText(this.textRenderer, "**text**", textX, textY, Colors.TEXT_MUTED, false);
-            context.drawText(this.textRenderer, Text.literal("text").formatted(Formatting.BOLD), colSplit, textY, Colors.TEXT_PRIMARY, false);
+            context.drawText(this.textRenderer, FMT_BOLD, colSplit, textY, Colors.TEXT_PRIMARY, false);
             textY += lineH;
 
             // Italic
             context.drawText(this.textRenderer, "*text*", textX, textY, Colors.TEXT_MUTED, false);
-            context.drawText(this.textRenderer, Text.literal("text").formatted(Formatting.ITALIC), colSplit, textY, Colors.TEXT_PRIMARY, false);
+            context.drawText(this.textRenderer, FMT_ITALIC, colSplit, textY, Colors.TEXT_PRIMARY, false);
             textY += lineH;
 
             // Strikethrough
             context.drawText(this.textRenderer, "~~text~~", textX, textY, Colors.TEXT_MUTED, false);
-            context.drawText(this.textRenderer, Text.literal("text").formatted(Formatting.STRIKETHROUGH), colSplit, textY, Colors.TEXT_PRIMARY, false);
+            context.drawText(this.textRenderer, FMT_STRIKE, colSplit, textY, Colors.TEXT_PRIMARY, false);
             textY += lineH;
 
             // Heading
             context.drawText(this.textRenderer, "# Heading", textX, textY, Colors.TEXT_MUTED, false);
-            context.drawText(this.textRenderer, Text.literal("Heading").formatted(Formatting.BOLD), colSplit, textY, 0xFFFFFF55, false);
+            context.drawText(this.textRenderer, FMT_HEADING, colSplit, textY, 0xFFFFFF55, false);
             textY += lineH;
 
             // Checkbox
@@ -515,7 +524,7 @@ public class QuestScreen extends BaseScreen {
 
             // Link
             context.drawText(this.textRenderer, "[a](url)", textX, textY, Colors.TEXT_MUTED, false);
-            context.drawText(this.textRenderer, Text.literal("a").formatted(Formatting.UNDERLINE), colSplit, textY, 0xFF5599FF, false);
+            context.drawText(this.textRenderer, FMT_LINK, colSplit, textY, 0xFF5599FF, false);
         }
 
         // Optional fields panel

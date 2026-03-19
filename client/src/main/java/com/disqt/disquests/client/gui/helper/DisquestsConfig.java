@@ -16,6 +16,8 @@ public class DisquestsConfig {
             .resolve("disquests").resolve("config.json");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
+    public static final int MIN_PINNED_WIDTH = 100;
+    public static final int MAX_PINNED_WIDTH = 400;
     private static int pinnedWidth = 200;
 
     public static void load() {
@@ -27,7 +29,7 @@ public class DisquestsConfig {
             String json = Files.readString(CONFIG_PATH);
             ConfigData data = GSON.fromJson(json, ConfigData.class);
             if (data != null) {
-                pinnedWidth = Math.max(100, Math.min(400, data.pinnedWidth));
+                pinnedWidth = Math.max(MIN_PINNED_WIDTH, Math.min(MAX_PINNED_WIDTH, data.pinnedWidth));
             }
         } catch (Exception e) {
             LOGGER.warn("Failed to load disquests config, using defaults", e);
@@ -35,7 +37,7 @@ public class DisquestsConfig {
     }
 
     public static void setPinnedWidth(int width) {
-        pinnedWidth = Math.max(100, Math.min(400, width));
+        pinnedWidth = Math.max(MIN_PINNED_WIDTH, Math.min(MAX_PINNED_WIDTH, width));
     }
 
     public static void save() {

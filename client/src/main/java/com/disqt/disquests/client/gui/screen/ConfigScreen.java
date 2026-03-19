@@ -58,7 +58,8 @@ public class ConfigScreen extends BaseScreen {
     }
 
     private void adjustWidth(int delta) {
-        pinnedWidth = Math.max(100, Math.min(400, pinnedWidth + delta));
+        pinnedWidth = Math.max(DisquestsConfig.MIN_PINNED_WIDTH,
+                Math.min(DisquestsConfig.MAX_PINNED_WIDTH, pinnedWidth + delta));
         widthLabel.setMessage(Text.literal("Pinned Width: " + pinnedWidth));
     }
 

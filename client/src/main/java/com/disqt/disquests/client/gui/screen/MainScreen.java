@@ -8,6 +8,7 @@ import com.disqt.disquests.client.gui.helper.ScreenLayouts;
 import com.disqt.disquests.client.gui.helper.UIHelper;
 import com.disqt.disquests.client.gui.widget.DarkButtonWidget;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
+import com.disqt.disquests.client.gui.widget.ToastOverlay;
 import com.disqt.disquests.client.gui.widget.TabButtonWidget;
 import com.disqt.disquests.client.gui.widget.list.QuestListWidget;
 import com.disqt.disquests.client.network.PacketSender;
@@ -61,7 +62,7 @@ public class MainScreen extends BaseScreen {
     private int currentTab;
     private int serverFilter;
     private int tickCounter = 0;
-    private final com.disqt.disquests.client.gui.widget.ToastOverlay toast = new com.disqt.disquests.client.gui.widget.ToastOverlay();
+    private final ToastOverlay toast = new ToastOverlay();
 
     public MainScreen() {
         this(null);
@@ -304,8 +305,7 @@ public class MainScreen extends BaseScreen {
     }
 
     public void refreshAfterPinToggle() {
-        // Only update buttons -- don't re-sort. Pin icon updates automatically
-        // since QuestEntry.render() reads isPinned live from ClientSession.
+        // Only update buttons -- don't re-sort. Pin icon reads isPinned live each frame.
         // Full re-sort happens on screen open (init) and tab switch.
         updateActionButtons();
     }

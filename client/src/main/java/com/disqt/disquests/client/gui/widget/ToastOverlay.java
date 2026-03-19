@@ -10,7 +10,8 @@ public class ToastOverlay {
     private int ticksRemaining;
     private static final int DURATION_TICKS = 60; // 3 seconds
     private static final int FADE_TICKS = 20;     // last 1 second fades
-    private static final int BG_COLOR = 0xCC222222;
+    private static final int BG_RGB = 0x222222;
+    private static final int BG_BASE_ALPHA = 0xCC;
     private static final int PADDING_X = 12;
     private static final int PADDING_Y = 6;
 
@@ -41,7 +42,8 @@ public class ToastOverlay {
         int x = (screenWidth - boxWidth) / 2;
         int y = bottomY - boxHeight - 4;
 
-        int bg = (alphaInt << 24) | (BG_COLOR & 0x00FFFFFF);
+        int bgAlpha = (int) (BG_BASE_ALPHA * alpha);
+        int bg = (bgAlpha << 24) | BG_RGB;
         context.fill(x, y, x + boxWidth, y + boxHeight, bg);
 
         int textColor = (alphaInt << 24) | (Colors.TEXT_PRIMARY & 0x00FFFFFF);
