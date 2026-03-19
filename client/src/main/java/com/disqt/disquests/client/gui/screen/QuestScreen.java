@@ -71,6 +71,7 @@ public class QuestScreen extends BaseScreen {
     // Permission cache (recomputed each init)
     private boolean canEdit;
     private boolean isOwner;
+    private boolean hideContent;
 
     // --- Pre-computed view mode strings (set in initViewMode, used in renderViewMode) ---
     private String viewOwnerInfo;
@@ -123,6 +124,9 @@ public class QuestScreen extends BaseScreen {
         this.isOwner = quest.getOwnerUuid().equals(myUuid);
         this.canEdit = isOwner || quest.getContributors().stream()
                 .anyMatch(c -> c.getUuid().equals(myUuid) && c.canEdit());
+        boolean isContributor = quest.getContributors().stream()
+                .anyMatch(c -> c.getUuid().equals(myUuid));
+        this.hideContent = quest.getVisibility() == Visibility.CLOSED && !isOwner && !isContributor;
 
         if (editing) {
             initEditMode();
@@ -198,13 +202,16 @@ public class QuestScreen extends BaseScreen {
         }
         int contentPanelHeight = contentPanelBottom - contentPanelY;
 
-        List<RenderedLine> rendered = MarkdownRenderer.render(
-                Objects.requireNonNullElse(quest.getContent(), ""));
+        String contentToRender = hideContent
+                ? "Request access to view this quest"
+                : Objects.requireNonNullElse(quest.getContent(), "");
+        List<RenderedLine> rendered = MarkdownRenderer.render(contentToRender);
         this.viewContentArea = new MarkdownWidget(
                 this.textRenderer, contentX, contentPanelY,
                 contentWidth, contentPanelHeight, rendered
         );
         this.viewContentArea.setCheckboxToggleListener((checkboxIndex, nowChecked) -> {
+            if (hideContent) return;
             String content = quest.getContent();
             if (content == null) return;
             String updated = toggleCheckbox(content, checkboxIndex, nowChecked);

@@ -68,18 +68,33 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
         private final String formattedDateTime;
         private final boolean isPinned;
         private final boolean isOwnedByPlayer;
+        private final boolean hideContent;
 
         public QuestEntry(Quest quest) {
             this.quest = quest;
 
+            // Check ownership and contributor status
+            UUID playerUuid = ClientSession.getEffectivePlayerUuid();
+            this.isOwnedByPlayer = playerUuid != null && playerUuid.equals(quest.getOwnerUuid());
+            boolean isContributor = quest.getContributors().stream()
+                    .anyMatch(c -> c.getUuid().equals(playerUuid));
+
+            // Hide content for closed quests the player hasn't joined
+            this.hideContent = quest.getVisibility() == Visibility.CLOSED
+                    && !isOwnedByPlayer && !isContributor;
+
             // Content preview: first line of content
-            String content = quest.getContent();
-            if (content == null || content.isEmpty()) {
+            if (hideContent) {
                 this.firstLine = "";
             } else {
-                String plain = MarkdownRenderer.stripToPlainText(content);
-                String[] lines = plain.split("\n");
-                this.firstLine = lines.length > 0 ? lines[0] : "";
+                String content = quest.getContent();
+                if (content == null || content.isEmpty()) {
+                    this.firstLine = "";
+                } else {
+                    String plain = MarkdownRenderer.stripToPlainText(content);
+                    String[] lines = plain.split("\n");
+                    this.firstLine = lines.length > 0 ? lines[0] : "";
+                }
             }
 
             // Format last modified timestamp
@@ -90,10 +105,6 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
 
             // Check if this quest is pinned
             this.isPinned = ClientSession.isPinned(quest.getId());
-
-            // Check ownership
-            UUID playerUuid = ClientSession.getEffectivePlayerUuid();
-            this.isOwnedByPlayer = playerUuid != null && playerUuid.equals(quest.getOwnerUuid());
         }
 
         public Quest getQuest() {
@@ -168,9 +179,15 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
             }
 
             // --- Row 2: Content preview ---
-            String truncatedContent = client.textRenderer.trimToWidth(firstLine, entryWidth - 22);
-            context.drawText(client.textRenderer, Text.literal(truncatedContent).formatted(Formatting.GRAY),
-                    entryX + 4, entryY + 14, Colors.TEXT_MUTED, false);
+            if (hideContent) {
+                context.drawText(client.textRenderer,
+                        Text.literal("Request access to view").formatted(Formatting.ITALIC),
+                        entryX + 4, entryY + 14, Colors.TEXT_MUTED, false);
+            } else {
+                String truncatedContent = client.textRenderer.trimToWidth(firstLine, entryWidth - 22);
+                context.drawText(client.textRenderer, Text.literal(truncatedContent).formatted(Formatting.GRAY),
+                        entryX + 4, entryY + 14, Colors.TEXT_MUTED, false);
+            }
 
             // Pin icon (right side of row 2) -- GUI sprite
             int pinIconSize = 10;
