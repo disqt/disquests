@@ -190,6 +190,14 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
                 context.drawText(client.textRenderer, locationStr,
                         entryX + entryWidth - locationWidth - 4, entryY + 24, Colors.TEXT_MUTED, false);
             }
+
+            // "Requested" indicator (right-aligned on row 3)
+            if (ClientSession.isRequested(quest.getId())) {
+                String requestedText = "Requested";
+                int requestedWidth = client.textRenderer.getWidth(requestedText);
+                context.drawText(client.textRenderer, requestedText,
+                        entryX + entryWidth - requestedWidth - 4, entryY + 24, 0xFFCCCC44, false);
+            }
         }
 
         private String buildLocationString() {
