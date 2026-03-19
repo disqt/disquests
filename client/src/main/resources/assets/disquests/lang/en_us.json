@@ -2,6 +2,10 @@
   "key.buildnotes.opengui": "Open BuildNotes",
   "category.buildnotes.main": "BuildNotes",
 
+  "key.category.disquests.main": "Disquests",
+  "key.disquests.opengui": "Open Disquests",
+  "key.disquests.togglepin": "Toggle HUD Pin",
+
   "gui.buildnotes.main_title": "BuildNotes",
   "gui.buildnotes.notes_tab": "Notes",
   "gui.buildnotes.builds_tab": "Builds",
