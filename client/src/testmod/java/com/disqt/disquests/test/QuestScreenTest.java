@@ -44,8 +44,8 @@ public class QuestScreenTest implements FabricClientGameTest {
     }
 
     /**
-     * Issue 1: Click the "?" button in edit mode and verify the formatting
-     * panel appears (content field width shrinks when panel is shown).
+     * Formatting panel is open by default. Toggling it off should expand the
+     * content field width (panel no longer taking space).
      */
     private void testHelpButtonToggle(ClientGameTestContext context) {
         Quest quest = createTestQuest();
@@ -54,30 +54,28 @@ public class QuestScreenTest implements FabricClientGameTest {
         context.waitForScreen(QuestScreen.class);
         context.waitTick();
 
-        // Get content field width BEFORE clicking help button
-        int widthBefore = context.computeOnClient(client -> {
+        // Panel is open by default -- content field is narrower
+        int widthWithPanel = context.computeOnClient(client -> {
             QuestScreen screen = (QuestScreen) client.currentScreen;
             return screen.getContentField().width;
         });
 
-        // Click the help button via direct method call
-        // (TestInput.pressMouse via GLFW doesn't reliably trigger Screen.mouseClicked on Xvfb)
+        // Toggle OFF -- content field should expand
         context.runOnClient(client -> {
             QuestScreen screen = (QuestScreen) client.currentScreen;
             screen.toggleFormattingHelp();
         });
         context.waitTicks(2);
 
-        // Content field should be narrower now (formatting panel visible)
-        int widthAfter = context.computeOnClient(client -> {
+        int widthWithoutPanel = context.computeOnClient(client -> {
             QuestScreen screen = (QuestScreen) client.currentScreen;
             return screen.getContentField().width;
         });
 
-        if (widthAfter >= widthBefore) {
+        if (widthWithoutPanel <= widthWithPanel) {
             throw new AssertionError(
-                    "Help button toggle failed: content width should shrink when formatting panel opens. " +
-                    "Before=" + widthBefore + " After=" + widthAfter);
+                    "Toggling formatting panel off should expand content field. " +
+                    "WithPanel=" + widthWithPanel + " WithoutPanel=" + widthWithoutPanel);
         }
 
         context.setScreen(() -> null);

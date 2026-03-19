@@ -8,9 +8,10 @@ import com.disqt.disquests.common.PacketCodec;
 import com.disqt.disquests.common.PacketType;
 import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.client.gui.screen.MainScreen;
+import com.disqt.disquests.client.migration.BuildNotesMigrator;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
+import net.minecraft.client.network.ServerInfo;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -49,6 +50,17 @@ public class ClientPacketHandler {
         PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(r);
         ClientSession.joinServer(payload.bluemapUrl(), payload.pendingRequestCount(), payload.pinnedQuestIds(), payload.playerUuid());
         PacketSender.requestSync();
+
+        // Migrate old BuildNotes if present
+        ServerInfo serverInfo = MinecraftClient.getInstance().getCurrentServerEntry();
+        if (serverInfo != null) {
+            String address = serverInfo.address;
+            // Strip port if present to match folder name
+            if (address.contains(":")) {
+                address = address.substring(0, address.indexOf(":"));
+            }
+            BuildNotesMigrator.migrateIfNeeded(address);
+        }
     }
 
     private static void handleSyncMyQuests(ByteBufReader r) {
@@ -102,11 +114,13 @@ public class ClientPacketHandler {
             ClientCache.addOrUpdateMyQuest(quest);
             ClientCache.removeFromServerQuests(payload.questId());
 
+            String toastMsg = "Joined \"" + quest.getTitle() + "\" \u2014 see My Quests";
             MinecraftClient client = MinecraftClient.getInstance();
-            client.inGameHud.setOverlayMessage(
-                    Text.literal("Joined \"" + quest.getTitle() + "\" \u2014 see My Quests"), false);
             if (client.currentScreen instanceof MainScreen mainScreen) {
                 mainScreen.refreshListContents();
+                mainScreen.showToast(toastMsg);
+            } else {
+                ClientSession.setPendingToast(toastMsg);
             }
         }
     }
