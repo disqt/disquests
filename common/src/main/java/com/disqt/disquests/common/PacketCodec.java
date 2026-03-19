@@ -139,6 +139,13 @@ public final class PacketCodec {
         return buf.toByteArray();
     }
 
+    public static byte[] writeLeaveQuest(UUID questId) {
+        ByteBufWriter w = new ByteBufWriter();
+        w.writeByte(PacketType.LEAVE_QUEST.getId());
+        w.writeUUID(questId);
+        return w.toByteArray();
+    }
+
     // ---- S2C encode ----
 
     public static byte[] writeHandshake(String bluemapUrl, int pendingRequestCount, List<UUID> pinnedQuestIds, UUID playerUuid) {
@@ -311,6 +318,10 @@ public final class PacketCodec {
 
     public static UUID readPinQuest(ByteBufReader buf) {
         return readNullableUUID(buf);
+    }
+
+    public static UUID readLeaveQuest(ByteBufReader r) {
+        return r.readUUID();
     }
 
     // ---- S2C decode ----

@@ -607,4 +607,18 @@ class PacketCodecTest {
         assertTrue(decoded.isEmpty());
         assertEquals(0, reader.remaining());
     }
+
+    // ---- 27. testLeaveQuestRoundTrip ----
+
+    @Test
+    void testLeaveQuestRoundTrip() {
+        UUID questId = UUID.randomUUID();
+        byte[] packet = PacketCodec.writeLeaveQuest(questId);
+        ByteBufReader reader = new ByteBufReader(packet);
+
+        assertEquals(PacketType.LEAVE_QUEST, PacketCodec.readType(reader));
+        UUID readId = PacketCodec.readLeaveQuest(reader);
+        assertEquals(questId, readId);
+        assertEquals(0, reader.remaining());
+    }
 }
