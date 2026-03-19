@@ -22,6 +22,7 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.Util;
 
 import java.net.URI;
@@ -60,8 +61,8 @@ public class QuestScreen extends BaseScreen {
     private DarkButtonWidget regionButton;
     private DarkButtonWidget helpButton;
     private boolean regionEnabled;
-    private boolean showFormattingHelp = false;
-    private static final int FORMATTING_PANEL_WIDTH = 120;
+    private boolean showFormattingHelp = true;
+    private static final int FORMATTING_PANEL_WIDTH = 160;
 
     // Dirty tracking (edit mode)
     private String originalTitle;
@@ -440,7 +441,7 @@ public class QuestScreen extends BaseScreen {
         UIHelper.drawPanel(context, contentX, contentPanelY, editorWidth, contentPanelHeight);
         this.editContentField.render(context, mouseX, mouseY, delta);
 
-        // Formatting help side panel
+        // Formatting help side panel (two-column: syntax | rendered preview)
         if (showFormattingHelp) {
             int panelX = contentX + contentWidth - FORMATTING_PANEL_WIDTH;
             UIHelper.drawPanel(context, panelX, contentPanelY, FORMATTING_PANEL_WIDTH, contentPanelHeight);
@@ -448,24 +449,49 @@ public class QuestScreen extends BaseScreen {
             int textX = panelX + 5;
             int textY = contentPanelY + 5;
             int lineH = this.textRenderer.fontHeight + 2;
+            int colSplit = panelX + 80;
 
             context.drawText(this.textRenderer, "Formatting", textX, textY, Colors.TEXT_PRIMARY, false);
-            textY += lineH + 2;
+            textY += lineH + 4;
 
-            String[][] help = {
-                    {"**text**", "bold"},
-                    {"*text*", "italic"},
-                    {"~~text~~", "strikethrough"},
-                    {"# Heading", "heading"},
-                    {"- [ ] task", "checkbox"},
-                    {"- [x] done", "checked"},
-                    {"> text", "quote"},
-                    {"[text](url)", "link"},
-            };
-            for (String[] entry : help) {
-                context.drawText(this.textRenderer, entry[0], textX, textY, Colors.TEXT_MUTED, false);
-                textY += lineH;
-            }
+            // Bold
+            context.drawText(this.textRenderer, "**text**", textX, textY, Colors.TEXT_MUTED, false);
+            context.drawText(this.textRenderer, Text.literal("text").formatted(Formatting.BOLD), colSplit, textY, Colors.TEXT_PRIMARY, false);
+            textY += lineH;
+
+            // Italic
+            context.drawText(this.textRenderer, "*text*", textX, textY, Colors.TEXT_MUTED, false);
+            context.drawText(this.textRenderer, Text.literal("text").formatted(Formatting.ITALIC), colSplit, textY, Colors.TEXT_PRIMARY, false);
+            textY += lineH;
+
+            // Strikethrough
+            context.drawText(this.textRenderer, "~~text~~", textX, textY, Colors.TEXT_MUTED, false);
+            context.drawText(this.textRenderer, Text.literal("text").formatted(Formatting.STRIKETHROUGH), colSplit, textY, Colors.TEXT_PRIMARY, false);
+            textY += lineH;
+
+            // Heading
+            context.drawText(this.textRenderer, "# Heading", textX, textY, Colors.TEXT_MUTED, false);
+            context.drawText(this.textRenderer, Text.literal("Heading").formatted(Formatting.BOLD), colSplit, textY, 0xFFFFFF55, false);
+            textY += lineH;
+
+            // Checkbox
+            context.drawText(this.textRenderer, "- [ ] task", textX, textY, Colors.TEXT_MUTED, false);
+            context.drawText(this.textRenderer, "[ ] task", colSplit, textY, Colors.TEXT_PRIMARY, false);
+            textY += lineH;
+
+            // Checked
+            context.drawText(this.textRenderer, "- [x] done", textX, textY, Colors.TEXT_MUTED, false);
+            context.drawText(this.textRenderer, "[x] done", colSplit, textY, 0xFF88FF88, false);
+            textY += lineH;
+
+            // Quote
+            context.drawText(this.textRenderer, "> text", textX, textY, Colors.TEXT_MUTED, false);
+            context.drawText(this.textRenderer, "| text", colSplit, textY, 0xFFAAAAFF, false);
+            textY += lineH;
+
+            // Link
+            context.drawText(this.textRenderer, "[a](url)", textX, textY, Colors.TEXT_MUTED, false);
+            context.drawText(this.textRenderer, Text.literal("a").formatted(Formatting.UNDERLINE), colSplit, textY, 0xFF5599FF, false);
         }
 
         // Optional fields panel
