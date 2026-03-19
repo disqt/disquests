@@ -77,6 +77,7 @@ public class QuestScreen extends BaseScreen {
     private String viewOwnerInfo;
     private String viewCoordsText;
     private String viewMapText;
+    private String viewContributorsText;
 
     /**
      * Open in view mode for an existing quest.
@@ -141,9 +142,11 @@ public class QuestScreen extends BaseScreen {
         int contentWidth = (int) (this.width * ScreenLayouts.CONTENT_WIDTH_RATIO);
         int contentX = (this.width - contentWidth) / 2;
 
-        // Determine if we need metadata bar
+        // Determine if we need metadata bar and contributors row
         boolean hasCoords = quest.getCoordinates() != null;
         int metadataHeight = hasCoords ? 24 : 0;
+        boolean hasContributors = !quest.getContributors().isEmpty();
+        int contributorsHeight = hasContributors ? 14 : 0;
 
         // Check if BlueMap link is available
         String bluemapUrl = BlueMapHelper.buildUrl(quest);
@@ -196,10 +199,9 @@ public class QuestScreen extends BaseScreen {
 
         // --- CONTENT AREA ---
         int contentPanelY = ScreenLayouts.TOP_MARGIN + ScreenLayouts.TITLE_PANEL_HEIGHT + ScreenLayouts.PANEL_SPACING;
-        int contentPanelBottom = this.height - bottomMargin - metadataHeight;
-        if (metadataHeight > 0) {
-            contentPanelBottom -= ScreenLayouts.PANEL_SPACING;
-        }
+        int contentPanelBottom = this.height - bottomMargin - metadataHeight - contributorsHeight;
+        if (metadataHeight > 0) contentPanelBottom -= ScreenLayouts.PANEL_SPACING;
+        if (contributorsHeight > 0) contentPanelBottom -= ScreenLayouts.PANEL_SPACING;
         int contentPanelHeight = contentPanelBottom - contentPanelY;
 
         String contentToRender = hideContent
@@ -252,6 +254,10 @@ public class QuestScreen extends BaseScreen {
         this.viewOwnerInfo = ownerInfo;
         this.viewCoordsText = hasCoords ? buildCoordsText() : null;
         this.viewMapText = (hasCoords && quest.getMap() != null) ? "Map: " + quest.getMap() : null;
+        this.viewContributorsText = quest.getContributors().isEmpty() ? null
+                : quest.getContributors().stream()
+                        .map(c -> c.getName())
+                        .collect(java.util.stream.Collectors.joining(", "));
     }
 
     private void renderViewMode(DrawContext context, int mouseX, int mouseY, float delta) {
@@ -261,6 +267,8 @@ public class QuestScreen extends BaseScreen {
 
         boolean hasCoords = quest.getCoordinates() != null;
         int metadataHeight = hasCoords ? 24 : 0;
+        boolean hasContributors = viewContributorsText != null;
+        int contributorsHeight = hasContributors ? 14 : 0;
 
         // --- Screen title ---
         context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 8, Colors.TEXT_PRIMARY);
@@ -279,20 +287,21 @@ public class QuestScreen extends BaseScreen {
 
         // --- Content Panel ---
         int contentPanelY = ScreenLayouts.TOP_MARGIN + ScreenLayouts.TITLE_PANEL_HEIGHT + ScreenLayouts.PANEL_SPACING;
-        int contentPanelBottom = this.height - bottomMargin - metadataHeight;
-        if (metadataHeight > 0) {
-            contentPanelBottom -= ScreenLayouts.PANEL_SPACING;
-        }
+        int contentPanelBottom = this.height - bottomMargin - metadataHeight - contributorsHeight;
+        if (metadataHeight > 0) contentPanelBottom -= ScreenLayouts.PANEL_SPACING;
+        if (contributorsHeight > 0) contentPanelBottom -= ScreenLayouts.PANEL_SPACING;
         UIHelper.drawPanel(context, contentX, contentPanelY,
                 contentWidth, contentPanelBottom - contentPanelY);
         this.viewContentArea.render(context, mouseX, mouseY, delta);
 
+        int nextY = contentPanelBottom;
+
         // --- Metadata bar (pre-computed in initViewMode) ---
         if (hasCoords) {
-            int metaY = contentPanelBottom + ScreenLayouts.PANEL_SPACING;
-            UIHelper.drawPanel(context, contentX, metaY, contentWidth, metadataHeight);
+            nextY += ScreenLayouts.PANEL_SPACING;
+            UIHelper.drawPanel(context, contentX, nextY, contentWidth, metadataHeight);
 
-            int textY = metaY + (metadataHeight - 8) / 2;
+            int textY = nextY + (metadataHeight - 8) / 2;
             int textX = contentX + 5;
 
             context.drawText(this.textRenderer, viewCoordsText, textX, textY, Colors.TEXT_MUTED, false);
@@ -302,6 +311,14 @@ public class QuestScreen extends BaseScreen {
                 context.drawText(this.textRenderer, viewMapText,
                         textX + coordsWidth + 12, textY, Colors.TEXT_MUTED, false);
             }
+            nextY += metadataHeight;
+        }
+
+        // --- Contributors ---
+        if (hasContributors) {
+            nextY += ScreenLayouts.PANEL_SPACING;
+            context.drawText(this.textRenderer, "Contributors: " + viewContributorsText,
+                    contentX + 5, nextY + 2, Colors.TEXT_MUTED, false);
         }
     }
 
