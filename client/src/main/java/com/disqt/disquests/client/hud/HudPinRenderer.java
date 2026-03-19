@@ -3,9 +3,12 @@ package com.disqt.disquests.client.hud;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.helper.DisquestsConfig;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
+import com.disqt.disquests.client.markdown.RenderedLine;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.OrderedText;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,7 +27,7 @@ public class HudPinRenderer {
     private static int getMaxWidth() { return DisquestsConfig.getPinnedWidth(); }
 
     // --- Cache ---
-    private record CachedPin(Quest quest, List<String> titleLines, List<String> contentLines, boolean truncated) {}
+    private record CachedPin(Quest quest, List<String> titleLines, List<OrderedText> contentLines, boolean truncated) {}
 
     private static List<UUID> lastPinnedIds = List.of();
     private static long lastContentHash = 0;
@@ -69,8 +72,15 @@ public class HudPinRenderer {
         for (Quest quest : quests) {
             List<String> titleLines = wrapText(tr, MarkdownRenderer.stripToPlainText(quest.getTitle()), maxWidth);
 
-            String plainContent = MarkdownRenderer.stripToPlainText(quest.getContent());
-            List<String> contentLines = wrapText(tr, plainContent, maxWidth);
+            // Render content with markdown formatting
+            List<RenderedLine> rendered = MarkdownRenderer.render(
+                    quest.getContent() != null ? quest.getContent() : "");
+            List<OrderedText> contentLines = new ArrayList<>();
+            for (RenderedLine line : rendered) {
+                // Wrap each rendered line to fit the HUD width
+                List<OrderedText> wrapped = tr.wrapLines(line.text(), maxWidth);
+                contentLines.addAll(wrapped);
+            }
 
             int maxContentLines = MAX_LINES - titleLines.size();
             boolean truncated = false;
@@ -99,8 +109,8 @@ public class HudPinRenderer {
             textY += lineHeight;
         }
 
-        // Content (gray)
-        for (String line : pin.contentLines) {
+        // Content (formatted)
+        for (OrderedText line : pin.contentLines) {
             context.drawText(tr, line, MARGIN + PADDING, textY, CONTENT_COLOR, true);
             textY += lineHeight;
         }
