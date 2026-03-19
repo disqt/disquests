@@ -27,12 +27,14 @@ public class HudPinRenderer {
     private record CachedPin(Quest quest, List<String> titleLines, List<String> contentLines, boolean truncated) {}
 
     private static List<UUID> lastPinnedIds = List.of();
+    private static long lastContentHash = 0;
     private static List<CachedPin> cachedPins = List.of();
 
     public static void render(DrawContext context) {
         List<Quest> quests = HudPinManager.getPinnedQuests();
         if (quests.isEmpty()) {
             lastPinnedIds = List.of();
+            lastContentHash = 0;
             cachedPins = List.of();
             return;
         }
@@ -40,11 +42,15 @@ public class HudPinRenderer {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.inGameHud.getDebugHud().shouldShowDebugHud()) return;
 
-        // Rebuild cache if pin list changed
+        // Rebuild cache if pin list or quest content changed
         List<UUID> currentIds = quests.stream().map(Quest::getId).toList();
-        if (!currentIds.equals(lastPinnedIds)) {
+        long contentHash = quests.stream()
+                .mapToLong(q -> q.getId().hashCode() + q.getLastModified())
+                .sum();
+        if (!currentIds.equals(lastPinnedIds) || contentHash != lastContentHash) {
             rebuildCache(client.textRenderer, quests);
             lastPinnedIds = currentIds;
+            lastContentHash = contentHash;
         }
 
         // Render from cache
