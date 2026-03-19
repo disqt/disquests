@@ -61,6 +61,7 @@ public class MainScreen extends BaseScreen {
     private int currentTab;
     private int serverFilter;
     private int tickCounter = 0;
+    private final com.disqt.disquests.client.gui.widget.ToastOverlay toast = new com.disqt.disquests.client.gui.widget.ToastOverlay();
 
     public MainScreen() {
         this(null);
@@ -373,8 +374,7 @@ public class MainScreen extends BaseScreen {
             PacketSender.requestCollaboration(sel.getId());
             ClientSession.markRequested(sel.getId());
             markRequestButtonAsRequested();
-            MinecraftClient.getInstance().inGameHud.setOverlayMessage(
-                    Text.literal("Request sent to " + sel.getOwnerName()), false);
+            showToast("Request sent to " + sel.getOwnerName());
         }
     }
 
@@ -384,6 +384,13 @@ public class MainScreen extends BaseScreen {
     public void tick() {
         super.tick();
         tickCounter++;
+        toast.tick();
+        String pending = ClientSession.consumePendingToast();
+        if (pending != null) toast.show(pending);
+    }
+
+    public void showToast(String message) {
+        toast.show(message);
     }
 
     // --- RENDERING ---
@@ -431,6 +438,10 @@ public class MainScreen extends BaseScreen {
         if (pendingCount > 0) {
             renderNotificationBadge(context, pendingCount);
         }
+
+        // Toast overlay (renders on top of everything)
+        int buttonsY = UIHelper.getBottomButtonY(this);
+        toast.render(context, this.textRenderer, this.width, buttonsY);
     }
 
     private static int hsbToRgb(float hue, float saturation, float brightness) {

@@ -10,7 +10,6 @@ import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -102,11 +101,13 @@ public class ClientPacketHandler {
             ClientCache.addOrUpdateMyQuest(quest);
             ClientCache.removeFromServerQuests(payload.questId());
 
+            String toastMsg = "Joined \"" + quest.getTitle() + "\" \u2014 see My Quests";
             MinecraftClient client = MinecraftClient.getInstance();
-            client.inGameHud.setOverlayMessage(
-                    Text.literal("Joined \"" + quest.getTitle() + "\" \u2014 see My Quests"), false);
             if (client.currentScreen instanceof MainScreen mainScreen) {
                 mainScreen.refreshListContents();
+                mainScreen.showToast(toastMsg);
+            } else {
+                ClientSession.setPendingToast(toastMsg);
             }
         }
     }
