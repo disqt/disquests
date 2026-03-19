@@ -34,7 +34,11 @@ public class DisquestsConfig {
         }
     }
 
-    private static void save() {
+    public static void setPinnedWidth(int width) {
+        pinnedWidth = Math.max(100, Math.min(400, width));
+    }
+
+    public static void save() {
         try {
             Files.createDirectories(CONFIG_PATH.getParent());
             ConfigData data = new ConfigData();
