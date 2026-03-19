@@ -66,20 +66,34 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
         private final Quest quest;
         private final String firstLine;
         private final String formattedDateTime;
-        private final boolean isPinned;
         private final boolean isOwnedByPlayer;
+        private final boolean hideContent;
 
         public QuestEntry(Quest quest) {
             this.quest = quest;
 
+            // Check ownership and contributor status
+            UUID playerUuid = ClientSession.getEffectivePlayerUuid();
+            this.isOwnedByPlayer = playerUuid != null && playerUuid.equals(quest.getOwnerUuid());
+            boolean isContributor = quest.getContributors().stream()
+                    .anyMatch(c -> c.getUuid().equals(playerUuid));
+
+            // Hide content for closed quests the player hasn't joined
+            this.hideContent = quest.getVisibility() == Visibility.CLOSED
+                    && !isOwnedByPlayer && !isContributor;
+
             // Content preview: first line of content
-            String content = quest.getContent();
-            if (content == null || content.isEmpty()) {
+            if (hideContent) {
                 this.firstLine = "";
             } else {
-                String plain = MarkdownRenderer.stripToPlainText(content);
-                String[] lines = plain.split("\n");
-                this.firstLine = lines.length > 0 ? lines[0] : "";
+                String content = quest.getContent();
+                if (content == null || content.isEmpty()) {
+                    this.firstLine = "";
+                } else {
+                    String plain = MarkdownRenderer.stripToPlainText(content);
+                    String[] lines = plain.split("\n");
+                    this.firstLine = lines.length > 0 ? lines[0] : "";
+                }
             }
 
             // Format last modified timestamp
@@ -88,12 +102,7 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
             );
             this.formattedDateTime = dateTime.format(DATE_TIME_FORMATTER);
 
-            // Check if this quest is pinned
-            this.isPinned = ClientSession.isPinned(quest.getId());
-
-            // Check ownership
-            UUID playerUuid = ClientSession.getEffectivePlayerUuid();
-            this.isOwnedByPlayer = playerUuid != null && playerUuid.equals(quest.getOwnerUuid());
+            // isPinned read live in render() so pin toggle updates icon immediately
         }
 
         public Quest getQuest() {
@@ -168,15 +177,22 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
             }
 
             // --- Row 2: Content preview ---
-            String truncatedContent = client.textRenderer.trimToWidth(firstLine, entryWidth - 22);
-            context.drawText(client.textRenderer, Text.literal(truncatedContent).formatted(Formatting.GRAY),
-                    entryX + 4, entryY + 14, Colors.TEXT_MUTED, false);
+            if (hideContent) {
+                context.drawText(client.textRenderer,
+                        Text.literal("Request access to view").formatted(Formatting.ITALIC),
+                        entryX + 4, entryY + 14, Colors.TEXT_MUTED, false);
+            } else {
+                String truncatedContent = client.textRenderer.trimToWidth(firstLine, entryWidth - 22);
+                context.drawText(client.textRenderer, Text.literal(truncatedContent).formatted(Formatting.GRAY),
+                        entryX + 4, entryY + 14, Colors.TEXT_MUTED, false);
+            }
 
             // Pin icon (right side of row 2) -- GUI sprite
             int pinIconSize = 10;
             int pinIconX = entryX + entryWidth - pinIconSize - 4;
             int pinIconY = entryY + 14;
-            Identifier pinIcon = isPinned ? PIN_ACTIVE_ICON : PIN_ICON;
+            boolean pinned = ClientSession.isPinned(quest.getId());
+            Identifier pinIcon = pinned ? PIN_ACTIVE_ICON : PIN_ICON;
             context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, pinIcon, pinIconX, pinIconY, pinIconSize, pinIconSize);
 
             // --- Row 3: Last modified + map/coords ---
@@ -189,6 +205,14 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
                 int locationWidth = client.textRenderer.getWidth(locationStr);
                 context.drawText(client.textRenderer, locationStr,
                         entryX + entryWidth - locationWidth - 4, entryY + 24, Colors.TEXT_MUTED, false);
+            }
+
+            // "Requested" indicator (right-aligned on row 3)
+            if (ClientSession.isRequested(quest.getId())) {
+                String requestedText = "Requested";
+                int requestedWidth = client.textRenderer.getWidth(requestedText);
+                context.drawText(client.textRenderer, requestedText,
+                        entryX + entryWidth - requestedWidth - 4, entryY + 24, 0xFFCCCC44, false);
             }
         }
 

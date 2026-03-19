@@ -22,6 +22,9 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+
+import java.util.stream.Collectors;
 import net.minecraft.util.Util;
 
 import java.net.URI;
@@ -60,8 +63,15 @@ public class QuestScreen extends BaseScreen {
     private DarkButtonWidget regionButton;
     private DarkButtonWidget helpButton;
     private boolean regionEnabled;
-    private boolean showFormattingHelp = false;
-    private static final int FORMATTING_PANEL_WIDTH = 120;
+    private boolean showFormattingHelp = true;
+    private static final int FORMATTING_PANEL_WIDTH = 160;
+
+    // Pre-built formatting preview Text objects (avoid per-frame allocation)
+    private static final Text FMT_BOLD = Text.literal("text").formatted(Formatting.BOLD);
+    private static final Text FMT_ITALIC = Text.literal("text").formatted(Formatting.ITALIC);
+    private static final Text FMT_STRIKE = Text.literal("text").formatted(Formatting.STRIKETHROUGH);
+    private static final Text FMT_HEADING = Text.literal("Heading").formatted(Formatting.BOLD);
+    private static final Text FMT_LINK = Text.literal("a").formatted(Formatting.UNDERLINE);
 
     // Dirty tracking (edit mode)
     private String originalTitle;
@@ -70,17 +80,13 @@ public class QuestScreen extends BaseScreen {
     // Permission cache (recomputed each init)
     private boolean canEdit;
     private boolean isOwner;
-
-    // --- Content area bounds (for click-to-edit in view mode) ---
-    private int contentAreaX;
-    private int contentAreaY;
-    private int contentAreaWidth;
-    private int contentAreaHeight;
+    private boolean hideContent;
 
     // --- Pre-computed view mode strings (set in initViewMode, used in renderViewMode) ---
     private String viewOwnerInfo;
     private String viewCoordsText;
     private String viewMapText;
+    private String viewContributorsText;
 
     /**
      * Open in view mode for an existing quest.
@@ -128,6 +134,9 @@ public class QuestScreen extends BaseScreen {
         this.isOwner = quest.getOwnerUuid().equals(myUuid);
         this.canEdit = isOwner || quest.getContributors().stream()
                 .anyMatch(c -> c.getUuid().equals(myUuid) && c.canEdit());
+        boolean isContributor = quest.getContributors().stream()
+                .anyMatch(c -> c.getUuid().equals(myUuid));
+        this.hideContent = quest.getVisibility() == Visibility.CLOSED && !isOwner && !isContributor;
 
         if (editing) {
             initEditMode();
@@ -142,9 +151,11 @@ public class QuestScreen extends BaseScreen {
         int contentWidth = (int) (this.width * ScreenLayouts.CONTENT_WIDTH_RATIO);
         int contentX = (this.width - contentWidth) / 2;
 
-        // Determine if we need metadata bar
+        // Determine if we need metadata bar and contributors row
         boolean hasCoords = quest.getCoordinates() != null;
         int metadataHeight = hasCoords ? 24 : 0;
+        boolean hasContributors = !quest.getContributors().isEmpty();
+        int contributorsHeight = hasContributors ? 14 : 0;
 
         // Check if BlueMap link is available
         String bluemapUrl = BlueMapHelper.buildUrl(quest);
@@ -197,25 +208,21 @@ public class QuestScreen extends BaseScreen {
 
         // --- CONTENT AREA ---
         int contentPanelY = ScreenLayouts.TOP_MARGIN + ScreenLayouts.TITLE_PANEL_HEIGHT + ScreenLayouts.PANEL_SPACING;
-        int contentPanelBottom = this.height - bottomMargin - metadataHeight;
-        if (metadataHeight > 0) {
-            contentPanelBottom -= ScreenLayouts.PANEL_SPACING;
-        }
+        int contentPanelBottom = this.height - bottomMargin - metadataHeight - contributorsHeight;
+        if (metadataHeight > 0) contentPanelBottom -= ScreenLayouts.PANEL_SPACING;
+        if (contributorsHeight > 0) contentPanelBottom -= ScreenLayouts.PANEL_SPACING;
         int contentPanelHeight = contentPanelBottom - contentPanelY;
 
-        // Save bounds for click-to-edit detection
-        this.contentAreaX = contentX;
-        this.contentAreaY = contentPanelY;
-        this.contentAreaWidth = contentWidth;
-        this.contentAreaHeight = contentPanelHeight;
-
-        List<RenderedLine> rendered = MarkdownRenderer.render(
-                Objects.requireNonNullElse(quest.getContent(), ""));
+        String contentToRender = hideContent
+                ? "Request access to view this quest"
+                : Objects.requireNonNullElse(quest.getContent(), "");
+        List<RenderedLine> rendered = MarkdownRenderer.render(contentToRender);
         this.viewContentArea = new MarkdownWidget(
                 this.textRenderer, contentX, contentPanelY,
                 contentWidth, contentPanelHeight, rendered
         );
         this.viewContentArea.setCheckboxToggleListener((checkboxIndex, nowChecked) -> {
+            if (hideContent) return;
             String content = quest.getContent();
             if (content == null) return;
             String updated = toggleCheckbox(content, checkboxIndex, nowChecked);
@@ -256,6 +263,10 @@ public class QuestScreen extends BaseScreen {
         this.viewOwnerInfo = ownerInfo;
         this.viewCoordsText = hasCoords ? buildCoordsText() : null;
         this.viewMapText = (hasCoords && quest.getMap() != null) ? "Map: " + quest.getMap() : null;
+        this.viewContributorsText = quest.getContributors().isEmpty() ? null
+                : quest.getContributors().stream()
+                        .map(c -> c.getName())
+                        .collect(Collectors.joining(", "));
     }
 
     private void renderViewMode(DrawContext context, int mouseX, int mouseY, float delta) {
@@ -265,6 +276,8 @@ public class QuestScreen extends BaseScreen {
 
         boolean hasCoords = quest.getCoordinates() != null;
         int metadataHeight = hasCoords ? 24 : 0;
+        boolean hasContributors = viewContributorsText != null;
+        int contributorsHeight = hasContributors ? 14 : 0;
 
         // --- Screen title ---
         context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 8, Colors.TEXT_PRIMARY);
@@ -283,20 +296,21 @@ public class QuestScreen extends BaseScreen {
 
         // --- Content Panel ---
         int contentPanelY = ScreenLayouts.TOP_MARGIN + ScreenLayouts.TITLE_PANEL_HEIGHT + ScreenLayouts.PANEL_SPACING;
-        int contentPanelBottom = this.height - bottomMargin - metadataHeight;
-        if (metadataHeight > 0) {
-            contentPanelBottom -= ScreenLayouts.PANEL_SPACING;
-        }
+        int contentPanelBottom = this.height - bottomMargin - metadataHeight - contributorsHeight;
+        if (metadataHeight > 0) contentPanelBottom -= ScreenLayouts.PANEL_SPACING;
+        if (contributorsHeight > 0) contentPanelBottom -= ScreenLayouts.PANEL_SPACING;
         UIHelper.drawPanel(context, contentX, contentPanelY,
                 contentWidth, contentPanelBottom - contentPanelY);
         this.viewContentArea.render(context, mouseX, mouseY, delta);
 
+        int nextY = contentPanelBottom;
+
         // --- Metadata bar (pre-computed in initViewMode) ---
         if (hasCoords) {
-            int metaY = contentPanelBottom + ScreenLayouts.PANEL_SPACING;
-            UIHelper.drawPanel(context, contentX, metaY, contentWidth, metadataHeight);
+            nextY += ScreenLayouts.PANEL_SPACING;
+            UIHelper.drawPanel(context, contentX, nextY, contentWidth, metadataHeight);
 
-            int textY = metaY + (metadataHeight - 8) / 2;
+            int textY = nextY + (metadataHeight - 8) / 2;
             int textX = contentX + 5;
 
             context.drawText(this.textRenderer, viewCoordsText, textX, textY, Colors.TEXT_MUTED, false);
@@ -306,6 +320,14 @@ public class QuestScreen extends BaseScreen {
                 context.drawText(this.textRenderer, viewMapText,
                         textX + coordsWidth + 12, textY, Colors.TEXT_MUTED, false);
             }
+            nextY += metadataHeight;
+        }
+
+        // --- Contributors ---
+        if (hasContributors) {
+            nextY += ScreenLayouts.PANEL_SPACING;
+            context.drawText(this.textRenderer, "Contributors: " + viewContributorsText,
+                    contentX + 5, nextY + 2, Colors.TEXT_MUTED, false);
         }
     }
 
@@ -452,7 +474,7 @@ public class QuestScreen extends BaseScreen {
         UIHelper.drawPanel(context, contentX, contentPanelY, editorWidth, contentPanelHeight);
         this.editContentField.render(context, mouseX, mouseY, delta);
 
-        // Formatting help side panel
+        // Formatting help side panel (two-column: syntax | rendered preview)
         if (showFormattingHelp) {
             int panelX = contentX + contentWidth - FORMATTING_PANEL_WIDTH;
             UIHelper.drawPanel(context, panelX, contentPanelY, FORMATTING_PANEL_WIDTH, contentPanelHeight);
@@ -460,24 +482,49 @@ public class QuestScreen extends BaseScreen {
             int textX = panelX + 5;
             int textY = contentPanelY + 5;
             int lineH = this.textRenderer.fontHeight + 2;
+            int colSplit = panelX + 80;
 
             context.drawText(this.textRenderer, "Formatting", textX, textY, Colors.TEXT_PRIMARY, false);
-            textY += lineH + 2;
+            textY += lineH + 4;
 
-            String[][] help = {
-                    {"**text**", "bold"},
-                    {"*text*", "italic"},
-                    {"~~text~~", "strikethrough"},
-                    {"# Heading", "heading"},
-                    {"- [ ] task", "checkbox"},
-                    {"- [x] done", "checked"},
-                    {"> text", "quote"},
-                    {"[text](url)", "link"},
-            };
-            for (String[] entry : help) {
-                context.drawText(this.textRenderer, entry[0], textX, textY, Colors.TEXT_MUTED, false);
-                textY += lineH;
-            }
+            // Bold
+            context.drawText(this.textRenderer, "**text**", textX, textY, Colors.TEXT_MUTED, false);
+            context.drawText(this.textRenderer, FMT_BOLD, colSplit, textY, Colors.TEXT_PRIMARY, false);
+            textY += lineH;
+
+            // Italic
+            context.drawText(this.textRenderer, "*text*", textX, textY, Colors.TEXT_MUTED, false);
+            context.drawText(this.textRenderer, FMT_ITALIC, colSplit, textY, Colors.TEXT_PRIMARY, false);
+            textY += lineH;
+
+            // Strikethrough
+            context.drawText(this.textRenderer, "~~text~~", textX, textY, Colors.TEXT_MUTED, false);
+            context.drawText(this.textRenderer, FMT_STRIKE, colSplit, textY, Colors.TEXT_PRIMARY, false);
+            textY += lineH;
+
+            // Heading
+            context.drawText(this.textRenderer, "# Heading", textX, textY, Colors.TEXT_MUTED, false);
+            context.drawText(this.textRenderer, FMT_HEADING, colSplit, textY, 0xFFFFFF55, false);
+            textY += lineH;
+
+            // Checkbox
+            context.drawText(this.textRenderer, "- [ ] task", textX, textY, Colors.TEXT_MUTED, false);
+            context.drawText(this.textRenderer, "[ ] task", colSplit, textY, Colors.TEXT_PRIMARY, false);
+            textY += lineH;
+
+            // Checked
+            context.drawText(this.textRenderer, "- [x] done", textX, textY, Colors.TEXT_MUTED, false);
+            context.drawText(this.textRenderer, "[x] done", colSplit, textY, 0xFF88FF88, false);
+            textY += lineH;
+
+            // Quote
+            context.drawText(this.textRenderer, "> text", textX, textY, Colors.TEXT_MUTED, false);
+            context.drawText(this.textRenderer, "| text", colSplit, textY, 0xFFAAAAFF, false);
+            textY += lineH;
+
+            // Link
+            context.drawText(this.textRenderer, "[a](url)", textX, textY, Colors.TEXT_MUTED, false);
+            context.drawText(this.textRenderer, FMT_LINK, colSplit, textY, 0xFF5599FF, false);
         }
 
         // Optional fields panel
@@ -982,16 +1029,6 @@ public class QuestScreen extends BaseScreen {
         // Let MarkdownWidget handle checkbox clicks first
         if (!editing && this.viewContentArea != null) {
             if (this.viewContentArea.mouseClicked(click, simulated)) {
-                return true;
-            }
-        }
-        // Click-to-edit for content area (only if not a checkbox click)
-        if (!editing && canEdit) {
-            double mx = click.x();
-            double my = click.y();
-            if (mx >= contentAreaX && mx < contentAreaX + contentAreaWidth
-                    && my >= contentAreaY && my < contentAreaY + contentAreaHeight) {
-                enterEditMode();
                 return true;
             }
         }

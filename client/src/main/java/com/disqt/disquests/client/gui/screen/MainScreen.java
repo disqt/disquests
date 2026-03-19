@@ -8,6 +8,7 @@ import com.disqt.disquests.client.gui.helper.ScreenLayouts;
 import com.disqt.disquests.client.gui.helper.UIHelper;
 import com.disqt.disquests.client.gui.widget.DarkButtonWidget;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
+import com.disqt.disquests.client.gui.widget.ToastOverlay;
 import com.disqt.disquests.client.gui.widget.TabButtonWidget;
 import com.disqt.disquests.client.gui.widget.list.QuestListWidget;
 import com.disqt.disquests.client.network.PacketSender;
@@ -61,6 +62,7 @@ public class MainScreen extends BaseScreen {
     private int currentTab;
     private int serverFilter;
     private int tickCounter = 0;
+    private final ToastOverlay toast = new ToastOverlay();
 
     public MainScreen() {
         this(null);
@@ -303,7 +305,8 @@ public class MainScreen extends BaseScreen {
     }
 
     public void refreshAfterPinToggle() {
-        refreshListContents();
+        // Only update buttons -- don't re-sort. Pin icon reads isPinned live each frame.
+        // Full re-sort happens on screen open (init) and tab switch.
         updateActionButtons();
     }
 
@@ -371,8 +374,7 @@ public class MainScreen extends BaseScreen {
             PacketSender.requestCollaboration(sel.getId());
             ClientSession.markRequested(sel.getId());
             markRequestButtonAsRequested();
-            MinecraftClient.getInstance().inGameHud.setOverlayMessage(
-                    Text.literal("Request sent to " + sel.getOwnerName()), false);
+            showToast("Request sent to " + sel.getOwnerName());
         }
     }
 
@@ -382,6 +384,13 @@ public class MainScreen extends BaseScreen {
     public void tick() {
         super.tick();
         tickCounter++;
+        toast.tick();
+        String pending = ClientSession.consumePendingToast();
+        if (pending != null) toast.show(pending);
+    }
+
+    public void showToast(String message) {
+        toast.show(message);
     }
 
     // --- RENDERING ---
@@ -429,6 +438,10 @@ public class MainScreen extends BaseScreen {
         if (pendingCount > 0) {
             renderNotificationBadge(context, pendingCount);
         }
+
+        // Toast overlay (renders on top of everything)
+        int buttonsY = UIHelper.getBottomButtonY(this);
+        toast.render(context, this.textRenderer, this.width, buttonsY);
     }
 
     private static int hsbToRgb(float hue, float saturation, float brightness) {

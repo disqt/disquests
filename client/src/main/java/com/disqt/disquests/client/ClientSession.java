@@ -20,6 +20,7 @@ public class ClientSession {
     private static int activeTab = 0; // 0=My Quests, 1=Server Quests
     private static String searchTerm = "";
     private static int serverQuestsFilter = 0; // 0=All, 1=Open, 2=Closed
+    private static String pendingToast = null;
 
     public static void joinServer(String bluemapUrl, int pendingCount, List<UUID> pinnedIds, UUID playerUuid) {
         onServer = true;
@@ -36,6 +37,7 @@ public class ClientSession {
         pendingRequestCount = 0;
         pinnedQuestIds.clear();
         requestedQuestIds.clear();
+        pendingToast = null;
         playerUuid = null;
         activeTab = 0;
         searchTerm = "";
@@ -94,6 +96,16 @@ public class ClientSession {
 
     public static boolean isRequested(UUID questId) {
         return requestedQuestIds.contains(questId);
+    }
+
+    public static void setPendingToast(String message) {
+        pendingToast = message;
+    }
+
+    public static String consumePendingToast() {
+        String msg = pendingToast;
+        pendingToast = null;
+        return msg;
     }
 
     public static UUID getPlayerUuid() {
