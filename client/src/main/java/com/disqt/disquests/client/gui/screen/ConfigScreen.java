@@ -5,12 +5,12 @@ import com.disqt.disquests.client.gui.helper.DisquestsConfig;
 import com.disqt.disquests.client.gui.widget.DarkButtonWidget;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.widget.SliderWidget;
 import net.minecraft.text.Text;
 
 public class ConfigScreen extends BaseScreen {
 
     private int pinnedWidth;
-    private DarkButtonWidget widthLabel;
 
     public ConfigScreen(Screen parent) {
         super(Text.literal("Disquests Settings"), parent);
@@ -24,21 +24,27 @@ public class ConfigScreen extends BaseScreen {
         int centerX = this.width / 2;
         int y = this.height / 2 - 20;
 
-        // Decrease button
-        this.addDrawableChild(new DarkButtonWidget(
-                centerX - 80, y, 20, 20,
-                Text.literal("-"), b -> adjustWidth(-10)));
+        // Pinned width slider
+        double initialValue = (double) (pinnedWidth - DisquestsConfig.MIN_PINNED_WIDTH)
+                / (DisquestsConfig.MAX_PINNED_WIDTH - DisquestsConfig.MIN_PINNED_WIDTH);
 
-        // Width display
-        widthLabel = this.addDrawableChild(new DarkButtonWidget(
-                centerX - 55, y, 110, 20,
-                Text.literal("Pinned Width: " + pinnedWidth), b -> {}));
-        widthLabel.active = false;
+        this.addDrawableChild(new SliderWidget(
+                centerX - 75, y, 150, 20,
+                Text.literal("Pinned Width: " + pinnedWidth),
+                initialValue) {
+            @Override
+            protected void updateMessage() {
+                int val = DisquestsConfig.MIN_PINNED_WIDTH
+                        + (int) (this.value * (DisquestsConfig.MAX_PINNED_WIDTH - DisquestsConfig.MIN_PINNED_WIDTH));
+                this.setMessage(Text.literal("Pinned Width: " + val));
+            }
 
-        // Increase button
-        this.addDrawableChild(new DarkButtonWidget(
-                centerX + 60, y, 20, 20,
-                Text.literal("+"), b -> adjustWidth(10)));
+            @Override
+            protected void applyValue() {
+                pinnedWidth = DisquestsConfig.MIN_PINNED_WIDTH
+                        + (int) (this.value * (DisquestsConfig.MAX_PINNED_WIDTH - DisquestsConfig.MIN_PINNED_WIDTH));
+            }
+        });
 
         y += 30;
 
@@ -55,12 +61,6 @@ public class ConfigScreen extends BaseScreen {
         this.addDrawableChild(new DarkButtonWidget(
                 centerX + 5, y, 50, 20,
                 Text.literal("Cancel"), b -> this.close()));
-    }
-
-    private void adjustWidth(int delta) {
-        pinnedWidth = Math.max(DisquestsConfig.MIN_PINNED_WIDTH,
-                Math.min(DisquestsConfig.MAX_PINNED_WIDTH, pinnedWidth + delta));
-        widthLabel.setMessage(Text.literal("Pinned Width: " + pinnedWidth));
     }
 
     @Override

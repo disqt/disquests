@@ -31,6 +31,7 @@ public class HudPinRenderer {
 
     private static List<UUID> lastPinnedIds = List.of();
     private static long lastContentHash = 0;
+    private static int lastWidth = 0;
     private static List<CachedPin> cachedPins = List.of();
 
     public static void render(DrawContext context) {
@@ -38,6 +39,7 @@ public class HudPinRenderer {
         if (quests.isEmpty()) {
             lastPinnedIds = List.of();
             lastContentHash = 0;
+            lastWidth = 0;
             cachedPins = List.of();
             return;
         }
@@ -50,10 +52,12 @@ public class HudPinRenderer {
         long contentHash = quests.stream()
                 .mapToLong(q -> q.getId().hashCode() + q.getLastModified())
                 .sum();
-        if (!currentIds.equals(lastPinnedIds) || contentHash != lastContentHash) {
+        int currentWidth = getMaxWidth();
+        if (!currentIds.equals(lastPinnedIds) || contentHash != lastContentHash || currentWidth != lastWidth) {
             rebuildCache(client.textRenderer, quests);
             lastPinnedIds = currentIds;
             lastContentHash = contentHash;
+            lastWidth = currentWidth;
         }
 
         // Render from cache
