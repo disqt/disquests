@@ -124,6 +124,10 @@ public class QuestScreen extends BaseScreen {
         return helpButton;
     }
 
+    public boolean isEditing() {
+        return editing;
+    }
+
     // --- Lifecycle ---
 
     @Override

@@ -304,6 +304,10 @@ public class MainScreen extends BaseScreen {
         updateActionButtons();
     }
 
+    public QuestListWidget getMyQuestList() {
+        return myQuestListWidget;
+    }
+
     public void refreshAfterPinToggle() {
         // Only update buttons -- don't re-sort. Pin icon reads isPinned live each frame.
         // Full re-sort happens on screen open (init) and tab switch.

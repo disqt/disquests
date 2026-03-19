@@ -3,7 +3,7 @@ package com.disqt.disquests.client;
 import com.disqt.disquests.client.gui.helper.ColorConfig;
 import com.disqt.disquests.client.gui.helper.DisquestsConfig;
 import com.disqt.disquests.client.gui.screen.MainScreen;
-import com.disqt.disquests.client.hud.HudPinManager;
+import com.disqt.disquests.client.hud.HudPinRenderer;
 import com.disqt.disquests.client.network.ClientPacketHandler;
 import com.disqt.disquests.client.network.PacketSender;
 import com.disqt.disquests.client.network.RawPayload;
@@ -34,11 +34,7 @@ public class DisquestsClient implements ClientModInitializer {
                 }
             }
             while (KeyBinds.pinKey.wasPressed()) {
-                if (!ClientSession.getPinnedQuestIds().isEmpty()) {
-                    for (java.util.UUID pinnedId : new java.util.ArrayList<>(ClientSession.getPinnedQuestIds())) {
-                        HudPinManager.toggle(pinnedId);
-                    }
-                }
+                HudPinRenderer.toggleVisibility();
             }
         });
 
