@@ -4,125 +4,147 @@ import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Contributor;
 import com.disqt.disquests.client.data.Quest;
-import com.disqt.disquests.client.gui.helper.Colors;
-import com.disqt.disquests.client.gui.helper.ScreenLayouts;
-import com.disqt.disquests.client.gui.helper.UIHelper;
-import com.disqt.disquests.client.gui.widget.DarkButtonWidget;
 import com.disqt.disquests.client.network.PacketSender;
 import com.disqt.disquests.common.PacketCodec;
 import com.disqt.disquests.common.model.CollaborationRequestData;
 import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.ContributorOp;
-import net.minecraft.client.gui.DrawContext;
+import io.wispforest.owo.ui.component.ButtonComponent;
+import io.wispforest.owo.ui.component.LabelComponent;
+import io.wispforest.owo.ui.component.UIComponents;
+import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.core.Sizing;
+import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.UUID;
 
-public class ContributorScreen extends BaseScreen {
+public class ContributorScreen extends DisquestsBaseScreen {
 
     private final Quest quest;
 
-    private static final int ROW_HEIGHT = 20;
-    private static final int BUTTON_HEIGHT = 14;
-    private static final int SMALL_BUTTON_WIDTH = 60;
-
-    public ContributorScreen(Screen parent, Quest quest) {
-        super(Text.literal("Contributors"), parent);
+    public ContributorScreen(@Nullable Screen parent, Quest quest) {
+        super(DataSource.asset(Identifier.of("disquests", "contributor_screen")), parent);
         this.quest = quest;
     }
 
     @Override
-    protected void init() {
-        super.init();
-
-        int contentWidth = (int) (this.width * ScreenLayouts.CONTENT_WIDTH_RATIO);
-        int contentX = (this.width - contentWidth) / 2;
-
-        // --- CLOSE BUTTON ---
-        int buttonsY = UIHelper.getBottomButtonY(this);
-        List<Text> buttonTexts = List.of(Text.literal("Close"));
-        UIHelper.createButtonRow(this, buttonsY, buttonTexts, (index, x, width) -> {
-            this.addDrawableChild(new DarkButtonWidget(
-                    x, buttonsY, width, UIHelper.BUTTON_HEIGHT,
-                    buttonTexts.get(0), b -> this.close()));
-        });
-
-        int listStartY = ScreenLayouts.TOP_MARGIN + 10;
-        int maxListBottom = buttonsY - 10;
-
-        // --- PENDING REQUESTS SECTION ---
+    protected void build(FlowLayout root) {
         List<CollaborationRequestData> pendingRequests = ClientCache.getPendingRequestsForQuest(quest.getId());
-        int pendingHeight = pendingRequests.isEmpty() ? 0 : (14 + pendingRequests.size() * ROW_HEIGHT);
+        List<Contributor> contributors = quest.getContributors();
 
-        if (!pendingRequests.isEmpty()) {
-            int pendingListY = listStartY + 14; // after "Pending Requests" header
-            for (int i = 0; i < pendingRequests.size(); i++) {
-                int rowY = pendingListY + (i * ROW_HEIGHT);
-                if (rowY + ROW_HEIGHT > maxListBottom) break;
+        // --- Pending requests section ---
+        FlowLayout pendingSection = root.childById(FlowLayout.class, "pending-section");
+        FlowLayout pendingList = root.childById(FlowLayout.class, "pending-list");
 
-                CollaborationRequestData req = pendingRequests.get(i);
-                int btnY = rowY + (ROW_HEIGHT - BUTTON_HEIGHT) / 2;
-
-                // "Deny" button (rightmost)
-                int denyBtnX = contentX + contentWidth - SMALL_BUTTON_WIDTH;
+        if (pendingRequests.isEmpty()) {
+            // Hide pending section via zero-sizing
+            pendingSection.sizing(Sizing.fixed(0), Sizing.fixed(0));
+        } else {
+            for (CollaborationRequestData req : pendingRequests) {
+                String name = req.requesterName() != null ? req.requesterName() : "Unknown";
                 final UUID requestId = req.id();
                 final UUID questId = req.questId();
 
-                this.addDrawableChild(new DarkButtonWidget(
-                        denyBtnX, btnY, SMALL_BUTTON_WIDTH, BUTTON_HEIGHT,
-                        Text.literal("Deny").withColor(0xFFCC5555),
-                        b -> respondToRequest(questId, requestId, false)));
+                FlowLayout row = io.wispforest.owo.ui.container.UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+                row.verticalAlignment(VerticalAlignment.CENTER);
+                row.gap(4);
 
-                // "Accept" button (left of Deny)
-                int acceptBtnWidth = Math.max(this.textRenderer.getWidth("Accept") + UIHelper.BUTTON_TEXT_PADDING, SMALL_BUTTON_WIDTH);
-                int acceptBtnX = denyBtnX - 4 - acceptBtnWidth;
+                LabelComponent nameLabel = UIComponents.label(Text.literal(name));
+                nameLabel.shadow(true);
+                nameLabel.sizing(Sizing.fill(40), Sizing.content());
+                row.child(nameLabel);
 
-                this.addDrawableChild(new DarkButtonWidget(
-                        acceptBtnX, btnY, acceptBtnWidth, BUTTON_HEIGHT,
+                // Spacer to push buttons right
+                FlowLayout spacer = io.wispforest.owo.ui.container.UIContainers.horizontalFlow(Sizing.fill(20), Sizing.fixed(1));
+                row.child(spacer);
+
+                ButtonComponent acceptBtn = UIComponents.button(
                         Text.literal("Accept").withColor(0xFF55CC55),
-                        b -> respondToRequest(questId, requestId, true)));
+                        b -> respondToRequest(questId, requestId, true));
+                acceptBtn.sizing(Sizing.fixed(60), Sizing.fixed(14));
+                row.child(acceptBtn);
+
+                ButtonComponent denyBtn = UIComponents.button(
+                        Text.literal("Deny").withColor(0xFFCC5555),
+                        b -> respondToRequest(questId, requestId, false));
+                denyBtn.sizing(Sizing.fixed(60), Sizing.fixed(14));
+                row.child(denyBtn);
+
+                pendingList.child(row);
             }
         }
 
-        // --- CONTRIBUTOR LIST --- (offset by pendingHeight)
-        List<Contributor> contributors = quest.getContributors();
-        int contributorListStartY = listStartY + pendingHeight;
+        // --- Contributor list ---
+        FlowLayout contributorList = root.childById(FlowLayout.class, "contributor-list");
+        LabelComponent emptyLabel = root.childById(LabelComponent.class, "empty-label");
 
-        for (int i = 0; i < contributors.size(); i++) {
-            int rowY = contributorListStartY + (i * ROW_HEIGHT);
-            if (rowY + ROW_HEIGHT > maxListBottom) break; // don't overflow
+        if (contributors.isEmpty() && pendingRequests.isEmpty()) {
+            // Show empty label, hide contributor scroll
+            root.childById(io.wispforest.owo.ui.container.ScrollContainer.class, "contributor-scroll")
+                    .sizing(Sizing.fixed(0), Sizing.fixed(0));
+        } else {
+            // Hide empty label
+            emptyLabel.sizing(Sizing.fixed(0), Sizing.fixed(0));
 
-            Contributor contrib = contributors.get(i);
-            int btnY = rowY + (ROW_HEIGHT - BUTTON_HEIGHT) / 2;
+            for (int i = 0; i < contributors.size(); i++) {
+                Contributor contrib = contributors.get(i);
+                final int idx = i;
 
-            // "Can Edit" / "View Only" toggle
-            String permText = contrib.canEdit() ? "Can Edit" : "View Only";
-            int permBtnWidth = Math.max(this.textRenderer.getWidth(permText) + UIHelper.BUTTON_TEXT_PADDING, SMALL_BUTTON_WIDTH);
-            int permBtnX = contentX + contentWidth - SMALL_BUTTON_WIDTH - 4 - permBtnWidth - 4;
+                FlowLayout row = io.wispforest.owo.ui.container.UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+                row.verticalAlignment(VerticalAlignment.CENTER);
+                row.gap(4);
 
-            final int contributorIndex = i;
-            this.addDrawableChild(new DarkButtonWidget(
-                    permBtnX, btnY, permBtnWidth, BUTTON_HEIGHT,
-                    Text.literal(permText), b -> togglePermission(contributorIndex)));
+                LabelComponent nameLabel = UIComponents.label(Text.literal(contrib.getName()));
+                nameLabel.shadow(true);
+                nameLabel.sizing(Sizing.fill(40), Sizing.content());
+                row.child(nameLabel);
 
-            // "Remove" button
-            int removeBtnX = contentX + contentWidth - SMALL_BUTTON_WIDTH;
-            this.addDrawableChild(new DarkButtonWidget(
-                    removeBtnX, btnY, SMALL_BUTTON_WIDTH, BUTTON_HEIGHT,
-                    Text.literal("Remove"), b -> removeContributor(contributorIndex)));
+                // Spacer
+                FlowLayout spacer = io.wispforest.owo.ui.container.UIContainers.horizontalFlow(Sizing.fill(20), Sizing.fixed(1));
+                row.child(spacer);
+
+                // Permission toggle
+                String permText = contrib.canEdit() ? "Can Edit" : "View Only";
+                ButtonComponent permBtn = UIComponents.button(
+                        Text.literal(permText),
+                        b -> togglePermission(idx));
+                permBtn.sizing(Sizing.fixed(60), Sizing.fixed(14));
+                row.child(permBtn);
+
+                // Remove button
+                ButtonComponent removeBtn = UIComponents.button(
+                        Text.literal("Remove"),
+                        b -> removeContributor(idx));
+                removeBtn.sizing(Sizing.fixed(60), Sizing.fixed(14));
+                row.child(removeBtn);
+
+                contributorList.child(row);
+            }
         }
+
+        // --- Close button ---
+        root.childById(ButtonComponent.class, "btn-close")
+                .onPress(b -> this.close());
     }
 
-    // --- ACTIONS ---
+    @Override
+    public boolean shouldPause() {
+        return false;
+    }
+
+    // --- Actions ---
 
     private void respondToRequest(UUID questId, UUID requestId, boolean accept) {
         PacketSender.respondCollaboration(requestId, accept);
         ClientCache.removePendingRequest(questId, requestId);
         ClientSession.setPendingRequestCount(
                 Math.max(0, ClientSession.getPendingRequestCount() - 1));
-        this.clearAndInit();
+        rebuildUi();
     }
 
     private void togglePermission(int index) {
@@ -134,93 +156,39 @@ public class ContributorScreen extends BaseScreen {
                 new PacketCodec.ContributorOpEntry(ContributorOp.UPDATE, contrib.getUuid(), contrib.getName(), newCanEdit)
         ));
 
-        // Optimistically replace contributor with updated canEdit
         quest.getContributors().set(index, new Contributor(
                 new ContributorData(contrib.getUuid(), contrib.getName(), newCanEdit)));
-        this.clearAndInit();
+        rebuildUi();
     }
 
     private void removeContributor(int index) {
         if (index < 0 || index >= quest.getContributors().size()) return;
         Contributor contrib = quest.getContributors().get(index);
 
-        showConfirm(Text.literal("Remove " + contrib.getName() + " from contributors?"), () -> {
-            PacketSender.updateContributors(quest.getId(), List.of(
-                    new PacketCodec.ContributorOpEntry(ContributorOp.REMOVE, contrib.getUuid(), contrib.getName(), false)
-            ));
-            quest.getContributors().remove(index);
-            this.clearAndInit();
-        });
+        if (this.client != null) {
+            this.client.setScreen(new ConfirmScreen(this,
+                    Text.literal("Remove " + contrib.getName() + " from contributors?"),
+                    () -> {
+                        PacketSender.updateContributors(quest.getId(), List.of(
+                                new PacketCodec.ContributorOpEntry(ContributorOp.REMOVE, contrib.getUuid(), contrib.getName(), false)
+                        ));
+                        quest.getContributors().remove(index);
+                        if (this.client != null) {
+                            this.client.setScreen(this);
+                        }
+                    },
+                    () -> {
+                        if (this.client != null) {
+                            this.client.setScreen(this);
+                        }
+                    }));
+        }
     }
 
-    // --- RENDERING ---
-
-    @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        super.render(context, mouseX, mouseY, delta);
-
-        int contentWidth = (int) (this.width * ScreenLayouts.CONTENT_WIDTH_RATIO);
-        int contentX = (this.width - contentWidth) / 2;
-
-        // Screen title
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 8, Colors.TEXT_PRIMARY);
-
-        int listStartY = ScreenLayouts.TOP_MARGIN + 10;
-        int buttonsY = UIHelper.getBottomButtonY(this);
-        int maxListBottom = buttonsY - 10;
-
-        // --- PENDING REQUESTS SECTION ---
-        List<CollaborationRequestData> pendingRequests = ClientCache.getPendingRequestsForQuest(quest.getId());
-        int pendingHeight = pendingRequests.isEmpty() ? 0 : (14 + pendingRequests.size() * ROW_HEIGHT);
-
-        if (!pendingRequests.isEmpty()) {
-            // Section header
-            context.drawText(this.textRenderer, Text.literal("Pending Requests").withColor(Colors.AMBER),
-                    contentX + 5, listStartY + 2, Colors.AMBER, false);
-
-            // Separator line
-            context.fill(contentX, listStartY + 12, contentX + contentWidth, listStartY + 13, 0x44FFAA33);
-
-            // Pending panel background
-            int pendingListY = listStartY + 14;
-            int pendingListHeight = Math.min(pendingRequests.size() * ROW_HEIGHT, maxListBottom - pendingListY);
-            UIHelper.drawPanel(context, contentX, pendingListY, contentWidth, pendingListHeight);
-
-            // Requester names
-            for (int i = 0; i < pendingRequests.size(); i++) {
-                int rowY = pendingListY + (i * ROW_HEIGHT);
-                if (rowY + ROW_HEIGHT > maxListBottom) break;
-                int textY = rowY + (ROW_HEIGHT - 8) / 2;
-                String name = pendingRequests.get(i).requesterName();
-                if (name == null) name = "Unknown";
-                context.drawText(this.textRenderer, name,
-                        contentX + 5, textY, Colors.TEXT_PRIMARY, false);
-            }
-        }
-
-        // --- CONTRIBUTOR LIST --- (offset by pendingHeight)
-        List<Contributor> contributors = quest.getContributors();
-        int contributorListStartY = listStartY + pendingHeight;
-
-        if (contributors.isEmpty() && pendingRequests.isEmpty()) {
-            context.drawCenteredTextWithShadow(this.textRenderer,
-                    Text.literal("No contributors yet"),
-                    this.width / 2, listStartY + 10, Colors.TEXT_DISABLED);
-        } else if (!contributors.isEmpty()) {
-            // Draw contributor list panel
-            int listHeight = Math.min(contributors.size() * ROW_HEIGHT, maxListBottom - contributorListStartY);
-            UIHelper.drawPanel(context, contentX, contributorListStartY, contentWidth, listHeight);
-
-            // Draw each contributor name
-            for (int i = 0; i < contributors.size(); i++) {
-                int rowY = contributorListStartY + (i * ROW_HEIGHT);
-                if (rowY + ROW_HEIGHT > maxListBottom) break;
-
-                Contributor contrib = contributors.get(i);
-                int textY = rowY + (ROW_HEIGHT - 8) / 2;
-                context.drawText(this.textRenderer, contrib.getName(),
-                        contentX + 5, textY, Colors.TEXT_PRIMARY, false);
-            }
+    private void rebuildUi() {
+        // Re-open this screen to rebuild the component tree
+        if (this.client != null) {
+            this.client.setScreen(new ContributorScreen(this.parent, this.quest));
         }
     }
 }
