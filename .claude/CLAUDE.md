@@ -18,6 +18,8 @@ paper/    — Paper plugin: SQLite storage, permissions, packet handler, command
 
 Both `client` and `paper` depend on `common`. The client registers a single `RawPayload` CustomPayload type that wraps raw bytes; the Paper plugin uses `Messenger.registerIncomingPluginChannel()`. Both sides use `PacketCodec` from common for serialization.
 
+**GUI migration state:** MainScreen uses owo-ui (XML layout + `DisquestsBaseScreen`). QuestScreen, ContributorScreen, ConfirmScreen, ConfigScreen remain vanilla widgets.
+
 **All modules share the same package namespace**: `com.disqt.disquests.*`
 - Common: `com.disqt.disquests.common.*`
 - Paper: `com.disqt.disquests.paper.*`
@@ -70,8 +72,12 @@ Channel: `disquests:main`. First byte = PacketType ID.
 | `client/src/main/java/com/disqt/disquests/client/DisquestsClient.java` | Fabric mod entrypoint, keybinds, channel registration |
 | `client/src/main/java/com/disqt/disquests/client/ClientSession.java` | Tracks connection state, dispatches S2C packets |
 | `client/src/main/java/com/disqt/disquests/client/ClientCache.java` | Client-side quest cache |
-| `client/src/main/java/com/disqt/disquests/client/gui/screen/` | MainScreen, QuestScreen (unified view/edit), ContributorScreen, ConfirmScreen |
-| `client/src/main/java/com/disqt/disquests/client/gui/helper/ColorConfig.java` | Color config loader (parses hex/rgb/rgba strings) |
+| `client/src/main/java/com/disqt/disquests/client/gui/screen/` | MainScreen (owo-ui), QuestScreen (vanilla, unified view/edit), ContributorScreen, ConfirmScreen |
+| `client/src/main/java/com/disqt/disquests/client/gui/screen/DisquestsBaseScreen.java` | Shared owo-ui base screen with parent navigation |
+| `client/src/main/java/com/disqt/disquests/client/gui/component/QuestEntryComponent.java` | Custom owo-ui component for quest list entries |
+| `client/src/main/java/com/disqt/disquests/client/gui/helper/Colors.java` | Color constants (AMBER, TEXT_PRIMARY, etc.) |
+| `client/src/main/java/com/disqt/disquests/client/debug/DebugScreenEvents.java` | Fabric screen event hooks for debug logging |
+| `client/src/main/resources/assets/disquests/owo_ui/main_screen.xml` | XML UI model for MainScreen layout (hot-reloadable) |
 | `paper/src/main/java/com/disqt/disquests/paper/DisquestsPlugin.java` | Plugin entry, channel registration |
 | `paper/src/main/java/com/disqt/disquests/paper/ServerPacketHandler.java` | Handles C2S, broadcasts S2C |
 | `paper/src/main/java/com/disqt/disquests/paper/DataManager.java` | SQLite persistence |
