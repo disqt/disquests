@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -58,6 +59,14 @@ public class ClientSession {
 
     public static boolean hasBluemap() {
         return bluemapUrl != null && !bluemapUrl.isEmpty();
+    }
+
+    /**
+     * Returns the server-provided map name mappings (dimension key -> BlueMap map ID).
+     * Stub returning empty map until Task 6 implements the full handshake integration.
+     */
+    public static Map<String, String> getBluemapMapNames() {
+        return Map.of();
     }
 
     public static int getPendingRequestCount() {
