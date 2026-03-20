@@ -8,6 +8,7 @@ import com.disqt.disquests.common.model.Visibility;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -609,6 +610,37 @@ class PacketCodecTest {
     }
 
     // ---- 27. testLeaveQuestRoundTrip ----
+
+    @Test
+    void testHandshakeWithMapMappings() {
+        List<UUID> pinnedIds = List.of(UUID.randomUUID());
+        UUID playerUuid = UUID.randomUUID();
+        Map<String, String> mapNames = Map.of("overworld", "world_new", "nether", "world_new_nether");
+
+        byte[] packet = PacketCodec.writeHandshake("https://example.com", 1, pinnedIds, playerUuid, mapNames);
+        ByteBufReader reader = new ByteBufReader(packet);
+
+        assertEquals(PacketType.HANDSHAKE, PacketCodec.readType(reader));
+        PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(reader);
+        assertEquals("https://example.com", payload.bluemapUrl());
+        assertEquals(mapNames, payload.bluemapMapNames());
+        assertEquals(0, reader.remaining());
+    }
+
+    @Test
+    void testHandshakeEmptyMapMappings() {
+        List<UUID> pinnedIds = List.of();
+        UUID playerUuid = UUID.randomUUID();
+        Map<String, String> mapNames = Map.of();
+
+        byte[] packet = PacketCodec.writeHandshake("", 0, pinnedIds, playerUuid, mapNames);
+        ByteBufReader reader = new ByteBufReader(packet);
+
+        assertEquals(PacketType.HANDSHAKE, PacketCodec.readType(reader));
+        PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(reader);
+        assertTrue(payload.bluemapMapNames().isEmpty());
+        assertEquals(0, reader.remaining());
+    }
 
     @Test
     void testLeaveQuestRoundTrip() {
