@@ -45,11 +45,7 @@
                     <label id="pending-header">
                         <text>Pending Requests</text>
                         <shadow>true</shadow>
-                        <color>
-                            <red>255</red>
-                            <green>170</green>
-                            <blue>51</blue>
-                        </color>
+                        <color>#FFAA33</color>
                     </label>
                     <!-- Pending entries added programmatically -->
                     <flow-layout direction="vertical" id="pending-list">

@@ -79,20 +79,25 @@ public class QuestScreenTest implements FabricClientGameTest {
      */
     private void testFormattingPanelToggle(ClientGameTestContext context) {
         Quest quest = createTestQuest();
+        ClientCache.addOrUpdateMyQuest(quest);
 
         context.setScreen(() -> new QuestScreen(null, quest, true));
         context.waitForScreen(QuestScreen.class);
-        context.waitTick();
+        context.waitTicks(3);
 
-        boolean editing = context.computeOnClient(client -> {
-            if (!(client.currentScreen instanceof QuestScreen screen)) return false;
-            return screen.isEditing();
+        String screenInfo = context.computeOnClient(client -> {
+            if (client.currentScreen == null) return "null";
+            if (!(client.currentScreen instanceof QuestScreen screen)) {
+                return "not QuestScreen: " + client.currentScreen.getClass().getSimpleName();
+            }
+            return "QuestScreen editing=" + screen.isEditing();
         });
 
-        if (!editing) {
-            throw new AssertionError("QuestScreen should open in edit mode when startInEditMode is true");
+        if (!screenInfo.contains("editing=true")) {
+            throw new AssertionError("Expected edit mode but got: " + screenInfo);
         }
 
+        ClientCache.removeQuestById(quest.getId());
         context.setScreen(() -> null);
         context.waitTick();
     }

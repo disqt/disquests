@@ -69,7 +69,7 @@
                 </padding>
             </scroll>
 
-            <!-- Metadata row (coords, map, BlueMap button -- hidden when no coords) -->
+            <!-- Metadata row (coords, map, BlueMap button, hidden when no coords) -->
             <flow-layout direction="horizontal" id="metadata-row">
                 <sizing>
                     <horizontal method="fill">85</horizontal>

@@ -154,7 +154,8 @@
                         </sizing>
                         <gap>4</gap>
                         <vertical-alignment>center</vertical-alignment>
-                        <children/>
+                        <children>
+                        </children>
                     </flow-layout>
                     <!-- Corner 2 row (hidden when not region) -->
                     <flow-layout direction="horizontal" id="corner2-row">
@@ -164,7 +165,8 @@
                         </sizing>
                         <gap>4</gap>
                         <vertical-alignment>center</vertical-alignment>
-                        <children/>
+                        <children>
+                        </children>
                     </flow-layout>
                     <!-- Map row -->
                     <flow-layout direction="horizontal" id="map-row">
@@ -174,12 +176,13 @@
                         </sizing>
                         <gap>4</gap>
                         <vertical-alignment>center</vertical-alignment>
-                        <children/>
+                        <children>
+                        </children>
                     </flow-layout>
                 </children>
             </flow-layout>
 
-            <!-- Settings row (owner only -- hidden via zero-sizing for non-owners) -->
+            <!-- Settings row (owner only, hidden via zero-sizing for non-owners) -->
             <flow-layout direction="horizontal" id="settings-row">
                 <sizing>
                     <horizontal method="fill">85</horizontal>
