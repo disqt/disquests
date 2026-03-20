@@ -750,12 +750,20 @@ public class QuestScreen extends BaseScreen {
         this.visibilityButton.setTooltip(Tooltip.of(Text.literal(visTooltip)));
 
         int contribCount = quest.getContributors() != null ? quest.getContributors().size() : 0;
-        String contribText = "Contributors (" + contribCount + ")";
+        int pendingReqCount = ClientCache.getPendingCount(quest.getId());
+        Text contribText;
+        if (pendingReqCount > 0) {
+            contribText = Text.literal("Contributors (" + contribCount + " ")
+                    .append(Text.literal("+ " + pendingReqCount).withColor(Colors.AMBER))
+                    .append(Text.literal(")"));
+        } else {
+            contribText = Text.literal("Contributors (" + contribCount + ")");
+        }
         int contribBtnWidth = this.textRenderer.getWidth(contribText) + UIHelper.BUTTON_TEXT_PADDING * 2;
         contribBtnWidth = Math.max(contribBtnWidth, UIHelper.MIN_BUTTON_WIDTH);
         this.contributorsButton = this.addDrawableChild(new DarkButtonWidget(
                 panelX + visBtnWidth + spacing, settingsY, contribBtnWidth, btnHeight,
-                Text.literal(contribText), b -> openContributors()));
+                contribText, b -> openContributors()));
         this.contributorsButton.setTooltip(Tooltip.of(Text.literal("Manage who can view/edit this quest")));
     }
 

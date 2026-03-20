@@ -1,5 +1,6 @@
 package com.disqt.disquests.client.gui.widget.list;
 
+import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.helper.Colors;
@@ -165,11 +166,21 @@ public class QuestListWidget extends AbstractListWidget<QuestListWidget.QuestEnt
             context.drawText(client.textRenderer, truncatedTitle,
                     entryX + 4, entryY + 4, Colors.TEXT_PRIMARY, false);
 
-            // Draw visibility badge + owner on the right
+            // Draw visibility badge + pending + owner on the right
             int rightX = entryX + entryWidth - 4;
             if (ownerText != null) {
                 rightX -= ownerWidth;
                 context.drawText(client.textRenderer, ownerText, rightX, entryY + 4, Colors.TEXT_MUTED, false);
+            }
+            // Pending request count (owned quests only)
+            if (isOwnedByPlayer) {
+                int pendingCount = ClientCache.getPendingCount(quest.getId());
+                if (pendingCount > 0) {
+                    Text pendingText = Text.literal(" (" + pendingCount + " pending)");
+                    int pendingWidth = client.textRenderer.getWidth(pendingText);
+                    rightX -= pendingWidth;
+                    context.drawText(client.textRenderer, pendingText, rightX, entryY + 4, Colors.AMBER, false);
+                }
             }
             if (visibilityText != null) {
                 rightX -= visibilityWidth;

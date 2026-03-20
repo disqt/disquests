@@ -40,6 +40,9 @@ public final class Colors {
     public static int FADE_GRADIENT_TOP = 0x60000000;
     public static int FADE_GRADIENT_BOTTOM = 0x00000000;
 
+    // --- Accent ---
+    public static int AMBER = 0xFFFFAA33;
+
     private Colors() {}
 
     public static void reload() {
