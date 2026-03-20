@@ -319,8 +319,10 @@ public class QuestScreenTest implements FabricClientGameTest {
     private void testCheckboxNotClickableWithoutPermission(ClientGameTestContext context) {
         Quest quest = createTestQuest();
         quest.setOwnerUuid(OTHER_PLAYER_UUID); // not owned by test player
+        quest.setOwnerName("OtherPlayer");
         quest.setContent("- [ ] Task 1\n- [ ] Task 2");
         quest.setContributors(new ArrayList<>()); // not a contributor
+        ClientCache.addOrUpdateServerQuest(quest); // prevent auto-close
 
         context.setScreen(() -> new QuestScreen(null, quest));
         context.waitForScreen(QuestScreen.class);
@@ -336,6 +338,7 @@ public class QuestScreenTest implements FabricClientGameTest {
             throw new AssertionError("Checkbox should not be toggled on quest without edit permission");
         }
 
+        ClientCache.removeQuestById(quest.getId());
         context.setScreen(() -> null);
         context.waitTick();
     }
@@ -347,9 +350,11 @@ public class QuestScreenTest implements FabricClientGameTest {
         // As contributor (not owner) -- should have leave button
         Quest quest = createTestQuest();
         quest.setOwnerUuid(OTHER_PLAYER_UUID);
+        quest.setOwnerName("OtherPlayer");
         quest.setContributors(new ArrayList<>(List.of(
                 new Contributor(new ContributorData(TEST_PLAYER_UUID, "TestPlayer", false))
         )));
+        ClientCache.addOrUpdateMyQuest(quest); // prevent auto-close
 
         context.setScreen(() -> new QuestScreen(null, quest));
         context.waitForScreen(QuestScreen.class);
@@ -365,6 +370,8 @@ public class QuestScreenTest implements FabricClientGameTest {
 
         // As owner -- no leave button
         Quest ownedQuest = createTestQuest(); // owned by TEST_PLAYER_UUID
+        ClientCache.addOrUpdateMyQuest(ownedQuest); // prevent auto-close
+
         context.setScreen(() -> new QuestScreen(null, ownedQuest));
         context.waitForScreen(QuestScreen.class);
         context.waitTicks(2);
@@ -377,6 +384,9 @@ public class QuestScreenTest implements FabricClientGameTest {
             throw new AssertionError("Leave button should NOT be visible for owners");
         }
 
+        // Cleanup
+        ClientCache.removeQuestById(quest.getId());
+        ClientCache.removeQuestById(ownedQuest.getId());
         context.setScreen(() -> null);
         context.waitTick();
     }
@@ -407,6 +417,7 @@ public class QuestScreenTest implements FabricClientGameTest {
     private void testMarkdownLeadingWhitespace(ClientGameTestContext context) {
         Quest quest = createTestQuest();
         quest.setContent("             **Hangar**\n  *italic text*\nNormal text");
+        ClientCache.addOrUpdateMyQuest(quest); // prevent auto-close
 
         context.setScreen(() -> new QuestScreen(null, quest));
         context.waitForScreen(QuestScreen.class);
@@ -418,6 +429,7 @@ public class QuestScreenTest implements FabricClientGameTest {
             throw new AssertionError("QuestScreen should render leading-whitespace markdown without crashing");
         }
 
+        ClientCache.removeQuestById(quest.getId());
         context.setScreen(() -> null);
         context.waitTick();
     }
