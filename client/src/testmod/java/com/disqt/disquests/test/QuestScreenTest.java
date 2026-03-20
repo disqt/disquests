@@ -2,17 +2,21 @@ package com.disqt.disquests.test;
 
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
+import com.disqt.disquests.client.data.Contributor;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.helper.DisquestsConfig;
 import com.disqt.disquests.client.gui.screen.ConfigScreen;
+import com.disqt.disquests.client.gui.screen.ContributorScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.client.hud.HudPinRenderer;
+import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.Visibility;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -57,6 +61,10 @@ public class QuestScreenTest implements FabricClientGameTest {
             testRequestedState(context);
             testToastOverlay(context);
             testConfigScreen(context);
+            testCheckboxNotClickableWithoutPermission(context);
+            testLeaveButtonVisibility(context);
+            testContributorScreenNoInvite(context);
+            testMarkdownLeadingWhitespace(context);
         } finally {
             ClientCache.clear();
             ClientSession.leaveServer();
@@ -303,5 +311,126 @@ public class QuestScreenTest implements FabricClientGameTest {
         if (DisquestsConfig.getPinnedWidth() != originalWidth) {
             throw new AssertionError("Config should not change without saving");
         }
+    }
+
+    /**
+     * Checkbox in task list should not be togglable when the player has no edit permission.
+     */
+    private void testCheckboxNotClickableWithoutPermission(ClientGameTestContext context) {
+        Quest quest = createTestQuest();
+        quest.setOwnerUuid(OTHER_PLAYER_UUID); // not owned by test player
+        quest.setOwnerName("OtherPlayer");
+        quest.setContent("- [ ] Task 1\n- [ ] Task 2");
+        quest.setContributors(new ArrayList<>()); // not a contributor
+        ClientCache.addOrUpdateServerQuest(quest); // prevent auto-close
+
+        context.setScreen(() -> new QuestScreen(null, quest));
+        context.waitForScreen(QuestScreen.class);
+        context.waitTicks(2);
+
+        // Verify the quest content hasn't been modified (checkbox guard prevents toggle)
+        String content = context.computeOnClient(client -> {
+            if (!(client.currentScreen instanceof QuestScreen screen)) return "";
+            return screen.getQuest().getContent();
+        });
+
+        if (content.contains("[x]")) {
+            throw new AssertionError("Checkbox should not be toggled on quest without edit permission");
+        }
+
+        ClientCache.removeQuestById(quest.getId());
+        context.setScreen(() -> null);
+        context.waitTick();
+    }
+
+    /**
+     * Leave button should be visible for contributors but not for the owner.
+     */
+    private void testLeaveButtonVisibility(ClientGameTestContext context) {
+        // As contributor (not owner) -- should have leave button
+        Quest quest = createTestQuest();
+        quest.setOwnerUuid(OTHER_PLAYER_UUID);
+        quest.setOwnerName("OtherPlayer");
+        quest.setContributors(new ArrayList<>(List.of(
+                new Contributor(new ContributorData(TEST_PLAYER_UUID, "TestPlayer", false))
+        )));
+        ClientCache.addOrUpdateMyQuest(quest); // prevent auto-close
+
+        context.setScreen(() -> new QuestScreen(null, quest));
+        context.waitForScreen(QuestScreen.class);
+        context.waitTicks(2);
+
+        boolean hasLeave = context.computeOnClient(client -> {
+            if (!(client.currentScreen instanceof QuestScreen screen)) return false;
+            return screen.hasLeaveButton();
+        });
+        if (!hasLeave) {
+            throw new AssertionError("Leave button should be visible for contributors");
+        }
+
+        // As owner -- no leave button
+        Quest ownedQuest = createTestQuest(); // owned by TEST_PLAYER_UUID
+        ClientCache.addOrUpdateMyQuest(ownedQuest); // prevent auto-close
+
+        context.setScreen(() -> new QuestScreen(null, ownedQuest));
+        context.waitForScreen(QuestScreen.class);
+        context.waitTicks(2);
+
+        boolean ownerHasLeave = context.computeOnClient(client -> {
+            if (!(client.currentScreen instanceof QuestScreen screen)) return false;
+            return screen.hasLeaveButton();
+        });
+        if (ownerHasLeave) {
+            throw new AssertionError("Leave button should NOT be visible for owners");
+        }
+
+        // Cleanup
+        ClientCache.removeQuestById(quest.getId());
+        ClientCache.removeQuestById(ownedQuest.getId());
+        context.setScreen(() -> null);
+        context.waitTick();
+    }
+
+    /**
+     * ContributorScreen should open without crashing.
+     */
+    private void testContributorScreenNoInvite(ClientGameTestContext context) {
+        Quest quest = createTestQuest();
+
+        context.setScreen(() -> new ContributorScreen(null, quest));
+        context.waitForScreen(ContributorScreen.class);
+        context.waitTicks(2);
+
+        boolean screenOpen = context.computeOnClient(client ->
+                client.currentScreen instanceof ContributorScreen);
+        if (!screenOpen) {
+            throw new AssertionError("ContributorScreen should be open");
+        }
+
+        context.setScreen(() -> null);
+        context.waitTick();
+    }
+
+    /**
+     * QuestScreen should render markdown with leading whitespace without crashing.
+     */
+    private void testMarkdownLeadingWhitespace(ClientGameTestContext context) {
+        Quest quest = createTestQuest();
+        quest.setContent("             **Hangar**\n  *italic text*\nNormal text");
+        ClientCache.addOrUpdateMyQuest(quest); // prevent auto-close
+
+        context.setScreen(() -> new QuestScreen(null, quest));
+        context.waitForScreen(QuestScreen.class);
+        context.waitTicks(2);
+
+        boolean screenOpen = context.computeOnClient(client ->
+                client.currentScreen instanceof QuestScreen);
+        if (!screenOpen) {
+            throw new AssertionError("QuestScreen should render leading-whitespace markdown without crashing");
+        }
+
+        ClientCache.removeQuestById(quest.getId());
+        context.setScreen(() -> null);
+        context.waitTick();
     }
 }

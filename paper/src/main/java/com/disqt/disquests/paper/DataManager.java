@@ -246,6 +246,11 @@ public class DataManager {
         }
     }
 
+    public synchronized void leaveQuest(UUID questId, UUID playerUuid) {
+        removeContributor(questId, playerUuid);
+        unpinQuest(playerUuid, questId);
+    }
+
     public synchronized void removeContributor(UUID questId, UUID playerUuid) {
         try (PreparedStatement stmt = connection.prepareStatement(
                 "DELETE FROM contributors WHERE quest_id = ? AND player_uuid = ?")) {

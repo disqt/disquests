@@ -46,6 +46,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
                 case UPDATE_CONTRIBUTORS -> handleUpdateContributors(player, PacketCodec.readUpdateContributors(buf));
                 case UPDATE_VISIBILITY -> handleUpdateVisibility(player, PacketCodec.readUpdateVisibility(buf));
                 case PIN_QUEST -> handlePinQuest(player, PacketCodec.readPinQuest(buf));
+                case LEAVE_QUEST -> handleLeaveQuest(player, buf);
                 default -> plugin.getLogger().warning("Unknown C2S packet from " + player.getName() + ": " + type);
             }
         } catch (Exception e) {
@@ -315,13 +316,39 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
         }
     }
 
+    private void handleLeaveQuest(Player player, ByteBufReader reader) {
+        UUID questId = PacketCodec.readLeaveQuest(reader);
+        UUID playerUuid = player.getUniqueId();
+
+        QuestData quest = dataManager.getQuest(questId);
+        if (quest == null) return;
+
+        // Owner cannot leave, only delete
+        if (quest.ownerUuid().equals(playerUuid)) return;
+
+        // Must be a contributor
+        boolean isContributor = dataManager.isContributor(questId, playerUuid);
+        if (!isContributor) return;
+
+        dataManager.leaveQuest(questId, playerUuid);
+
+        // Notify the leaving player: remove quest from their "my quests"
+        sendPacket(player, PacketCodec.writeDeleteQuestS2C(questId));
+
+        // Broadcast updated quest to everyone who should see it
+        QuestData updated = dataManager.getQuest(questId);
+        if (updated != null) {
+            broadcastQuestUpdate(updated);
+        }
+    }
+
     // --- Helpers ---
 
     private void sendHandshake(Player player) {
         List<UUID> pinnedIds = dataManager.getPinnedQuestIds(player.getUniqueId());
         int pendingCount = dataManager.getPendingRequestCount(player.getUniqueId());
         sendPacket(player, PacketCodec.writeHandshake(
-            config.getBluemapUrl(), pendingCount, pinnedIds, player.getUniqueId()));
+            config.getBluemapUrl(), pendingCount, pinnedIds, player.getUniqueId(), config.getBluemapMapNames()));
     }
 
     private void sendPacket(Player player, byte[] data) {

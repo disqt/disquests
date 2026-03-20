@@ -9,7 +9,9 @@ import net.minecraft.client.gui.Drawable;
 import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.Selectable;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
+import net.minecraft.text.ClickEvent;
 import net.minecraft.text.OrderedText;
+import net.minecraft.text.Text;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,6 +49,25 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
     }
 
     private record CheckboxHitbox(int x, int y, int width, int height, int checkboxIndex, boolean checked) {}
+    private record LinkHitbox(int x, int y, int width, int height, String url, Text displayText) {}
+
+    private static boolean hitTest(double mx, double my, int x, int y, int w, int h) {
+        return mx >= x && mx < x + w && my >= y && my < y + h;
+    }
+
+    private static String findUrlInText(OrderedText text) {
+        String[] result = {null};
+        text.accept((index, style, codepoint) -> {
+            ClickEvent clickEvent = style.getClickEvent();
+            if (clickEvent instanceof ClickEvent.OpenUrl openUrl) {
+                result[0] = openUrl.uri().toString();
+                return false;
+            }
+            return true;
+        });
+        return result[0];
+    }
+    private final List<LinkHitbox> linkHitboxes = new ArrayList<>();
 
     /**
      * A single visual line after word-wrapping, with its indent and scale.
@@ -124,6 +145,7 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
         context.enableScissor(x, y, x + width, y + height);
 
         checkboxHitboxes.clear();
+        linkHitboxes.clear();
         int contentX = x + PADDING;
         int contentY = y + PADDING;
         int drawY = contentY - (int) scrollOffset;
@@ -153,12 +175,27 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
                             drawX, drawY, cbWidth, lineHeight,
                             entry.checkboxIndex, entry.checked));
                 }
+
+                // Record link hitbox for click detection
+                String url = findUrlInText(entry.text());
+                if (url != null) {
+                    int textWidth = textRenderer.getWidth(entry.text());
+                    linkHitboxes.add(new LinkHitbox(drawX, drawY, textWidth, textRenderer.fontHeight, url, Text.literal(url)));
+                }
             }
 
             drawY += lineHeight;
         }
 
         context.disableScissor();
+
+        // Draw link hover tooltips
+        for (LinkHitbox lh : linkHitboxes) {
+            if (hitTest(mouseX, mouseY, lh.x(), lh.y(), lh.width(), lh.height())) {
+                context.drawTooltip(textRenderer, lh.displayText(), mouseX, mouseY);
+                break;
+            }
+        }
 
         // Draw scrollbar if needed
         if (needsScrollbar()) {
@@ -211,12 +248,21 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
 
     @Override
     public boolean mouseClicked(Click click, boolean simulated) {
-        if (checkboxToggleListener == null) return false;
         double mx = click.x();
         double my = click.y();
-        for (CheckboxHitbox cb : checkboxHitboxes) {
-            if (mx >= cb.x && mx < cb.x + cb.width && my >= cb.y && my < cb.y + cb.height) {
-                checkboxToggleListener.onCheckboxToggled(cb.checkboxIndex, !cb.checked);
+        if (checkboxToggleListener != null) {
+            for (CheckboxHitbox cb : checkboxHitboxes) {
+                if (hitTest(mx, my, cb.x, cb.y, cb.width, cb.height)) {
+                    checkboxToggleListener.onCheckboxToggled(cb.checkboxIndex, !cb.checked);
+                    return true;
+                }
+            }
+        }
+        for (LinkHitbox lh : linkHitboxes) {
+            if (hitTest(mx, my, lh.x(), lh.y(), lh.width(), lh.height())) {
+                try {
+                    net.minecraft.util.Util.getOperatingSystem().open(java.net.URI.create(lh.url()));
+                } catch (Exception ignored) {}
                 return true;
             }
         }
