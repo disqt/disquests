@@ -1,6 +1,7 @@
 <owo-ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/wisp-forest/owo-lib/1.21/owo-ui.xsd">
 
+    <components>
     <!-- Root: vertical flow, full screen, translucent background -->
     <flow-layout direction="vertical" id="root">
         <sizing>
@@ -185,5 +186,6 @@
 
         </children>
     </flow-layout>
+    </components>
 
 </owo-ui>
