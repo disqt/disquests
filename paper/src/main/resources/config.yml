@@ -1,2 +1,9 @@
 # BlueMap web map URL. Leave empty to disable BlueMap links.
 bluemap-url: ""
+
+# Map name mappings: quest map name -> BlueMap map ID.
+# Used to generate correct BlueMap URLs from quest coordinates.
+bluemap-map-names:
+  overworld: "world_new"
+  nether: "world_new_nether"
+  the_end: "world_new_the_end"

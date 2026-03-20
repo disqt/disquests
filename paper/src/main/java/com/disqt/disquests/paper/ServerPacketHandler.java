@@ -349,7 +349,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
         List<UUID> pinnedIds = dataManager.getPinnedQuestIds(player.getUniqueId());
         int pendingCount = dataManager.getPendingRequestCount(player.getUniqueId());
         sendPacket(player, PacketCodec.writeHandshake(
-            config.getBluemapUrl(), pendingCount, pinnedIds, player.getUniqueId()));
+            config.getBluemapUrl(), pendingCount, pinnedIds, player.getUniqueId(), config.getBluemapMapNames()));
     }
 
     private void sendPacket(Player player, byte[] data) {
