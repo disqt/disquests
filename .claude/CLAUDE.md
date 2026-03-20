@@ -47,6 +47,11 @@ Client game tests live in `client/src/testmod/java/com/disqt/disquests/test/Ques
 
 Tests use `FabricClientGameTest` API: `setScreen`, `waitForScreen`, `computeOnClient`, `runOnClient`. Quests must be added to `ClientCache` before opening screens to prevent auto-close (`tick()` closes screens when quest is not in cache).
 
+- **Use `TestInput` for click simulation** -- `context.getInput().setCursorPos(x * scale, y * scale)` + `context.getInput().pressMouse(GLFW_MOUSE_BUTTON_LEFT)`. Never call `screen.mouseClicked()` directly -- it bypasses the real input pipeline and gives false test results.
+- **GLFW uses physical pixels** -- multiply logical coordinates by `client.getWindow().getScaleFactor()` before passing to `setCursorPos`.
+- **`TestLogCapture`** -- attach to any logger name, captures Log4j2 events at DEBUG level for assertions: `TestLogCapture.attach("Disquests/QuestEntry")` then `capture.hasMessageContaining("...")`.
+- **`DebugScreenEvents`** -- registered at mod init, logs all mouse events on Disquests screens at DEBUG level via Fabric `ScreenMouseEvents` hooks. Enable by setting `Disquests` logger to DEBUG in log4j2 config.
+
 ## Networking Protocol
 
 Channel: `disquests:main`. First byte = PacketType ID.
@@ -113,3 +118,9 @@ Read these on-demand when working on the relevant area. For owo-ui, Context7 MCP
 - **MC 1.21.11 ClickEvent API** — sealed classes, not enum. Use `new ClickEvent.OpenUrl(URI)` and `instanceof ClickEvent.OpenUrl openUrl` for pattern matching.
 - **Contributor is immutable** — `canEdit` is final. To update, replace with `new Contributor(new ContributorData(...))`.
 - **QuestScreen auto-close** — `tick()` closes the screen if the quest is not in `ClientCache`. E2E tests must add quests to cache before opening screens.
+- **owo-ui v0.13.0 renames** — `BaseComponent` -> `BaseUIComponent`, `Components` -> `UIComponents`, `Containers` -> `UIContainers`, `OwoUIDrawContext` -> `OwoUIGraphics`. XML tags unchanged.
+- **owo-ui `onMouseDown` coordinates are relative** — `Click.x()`/`Click.y()` are already relative to the component. Do NOT subtract `this.x()`/`this.y()`.
+- **owo-ui XML scroll container** — child element must be FIRST (before `<sizing>`, `<surface>`, `<padding>`). `WrappingParentUIComponent.parseProperties` takes first element child.
+- **owo-ui XML requires `<components>` wrapper** — root component must be inside `<components>` tag, not directly under `<owo-ui>`.
+- **MC 1.21.11 `Click` record** — `Click(double x, double y, MouseInput buttonInfo)` where `MouseInput(int button, int modifiers)`. Not `(double, double, int)`.
+- **No owo-ui visibility API** — use `component.sizing(Sizing.fixed(0), Sizing.fixed(0))` to hide, `Sizing.content()` to show.
