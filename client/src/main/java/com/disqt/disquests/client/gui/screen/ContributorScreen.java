@@ -6,9 +6,9 @@ import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.helper.ScreenLayouts;
 import com.disqt.disquests.client.gui.helper.UIHelper;
 import com.disqt.disquests.client.gui.widget.DarkButtonWidget;
-import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.client.network.PacketSender;
 import com.disqt.disquests.common.PacketCodec;
+import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.ContributorOp;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -19,7 +19,6 @@ import java.util.List;
 public class ContributorScreen extends BaseScreen {
 
     private final Quest quest;
-    private MultiLineTextFieldWidget inviteField;
 
     private static final int ROW_HEIGHT = 20;
     private static final int BUTTON_HEIGHT = 14;
@@ -46,25 +45,10 @@ public class ContributorScreen extends BaseScreen {
                     buttonTexts.get(0), b -> this.close()));
         });
 
-        // --- INVITE SECTION (bottom, above close button) ---
-        int inviteRowY = buttonsY - UIHelper.OUTER_PADDING - 20;
-        int inviteFieldWidth = contentWidth - SMALL_BUTTON_WIDTH - 8;
-        this.inviteField = new MultiLineTextFieldWidget(
-                this.textRenderer, contentX, inviteRowY,
-                inviteFieldWidth, 18,
-                "", "Player name...", 1, false
-        );
-        this.addSelectableChild(this.inviteField);
-
-        this.addDrawableChild(new DarkButtonWidget(
-                contentX + inviteFieldWidth + 4, inviteRowY,
-                SMALL_BUTTON_WIDTH, 18,
-                Text.literal("Invite"), b -> invitePlayer()));
-
         // --- CONTRIBUTOR LIST ---
         List<Contributor> contributors = quest.getContributors();
         int listStartY = ScreenLayouts.TOP_MARGIN + 10;
-        int maxListBottom = inviteRowY - 10;
+        int maxListBottom = buttonsY - 10;
 
         for (int i = 0; i < contributors.size(); i++) {
             int rowY = listStartY + (i * ROW_HEIGHT);
@@ -93,18 +77,6 @@ public class ContributorScreen extends BaseScreen {
 
     // --- ACTIONS ---
 
-    private void invitePlayer() {
-        String playerName = this.inviteField.getText().trim();
-        if (playerName.isEmpty()) return;
-
-        PacketSender.updateContributors(quest.getId(), List.of(
-                new PacketCodec.ContributorOpEntry(ContributorOp.ADD, null, playerName, false)
-        ));
-
-        // Clear field and refresh
-        this.inviteField.setText("");
-    }
-
     private void togglePermission(int index) {
         if (index < 0 || index >= quest.getContributors().size()) return;
         Contributor contrib = quest.getContributors().get(index);
@@ -114,8 +86,9 @@ public class ContributorScreen extends BaseScreen {
                 new PacketCodec.ContributorOpEntry(ContributorOp.UPDATE, contrib.getUuid(), contrib.getName(), newCanEdit)
         ));
 
-        // Refresh UI after a brief delay to allow server response
-        // For now, just reinit the screen optimistically
+        // Optimistically replace contributor with updated canEdit
+        quest.getContributors().set(index, new Contributor(
+                new ContributorData(contrib.getUuid(), contrib.getName(), newCanEdit)));
         this.clearAndInit();
     }
 
@@ -127,6 +100,7 @@ public class ContributorScreen extends BaseScreen {
             PacketSender.updateContributors(quest.getId(), List.of(
                     new PacketCodec.ContributorOpEntry(ContributorOp.REMOVE, contrib.getUuid(), contrib.getName(), false)
             ));
+            quest.getContributors().remove(index);
             this.clearAndInit();
         });
     }
@@ -147,8 +121,7 @@ public class ContributorScreen extends BaseScreen {
         int listStartY = ScreenLayouts.TOP_MARGIN + 10;
 
         int buttonsY = UIHelper.getBottomButtonY(this);
-        int inviteRowY = buttonsY - UIHelper.OUTER_PADDING - 20;
-        int maxListBottom = inviteRowY - 10;
+        int maxListBottom = buttonsY - 10;
 
         if (contributors.isEmpty()) {
             context.drawCenteredTextWithShadow(this.textRenderer,
@@ -170,22 +143,5 @@ public class ContributorScreen extends BaseScreen {
                         contentX + 5, textY, Colors.TEXT_PRIMARY, false);
             }
         }
-
-        // Invite section label
-        context.drawText(this.textRenderer, "Invite:", contentX,
-                inviteRowY - 10, Colors.TEXT_MUTED, false);
-
-        // Invite field panel
-        UIHelper.drawPanel(context, this.inviteField.x - 2, this.inviteField.y,
-                this.inviteField.width + 4, this.inviteField.height);
-        this.inviteField.render(context, mouseX, mouseY, delta);
-    }
-
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        if (this.inviteField.isMouseOver(mouseX, mouseY)) {
-            return this.inviteField.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
-        }
-        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 }
