@@ -124,10 +124,14 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
         rebuildDisplayLines();
     }
 
+    protected int getEffectiveLineCount() {
+        return getEffectiveLineCount();
+    }
+
     protected void rebuildDisplayLines() {
-        displayLines = new ArrayList<>();
-        displayToLogical = new ArrayList<>();
-        displayToOffset = new ArrayList<>();
+        displayLines.clear();
+        displayToLogical.clear();
+        displayToOffset.clear();
 
         if (!wordWrap) {
             for (int i = 0; i < lines.size(); i++) {
@@ -499,7 +503,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
     protected void renderVScrollbar(DrawContext context, int contentHeight) {
         int scrollbarX = this.x + this.width - SCROLLBAR_THICKNESS - 2;
         int maxScroll = getMaxScrollV();
-        int lineCount = wordWrap ? displayLines.size() : lines.size();
+        int lineCount = getEffectiveLineCount();
         float contentPixelHeight = lineCount * textRenderer.fontHeight;
         float thumbHeight = Math.max(10, (contentHeight / contentPixelHeight) * contentHeight);
         float thumbY = (float) ((scrollY / (double) Math.max(1, maxScroll)) * (contentHeight - thumbHeight));
@@ -609,7 +613,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
             int trackHeight = this.height - 10 - (isScrollbarNeededH() ? (SCROLLBAR_THICKNESS + 2) : 0);
 
             double maxScroll = Math.max(1, getMaxScrollV());
-            int lineCount = wordWrap ? displayLines.size() : lines.size();
+            int lineCount = getEffectiveLineCount();
             double contentPixelHeight = lineCount * textRenderer.fontHeight;
             double thumbHeight = Math.max(10, (trackHeight / contentPixelHeight) * trackHeight);
             double toTrack = (trackHeight - thumbHeight);
@@ -933,12 +937,12 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
 
     // ---------- Scroll metrics ----------
     protected int getMaxScrollV() {
-        int lineCount = wordWrap ? displayLines.size() : lines.size();
+        int lineCount = getEffectiveLineCount();
         return Math.max(0, (lineCount * textRenderer.fontHeight) - (height - 10 - (isScrollbarNeededH() ? (SCROLLBAR_THICKNESS + 2) : 0)));
     }
 
     protected boolean isScrollbarNeededV() {
-        int lineCount = wordWrap ? displayLines.size() : lines.size();
+        int lineCount = getEffectiveLineCount();
         return (lineCount * textRenderer.fontHeight) > (height - 10);
     }
 

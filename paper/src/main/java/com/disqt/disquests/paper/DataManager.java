@@ -246,7 +246,7 @@ public class DataManager {
         }
     }
 
-    public void leaveQuest(UUID questId, UUID playerUuid) {
+    public synchronized void leaveQuest(UUID questId, UUID playerUuid) {
         removeContributor(questId, playerUuid);
         unpinQuest(playerUuid, questId);
     }

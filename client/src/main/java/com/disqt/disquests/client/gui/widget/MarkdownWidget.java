@@ -49,7 +49,24 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
     }
 
     private record CheckboxHitbox(int x, int y, int width, int height, int checkboxIndex, boolean checked) {}
-    private record LinkHitbox(int x, int y, int width, int height, String url) {}
+    private record LinkHitbox(int x, int y, int width, int height, String url, Text displayText) {}
+
+    private static boolean hitTest(double mx, double my, int x, int y, int w, int h) {
+        return mx >= x && mx < x + w && my >= y && my < y + h;
+    }
+
+    private static String findUrlInText(OrderedText text) {
+        String[] result = {null};
+        text.accept((index, style, codepoint) -> {
+            ClickEvent clickEvent = style.getClickEvent();
+            if (clickEvent instanceof ClickEvent.OpenUrl openUrl) {
+                result[0] = openUrl.uri().toString();
+                return false;
+            }
+            return true;
+        });
+        return result[0];
+    }
     private final List<LinkHitbox> linkHitboxes = new ArrayList<>();
 
     /**
@@ -160,17 +177,10 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
                 }
 
                 // Record link hitbox for click detection
-                String[] urlHolder = {null};
-                entry.text().accept((index, style, codepoint) -> {
-                    ClickEvent clickEvent = style.getClickEvent();
-                    if (clickEvent instanceof ClickEvent.OpenUrl openUrl) {
-                        urlHolder[0] = openUrl.uri().toString();
-                    }
-                    return true;
-                });
-                if (urlHolder[0] != null) {
+                String url = findUrlInText(entry.text());
+                if (url != null) {
                     int textWidth = textRenderer.getWidth(entry.text());
-                    linkHitboxes.add(new LinkHitbox(drawX, drawY, textWidth, textRenderer.fontHeight, urlHolder[0]));
+                    linkHitboxes.add(new LinkHitbox(drawX, drawY, textWidth, textRenderer.fontHeight, url, Text.literal(url)));
                 }
             }
 
@@ -181,9 +191,8 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
 
         // Draw link hover tooltips
         for (LinkHitbox lh : linkHitboxes) {
-            if (mouseX >= lh.x() && mouseX <= lh.x() + lh.width()
-                    && mouseY >= lh.y() && mouseY <= lh.y() + lh.height()) {
-                context.drawTooltip(textRenderer, Text.literal(lh.url()), mouseX, mouseY);
+            if (hitTest(mouseX, mouseY, lh.x(), lh.y(), lh.width(), lh.height())) {
+                context.drawTooltip(textRenderer, lh.displayText(), mouseX, mouseY);
                 break;
             }
         }
@@ -243,15 +252,14 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
         double my = click.y();
         if (checkboxToggleListener != null) {
             for (CheckboxHitbox cb : checkboxHitboxes) {
-                if (mx >= cb.x && mx < cb.x + cb.width && my >= cb.y && my < cb.y + cb.height) {
+                if (hitTest(mx, my, cb.x, cb.y, cb.width, cb.height)) {
                     checkboxToggleListener.onCheckboxToggled(cb.checkboxIndex, !cb.checked);
                     return true;
                 }
             }
         }
         for (LinkHitbox lh : linkHitboxes) {
-            if (mx >= lh.x() && mx <= lh.x() + lh.width()
-                    && my >= lh.y() && my <= lh.y() + lh.height()) {
+            if (hitTest(mx, my, lh.x(), lh.y(), lh.width(), lh.height())) {
                 try {
                     net.minecraft.util.Util.getOperatingSystem().open(java.net.URI.create(lh.url()));
                 } catch (Exception ignored) {}

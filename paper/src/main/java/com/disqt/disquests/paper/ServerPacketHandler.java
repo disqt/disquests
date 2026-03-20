@@ -327,8 +327,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
         if (quest.ownerUuid().equals(playerUuid)) return;
 
         // Must be a contributor
-        boolean isContributor = quest.contributors().stream()
-                .anyMatch(c -> c.uuid().equals(playerUuid));
+        boolean isContributor = dataManager.isContributor(questId, playerUuid);
         if (!isContributor) return;
 
         dataManager.leaveQuest(questId, playerUuid);
