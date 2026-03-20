@@ -6,6 +6,7 @@ import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.common.ByteBufReader;
 import com.disqt.disquests.common.PacketCodec;
 import com.disqt.disquests.common.PacketType;
+import com.disqt.disquests.common.model.CollaborationRequestData;
 import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.migration.BuildNotesMigrator;
@@ -14,6 +15,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ServerInfo;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public class ClientPacketHandler {
@@ -37,6 +39,7 @@ public class ClientPacketHandler {
                     case DELETE_QUEST_S2C -> handleDeleteQuestS2C(r);
                     case COLLABORATION_REQUEST -> handleCollaborationRequest(r);
                     case COLLABORATION_RESPONSE -> handleCollaborationResponse(r);
+                    case SYNC_PENDING_REQUESTS -> handleSyncPendingRequests(r);
                     default -> {}
                 }
             } catch (Exception e) {
@@ -66,11 +69,13 @@ public class ClientPacketHandler {
 
     private static void handleSyncMyQuests(ByteBufReader r) {
         List<QuestData> dataList = PacketCodec.readSyncMyQuests(r);
+        Map<UUID, Integer> counts = PacketCodec.readPendingCounts(r);
         List<Quest> quests = new ArrayList<>(dataList.size());
         for (QuestData data : dataList) {
             quests.add(Quest.fromNetwork(data));
         }
         ClientCache.setMyQuests(quests);
+        ClientCache.setPendingCounts(counts);
     }
 
     private static void handleSyncServerQuests(ByteBufReader r) {
@@ -121,8 +126,18 @@ public class ClientPacketHandler {
     }
 
     private static void handleCollaborationRequest(ByteBufReader r) {
-        PacketCodec.readCollaborationRequest(r);
+        PacketCodec.CollaborationRequestPayload payload = PacketCodec.readCollaborationRequest(r);
         ClientSession.incrementPendingRequestCount();
+        // Store in cache for real-time display
+        CollaborationRequestData requestData = new CollaborationRequestData(
+                payload.requestId(), payload.questId(), payload.questTitle(),
+                null, payload.requesterName(), System.currentTimeMillis() / 1000L);
+        ClientCache.addPendingRequest(requestData);
+    }
+
+    private static void handleSyncPendingRequests(ByteBufReader r) {
+        List<CollaborationRequestData> requests = PacketCodec.readSyncPendingRequests(r);
+        ClientCache.setPendingRequests(requests);
     }
 
     private static void handleCollaborationResponse(ByteBufReader r) {
