@@ -97,6 +97,14 @@
 
             <!-- Scrollable quest list area -->
             <scroll direction="vertical" id="quest-scroll">
+                <!-- Child MUST be first element for WrappingParentUIComponent -->
+                <flow-layout direction="vertical" id="quest-list">
+                    <sizing>
+                        <horizontal method="fill">100</horizontal>
+                        <vertical method="content"/>
+                    </sizing>
+                    <gap>2</gap>
+                </flow-layout>
                 <sizing>
                     <horizontal method="fill">85</horizontal>
                     <vertical method="fill">100</vertical>
@@ -107,14 +115,6 @@
                 <padding>
                     <all>4</all>
                 </padding>
-                <!-- Quest list: single child of scroll, entries added programmatically -->
-                <flow-layout direction="vertical" id="quest-list">
-                    <sizing>
-                        <horizontal method="fill">100</horizontal>
-                        <vertical method="content"/>
-                    </sizing>
-                    <gap>2</gap>
-                </flow-layout>
             </scroll>
 
             <!-- Search row -->
