@@ -676,6 +676,10 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
         }
 
         switch (keyCode) {
+            case GLFW.GLFW_KEY_TAB -> {
+                insertText("    ");
+                return true;
+            }
             case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> {
                 if (this.lines.size() < this.maxLines) {
                     insertText("\n");
