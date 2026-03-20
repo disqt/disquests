@@ -450,6 +450,10 @@ public class QuestScreenTest implements FabricClientGameTest {
         context.waitForScreen(MainScreen.class);
         context.waitTicks(3);
 
+        // Attach log capture to verify debug events fire
+        TestLogCapture entryLog = TestLogCapture.attach("Disquests/QuestEntry");
+        TestLogCapture screenLog = TestLogCapture.attach("Disquests/MainScreen");
+
         // Click on the center of the first entry through the screen's mouseClicked
         String clickResult = context.computeOnClient(client -> {
             if (!(client.currentScreen instanceof MainScreen screen)) return "NO_SCREEN";
@@ -458,7 +462,6 @@ public class QuestScreenTest implements FabricClientGameTest {
 
             QuestEntryComponent entry = entries.get(0);
 
-            // Click center of entry (should trigger selection)
             double clickX = entry.x() + entry.width() / 2.0;
             double clickY = entry.y() + entry.height() / 2.0;
 
@@ -472,6 +475,20 @@ public class QuestScreenTest implements FabricClientGameTest {
         if (!"SELECTED".equals(clickResult)) {
             throw new AssertionError("Clicking entry through screen should select it, got: " + clickResult);
         }
+
+        // Verify debug logs were emitted through the full dispatch path
+        if (!entryLog.hasMessageContaining("onMouseDown called")) {
+            throw new AssertionError("QuestEntryComponent.onMouseDown debug log should fire on click. Captured: " + entryLog.getMessages());
+        }
+        if (!entryLog.hasMessageContaining("SINGLE CLICK (select)")) {
+            throw new AssertionError("Click should be logged as SINGLE CLICK. Captured: " + entryLog.getMessages());
+        }
+        if (!screenLog.hasMessageContaining("onEntryClicked")) {
+            throw new AssertionError("MainScreen.onEntryClicked debug log should fire. Captured: " + screenLog.getMessages());
+        }
+
+        entryLog.detach();
+        screenLog.detach();
 
         // Cleanup
         ClientCache.removeQuestById(quest.getId());
@@ -493,6 +510,8 @@ public class QuestScreenTest implements FabricClientGameTest {
         context.waitForScreen(MainScreen.class);
         context.waitTicks(3);
 
+        TestLogCapture entryLog = TestLogCapture.attach("Disquests/QuestEntry");
+
         // Click on the pin icon area through the screen
         boolean pinned = context.computeOnClient(client -> {
             if (!(client.currentScreen instanceof MainScreen screen)) return false;
@@ -500,8 +519,6 @@ public class QuestScreenTest implements FabricClientGameTest {
             if (entries.isEmpty()) return false;
 
             QuestEntryComponent entry = entries.get(0);
-            // Pin icon is at rightmost area. owo-ui translates to relative coords,
-            // so click at absolute (entry.x + width - 7, entry.y + 18)
             double clickX = entry.x() + entry.width() - 7;
             double clickY = entry.y() + 18;
 
@@ -519,6 +536,13 @@ public class QuestScreenTest implements FabricClientGameTest {
         if (!pinned) {
             throw new AssertionError("Clicking pin icon through screen should pin the quest");
         }
+
+        // Verify the pin click was logged through the full dispatch path
+        if (!entryLog.hasMessageContaining("PIN CLICK detected")) {
+            throw new AssertionError("Pin click debug log should fire. Captured: " + entryLog.getMessages());
+        }
+
+        entryLog.detach();
 
         // Cleanup
         ClientSession.removePinnedQuest(quest.getId());

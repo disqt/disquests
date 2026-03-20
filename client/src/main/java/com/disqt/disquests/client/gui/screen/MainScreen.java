@@ -30,6 +30,8 @@ import java.util.stream.Collectors;
 
 public class MainScreen extends DisquestsBaseScreen {
 
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger("Disquests/MainScreen");
+
     // Tabs
     private static final int TAB_MY_QUESTS = 0;
     private static final int TAB_SERVER_QUESTS = 1;
@@ -138,12 +140,14 @@ public class MainScreen extends DisquestsBaseScreen {
         this.titleWidth = MinecraftClient.getInstance().textRenderer.getWidth("Disquests");
 
         // --- Apply saved state ---
+        LOGGER.debug("build() complete. questList={}, entries will be added by selectTab", questList != null);
         selectTab(this.currentTab);
     }
 
     // --- TAB SWITCHING ---
 
     private void selectTab(int tab) {
+        LOGGER.debug("selectTab({})", tab);
         this.currentTab = tab;
         ClientSession.setActiveTab(tab);
 
@@ -188,6 +192,7 @@ public class MainScreen extends DisquestsBaseScreen {
     // --- SERVER FILTER ---
 
     private void selectServerFilter(int filter) {
+        LOGGER.debug("selectServerFilter({})", filter);
         this.serverFilter = filter;
         ClientSession.setServerQuestsFilter(filter);
 
@@ -217,7 +222,10 @@ public class MainScreen extends DisquestsBaseScreen {
     // --- DATA REFRESH ---
 
     public void refreshListContents() {
-        if (questList == null) return;
+        if (questList == null) {
+            LOGGER.debug("refreshListContents: questList is null!");
+            return;
+        }
 
         questList.clearChildren();
         selectedEntry = null;
@@ -263,6 +271,7 @@ public class MainScreen extends DisquestsBaseScreen {
             quests.sort(Comparator.comparing(Quest::getLastModified, Comparator.reverseOrder()));
         }
 
+        LOGGER.debug("refreshListContents: tab={}, {} quests after filtering", currentTab, quests.size());
         for (Quest quest : quests) {
             QuestEntryComponent entry = new QuestEntryComponent(quest);
             entry.sizing(Sizing.fill(100), Sizing.fixed(QuestEntryComponent.ENTRY_HEIGHT));
@@ -271,6 +280,7 @@ public class MainScreen extends DisquestsBaseScreen {
             entry.onPinToggle(e -> refreshAfterPinToggle());
             questList.child(entry);
         }
+        LOGGER.debug("refreshListContents: added {} entries to questList", questList.children().size());
 
         updateActionButtons();
     }
@@ -278,6 +288,7 @@ public class MainScreen extends DisquestsBaseScreen {
     // --- SELECTION ---
 
     private void onEntryClicked(QuestEntryComponent entry) {
+        LOGGER.debug("onEntryClicked: quest={}", entry.getQuest().getTitle());
         clearSelection();
         entry.selected(true);
         selectedEntry = entry;
@@ -297,8 +308,7 @@ public class MainScreen extends DisquestsBaseScreen {
     }
 
     public void refreshAfterPinToggle() {
-        // Only update buttons -- don't re-sort. Pin icon reads isPinned live each frame.
-        // Full re-sort happens on screen open (build) and tab switch.
+        LOGGER.debug("refreshAfterPinToggle called");
         updateActionButtons();
     }
 

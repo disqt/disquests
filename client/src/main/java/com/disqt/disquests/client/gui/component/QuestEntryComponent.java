@@ -37,6 +37,7 @@ public class QuestEntryComponent extends BaseUIComponent {
     private static final Text HIDDEN_CONTENT_TEXT = Text.literal("Request access to view").formatted(Formatting.ITALIC);
     private static final String REQUESTED_STR = "Requested";
 
+
     private final Quest quest;
     private final String firstLine;
     private final String formattedDateTime;
@@ -283,25 +284,34 @@ public class QuestEntryComponent extends BaseUIComponent {
 
     // --- Interaction ---
 
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger("Disquests/QuestEntry");
+
     @Override
     public boolean onMouseDown(Click click, boolean doubled) {
+        LOGGER.debug("onMouseDown called: click=({}, {}), button={}, quest={}", click.x(), click.y(), click.button(), quest.getTitle());
         if (click.button() != 0) return false;
 
         // owo-ui passes component-relative coordinates in Click
         double relX = click.x();
         double relY = click.y();
+        LOGGER.debug("  relX={}, relY={}, width={}, pinArea=[{}-{}, 12-26], isPinned={}",
+                relX, relY, this.width(), this.width() - 20, this.width(), ClientSession.isPinned(quest.getId()));
 
         // Pin icon hit area: rightmost 20px, row 2 (y+12 to y+26)
         if (relX >= this.width() - 20 && relX <= this.width()
                 && relY >= 12 && relY <= 26) {
+            LOGGER.debug("  -> PIN CLICK detected, toggling pin for {}", quest.getTitle());
             HudPinManager.toggle(quest.getId());
+            LOGGER.debug("  -> after toggle, isPinned={}", ClientSession.isPinned(quest.getId()));
             if (onPinToggle != null) onPinToggle.accept(this);
             return true;
         }
 
         if (doubled) {
+            LOGGER.debug("  -> DOUBLE CLICK on {}", quest.getTitle());
             if (onDoubleClick != null) onDoubleClick.accept(this);
         } else {
+            LOGGER.debug("  -> SINGLE CLICK (select) on {}", quest.getTitle());
             if (onClick != null) onClick.accept(this);
         }
         return true;
