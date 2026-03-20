@@ -33,11 +33,40 @@ public class QuestEntryComponent extends BaseUIComponent {
     private static final Identifier PIN_ICON = Identifier.of("disquests", "icon/pin");
     private static final Identifier PIN_ACTIVE_ICON = Identifier.of("disquests", "icon/pin_active");
 
+    // Static constants cached once across all instances
+    private static final Text HIDDEN_CONTENT_TEXT = Text.literal("Request access to view").formatted(Formatting.ITALIC);
+    private static final String REQUESTED_STR = "Requested";
+
     private final Quest quest;
     private final String firstLine;
     private final String formattedDateTime;
     private final boolean isOwnedByPlayer;
     private final boolean hideContent;
+
+    // Cached visibility badge (fix 1)
+    private final Text cachedVisibilityText;
+    private final int cachedVisibilityWidth;
+
+    // Cached owner text (fix 2)
+    private final Text cachedOwnerText;
+    private final int cachedOwnerWidth;
+
+    // Cached location string (fix 4)
+    private final String cachedLocationString;
+    private final int cachedLocationWidth;
+
+    // Cached truncated content (fix 5) — depends on width known at draw time
+    private Text cachedContentText;
+    private int cachedContentWidth = -1;
+
+    // Cached truncated title (fix 6) — depends on width known at draw time
+    private String cachedTruncatedTitle;
+    private int cachedTitleAvailableWidth = -1;
+
+    // Cached pending badge (fix 8)
+    private int lastPendingCount = -1;
+    private Text cachedPendingText;
+    private int cachedPendingWidth;
 
     private boolean selected = false;
 
@@ -73,6 +102,39 @@ public class QuestEntryComponent extends BaseUIComponent {
                 Instant.ofEpochSecond(quest.getLastModified()), ZoneId.systemDefault()
         );
         this.formattedDateTime = dateTime.format(DATE_TIME_FORMATTER);
+
+        // Cache visibility text + width (fix 1)
+        Text visText = null;
+        if (quest.getVisibility() != null) {
+            visText = switch (quest.getVisibility()) {
+                case PRIVATE -> Text.literal("Private").formatted(Formatting.LIGHT_PURPLE);
+                case CLOSED  -> Text.literal("Closed").formatted(Formatting.YELLOW);
+                case OPEN    -> Text.literal("Open").formatted(Formatting.GREEN);
+            };
+        }
+        this.cachedVisibilityText = visText;
+        if (visText != null) {
+            this.cachedVisibilityWidth = MinecraftClient.getInstance().textRenderer.getWidth(visText);
+        } else {
+            this.cachedVisibilityWidth = 0;
+        }
+
+        // Cache owner text + width (fix 2)
+        if (!isOwnedByPlayer && quest.getOwnerName() != null) {
+            this.cachedOwnerText = Text.literal(" by " + quest.getOwnerName()).formatted(Formatting.GRAY);
+            this.cachedOwnerWidth = MinecraftClient.getInstance().textRenderer.getWidth(cachedOwnerText);
+        } else {
+            this.cachedOwnerText = null;
+            this.cachedOwnerWidth = 0;
+        }
+
+        // Cache location string + width (fix 4)
+        this.cachedLocationString = buildLocationString();
+        if (!cachedLocationString.isEmpty()) {
+            this.cachedLocationWidth = MinecraftClient.getInstance().textRenderer.getWidth(cachedLocationString);
+        } else {
+            this.cachedLocationWidth = 0;
+        }
     }
 
     // --- Fluent setters ---
@@ -140,66 +202,58 @@ public class QuestEntryComponent extends BaseUIComponent {
 
         // --- Row 1: Title + visibility badge + pending + owner ---
 
-        Text visibilityText = null;
-        if (quest.getVisibility() != null) {
-            switch (quest.getVisibility()) {
-                case PRIVATE ->
-                        visibilityText = Text.literal("Private").formatted(Formatting.LIGHT_PURPLE);
-                case CLOSED ->
-                        visibilityText = Text.literal("Closed").formatted(Formatting.YELLOW);
-                case OPEN ->
-                        visibilityText = Text.literal("Open").formatted(Formatting.GREEN);
-            }
-        }
-
-        Text ownerText = null;
-        int ownerWidth = 0;
-        if (!isOwnedByPlayer && quest.getOwnerName() != null) {
-            ownerText = Text.literal(" by " + quest.getOwnerName()).formatted(Formatting.GRAY);
-            ownerWidth = textRenderer.getWidth(ownerText);
-        }
-
-        int visibilityWidth = visibilityText != null ? textRenderer.getWidth(visibilityText) : 0;
-
         int rightSideWidth = 0;
-        if (visibilityText != null) rightSideWidth += visibilityWidth;
-        if (ownerText != null) rightSideWidth += ownerWidth;
+        if (cachedVisibilityText != null) rightSideWidth += cachedVisibilityWidth;
+        if (cachedOwnerText != null) rightSideWidth += cachedOwnerWidth;
         if (rightSideWidth > 0) rightSideWidth += 7;
 
         int availableTitleWidth = entryWidth - 8;
         if (rightSideWidth > 0) availableTitleWidth -= rightSideWidth;
 
-        String truncatedTitle = textRenderer.trimToWidth(quest.getTitle(), availableTitleWidth);
-        context.drawText(textRenderer, truncatedTitle, entryX + 4, entryY + 4, Colors.TEXT_PRIMARY, false);
+        // Cache truncated title (fix 6): recompute only when available width changes
+        if (availableTitleWidth != cachedTitleAvailableWidth) {
+            cachedTruncatedTitle = textRenderer.trimToWidth(quest.getTitle(), availableTitleWidth);
+            cachedTitleAvailableWidth = availableTitleWidth;
+        }
+        context.drawText(textRenderer, cachedTruncatedTitle, entryX + 4, entryY + 4, Colors.TEXT_PRIMARY, false);
 
         int rightX = entryX + entryWidth - 4;
-        if (ownerText != null) {
-            rightX -= ownerWidth;
-            context.drawText(textRenderer, ownerText, rightX, entryY + 4, Colors.TEXT_MUTED, false);
+        if (cachedOwnerText != null) {
+            rightX -= cachedOwnerWidth;
+            context.drawText(textRenderer, cachedOwnerText, rightX, entryY + 4, Colors.TEXT_MUTED, false);
         }
         if (isOwnedByPlayer) {
             int pendingCount = ClientCache.getPendingCount(quest.getId());
             if (pendingCount > 0) {
-                Text pendingText = Text.literal(" (" + pendingCount + " pending)");
-                int pendingWidth = textRenderer.getWidth(pendingText);
-                rightX -= pendingWidth;
-                context.drawText(textRenderer, pendingText, rightX, entryY + 4, Colors.AMBER, false);
+                // Cache pending text (fix 8): rebuild only when count changes
+                if (pendingCount != lastPendingCount) {
+                    cachedPendingText = Text.literal(" (" + pendingCount + " pending)");
+                    cachedPendingWidth = textRenderer.getWidth(cachedPendingText);
+                    lastPendingCount = pendingCount;
+                }
+                rightX -= cachedPendingWidth;
+                context.drawText(textRenderer, cachedPendingText, rightX, entryY + 4, Colors.AMBER, false);
             }
         }
-        if (visibilityText != null) {
-            rightX -= visibilityWidth;
-            context.drawText(textRenderer, visibilityText, rightX, entryY + 4, Colors.TEXT_PRIMARY, false);
+        if (cachedVisibilityText != null) {
+            rightX -= cachedVisibilityWidth;
+            context.drawText(textRenderer, cachedVisibilityText, rightX, entryY + 4, Colors.TEXT_PRIMARY, false);
         }
 
         // --- Row 2: Content preview + pin icon ---
         if (hideContent) {
-            context.drawText(textRenderer,
-                    Text.literal("Request access to view").formatted(Formatting.ITALIC),
+            // Static constant (fix 3)
+            context.drawText(textRenderer, HIDDEN_CONTENT_TEXT,
                     entryX + 4, entryY + 14, Colors.TEXT_MUTED, false);
         } else {
-            String truncatedContent = textRenderer.trimToWidth(firstLine, entryWidth - 22);
-            context.drawText(textRenderer,
-                    Text.literal(truncatedContent).formatted(Formatting.GRAY),
+            // Cache truncated content (fix 5): recompute only when available width changes
+            int contentAvailWidth = entryWidth - 22;
+            if (contentAvailWidth != cachedContentWidth) {
+                String truncated = textRenderer.trimToWidth(firstLine, contentAvailWidth);
+                cachedContentText = Text.literal(truncated).formatted(Formatting.GRAY);
+                cachedContentWidth = contentAvailWidth;
+            }
+            context.drawText(textRenderer, cachedContentText,
                     entryX + 4, entryY + 14, Colors.TEXT_MUTED, false);
         }
 
@@ -215,16 +269,14 @@ public class QuestEntryComponent extends BaseUIComponent {
                 entryX + 4, entryY + 24, Colors.TEXT_MUTED, false);
 
         if (ClientSession.isRequested(quest.getId())) {
-            String requestedText = "Requested";
-            int requestedWidth = textRenderer.getWidth(requestedText);
-            context.drawText(textRenderer, requestedText,
+            // Width computed once via static constant (fix 7)
+            int requestedWidth = textRenderer.getWidth(REQUESTED_STR);
+            context.drawText(textRenderer, REQUESTED_STR,
                     entryX + entryWidth - requestedWidth - 4, entryY + 24, 0xFFCCCC44, false);
         } else {
-            String locationStr = buildLocationString();
-            if (!locationStr.isEmpty()) {
-                int locationWidth = textRenderer.getWidth(locationStr);
-                context.drawText(textRenderer, locationStr,
-                        entryX + entryWidth - locationWidth - 4, entryY + 24, Colors.TEXT_MUTED, false);
+            if (!cachedLocationString.isEmpty()) {
+                context.drawText(textRenderer, cachedLocationString,
+                        entryX + entryWidth - cachedLocationWidth - 4, entryY + 24, Colors.TEXT_MUTED, false);
             }
         }
     }

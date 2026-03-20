@@ -13,7 +13,6 @@ import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.TextBoxComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
-import io.wispforest.owo.ui.core.Color;
 import io.wispforest.owo.ui.core.Sizing;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -23,6 +22,7 @@ import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -72,6 +72,9 @@ public class MainScreen extends DisquestsBaseScreen {
 
     // Saved filter row parent index for reinsertion
     private int filterRowIndex = -1;
+
+    // Cached title width (fix 12)
+    private int titleWidth;
 
     public MainScreen() {
         this(null);
@@ -141,6 +144,9 @@ public class MainScreen extends DisquestsBaseScreen {
                 break;
             }
         }
+
+        // Cache title width (fix 12)
+        this.titleWidth = MinecraftClient.getInstance().textRenderer.getWidth("Disquests");
 
         // --- Apply saved state ---
         selectTab(this.currentTab);
@@ -213,6 +219,12 @@ public class MainScreen extends DisquestsBaseScreen {
 
     // --- SEARCH ---
 
+    private boolean matchesSearch(Quest q) {
+        if (searchTerm.isEmpty()) return true;
+        return q.getTitle().toLowerCase().contains(searchTerm)
+                || (q.getContent() != null && q.getContent().toLowerCase().contains(searchTerm));
+    }
+
     private void onSearchTermChanged(String newTerm) {
         this.searchTerm = newTerm.toLowerCase().trim();
         ClientSession.setSearchTerm(this.searchTerm);
@@ -235,8 +247,7 @@ public class MainScreen extends DisquestsBaseScreen {
             // Filter by search term
             if (!searchTerm.isEmpty()) {
                 quests = quests.stream()
-                        .filter(q -> q.getTitle().toLowerCase().contains(searchTerm)
-                                || (q.getContent() != null && q.getContent().toLowerCase().contains(searchTerm)))
+                        .filter(this::matchesSearch)
                         .collect(Collectors.toList());
             }
 
@@ -261,8 +272,7 @@ public class MainScreen extends DisquestsBaseScreen {
             // Filter by search term
             if (!searchTerm.isEmpty()) {
                 quests = quests.stream()
-                        .filter(q -> q.getTitle().toLowerCase().contains(searchTerm)
-                                || (q.getContent() != null && q.getContent().toLowerCase().contains(searchTerm)))
+                        .filter(this::matchesSearch)
                         .collect(Collectors.toList());
             }
 
@@ -310,12 +320,12 @@ public class MainScreen extends DisquestsBaseScreen {
     }
 
     /** Returns the current quest entries in list order. Used by E2E tests. */
-    public java.util.List<QuestEntryComponent> getQuestEntries() {
-        if (questList == null) return java.util.Collections.emptyList();
+    public List<QuestEntryComponent> getQuestEntries() {
+        if (questList == null) return Collections.emptyList();
         return questList.children().stream()
                 .filter(c -> c instanceof QuestEntryComponent)
                 .map(c -> (QuestEntryComponent) c)
-                .collect(java.util.stream.Collectors.toList());
+                .collect(Collectors.toList());
     }
 
     private void updateActionButtons() {
@@ -403,7 +413,6 @@ public class MainScreen extends DisquestsBaseScreen {
         // Rainbow title on hover
         if (titleLabel != null) {
             String titleStr = "Disquests";
-            int titleWidth = this.textRenderer.getWidth(titleStr);
             int titleX = titleLabel.x();
             int titleY = titleLabel.y();
 
@@ -423,10 +432,12 @@ public class MainScreen extends DisquestsBaseScreen {
             }
         }
 
-        // Notification badge on My Quests tab
-        int pendingCount = ClientSession.getPendingRequestCount();
-        if (pendingCount > 0 && tabMyQuests != null) {
-            renderNotificationBadge(context, pendingCount);
+        // Notification badge on My Quests tab (fix 13: only query when on My Quests)
+        if (currentTab == TAB_MY_QUESTS && tabMyQuests != null) {
+            int pendingCount = ClientSession.getPendingRequestCount();
+            if (pendingCount > 0) {
+                renderNotificationBadge(context, pendingCount);
+            }
         }
 
         // Toast overlay (renders on top of everything)
