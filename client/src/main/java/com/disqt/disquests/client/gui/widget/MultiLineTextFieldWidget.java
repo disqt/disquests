@@ -125,7 +125,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
     }
 
     protected int getEffectiveLineCount() {
-        return getEffectiveLineCount();
+        return wordWrap ? displayLines.size() : lines.size();
     }
 
     protected void rebuildDisplayLines() {
