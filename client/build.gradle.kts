@@ -4,6 +4,8 @@ plugins {
 
 repositories {
     maven("https://maven.terraformersmc.com/releases/")
+    maven("https://maven.wispforest.io/releases/")
+    maven("https://jitpack.io")
 }
 
 val minecraft_version: String by project
@@ -32,6 +34,11 @@ dependencies {
     // Mod Menu (optional at runtime)
     val modmenu_version: String by project
     modCompileOnly("com.terraformersmc:modmenu:$modmenu_version")
+
+    // owo-lib UI framework
+    val owo_version: String by project
+    modImplementation("io.wispforest:owo-lib:$owo_version")
+    include("io.wispforest:owo-sentinel:$owo_version")
 
     // Markdown rendering
     implementation("org.commonmark:commonmark:0.27.1")
