@@ -16,6 +16,7 @@ public class ClientSession {
     private static final List<UUID> pinnedQuestIds = new ArrayList<>();
     private static final Set<UUID> requestedQuestIds = new HashSet<>();
     private static UUID playerUuid = null;
+    private static Map<String, String> bluemapMapNames = Map.of();
 
     // UI state
     private static int activeTab = 0; // 0=My Quests, 1=Server Quests
@@ -24,12 +25,18 @@ public class ClientSession {
     private static String pendingToast = null;
 
     public static void joinServer(String bluemapUrl, int pendingCount, List<UUID> pinnedIds, UUID playerUuid) {
+        joinServer(bluemapUrl, pendingCount, pinnedIds, playerUuid, Map.of());
+    }
+
+    public static void joinServer(String bluemapUrl, int pendingCount, List<UUID> pinnedIds, UUID playerUuid,
+            Map<String, String> bluemapMapNames) {
         onServer = true;
         ClientSession.bluemapUrl = bluemapUrl;
         pendingRequestCount = pendingCount;
         pinnedQuestIds.clear();
         pinnedQuestIds.addAll(pinnedIds);
         ClientSession.playerUuid = playerUuid;
+        ClientSession.bluemapMapNames = bluemapMapNames != null ? bluemapMapNames : Map.of();
     }
 
     public static void leaveServer() {
@@ -40,6 +47,7 @@ public class ClientSession {
         requestedQuestIds.clear();
         pendingToast = null;
         playerUuid = null;
+        bluemapMapNames = Map.of();
         activeTab = 0;
         searchTerm = "";
         serverQuestsFilter = 0;
@@ -63,10 +71,9 @@ public class ClientSession {
 
     /**
      * Returns the server-provided map name mappings (dimension key -> BlueMap map ID).
-     * Stub returning empty map until Task 6 implements the full handshake integration.
      */
     public static Map<String, String> getBluemapMapNames() {
-        return Map.of();
+        return bluemapMapNames;
     }
 
     public static int getPendingRequestCount() {
