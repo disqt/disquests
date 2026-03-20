@@ -46,6 +46,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
                 case UPDATE_CONTRIBUTORS -> handleUpdateContributors(player, PacketCodec.readUpdateContributors(buf));
                 case UPDATE_VISIBILITY -> handleUpdateVisibility(player, PacketCodec.readUpdateVisibility(buf));
                 case PIN_QUEST -> handlePinQuest(player, PacketCodec.readPinQuest(buf));
+                case LEAVE_QUEST -> handleLeaveQuest(player, buf);
                 default -> plugin.getLogger().warning("Unknown C2S packet from " + player.getName() + ": " + type);
             }
         } catch (Exception e) {
@@ -312,6 +313,33 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
                 || quest.visibility() == Visibility.OPEN;
             if (!canSee) return;
             dataManager.pinQuest(playerUuid, questId);
+        }
+    }
+
+    private void handleLeaveQuest(Player player, ByteBufReader reader) {
+        UUID questId = PacketCodec.readLeaveQuest(reader);
+        UUID playerUuid = player.getUniqueId();
+
+        QuestData quest = dataManager.getQuest(questId);
+        if (quest == null) return;
+
+        // Owner cannot leave, only delete
+        if (quest.ownerUuid().equals(playerUuid)) return;
+
+        // Must be a contributor
+        boolean isContributor = quest.contributors().stream()
+                .anyMatch(c -> c.uuid().equals(playerUuid));
+        if (!isContributor) return;
+
+        dataManager.leaveQuest(questId, playerUuid);
+
+        // Notify the leaving player: remove quest from their "my quests"
+        sendPacket(player, PacketCodec.writeDeleteQuestS2C(questId));
+
+        // Broadcast updated quest to everyone who should see it
+        QuestData updated = dataManager.getQuest(questId);
+        if (updated != null) {
+            broadcastQuestUpdate(updated);
         }
     }
 
