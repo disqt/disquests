@@ -438,8 +438,9 @@ public class QuestScreenTest implements FabricClientGameTest {
     }
 
     /**
-     * Clicking on a quest entry through the screen dispatches to QuestEntryComponent.
-     * Tests the full click path: Screen.mouseClicked -> owo-ui dispatch -> QuestEntryComponent.onMouseDown.
+     * Clicking on a quest entry via GLFW input simulation selects it.
+     * Uses TestInput (setCursorPos + pressMouse) for the FULL input path:
+     * GLFW -> MC mouse handler -> Fabric screen events -> owo-ui adapter -> QuestEntryComponent.onMouseDown
      */
     private void testEntryClickThroughScreen(ClientGameTestContext context) {
         Quest quest = createTestQuest();
@@ -450,45 +451,65 @@ public class QuestScreenTest implements FabricClientGameTest {
         context.waitForScreen(MainScreen.class);
         context.waitTicks(3);
 
-        // Attach log capture to verify debug events fire
+        // Attach log capture to verify the full dispatch chain
         TestLogCapture entryLog = TestLogCapture.attach("Disquests/QuestEntry");
         TestLogCapture screenLog = TestLogCapture.attach("Disquests/MainScreen");
+        TestLogCapture screenEventsLog = TestLogCapture.attach("Disquests/ScreenEvents");
 
-        // Click on the center of the first entry through the screen's mouseClicked
-        String clickResult = context.computeOnClient(client -> {
-            if (!(client.currentScreen instanceof MainScreen screen)) return "NO_SCREEN";
+        // Get entry position, then click via real input simulation
+        double[] clickPos = context.computeOnClient(client -> {
+            if (!(client.currentScreen instanceof MainScreen screen)) return new double[]{-1, -1};
             var entries = screen.getQuestEntries();
-            if (entries.isEmpty()) return "NO_ENTRIES";
-
+            if (entries.isEmpty()) return new double[]{-1, -1};
             QuestEntryComponent entry = entries.get(0);
-
-            double clickX = entry.x() + entry.width() / 2.0;
-            double clickY = entry.y() + entry.height() / 2.0;
-
-            net.minecraft.client.input.MouseInput mouseInput = new net.minecraft.client.input.MouseInput(0, 0);
-            net.minecraft.client.gui.Click click = new net.minecraft.client.gui.Click(clickX, clickY, mouseInput);
-            screen.mouseClicked(click, false);
-
-            return entries.get(0).isSelected() ? "SELECTED" : "NOT_SELECTED";
+            return new double[]{entry.x() + entry.width() / 2.0, entry.y() + entry.height() / 2.0};
         });
 
-        if (!"SELECTED".equals(clickResult)) {
-            throw new AssertionError("Clicking entry through screen should select it, got: " + clickResult);
+        if (clickPos[0] < 0) {
+            throw new AssertionError("No quest entries found on screen");
         }
 
-        // Verify debug logs were emitted through the full dispatch path
-        if (!entryLog.hasMessageContaining("onMouseDown called")) {
-            throw new AssertionError("QuestEntryComponent.onMouseDown debug log should fire on click. Captured: " + entryLog.getMessages());
+        // Log the actual click position for debugging
+        org.slf4j.LoggerFactory.getLogger("Disquests/Test").info(
+                "Entry click target: ({}, {})", clickPos[0], clickPos[1]);
+
+        // Simulate real mouse click through GLFW path
+        // GLFW uses physical pixels; entry coords are logical (UI-scaled)
+        // Multiply by scale factor to convert logical -> physical
+        double scale = context.computeOnClient(client ->
+                (double) client.getWindow().getScaleFactor());
+        context.getInput().setCursorPos(clickPos[0] * scale, clickPos[1] * scale);
+        context.getInput().pressMouse(org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT);
+        context.waitTicks(2);
+
+        // Verify entry was selected
+        boolean selected = context.computeOnClient(client -> {
+            if (!(client.currentScreen instanceof MainScreen screen)) return false;
+            var entries = screen.getQuestEntries();
+            return !entries.isEmpty() && entries.get(0).isSelected();
+        });
+
+        if (!selected) {
+            throw new AssertionError("Entry should be selected after GLFW click. "
+                    + "EntryLog: " + entryLog.getMessages()
+                    + " ScreenLog: " + screenLog.getMessages()
+                    + " ScreenEventsLog: " + screenEventsLog.getMessages());
         }
-        if (!entryLog.hasMessageContaining("SINGLE CLICK (select)")) {
-            throw new AssertionError("Click should be logged as SINGLE CLICK. Captured: " + entryLog.getMessages());
+
+        // Verify debug logs prove the full dispatch chain fired
+        if (!entryLog.hasMessageContaining("onMouseDown called")) {
+            throw new AssertionError("onMouseDown debug log missing. Captured: " + entryLog.getMessages());
         }
         if (!screenLog.hasMessageContaining("onEntryClicked")) {
-            throw new AssertionError("MainScreen.onEntryClicked debug log should fire. Captured: " + screenLog.getMessages());
+            throw new AssertionError("onEntryClicked debug log missing. Captured: " + screenLog.getMessages());
+        }
+        if (!screenEventsLog.hasMessageContaining("[CLICK PRE]")) {
+            throw new AssertionError("Fabric ScreenMouseEvents [CLICK PRE] missing. Captured: " + screenEventsLog.getMessages());
         }
 
         entryLog.detach();
         screenLog.detach();
+        screenEventsLog.detach();
 
         // Cleanup
         ClientCache.removeQuestById(quest.getId());
@@ -497,8 +518,8 @@ public class QuestScreenTest implements FabricClientGameTest {
     }
 
     /**
-     * Clicking the pin icon area through the screen dispatches correctly.
-     * Verifies owo-ui passes component-relative coordinates.
+     * Clicking the pin icon via GLFW input simulation toggles pin state.
+     * Uses TestInput for the full input path.
      */
     private void testPinClickThroughScreen(ClientGameTestContext context) {
         Quest quest = createTestQuest();
@@ -512,34 +533,41 @@ public class QuestScreenTest implements FabricClientGameTest {
 
         TestLogCapture entryLog = TestLogCapture.attach("Disquests/QuestEntry");
 
-        // Click on the pin icon area through the screen
-        boolean pinned = context.computeOnClient(client -> {
-            if (!(client.currentScreen instanceof MainScreen screen)) return false;
+        // Get pin icon position
+        double[] pinPos = context.computeOnClient(client -> {
+            if (!(client.currentScreen instanceof MainScreen screen)) return new double[]{-1, -1};
             var entries = screen.getQuestEntries();
-            if (entries.isEmpty()) return false;
-
+            if (entries.isEmpty()) return new double[]{-1, -1};
             QuestEntryComponent entry = entries.get(0);
-            double clickX = entry.x() + entry.width() - 7;
-            double clickY = entry.y() + 18;
-
-            net.minecraft.client.input.MouseInput mouseInput = new net.minecraft.client.input.MouseInput(0, 0);
-            net.minecraft.client.gui.Click click = new net.minecraft.client.gui.Click(clickX, clickY, mouseInput);
-            try {
-                screen.mouseClicked(click, false);
-            } catch (Exception ignored) {
-                // PacketSender throws when no server connection -- pin state is already updated locally
-            }
-
-            return ClientSession.isPinned(quest.getId());
+            // Pin icon center: rightmost area, row 2
+            return new double[]{entry.x() + entry.width() - 7, entry.y() + 18};
         });
 
-        if (!pinned) {
-            throw new AssertionError("Clicking pin icon through screen should pin the quest");
+        if (pinPos[0] < 0) {
+            throw new AssertionError("No quest entries found on screen");
         }
 
-        // Verify the pin click was logged through the full dispatch path
+        // Simulate real mouse click on pin icon through GLFW path
+        // GLFW uses physical pixels; multiply by scale factor
+        double scale = context.computeOnClient(client ->
+                (double) client.getWindow().getScaleFactor());
+        context.getInput().setCursorPos(pinPos[0] * scale, pinPos[1] * scale);
+        try {
+            context.getInput().pressMouse(org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT);
+        } catch (Exception ignored) {
+            // PacketSender.pinQuest throws when no server -- pin state already updated locally
+        }
+        context.waitTicks(2);
+
+        boolean pinned = ClientSession.isPinned(quest.getId());
+
+        if (!pinned) {
+            throw new AssertionError("Pin icon GLFW click should toggle pin state. "
+                    + "EntryLog: " + entryLog.getMessages());
+        }
+
         if (!entryLog.hasMessageContaining("PIN CLICK detected")) {
-            throw new AssertionError("Pin click debug log should fire. Captured: " + entryLog.getMessages());
+            throw new AssertionError("PIN CLICK debug log missing. Captured: " + entryLog.getMessages());
         }
 
         entryLog.detach();
