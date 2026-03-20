@@ -1,0 +1,243 @@
+<owo-ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/wisp-forest/owo-lib/1.21/owo-ui.xsd">
+
+    <components>
+    <flow-layout direction="vertical" id="root">
+        <sizing>
+            <horizontal method="fill">100</horizontal>
+            <vertical method="fill">100</vertical>
+        </sizing>
+        <surface>
+            <vanilla-translucent/>
+        </surface>
+        <horizontal-alignment>center</horizontal-alignment>
+        <padding>
+            <all>0</all>
+            <top>4</top>
+        </padding>
+
+        <children>
+
+            <!-- Screen title -->
+            <label id="title-label">
+                <text>Edit Quest</text>
+                <shadow>true</shadow>
+                <sizing>
+                    <horizontal method="content"/>
+                    <vertical method="content"/>
+                </sizing>
+                <margins>
+                    <bottom>4</bottom>
+                </margins>
+            </label>
+
+            <!-- Title field row (title + help button) -->
+            <flow-layout direction="horizontal" id="title-row">
+                <sizing>
+                    <horizontal method="fill">85</horizontal>
+                    <vertical method="content"/>
+                </sizing>
+                <surface>
+                    <panel dark="true"/>
+                </surface>
+                <padding>
+                    <all>4</all>
+                </padding>
+                <gap>4</gap>
+                <vertical-alignment>center</vertical-alignment>
+                <children>
+                    <!-- Title text field added programmatically -->
+                </children>
+            </flow-layout>
+
+            <!-- Content area (editor + formatting help) -->
+            <flow-layout direction="horizontal" id="content-row">
+                <sizing>
+                    <horizontal method="fill">85</horizontal>
+                    <vertical method="fill">45</vertical>
+                </sizing>
+                <gap>4</gap>
+                <margins>
+                    <top>2</top>
+                </margins>
+                <children>
+                    <!-- Editor panel -->
+                    <flow-layout direction="vertical" id="editor-panel">
+                        <sizing>
+                            <horizontal method="fill">100</horizontal>
+                            <vertical method="fill">100</vertical>
+                        </sizing>
+                        <surface>
+                            <panel dark="true"/>
+                        </surface>
+                        <padding>
+                            <all>4</all>
+                        </padding>
+                        <children>
+                            <!-- MultiLineTextFieldWidget wrapped and added programmatically -->
+                        </children>
+                    </flow-layout>
+
+                    <!-- Formatting help panel (hidden via zero-sizing when toggled off) -->
+                    <flow-layout direction="vertical" id="formatting-panel">
+                        <sizing>
+                            <horizontal method="fixed">160</horizontal>
+                            <vertical method="fill">100</vertical>
+                        </sizing>
+                        <surface>
+                            <panel dark="true"/>
+                        </surface>
+                        <padding>
+                            <all>5</all>
+                        </padding>
+                        <gap>2</gap>
+                        <children>
+                            <label id="fmt-title">
+                                <text>Formatting</text>
+                                <shadow>true</shadow>
+                            </label>
+                            <label id="fmt-bold">
+                                <text>**text** = bold</text>
+                                <shadow>true</shadow>
+                            </label>
+                            <label id="fmt-italic">
+                                <text>*text* = italic</text>
+                                <shadow>true</shadow>
+                            </label>
+                            <label id="fmt-strike">
+                                <text>~~text~~ = strikethrough</text>
+                                <shadow>true</shadow>
+                            </label>
+                            <label id="fmt-heading">
+                                <text># Heading</text>
+                                <shadow>true</shadow>
+                            </label>
+                            <label id="fmt-checkbox">
+                                <text>- [ ] task / - [x] done</text>
+                                <shadow>true</shadow>
+                            </label>
+                            <label id="fmt-quote">
+                                <text>> quote</text>
+                                <shadow>true</shadow>
+                            </label>
+                            <label id="fmt-link">
+                                <text>[text](url)</text>
+                                <shadow>true</shadow>
+                            </label>
+                        </children>
+                    </flow-layout>
+                </children>
+            </flow-layout>
+
+            <!-- Coords section -->
+            <flow-layout direction="vertical" id="coords-section">
+                <sizing>
+                    <horizontal method="fill">85</horizontal>
+                    <vertical method="content"/>
+                </sizing>
+                <surface>
+                    <panel dark="true"/>
+                </surface>
+                <padding>
+                    <all>4</all>
+                </padding>
+                <gap>2</gap>
+                <margins>
+                    <top>2</top>
+                </margins>
+                <children>
+                    <!-- Coords row (built programmatically) -->
+                    <flow-layout direction="horizontal" id="coords-row">
+                        <sizing>
+                            <horizontal method="fill">100</horizontal>
+                            <vertical method="content"/>
+                        </sizing>
+                        <gap>4</gap>
+                        <vertical-alignment>center</vertical-alignment>
+                        <children/>
+                    </flow-layout>
+                    <!-- Corner 2 row (hidden when not region) -->
+                    <flow-layout direction="horizontal" id="corner2-row">
+                        <sizing>
+                            <horizontal method="fill">100</horizontal>
+                            <vertical method="content"/>
+                        </sizing>
+                        <gap>4</gap>
+                        <vertical-alignment>center</vertical-alignment>
+                        <children/>
+                    </flow-layout>
+                    <!-- Map row -->
+                    <flow-layout direction="horizontal" id="map-row">
+                        <sizing>
+                            <horizontal method="fill">100</horizontal>
+                            <vertical method="content"/>
+                        </sizing>
+                        <gap>4</gap>
+                        <vertical-alignment>center</vertical-alignment>
+                        <children/>
+                    </flow-layout>
+                </children>
+            </flow-layout>
+
+            <!-- Settings row (owner only -- hidden via zero-sizing for non-owners) -->
+            <flow-layout direction="horizontal" id="settings-row">
+                <sizing>
+                    <horizontal method="fill">85</horizontal>
+                    <vertical method="content"/>
+                </sizing>
+                <gap>8</gap>
+                <margins>
+                    <top>2</top>
+                </margins>
+                <children>
+                    <button id="btn-visibility">
+                        <text>Visibility</text>
+                        <sizing>
+                            <horizontal method="content"/>
+                            <vertical method="fixed">16</vertical>
+                        </sizing>
+                    </button>
+                    <button id="btn-contributors">
+                        <text>Contributors</text>
+                        <sizing>
+                            <horizontal method="content"/>
+                            <vertical method="fixed">16</vertical>
+                        </sizing>
+                    </button>
+                </children>
+            </flow-layout>
+
+            <!-- Button row -->
+            <flow-layout direction="horizontal" id="button-row">
+                <sizing>
+                    <horizontal method="content"/>
+                    <vertical method="content"/>
+                </sizing>
+                <gap>4</gap>
+                <margins>
+                    <top>4</top>
+                    <bottom>4</bottom>
+                </margins>
+                <children>
+                    <button id="btn-save">
+                        <text>Save</text>
+                        <sizing>
+                            <horizontal method="fixed">60</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                    <button id="btn-cancel">
+                        <text>Cancel</text>
+                        <sizing>
+                            <horizontal method="fixed">60</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                </children>
+            </flow-layout>
+
+        </children>
+    </flow-layout>
+    </components>
+
+</owo-ui>

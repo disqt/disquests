@@ -1,0 +1,168 @@
+<owo-ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/wisp-forest/owo-lib/1.21/owo-ui.xsd">
+
+    <components>
+    <flow-layout direction="vertical" id="root">
+        <sizing>
+            <horizontal method="fill">100</horizontal>
+            <vertical method="fill">100</vertical>
+        </sizing>
+        <surface>
+            <vanilla-translucent/>
+        </surface>
+        <horizontal-alignment>center</horizontal-alignment>
+        <padding>
+            <all>0</all>
+            <top>4</top>
+        </padding>
+
+        <children>
+
+            <!-- Header row: title + owner/visibility info -->
+            <flow-layout direction="horizontal" id="header-row">
+                <sizing>
+                    <horizontal method="fill">85</horizontal>
+                    <vertical method="content"/>
+                </sizing>
+                <vertical-alignment>center</vertical-alignment>
+                <margins>
+                    <bottom>4</bottom>
+                </margins>
+                <children>
+                    <label id="title-label">
+                        <text>Quest</text>
+                        <shadow>true</shadow>
+                        <sizing>
+                            <horizontal method="fill">50</horizontal>
+                            <vertical method="content"/>
+                        </sizing>
+                    </label>
+                    <label id="owner-label">
+                        <text></text>
+                        <shadow>true</shadow>
+                        <horizontal-text-alignment>right</horizontal-text-alignment>
+                        <sizing>
+                            <horizontal method="fill">50</horizontal>
+                            <vertical method="content"/>
+                        </sizing>
+                    </label>
+                </children>
+            </flow-layout>
+
+            <!-- Content scroll area (MarkdownWidget added programmatically) -->
+            <scroll direction="vertical" id="content-scroll">
+                <flow-layout direction="vertical" id="content-area">
+                    <sizing>
+                        <horizontal method="fill">100</horizontal>
+                        <vertical method="content"/>
+                    </sizing>
+                </flow-layout>
+                <sizing>
+                    <horizontal method="fill">85</horizontal>
+                    <vertical method="fill">65</vertical>
+                </sizing>
+                <surface>
+                    <panel dark="true"/>
+                </surface>
+                <padding>
+                    <all>4</all>
+                </padding>
+            </scroll>
+
+            <!-- Metadata row (coords, map, BlueMap button -- hidden when no coords) -->
+            <flow-layout direction="horizontal" id="metadata-row">
+                <sizing>
+                    <horizontal method="fill">85</horizontal>
+                    <vertical method="content"/>
+                </sizing>
+                <surface>
+                    <panel dark="true"/>
+                </surface>
+                <padding>
+                    <all>4</all>
+                </padding>
+                <vertical-alignment>center</vertical-alignment>
+                <gap>8</gap>
+                <margins>
+                    <top>2</top>
+                </margins>
+                <children>
+                    <label id="coords-label">
+                        <text></text>
+                        <shadow>true</shadow>
+                    </label>
+                    <label id="map-label">
+                        <text></text>
+                        <shadow>true</shadow>
+                    </label>
+                </children>
+            </flow-layout>
+
+            <!-- Contributors row (hidden when empty) -->
+            <flow-layout direction="horizontal" id="contributors-row">
+                <sizing>
+                    <horizontal method="fill">85</horizontal>
+                    <vertical method="content"/>
+                </sizing>
+                <padding>
+                    <left>4</left>
+                </padding>
+                <margins>
+                    <top>2</top>
+                </margins>
+                <children>
+                    <label id="contributors-label">
+                        <text></text>
+                        <shadow>true</shadow>
+                    </label>
+                </children>
+            </flow-layout>
+
+            <!-- Button row -->
+            <flow-layout direction="horizontal" id="button-row">
+                <sizing>
+                    <horizontal method="content"/>
+                    <vertical method="content"/>
+                </sizing>
+                <gap>4</gap>
+                <margins>
+                    <top>4</top>
+                    <bottom>4</bottom>
+                </margins>
+                <children>
+                    <button id="btn-edit">
+                        <text>Edit</text>
+                        <sizing>
+                            <horizontal method="fixed">60</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                    <button id="btn-leave">
+                        <text>Leave</text>
+                        <sizing>
+                            <horizontal method="fixed">60</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                    <button id="btn-delete">
+                        <text>Delete</text>
+                        <sizing>
+                            <horizontal method="fixed">60</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                    <button id="btn-close">
+                        <text>Close</text>
+                        <sizing>
+                            <horizontal method="fixed">60</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                </children>
+            </flow-layout>
+
+        </children>
+    </flow-layout>
+    </components>
+
+</owo-ui>
