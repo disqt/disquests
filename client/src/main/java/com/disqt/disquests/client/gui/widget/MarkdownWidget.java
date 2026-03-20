@@ -2,13 +2,12 @@ package com.disqt.disquests.client.gui.widget;
 
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.markdown.RenderedLine;
+import io.wispforest.owo.ui.base.BaseUIComponent;
+import io.wispforest.owo.ui.core.OwoUIGraphics;
+import io.wispforest.owo.ui.core.Sizing;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.Drawable;
-import net.minecraft.client.gui.Element;
-import net.minecraft.client.gui.Selectable;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 import net.minecraft.text.ClickEvent;
 import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
@@ -17,27 +16,22 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A scrollable widget that renders pre-parsed markdown as styled text lines.
- * Each RenderedLine is word-wrapped to fit the available width, and the widget
- * supports vertical scrolling.
+ * An owo-ui component that renders pre-parsed markdown as styled text lines.
+ * Word-wraps lines, supports scrolling, checkbox toggling, and link clicking.
  */
-public class MarkdownWidget implements Drawable, Element, Selectable {
-
-    private final TextRenderer textRenderer;
-    private final int x;
-    private final int y;
-    private final int width;
-    private final int height;
+public class MarkdownWidget extends BaseUIComponent {
 
     private static final int PADDING = 5;
     private static final int SCROLLBAR_THICKNESS = 6;
 
     private final List<WrappedEntry> wrappedLines = new ArrayList<>();
     private final List<CheckboxHitbox> checkboxHitboxes = new ArrayList<>();
+    private final List<LinkHitbox> linkHitboxes = new ArrayList<>();
     private int totalContentHeight = 0;
     private double scrollOffset = 0;
-    private boolean focused = false;
     private CheckboxToggleListener checkboxToggleListener;
+    private int lastKnownWidth = -1;
+    private List<RenderedLine> currentLines;
 
     @FunctionalInterface
     public interface CheckboxToggleListener {
@@ -67,41 +61,31 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
         });
         return result[0];
     }
-    private final List<LinkHitbox> linkHitboxes = new ArrayList<>();
 
-    /**
-     * A single visual line after word-wrapping, with its indent and scale.
-     */
     private record WrappedEntry(OrderedText text, int indent, float scale, int checkboxIndex, boolean checked) {
         int height(TextRenderer tr) {
             return Math.round(tr.fontHeight * scale);
         }
     }
 
-    public MarkdownWidget(TextRenderer textRenderer, int x, int y, int width, int height, List<RenderedLine> lines) {
-        this.textRenderer = textRenderer;
-        this.x = x;
-        this.y = y;
-        this.width = width;
-        this.height = height;
-        rebuildWrappedLines(lines);
+    public MarkdownWidget(List<RenderedLine> lines) {
+        this.currentLines = lines;
     }
 
-    /**
-     * Update the content displayed by this widget.
-     */
     public void setContent(List<RenderedLine> lines) {
+        this.currentLines = lines;
         this.scrollOffset = 0;
-        rebuildWrappedLines(lines);
+        this.lastKnownWidth = -1; // force rebuild
     }
 
-    private void rebuildWrappedLines(List<RenderedLine> lines) {
+    private void rebuildWrappedLines(List<RenderedLine> lines, int componentWidth) {
+        TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
         wrappedLines.clear();
         checkboxHitboxes.clear();
         totalContentHeight = 0;
         int checkboxIndex = 0;
 
-        int availableWidth = width - PADDING * 2 - SCROLLBAR_THICKNESS - 2;
+        int availableWidth = componentWidth - PADDING * 2 - SCROLLBAR_THICKNESS - 2;
 
         for (RenderedLine line : lines) {
             int indent = line.indent();
@@ -110,13 +94,11 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
 
             if (lineAvailWidth <= 0) lineAvailWidth = availableWidth;
 
-            // Detect checkbox lines
             String lineStr = line.text().getString();
             boolean isCheckbox = lineStr.startsWith("[x] ") || lineStr.startsWith("[ ] ");
             boolean checked = lineStr.startsWith("[x] ");
             int cbIdx = isCheckbox ? checkboxIndex++ : -1;
 
-            // Empty lines produce one blank entry
             if (lineStr.isEmpty()) {
                 wrappedLines.add(new WrappedEntry(OrderedText.EMPTY, indent, 1.0f, -1, false));
                 totalContentHeight += textRenderer.fontHeight;
@@ -138,27 +120,48 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
         }
     }
 
-    // --- Rendering ---
+    // --- owo-ui component API ---
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        context.enableScissor(x, y, x + width, y + height);
+    protected int determineHorizontalContentSize(Sizing sizing) {
+        return 200; // default, overridden by parent sizing
+    }
+
+    @Override
+    protected int determineVerticalContentSize(Sizing sizing) {
+        return totalContentHeight + PADDING * 2;
+    }
+
+    @Override
+    public void draw(OwoUIGraphics context, int mouseX, int mouseY, float partialTicks, float delta) {
+        TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
+
+        // Rebuild wrapped lines if width changed
+        if (this.width() != lastKnownWidth && currentLines != null) {
+            lastKnownWidth = this.width();
+            rebuildWrappedLines(currentLines, this.width());
+        }
+
+        int compX = this.x();
+        int compY = this.y();
+        int compW = this.width();
+        int compH = this.height();
+
+        context.enableScissor(compX, compY, compX + compW, compY + compH);
 
         checkboxHitboxes.clear();
         linkHitboxes.clear();
-        int contentX = x + PADDING;
-        int contentY = y + PADDING;
+        int contentX = compX + PADDING;
+        int contentY = compY + PADDING;
         int drawY = contentY - (int) scrollOffset;
 
         for (WrappedEntry entry : wrappedLines) {
             int lineHeight = entry.height(textRenderer);
 
-            // Culling: skip lines that are entirely above or below visible area
-            if (drawY + lineHeight > y && drawY < y + height) {
+            if (drawY + lineHeight > compY && drawY < compY + compH) {
                 int drawX = contentX + entry.indent;
 
                 if (entry.scale != 1.0f) {
-                    // Scale rendering for headings
                     context.getMatrices().pushMatrix();
                     context.getMatrices().translate(drawX, drawY);
                     context.getMatrices().scale(entry.scale, entry.scale);
@@ -168,7 +171,6 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
                     context.drawText(textRenderer, entry.text, drawX, drawY, Colors.TEXT_PRIMARY, false);
                 }
 
-                // Record checkbox hitbox for click detection
                 if (entry.checkboxIndex >= 0) {
                     int cbWidth = textRenderer.getWidth("[x] ");
                     checkboxHitboxes.add(new CheckboxHitbox(
@@ -176,7 +178,6 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
                             entry.checkboxIndex, entry.checked));
                 }
 
-                // Record link hitbox for click detection
                 String url = findUrlInText(entry.text());
                 if (url != null) {
                     int textWidth = textRenderer.getWidth(entry.text());
@@ -189,7 +190,7 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
 
         context.disableScissor();
 
-        // Draw link hover tooltips
+        // Link hover tooltip
         for (LinkHitbox lh : linkHitboxes) {
             if (hitTest(mouseX, mouseY, lh.x(), lh.y(), lh.width(), lh.height())) {
                 context.drawTooltip(textRenderer, lh.displayText(), mouseX, mouseY);
@@ -197,18 +198,18 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
             }
         }
 
-        // Draw scrollbar if needed
+        // Scrollbar
         if (needsScrollbar()) {
-            renderScrollbar(context);
+            renderScrollbar(context, compX, compY, compW, compH);
         }
     }
 
-    private void renderScrollbar(DrawContext context) {
-        int scrollbarX = x + width - SCROLLBAR_THICKNESS - 2;
-        int trackHeight = height - PADDING * 2;
-        int trackY = y + PADDING;
+    private void renderScrollbar(OwoUIGraphics context, int compX, int compY, int compW, int compH) {
+        int scrollbarX = compX + compW - SCROLLBAR_THICKNESS - 2;
+        int trackHeight = compH - PADDING * 2;
+        int trackY = compY + PADDING;
 
-        float visibleRatio = (float) height / totalContentHeight;
+        float visibleRatio = (float) compH / totalContentHeight;
         float thumbHeight = Math.max(10, visibleRatio * trackHeight);
         float maxScroll = getMaxScroll();
         float thumbY = maxScroll > 0 ? (float) (scrollOffset / maxScroll) * (trackHeight - thumbHeight) : 0;
@@ -220,14 +221,12 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
         );
     }
 
-    // --- Scrolling ---
-
     private boolean needsScrollbar() {
-        return totalContentHeight > height - PADDING * 2;
+        return totalContentHeight > this.height() - PADDING * 2;
     }
 
     private float getMaxScroll() {
-        return Math.max(0, totalContentHeight - (height - PADDING * 2));
+        return Math.max(0, totalContentHeight - (this.height() - PADDING * 2));
     }
 
     private void clampScroll() {
@@ -237,19 +236,18 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        if (!isMouseOver(mouseX, mouseY)) return false;
-        scrollOffset -= verticalAmount * 10.0;
+    public boolean onMouseScroll(double mouseX, double mouseY, double amount) {
+        scrollOffset -= amount * 10.0;
         clampScroll();
         return true;
     }
 
-    // --- Click handling ---
-
     @Override
-    public boolean mouseClicked(Click click, boolean simulated) {
-        double mx = click.x();
-        double my = click.y();
+    public boolean onMouseDown(Click click, boolean doubled) {
+        // Click coordinates are component-relative in owo-ui
+        double mx = click.x() + this.x();
+        double my = click.y() + this.y();
+
         if (checkboxToggleListener != null) {
             for (CheckboxHitbox cb : checkboxHitboxes) {
                 if (hitTest(mx, my, cb.x, cb.y, cb.width, cb.height)) {
@@ -266,35 +264,6 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
                 return true;
             }
         }
-        return false;
-    }
-
-    // --- Element ---
-
-    @Override
-    public boolean isMouseOver(double mouseX, double mouseY) {
-        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
-    }
-
-    @Override
-    public void setFocused(boolean focused) {
-        this.focused = focused;
-    }
-
-    @Override
-    public boolean isFocused() {
-        return focused;
-    }
-
-    // --- Selectable ---
-
-    @Override
-    public SelectionType getType() {
-        return focused ? SelectionType.FOCUSED : SelectionType.NONE;
-    }
-
-    @Override
-    public void appendNarrations(NarrationMessageBuilder builder) {
-        // Not needed for this widget
+        return super.onMouseDown(click, doubled);
     }
 }
