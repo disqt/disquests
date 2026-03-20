@@ -1,37 +1,33 @@
 package com.disqt.disquests.client.gui.screen;
 
-import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.helper.DisquestsConfig;
-import com.disqt.disquests.client.gui.widget.DarkButtonWidget;
-import net.minecraft.client.gui.DrawContext;
+import io.wispforest.owo.ui.component.ButtonComponent;
+import io.wispforest.owo.ui.component.UIComponents;
+import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.core.Sizing;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.SliderWidget;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
+import org.jetbrains.annotations.Nullable;
 
-public class ConfigScreen extends BaseScreen {
+public class ConfigScreen extends DisquestsBaseScreen {
 
     private int pinnedWidth;
 
-    public ConfigScreen(Screen parent) {
-        super(Text.literal("Disquests Settings"), parent);
+    public ConfigScreen(@Nullable Screen parent) {
+        super(DataSource.asset(Identifier.of("disquests", "config_screen")), parent);
         this.pinnedWidth = DisquestsConfig.getPinnedWidth();
     }
 
     @Override
-    protected void init() {
-        super.init();
-
-        int centerX = this.width / 2;
-        int y = this.height / 2 - 20;
-
-        // Pinned width slider
+    protected void build(FlowLayout root) {
+        // Create vanilla slider and wrap for owo-ui
         double initialValue = (double) (pinnedWidth - DisquestsConfig.MIN_PINNED_WIDTH)
                 / (DisquestsConfig.MAX_PINNED_WIDTH - DisquestsConfig.MIN_PINNED_WIDTH);
 
-        this.addDrawableChild(new SliderWidget(
-                centerX - 75, y, 150, 20,
-                Text.literal("Pinned Width: " + pinnedWidth),
-                initialValue) {
+        SliderWidget slider = new SliderWidget(0, 0, 150, 20,
+                Text.literal("Pinned Width: " + pinnedWidth), initialValue) {
             @Override
             protected void updateMessage() {
                 int val = DisquestsConfig.MIN_PINNED_WIDTH
@@ -44,29 +40,25 @@ public class ConfigScreen extends BaseScreen {
                 pinnedWidth = DisquestsConfig.MIN_PINNED_WIDTH
                         + (int) (this.value * (DisquestsConfig.MAX_PINNED_WIDTH - DisquestsConfig.MIN_PINNED_WIDTH));
             }
-        });
+        };
 
-        y += 30;
+        FlowLayout sliderRow = root.childById(FlowLayout.class, "slider-row");
+        sliderRow.child(UIComponents.wrapVanillaWidget(slider)
+                .sizing(Sizing.fixed(150), Sizing.fixed(20)));
 
-        // Save button
-        this.addDrawableChild(new DarkButtonWidget(
-                centerX - 55, y, 50, 20,
-                Text.literal("Save"), b -> {
+        root.childById(ButtonComponent.class, "btn-save")
+                .onPress(b -> {
                     DisquestsConfig.setPinnedWidth(pinnedWidth);
                     DisquestsConfig.save();
                     this.close();
-                }));
+                });
 
-        // Cancel button
-        this.addDrawableChild(new DarkButtonWidget(
-                centerX + 5, y, 50, 20,
-                Text.literal("Cancel"), b -> this.close()));
+        root.childById(ButtonComponent.class, "btn-cancel")
+                .onPress(b -> this.close());
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        super.render(context, mouseX, mouseY, delta);
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title,
-                this.width / 2, this.height / 2 - 50, Colors.TEXT_PRIMARY);
+    public boolean shouldPause() {
+        return false;
     }
 }
