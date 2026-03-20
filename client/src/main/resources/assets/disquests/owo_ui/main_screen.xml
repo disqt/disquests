@@ -107,16 +107,14 @@
                 <padding>
                     <all>4</all>
                 </padding>
-                <children>
-                    <!-- Quest list: entries added programmatically -->
-                    <flow-layout direction="vertical" id="quest-list">
-                        <sizing>
-                            <horizontal method="fill">100</horizontal>
-                            <vertical method="content"/>
-                        </sizing>
-                        <gap>2</gap>
-                    </flow-layout>
-                </children>
+                <!-- Quest list: single child of scroll, entries added programmatically -->
+                <flow-layout direction="vertical" id="quest-list">
+                    <sizing>
+                        <horizontal method="fill">100</horizontal>
+                        <vertical method="content"/>
+                    </sizing>
+                    <gap>2</gap>
+                </flow-layout>
             </scroll>
 
             <!-- Search row -->
@@ -130,9 +128,8 @@
                     <top>4</top>
                     <bottom>4</bottom>
                 </margins>
-                <children>
-                    <!-- TextBox added programmatically for search -->
-                </children>
+                <children/>
+                <!-- TextBox added programmatically for search -->
             </flow-layout>
 
             <!-- Action button row -->
