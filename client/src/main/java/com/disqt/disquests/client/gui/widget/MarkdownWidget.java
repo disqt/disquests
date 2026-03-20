@@ -9,7 +9,9 @@ import net.minecraft.client.gui.Drawable;
 import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.Selectable;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
+import net.minecraft.text.ClickEvent;
 import net.minecraft.text.OrderedText;
+import net.minecraft.text.Text;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,6 +49,8 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
     }
 
     private record CheckboxHitbox(int x, int y, int width, int height, int checkboxIndex, boolean checked) {}
+    private record LinkHitbox(int x, int y, int width, int height, String url) {}
+    private final List<LinkHitbox> linkHitboxes = new ArrayList<>();
 
     /**
      * A single visual line after word-wrapping, with its indent and scale.
@@ -124,6 +128,7 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
         context.enableScissor(x, y, x + width, y + height);
 
         checkboxHitboxes.clear();
+        linkHitboxes.clear();
         int contentX = x + PADDING;
         int contentY = y + PADDING;
         int drawY = contentY - (int) scrollOffset;
@@ -153,12 +158,35 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
                             drawX, drawY, cbWidth, lineHeight,
                             entry.checkboxIndex, entry.checked));
                 }
+
+                // Record link hitbox for click detection
+                String[] urlHolder = {null};
+                entry.text().accept((index, style, codepoint) -> {
+                    ClickEvent clickEvent = style.getClickEvent();
+                    if (clickEvent instanceof ClickEvent.OpenUrl openUrl) {
+                        urlHolder[0] = openUrl.uri().toString();
+                    }
+                    return true;
+                });
+                if (urlHolder[0] != null) {
+                    int textWidth = textRenderer.getWidth(entry.text());
+                    linkHitboxes.add(new LinkHitbox(drawX, drawY, textWidth, textRenderer.fontHeight, urlHolder[0]));
+                }
             }
 
             drawY += lineHeight;
         }
 
         context.disableScissor();
+
+        // Draw link hover tooltips
+        for (LinkHitbox lh : linkHitboxes) {
+            if (mouseX >= lh.x() && mouseX <= lh.x() + lh.width()
+                    && mouseY >= lh.y() && mouseY <= lh.y() + lh.height()) {
+                context.drawTooltip(textRenderer, Text.literal(lh.url()), mouseX, mouseY);
+                break;
+            }
+        }
 
         // Draw scrollbar if needed
         if (needsScrollbar()) {
@@ -211,12 +239,22 @@ public class MarkdownWidget implements Drawable, Element, Selectable {
 
     @Override
     public boolean mouseClicked(Click click, boolean simulated) {
-        if (checkboxToggleListener == null) return false;
         double mx = click.x();
         double my = click.y();
-        for (CheckboxHitbox cb : checkboxHitboxes) {
-            if (mx >= cb.x && mx < cb.x + cb.width && my >= cb.y && my < cb.y + cb.height) {
-                checkboxToggleListener.onCheckboxToggled(cb.checkboxIndex, !cb.checked);
+        if (checkboxToggleListener != null) {
+            for (CheckboxHitbox cb : checkboxHitboxes) {
+                if (mx >= cb.x && mx < cb.x + cb.width && my >= cb.y && my < cb.y + cb.height) {
+                    checkboxToggleListener.onCheckboxToggled(cb.checkboxIndex, !cb.checked);
+                    return true;
+                }
+            }
+        }
+        for (LinkHitbox lh : linkHitboxes) {
+            if (mx >= lh.x() && mx <= lh.x() + lh.width()
+                    && my >= lh.y() && my <= lh.y() + lh.height()) {
+                try {
+                    net.minecraft.util.Util.getOperatingSystem().open(java.net.URI.create(lh.url()));
+                } catch (Exception ignored) {}
                 return true;
             }
         }
