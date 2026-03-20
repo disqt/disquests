@@ -287,14 +287,14 @@ public class QuestEntryComponent extends BaseUIComponent {
     public boolean onMouseDown(Click click, boolean doubled) {
         if (click.button() != 0) return false;
 
-        // Pin icon hit area: rightmost 20px, row 2 (y+12 to y+26)
-        int entryX = this.x();
-        int entryY = this.y();
-        int entryWidth = this.width();
-        int pinHitX = entryX + entryWidth - 20;
+        // Use relative coordinates (click pos minus component pos)
+        // to avoid scroll-offset issues
+        double relX = click.x() - this.x();
+        double relY = click.y() - this.y();
 
-        if (click.x() >= pinHitX && click.x() <= entryX + entryWidth
-                && click.y() >= entryY + 12 && click.y() <= entryY + 26) {
+        // Pin icon hit area: rightmost 20px, row 2 (y+12 to y+26)
+        if (relX >= this.width() - 20 && relX <= this.width()
+                && relY >= 12 && relY <= 26) {
             HudPinManager.toggle(quest.getId());
             if (onPinToggle != null) onPinToggle.accept(this);
             return true;

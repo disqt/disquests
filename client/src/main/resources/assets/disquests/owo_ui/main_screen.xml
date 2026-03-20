@@ -110,7 +110,7 @@
                     <vertical method="fill">100</vertical>
                 </sizing>
                 <surface>
-                    <panel/>
+                    <panel dark="true"/>
                 </surface>
                 <padding>
                     <all>4</all>
