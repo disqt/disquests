@@ -160,8 +160,8 @@ public class QuestScreenTest implements FabricClientGameTest {
         // Get first quest title (should be "Newer Quest" -- sorted by lastModified desc)
         String firstBefore = context.computeOnClient(client -> {
             MainScreen screen = (MainScreen) client.currentScreen;
-            var children = screen.getMyQuestList().children();
-            return children.isEmpty() ? "" : children.get(0).getQuest().getTitle();
+            var entries = screen.getQuestEntries();
+            return entries.isEmpty() ? "" : entries.get(0).getQuest().getTitle();
         });
 
         // Pin the older quest (use ClientSession directly to avoid packet send)
@@ -175,8 +175,8 @@ public class QuestScreenTest implements FabricClientGameTest {
         // Order should NOT have changed (older quest should NOT jump to top)
         String firstAfter = context.computeOnClient(client -> {
             MainScreen screen = (MainScreen) client.currentScreen;
-            var children = screen.getMyQuestList().children();
-            return children.isEmpty() ? "" : children.get(0).getQuest().getTitle();
+            var entries = screen.getQuestEntries();
+            return entries.isEmpty() ? "" : entries.get(0).getQuest().getTitle();
         });
 
         if (!firstBefore.equals(firstAfter)) {

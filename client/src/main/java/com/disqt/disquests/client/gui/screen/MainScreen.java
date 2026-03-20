@@ -309,6 +309,15 @@ public class MainScreen extends DisquestsBaseScreen {
         updateActionButtons();
     }
 
+    /** Returns the current quest entries in list order. Used by E2E tests. */
+    public java.util.List<QuestEntryComponent> getQuestEntries() {
+        if (questList == null) return java.util.Collections.emptyList();
+        return questList.children().stream()
+                .filter(c -> c instanceof QuestEntryComponent)
+                .map(c -> (QuestEntryComponent) c)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
     private void updateActionButtons() {
         if (currentTab == TAB_MY_QUESTS) {
             boolean hasSelection = getSelectedQuest() != null;
