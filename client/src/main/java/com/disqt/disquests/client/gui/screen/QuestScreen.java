@@ -235,6 +235,7 @@ public class QuestScreen extends BaseScreen {
                 contentWidth, contentPanelHeight, rendered
         );
         this.viewContentArea.setCheckboxToggleListener((checkboxIndex, nowChecked) -> {
+            if (!canEdit) return;
             if (hideContent) return;
             String content = quest.getContent();
             if (content == null) return;
