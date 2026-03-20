@@ -1,5 +1,6 @@
 package com.disqt.disquests.common;
 
+import com.disqt.disquests.common.model.CollaborationRequestData;
 import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.ContributorOp;
 import com.disqt.disquests.common.model.CoordinatesData;
@@ -182,6 +183,21 @@ public final class PacketCodec {
         return buf.toByteArray();
     }
 
+    public static byte[] writeSyncMyQuests(List<QuestData> quests, Map<UUID, Integer> pendingCounts) {
+        ByteBufWriter buf = new ByteBufWriter();
+        buf.writeByte(PacketType.SYNC_MY_QUESTS.getId());
+        buf.writeVarInt(quests.size());
+        for (QuestData quest : quests) {
+            writeQuest(buf, quest);
+        }
+        buf.writeVarInt(pendingCounts.size());
+        for (Map.Entry<UUID, Integer> entry : pendingCounts.entrySet()) {
+            buf.writeUUID(entry.getKey());
+            buf.writeVarInt(entry.getValue());
+        }
+        return buf.toByteArray();
+    }
+
     public static byte[] writeSyncServerQuests(List<QuestData> quests) {
         ByteBufWriter buf = new ByteBufWriter();
         buf.writeByte(PacketType.SYNC_SERVER_QUESTS.getId());
@@ -223,6 +239,20 @@ public final class PacketCodec {
         buf.writeUUID(questId);
         buf.writeBoolean(approved);
         writeNullableQuest(buf, quest);
+        return buf.toByteArray();
+    }
+
+    public static byte[] writeSyncPendingRequests(List<CollaborationRequestData> requests) {
+        ByteBufWriter buf = new ByteBufWriter();
+        buf.writeByte(PacketType.SYNC_PENDING_REQUESTS.getId());
+        buf.writeVarInt(requests.size());
+        for (CollaborationRequestData req : requests) {
+            buf.writeUUID(req.id());
+            buf.writeUUID(req.questId());
+            buf.writeString(req.questTitle());
+            writeNullableString(buf, req.requesterName());
+            buf.writeLong(req.timestamp());
+        }
         return buf.toByteArray();
     }
 
@@ -370,6 +400,16 @@ public final class PacketCodec {
         return quests;
     }
 
+    public static Map<UUID, Integer> readPendingCounts(ByteBufReader r) {
+        if (r.remaining() <= 0) return Map.of();
+        int count = r.readVarInt();
+        Map<UUID, Integer> map = new HashMap<>(count);
+        for (int i = 0; i < count; i++) {
+            map.put(r.readUUID(), r.readVarInt());
+        }
+        return map;
+    }
+
     public static List<QuestData> readSyncServerQuests(ByteBufReader buf) {
         int count = readCount(buf, MAX_QUEST_LIST, "Quest");
         List<QuestData> quests = new ArrayList<>(count);
@@ -400,6 +440,20 @@ public final class PacketCodec {
         boolean approved = buf.readBoolean();
         QuestData quest = readNullableQuest(buf);
         return new CollaborationResponsePayload(questId, approved, quest);
+    }
+
+    public static List<CollaborationRequestData> readSyncPendingRequests(ByteBufReader r) {
+        int count = r.readVarInt();
+        List<CollaborationRequestData> requests = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            UUID id = r.readUUID();
+            UUID questId = r.readUUID();
+            String questTitle = r.readString();
+            String requesterName = readNullableString(r);
+            long timestamp = r.readLong();
+            requests.add(new CollaborationRequestData(id, questId, questTitle, null, requesterName, timestamp));
+        }
+        return requests;
     }
 
     // ---- Private nullable helpers ----

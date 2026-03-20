@@ -1,5 +1,6 @@
 package com.disqt.disquests.common;
 
+import com.disqt.disquests.common.model.CollaborationRequestData;
 import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.ContributorOp;
 import com.disqt.disquests.common.model.CoordinatesData;
@@ -651,6 +652,46 @@ class PacketCodecTest {
         assertEquals(PacketType.LEAVE_QUEST, PacketCodec.readType(reader));
         UUID readId = PacketCodec.readLeaveQuest(reader);
         assertEquals(questId, readId);
+        assertEquals(0, reader.remaining());
+    }
+
+    // ---- 28. testSyncMyQuestsWithPendingCounts ----
+
+    @Test
+    void testSyncMyQuestsWithPendingCounts() {
+        UUID questId = UUID.randomUUID();
+        QuestData quest = new QuestData(questId, "Test", "content", UUID.randomUUID(), "Owner",
+                Visibility.OPEN, List.of(), System.currentTimeMillis(), null, false, null, null);
+        Map<UUID, Integer> pendingCounts = Map.of(questId, 3);
+
+        byte[] packet = PacketCodec.writeSyncMyQuests(List.of(quest), pendingCounts);
+        ByteBufReader reader = new ByteBufReader(packet);
+        assertEquals(PacketType.SYNC_MY_QUESTS, PacketCodec.readType(reader));
+        List<QuestData> readQuests = PacketCodec.readSyncMyQuests(reader);
+        assertEquals(1, readQuests.size());
+        Map<UUID, Integer> readCounts = PacketCodec.readPendingCounts(reader);
+        assertEquals(3, readCounts.get(questId));
+        assertEquals(0, reader.remaining());
+    }
+
+    // ---- 29. testSyncPendingRequestsRoundTrip ----
+
+    @Test
+    void testSyncPendingRequestsRoundTrip() {
+        CollaborationRequestData req = new CollaborationRequestData(
+                UUID.randomUUID(), UUID.randomUUID(), "Test Quest",
+                UUID.randomUUID(), "PlayerName", 1234567890L);
+
+        byte[] packet = PacketCodec.writeSyncPendingRequests(List.of(req));
+        ByteBufReader reader = new ByteBufReader(packet);
+        assertEquals(PacketType.SYNC_PENDING_REQUESTS, PacketCodec.readType(reader));
+        List<CollaborationRequestData> readReqs = PacketCodec.readSyncPendingRequests(reader);
+        assertEquals(1, readReqs.size());
+        assertEquals(req.id(), readReqs.get(0).id());
+        assertEquals(req.questId(), readReqs.get(0).questId());
+        assertEquals(req.questTitle(), readReqs.get(0).questTitle());
+        assertEquals(req.requesterName(), readReqs.get(0).requesterName());
+        assertEquals(req.timestamp(), readReqs.get(0).timestamp());
         assertEquals(0, reader.remaining());
     }
 }

@@ -20,7 +20,8 @@ public enum PacketType {
     UPDATE_QUEST((byte) 0x13),
     DELETE_QUEST_S2C((byte) 0x14),
     COLLABORATION_REQUEST((byte) 0x15),
-    COLLABORATION_RESPONSE((byte) 0x16);
+    COLLABORATION_RESPONSE((byte) 0x16),
+    SYNC_PENDING_REQUESTS((byte) 0x17);
 
     private final byte id;
 
