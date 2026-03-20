@@ -1,5 +1,6 @@
 package com.disqt.disquests.client;
 
+import com.disqt.disquests.client.debug.DebugScreenEvents;
 import com.disqt.disquests.client.gui.helper.ColorConfig;
 import com.disqt.disquests.client.gui.helper.DisquestsConfig;
 import com.disqt.disquests.client.gui.screen.MainScreen;
@@ -22,6 +23,7 @@ public class DisquestsClient implements ClientModInitializer {
         ColorConfig.loadColors();
         DisquestsConfig.load();
         KeyBinds.register();
+        DebugScreenEvents.register();
 
         // Register payload types before registering receivers
         PayloadTypeRegistry.playS2C().register(RawPayload.ID, RawPayload.CODEC);

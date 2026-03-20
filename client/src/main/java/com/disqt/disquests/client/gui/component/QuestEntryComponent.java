@@ -136,6 +136,20 @@ public class QuestEntryComponent extends BaseUIComponent {
         } else {
             this.cachedLocationWidth = 0;
         }
+
+        // Debug: log construction state
+        LOGGER.debug("Created QuestEntryComponent: quest={}, owner={}, isOwned={}, visibility={}, pinned={}",
+                quest.getTitle(), quest.getOwnerName(), isOwnedByPlayer,
+                quest.getVisibility(), ClientSession.isPinned(quest.getId()));
+
+        // Debug: subscribe to owo-ui event streams for dispatch tracing
+        this.mouseDown().subscribe((click, doubled) -> {
+            LOGGER.debug("[EVENT mouseDown] quest={}, click=({}, {}), doubled={}", quest.getTitle(), click.x(), click.y(), doubled);
+            return false; // don't consume -- let onMouseDown handle it
+        });
+        this.mouseEnter().subscribe(() -> {
+            LOGGER.debug("[EVENT mouseEnter] quest={}", quest.getTitle());
+        });
     }
 
     // --- Fluent setters ---
