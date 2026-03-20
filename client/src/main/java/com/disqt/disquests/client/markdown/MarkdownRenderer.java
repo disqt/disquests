@@ -27,7 +27,17 @@ public class MarkdownRenderer {
         if (markdown == null || markdown.isEmpty()) {
             return List.of(RenderedLine.empty());
         }
-        Node document = PARSER.parse(markdown);
+
+        // Strip leading whitespace per line to prevent commonmark
+        // from treating 4+ spaces as indented code blocks
+        String[] rawLines = markdown.split("\n", -1);
+        StringBuilder processed = new StringBuilder();
+        for (int i = 0; i < rawLines.length; i++) {
+            if (i > 0) processed.append('\n');
+            processed.append(rawLines[i].stripLeading());
+        }
+
+        Node document = PARSER.parse(processed.toString());
         List<RenderedLine> lines = new ArrayList<>();
         renderChildren(document, lines, 0, Style.EMPTY);
         return lines;

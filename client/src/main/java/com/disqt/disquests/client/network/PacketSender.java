@@ -47,6 +47,10 @@ public class PacketSender {
         send(PacketCodec.writePinQuest(questId));
     }
 
+    public static void leaveQuest(UUID questId) {
+        send(PacketCodec.writeLeaveQuest(questId));
+    }
+
     private static void send(byte[] data) {
         ClientPlayNetworking.send(new RawPayload(data));
     }

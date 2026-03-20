@@ -80,6 +80,7 @@ public class QuestScreen extends BaseScreen {
     // Permission cache (recomputed each init)
     private boolean canEdit;
     private boolean isOwner;
+    private boolean isContributor;
     private boolean hideContent;
 
     // --- Pre-computed view mode strings (set in initViewMode, used in renderViewMode) ---
@@ -138,7 +139,7 @@ public class QuestScreen extends BaseScreen {
         this.isOwner = quest.getOwnerUuid().equals(myUuid);
         this.canEdit = isOwner || quest.getContributors().stream()
                 .anyMatch(c -> c.getUuid().equals(myUuid) && c.canEdit());
-        boolean isContributor = quest.getContributors().stream()
+        this.isContributor = quest.getContributors().stream()
                 .anyMatch(c -> c.getUuid().equals(myUuid));
         this.hideContent = quest.getVisibility() == Visibility.CLOSED && !isOwner && !isContributor;
 
@@ -172,28 +173,36 @@ public class QuestScreen extends BaseScreen {
         // --- BUTTONS ---
         List<Text> buttonTexts = new ArrayList<>();
         buttonTexts.add(Text.literal("Edit"));
+        if (isContributor && !isOwner) {
+            buttonTexts.add(Text.literal("Leave"));
+        }
         buttonTexts.add(Text.literal("Delete"));
         buttonTexts.add(Text.literal("Close"));
 
         UIHelper.createButtonRow(this, buttonsY, buttonTexts, (index, x, width) -> {
-            switch (index) {
-                case 0 -> {
+            String label = buttonTexts.get(index).getString();
+            switch (label) {
+                case "Edit" -> {
                     this.editButton = this.addDrawableChild(new DarkButtonWidget(
                             x, buttonsY, width, UIHelper.BUTTON_HEIGHT,
-                            buttonTexts.get(0),
+                            buttonTexts.get(index),
                             b -> enterEditMode()));
                     this.editButton.active = canEdit;
                 }
-                case 1 -> {
+                case "Leave" -> this.addDrawableChild(new DarkButtonWidget(
+                        x, buttonsY, width, UIHelper.BUTTON_HEIGHT,
+                        buttonTexts.get(index),
+                        b -> leaveQuest()));
+                case "Delete" -> {
                     this.deleteButton = this.addDrawableChild(new DarkButtonWidget(
                             x, buttonsY, width, UIHelper.BUTTON_HEIGHT,
-                            buttonTexts.get(1),
+                            buttonTexts.get(index),
                             b -> confirmDelete()));
                     this.deleteButton.active = isOwner;
                 }
-                case 2 -> this.addDrawableChild(new DarkButtonWidget(
+                case "Close" -> this.addDrawableChild(new DarkButtonWidget(
                         x, buttonsY, width, UIHelper.BUTTON_HEIGHT,
-                        buttonTexts.get(2),
+                        buttonTexts.get(index),
                         b -> this.close()));
             }
         });
@@ -226,6 +235,7 @@ public class QuestScreen extends BaseScreen {
                 contentWidth, contentPanelHeight, rendered
         );
         this.viewContentArea.setCheckboxToggleListener((checkboxIndex, nowChecked) -> {
+            if (!canEdit) return;
             if (hideContent) return;
             String content = quest.getContent();
             if (content == null) return;
@@ -401,7 +411,7 @@ public class QuestScreen extends BaseScreen {
                 this.textRenderer, contentX, contentPanelY,
                 editorWidth, contentPanelHeight,
                 quest.getContent() != null ? quest.getContent() : "",
-                "Quest content...", Integer.MAX_VALUE, true
+                "Quest content...", Integer.MAX_VALUE, true, true
         );
         this.addSelectableChild(this.editContentField);
 
@@ -894,6 +904,19 @@ public class QuestScreen extends BaseScreen {
             PacketSender.deleteQuest(quest.getId());
             this.close();
         });
+    }
+
+    private void leaveQuest() {
+        showConfirm(Text.literal("Leave this quest? You'll lose contributor access."),
+                () -> {
+                    PacketSender.leaveQuest(quest.getId());
+                    ClientSession.setPendingToast("Left \"" + quest.getTitle() + "\"");
+                    this.close();
+                });
+    }
+
+    public boolean hasLeaveButton() {
+        return isContributor && !isOwner && !editing;
     }
 
     // ===================== SHARED HELPERS =====================

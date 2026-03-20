@@ -11,6 +11,7 @@ public enum PacketType {
     UPDATE_CONTRIBUTORS((byte) 0x07),
     UPDATE_VISIBILITY((byte) 0x08),
     PIN_QUEST((byte) 0x09),
+    LEAVE_QUEST((byte) 0x0A),
 
     // S2C
     HANDSHAKE((byte) 0x10),

@@ -7,7 +7,9 @@ import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.common.model.Visibility;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public final class PacketCodec {
@@ -52,7 +54,7 @@ public final class PacketCodec {
 
     public record UpdateVisibilityPayload(UUID questId, Visibility visibility) {}
 
-    public record HandshakePayload(String bluemapUrl, int pendingRequestCount, List<UUID> pinnedQuestIds, UUID playerUuid) {}
+    public record HandshakePayload(String bluemapUrl, int pendingRequestCount, List<UUID> pinnedQuestIds, UUID playerUuid, Map<String, String> bluemapMapNames) {}
 
     public record CollaborationRequestPayload(UUID requestId, UUID questId,
             String questTitle, String requesterName) {}
@@ -139,9 +141,20 @@ public final class PacketCodec {
         return buf.toByteArray();
     }
 
+    public static byte[] writeLeaveQuest(UUID questId) {
+        ByteBufWriter w = new ByteBufWriter();
+        w.writeByte(PacketType.LEAVE_QUEST.getId());
+        w.writeUUID(questId);
+        return w.toByteArray();
+    }
+
     // ---- S2C encode ----
 
     public static byte[] writeHandshake(String bluemapUrl, int pendingRequestCount, List<UUID> pinnedQuestIds, UUID playerUuid) {
+        return writeHandshake(bluemapUrl, pendingRequestCount, pinnedQuestIds, playerUuid, Map.of());
+    }
+
+    public static byte[] writeHandshake(String bluemapUrl, int pendingRequestCount, List<UUID> pinnedQuestIds, UUID playerUuid, Map<String, String> mapNames) {
         ByteBufWriter buf = new ByteBufWriter();
         buf.writeByte(PacketType.HANDSHAKE.getId());
         writeNullableString(buf, bluemapUrl);
@@ -151,6 +164,11 @@ public final class PacketCodec {
             buf.writeUUID(id);
         }
         buf.writeUUID(playerUuid);
+        buf.writeVarInt(mapNames.size());
+        for (Map.Entry<String, String> entry : mapNames.entrySet()) {
+            buf.writeString(entry.getKey());
+            buf.writeString(entry.getValue());
+        }
         return buf.toByteArray();
     }
 
@@ -313,6 +331,10 @@ public final class PacketCodec {
         return readNullableUUID(buf);
     }
 
+    public static UUID readLeaveQuest(ByteBufReader r) {
+        return r.readUUID();
+    }
+
     // ---- S2C decode ----
 
     public static HandshakePayload readHandshake(ByteBufReader buf) {
@@ -324,7 +346,19 @@ public final class PacketCodec {
             pinnedQuestIds.add(buf.readUUID());
         }
         UUID playerUuid = buf.readUUID();
-        return new HandshakePayload(bluemapUrl, pendingRequestCount, pinnedQuestIds, playerUuid);
+        Map<String, String> mapNames;
+        if (buf.remaining() > 0) {
+            int mapCount = buf.readVarInt();
+            mapNames = new HashMap<>(mapCount);
+            for (int i = 0; i < mapCount; i++) {
+                String key = buf.readString();
+                String value = buf.readString();
+                mapNames.put(key, value);
+            }
+        } else {
+            mapNames = Map.of();
+        }
+        return new HandshakePayload(bluemapUrl, pendingRequestCount, pinnedQuestIds, playerUuid, mapNames);
     }
 
     public static List<QuestData> readSyncMyQuests(ByteBufReader buf) {

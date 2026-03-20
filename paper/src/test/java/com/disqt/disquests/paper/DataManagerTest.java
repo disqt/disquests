@@ -385,6 +385,32 @@ class DataManagerTest {
     }
 
     // -------------------------------------------------------------------------
+    // Leave Quest
+    // -------------------------------------------------------------------------
+
+    @Test
+    void leaveQuest_removesContributorAndPin() {
+        UUID questId = UUID.randomUUID();
+        dm.upsertPlayerName(OWNER, "Owner");
+        dm.upsertPlayerName(PLAYER2, "Player2");
+
+        QuestData quest = new QuestData(questId, "Quest", "content", OWNER, null,
+                Visibility.OPEN, List.of(), System.currentTimeMillis(), null, false, null, null);
+        dm.saveQuest(quest);
+        dm.addContributor(questId, PLAYER2, false);
+        dm.pinQuest(PLAYER2, questId);
+
+        assertTrue(dm.isContributor(questId, PLAYER2));
+        assertTrue(dm.isQuestPinned(PLAYER2, questId));
+
+        dm.leaveQuest(questId, PLAYER2);
+
+        assertFalse(dm.isContributor(questId, PLAYER2));
+        assertFalse(dm.isQuestPinned(PLAYER2, questId));
+        assertNotNull(dm.getQuest(questId)); // quest still exists
+    }
+
+    // -------------------------------------------------------------------------
     // Cascade Deletes
     // -------------------------------------------------------------------------
 
