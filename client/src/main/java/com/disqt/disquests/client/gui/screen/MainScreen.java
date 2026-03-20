@@ -70,10 +70,8 @@ public class MainScreen extends DisquestsBaseScreen {
     @Nullable
     private QuestEntryComponent selectedEntry = null;
 
-    // Saved filter row parent index for reinsertion
-    private int filterRowIndex = -1;
+    // Cached title width
 
-    // Cached title width (fix 12)
     private int titleWidth;
 
     public MainScreen() {
@@ -136,16 +134,7 @@ public class MainScreen extends DisquestsBaseScreen {
         this.searchField.onChanged().subscribe(this::onSearchTermChanged);
         this.searchRow.child(this.searchField);
 
-        // Record filter row position for show/hide
-        List<? extends io.wispforest.owo.ui.core.UIComponent> rootChildren = root.children();
-        for (int i = 0; i < rootChildren.size(); i++) {
-            if (rootChildren.get(i) == this.filterRow) {
-                this.filterRowIndex = i;
-                break;
-            }
-        }
-
-        // Cache title width (fix 12)
+        // Cache title width
         this.titleWidth = MinecraftClient.getInstance().textRenderer.getWidth("Disquests");
 
         // --- Apply saved state ---
@@ -167,17 +156,11 @@ public class MainScreen extends DisquestsBaseScreen {
         // Clear selection
         clearSelection();
 
-        // Filter row visibility: remove or re-add from root
+        // Filter row visibility: collapse to zero size when hidden
         if (isMyQuests) {
-            // Hide filter row
-            if (filterRow.parent() != null) {
-                rootLayout.removeChild(filterRow);
-            }
+            filterRow.sizing(Sizing.fixed(0), Sizing.fixed(0));
         } else {
-            // Show filter row (re-insert at saved index if not already present)
-            if (filterRow.parent() == null && filterRowIndex >= 0) {
-                rootLayout.child(filterRowIndex, filterRow);
-            }
+            filterRow.sizing(Sizing.content(), Sizing.content());
             selectServerFilter(this.serverFilter);
         }
 

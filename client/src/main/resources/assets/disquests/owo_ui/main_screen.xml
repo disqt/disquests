@@ -107,7 +107,7 @@
                 </flow-layout>
                 <sizing>
                     <horizontal method="fill">85</horizontal>
-                    <vertical method="fill">100</vertical>
+                    <vertical method="fill">70</vertical>
                 </sizing>
                 <surface>
                     <panel dark="true"/>
