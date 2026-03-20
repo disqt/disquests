@@ -4,137 +4,101 @@ import com.disqt.disquests.client.BlueMapHelper;
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
+import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
-import com.disqt.disquests.client.gui.helper.ScreenLayouts;
-import com.disqt.disquests.client.gui.helper.UIHelper;
-import com.disqt.disquests.client.gui.widget.DarkButtonWidget;
 import com.disqt.disquests.client.gui.widget.MarkdownWidget;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
-import com.disqt.disquests.client.gui.widget.ReadOnlyMultiLineTextFieldWidget;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.client.markdown.RenderedLine;
 import com.disqt.disquests.client.network.PacketSender;
 import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.Visibility;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
+import io.wispforest.owo.ui.component.ButtonComponent;
+import io.wispforest.owo.ui.component.LabelComponent;
+import io.wispforest.owo.ui.component.UIComponents;
+import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.core.Sizing;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-
-import java.util.stream.Collectors;
-import net.minecraft.util.Util;
+import net.minecraft.util.Identifier;
+import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
- * Unified quest screen that toggles between a formatted view mode and a raw editing mode.
- * Replaces the old ViewQuestScreen and EditQuestScreen.
+ * Unified quest screen with view and edit modes, using owo-ui.
+ * Switches between two XML models by re-opening with different state.
  */
-public class QuestScreen extends BaseScreen {
+public class QuestScreen extends DisquestsBaseScreen {
 
     private final Quest quest;
-    private boolean editing;
+    private final boolean editing;
     private final boolean isNewQuest;
 
-    // --- View mode widgets ---
-    private ReadOnlyMultiLineTextFieldWidget viewTitleArea;
-    private MarkdownWidget viewContentArea;
-    private DarkButtonWidget editButton;
-    private DarkButtonWidget deleteButton;
-
-    // --- Edit mode widgets ---
-    private MultiLineTextFieldWidget editTitleField;
-    private MultiLineTextFieldWidget editContentField;
-    private MultiLineTextFieldWidget coordXField;
-    private MultiLineTextFieldWidget coordYField;
-    private MultiLineTextFieldWidget coordZField;
-    private MultiLineTextFieldWidget coord2XField;
-    private MultiLineTextFieldWidget coord2YField;
-    private MultiLineTextFieldWidget coord2ZField;
-    private DarkButtonWidget visibilityButton;
-    private DarkButtonWidget contributorsButton;
-    private DarkButtonWidget regionButton;
-    private DarkButtonWidget helpButton;
+    // Edit mode state preserved across rebuilds
     private boolean regionEnabled;
-    private boolean showFormattingHelp = true;
-    private static final int FORMATTING_PANEL_WIDTH = 160;
-
-    // Pre-built formatting preview Text objects (avoid per-frame allocation)
-    private static final Text FMT_BOLD = Text.literal("text").formatted(Formatting.BOLD);
-    private static final Text FMT_ITALIC = Text.literal("text").formatted(Formatting.ITALIC);
-    private static final Text FMT_STRIKE = Text.literal("text").formatted(Formatting.STRIKETHROUGH);
-    private static final Text FMT_HEADING = Text.literal("Heading").formatted(Formatting.BOLD);
-    private static final Text FMT_LINK = Text.literal("a").formatted(Formatting.UNDERLINE);
-
-    // Dirty tracking (edit mode)
+    private boolean showFormattingHelp;
     private String originalTitle;
     private String originalContent;
 
-    // Permission cache (recomputed each init)
+    // Permission cache
     private boolean canEdit;
     private boolean isOwner;
     private boolean isContributor;
     private boolean hideContent;
 
-    // --- Pre-computed view mode strings (set in initViewMode, used in renderViewMode) ---
-    private String viewOwnerInfo;
-    private String viewCoordsText;
-    private String viewMapText;
-    private String viewContributorsText;
+    // Widget references for edit mode
+    private TextFieldComponent titleFieldComponent;
+    private TextFieldComponent contentFieldComponent;
+    private TextFieldComponent coordXComponent;
+    private TextFieldComponent coordYComponent;
+    private TextFieldComponent coordZComponent;
+    private TextFieldComponent coord2XComponent;
+    private TextFieldComponent coord2YComponent;
+    private TextFieldComponent coord2ZComponent;
 
     /**
      * Open in view mode for an existing quest.
      */
-    public QuestScreen(Screen parent, Quest quest) {
-        this(parent, quest, false);
+    public QuestScreen(@Nullable Screen parent, Quest quest) {
+        this(parent, quest, false, false, true, null, null);
     }
 
     /**
-     * Open in edit mode when {@code startInEditMode} is true (e.g. new quest).
+     * Open in edit mode when startInEditMode is true (e.g. new quest).
      */
-    public QuestScreen(Screen parent, Quest quest, boolean startInEditMode) {
-        super(Text.literal(startInEditMode ? "Edit Quest" : "View Quest"), parent);
+    public QuestScreen(@Nullable Screen parent, Quest quest, boolean startInEditMode) {
+        this(parent, quest, startInEditMode, startInEditMode, true, null, null);
+    }
+
+    /**
+     * Internal constructor preserving edit state across mode switches.
+     */
+    private QuestScreen(@Nullable Screen parent, Quest quest, boolean editing, boolean isNewQuest,
+                        boolean showFormattingHelp, @Nullable String originalTitle, @Nullable String originalContent) {
+        super(DataSource.asset(Identifier.of("disquests",
+                editing ? "quest_screen_edit" : "quest_screen_view")), parent);
         this.quest = quest;
-        this.editing = startInEditMode;
-        this.isNewQuest = startInEditMode;
+        this.editing = editing;
+        this.isNewQuest = isNewQuest;
         this.regionEnabled = quest.isRegion();
+        this.showFormattingHelp = showFormattingHelp;
+        this.originalTitle = originalTitle;
+        this.originalContent = originalContent;
     }
 
-    // --- Accessors for ContributorScreen ---
+    // --- Accessors ---
 
-    public Quest getQuest() {
-        return quest;
-    }
-
-    public MultiLineTextFieldWidget getTitleField() {
-        return editTitleField;
-    }
-
-    public MultiLineTextFieldWidget getContentField() {
-        return editContentField;
-    }
-
-    public DarkButtonWidget getHelpButton() {
-        return helpButton;
-    }
-
-    public boolean isEditing() {
-        return editing;
-    }
-
-    // --- Lifecycle ---
+    public Quest getQuest() { return quest; }
+    public boolean isEditing() { return editing; }
+    public boolean hasLeaveButton() { return isContributor && !isOwner && !editing; }
 
     @Override
-    protected void init() {
-        super.init();
-
+    protected void build(FlowLayout root) {
         UUID myUuid = ClientSession.getEffectivePlayerUuid();
         this.isOwner = quest.getOwnerUuid().equals(myUuid);
         this.canEdit = isOwner || quest.getContributors().stream()
@@ -144,627 +108,361 @@ public class QuestScreen extends BaseScreen {
         this.hideContent = quest.getVisibility() == Visibility.CLOSED && !isOwner && !isContributor;
 
         if (editing) {
-            initEditMode();
+            buildEditMode(root);
         } else {
-            initViewMode();
+            buildViewMode(root);
         }
     }
 
     // ===================== VIEW MODE =====================
 
-    private void initViewMode() {
-        int contentWidth = (int) (this.width * ScreenLayouts.CONTENT_WIDTH_RATIO);
-        int contentX = (this.width - contentWidth) / 2;
+    private void buildViewMode(FlowLayout root) {
+        // Title
+        root.childById(LabelComponent.class, "title-label")
+                .text(Text.literal(quest.getTitle() != null ? quest.getTitle() : "Untitled"));
 
-        // Determine if we need metadata bar and contributors row
-        boolean hasCoords = quest.getCoordinates() != null;
-        int metadataHeight = hasCoords ? 24 : 0;
-        boolean hasContributors = !quest.getContributors().isEmpty();
-        int contributorsHeight = hasContributors ? 14 : 0;
-
-        // Check if BlueMap link is available
-        String bluemapUrl = BlueMapHelper.buildUrl(quest);
-        boolean hasBluemap = bluemapUrl != null;
-
-        // Bottom buttons
-        int buttonsY = UIHelper.getBottomButtonY(this);
-        int bottomMargin = ScreenLayouts.getBottomMarginSingleRow();
-
-        // --- BUTTONS ---
-        List<Text> buttonTexts = new ArrayList<>();
-        buttonTexts.add(Text.literal("Edit"));
-        if (isContributor && !isOwner) {
-            buttonTexts.add(Text.literal("Leave"));
-        }
-        buttonTexts.add(Text.literal("Delete"));
-        buttonTexts.add(Text.literal("Close"));
-
-        UIHelper.createButtonRow(this, buttonsY, buttonTexts, (index, x, width) -> {
-            String label = buttonTexts.get(index).getString();
-            switch (label) {
-                case "Edit" -> {
-                    this.editButton = this.addDrawableChild(new DarkButtonWidget(
-                            x, buttonsY, width, UIHelper.BUTTON_HEIGHT,
-                            buttonTexts.get(index),
-                            b -> enterEditMode()));
-                    this.editButton.active = canEdit;
-                }
-                case "Leave" -> this.addDrawableChild(new DarkButtonWidget(
-                        x, buttonsY, width, UIHelper.BUTTON_HEIGHT,
-                        buttonTexts.get(index),
-                        b -> leaveQuest()));
-                case "Delete" -> {
-                    this.deleteButton = this.addDrawableChild(new DarkButtonWidget(
-                            x, buttonsY, width, UIHelper.BUTTON_HEIGHT,
-                            buttonTexts.get(index),
-                            b -> confirmDelete()));
-                    this.deleteButton.active = isOwner;
-                }
-                case "Close" -> this.addDrawableChild(new DarkButtonWidget(
-                        x, buttonsY, width, UIHelper.BUTTON_HEIGHT,
-                        buttonTexts.get(index),
-                        b -> this.close()));
-            }
-        });
-
-        this.editButton.setTooltip(Tooltip.of(Text.literal("Edit this quest")));
-        this.deleteButton.setTooltip(Tooltip.of(Text.literal("Permanently delete this quest")));
-
-        // --- TITLE AREA ---
-        int titleY = ScreenLayouts.TOP_MARGIN + 5;
-        this.viewTitleArea = new ReadOnlyMultiLineTextFieldWidget(
-                this.textRenderer, contentX, titleY,
-                contentWidth, ScreenLayouts.TITLE_PANEL_HEIGHT,
-                quest.getTitle(), 1, false
-        );
-        this.addSelectableChild(this.viewTitleArea);
-
-        // --- CONTENT AREA ---
-        int contentPanelY = ScreenLayouts.TOP_MARGIN + ScreenLayouts.TITLE_PANEL_HEIGHT + ScreenLayouts.PANEL_SPACING;
-        int contentPanelBottom = this.height - bottomMargin - metadataHeight - contributorsHeight;
-        if (metadataHeight > 0) contentPanelBottom -= ScreenLayouts.PANEL_SPACING;
-        if (contributorsHeight > 0) contentPanelBottom -= ScreenLayouts.PANEL_SPACING;
-        int contentPanelHeight = contentPanelBottom - contentPanelY;
-
-        String contentToRender = hideContent
-                ? "Request access to view this quest"
-                : Objects.requireNonNullElse(quest.getContent(), "");
-        List<RenderedLine> rendered = MarkdownRenderer.render(contentToRender);
-        this.viewContentArea = new MarkdownWidget(
-                this.textRenderer, contentX, contentPanelY,
-                contentWidth, contentPanelHeight, rendered
-        );
-        this.viewContentArea.setCheckboxToggleListener((checkboxIndex, nowChecked) -> {
-            if (!canEdit) return;
-            if (hideContent) return;
-            String content = quest.getContent();
-            if (content == null) return;
-            String updated = toggleCheckbox(content, checkboxIndex, nowChecked);
-            quest.setContent(updated);
-            List<RenderedLine> rerendered = MarkdownRenderer.render(updated);
-            this.viewContentArea.setContent(rerendered);
-            PacketSender.saveQuest(quest.getId(), quest.getTitle(), updated,
-                    quest.getCoordinates(), quest.isRegion(), quest.getCoordinates2(), quest.getMap());
-            ClientCache.addOrUpdateMyQuest(quest);
-        });
-        this.addSelectableChild(this.viewContentArea);
-
-        // --- BLUEMAP BUTTON (if applicable) ---
-        if (hasCoords && hasBluemap) {
-            int metaY = contentPanelBottom + ScreenLayouts.PANEL_SPACING;
-            int bmBtnWidth = this.textRenderer.getWidth("View on BlueMap") + UIHelper.BUTTON_TEXT_PADDING * 2;
-            bmBtnWidth = Math.max(bmBtnWidth, UIHelper.MIN_BUTTON_WIDTH);
-            int bmBtnX = contentX + contentWidth - bmBtnWidth;
-
-            final String url = bluemapUrl;
-            this.addDrawableChild(new DarkButtonWidget(
-                    bmBtnX, metaY, bmBtnWidth, 20,
-                    Text.literal("View on BlueMap"),
-                    b -> {
-                        try {
-                            Util.getOperatingSystem().open(URI.create(url));
-                        } catch (Exception ignored) {
-                        }
-                    }
-            ));
-        }
-
-        // --- Pre-compute view mode render strings ---
+        // Owner + visibility info
         String ownerInfo = "by " + quest.getOwnerName();
         if (quest.getVisibility() != null) {
             ownerInfo += "  [" + quest.getVisibility().name() + "]";
         }
-        this.viewOwnerInfo = ownerInfo;
-        this.viewCoordsText = hasCoords ? buildCoordsText() : null;
-        this.viewMapText = (hasCoords && quest.getMap() != null) ? "Map: " + quest.getMap() : null;
-        this.viewContributorsText = quest.getContributors().isEmpty() ? null
-                : quest.getContributors().stream()
-                        .map(c -> c.getName())
-                        .collect(Collectors.joining(", "));
-    }
+        root.childById(LabelComponent.class, "owner-label")
+                .text(Text.literal(ownerInfo).withColor(Colors.TEXT_MUTED));
 
-    private void renderViewMode(DrawContext context, int mouseX, int mouseY, float delta) {
-        int contentWidth = (int) (this.width * ScreenLayouts.CONTENT_WIDTH_RATIO);
-        int contentX = (this.width - contentWidth) / 2;
-        int bottomMargin = ScreenLayouts.getBottomMarginSingleRow();
+        // Content area -- add MarkdownWidget
+        String contentToRender = hideContent
+                ? "Request access to view this quest"
+                : Objects.requireNonNullElse(quest.getContent(), "");
+        List<RenderedLine> rendered = MarkdownRenderer.render(contentToRender);
+        MarkdownWidget markdownWidget = new MarkdownWidget(rendered);
+        markdownWidget.sizing(Sizing.fill(100), Sizing.fill(100));
 
+        if (!hideContent) {
+            markdownWidget.setCheckboxToggleListener((checkboxIndex, nowChecked) -> {
+                if (!canEdit) return;
+                String content = quest.getContent();
+                if (content == null) return;
+                String updated = toggleCheckbox(content, checkboxIndex, nowChecked);
+                quest.setContent(updated);
+                List<RenderedLine> rerendered = MarkdownRenderer.render(updated);
+                markdownWidget.setContent(rerendered);
+                PacketSender.saveQuest(quest.getId(), quest.getTitle(), updated,
+                        quest.getCoordinates(), quest.isRegion(), quest.getCoordinates2(), quest.getMap());
+                ClientCache.addOrUpdateMyQuest(quest);
+            });
+        }
+
+        FlowLayout contentArea = root.childById(FlowLayout.class, "content-area");
+        contentArea.child(markdownWidget);
+
+        // Metadata row (coords + BlueMap button)
         boolean hasCoords = quest.getCoordinates() != null;
-        int metadataHeight = hasCoords ? 24 : 0;
-        boolean hasContributors = viewContributorsText != null;
-        int contributorsHeight = hasContributors ? 14 : 0;
-
-        // --- Screen title ---
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 8, Colors.TEXT_PRIMARY);
-
-        // --- Owner & visibility info (pre-computed in initViewMode) ---
-        int ownerInfoWidth = this.textRenderer.getWidth(viewOwnerInfo);
-        context.drawText(this.textRenderer, viewOwnerInfo,
-                contentX + contentWidth - ownerInfoWidth,
-                8,
-                Colors.TEXT_MUTED, false);
-
-        // --- Title Panel ---
-        UIHelper.drawPanel(context, contentX, ScreenLayouts.TOP_MARGIN,
-                contentWidth, ScreenLayouts.TITLE_PANEL_HEIGHT);
-        this.viewTitleArea.render(context, mouseX, mouseY, delta);
-
-        // --- Content Panel ---
-        int contentPanelY = ScreenLayouts.TOP_MARGIN + ScreenLayouts.TITLE_PANEL_HEIGHT + ScreenLayouts.PANEL_SPACING;
-        int contentPanelBottom = this.height - bottomMargin - metadataHeight - contributorsHeight;
-        if (metadataHeight > 0) contentPanelBottom -= ScreenLayouts.PANEL_SPACING;
-        if (contributorsHeight > 0) contentPanelBottom -= ScreenLayouts.PANEL_SPACING;
-        UIHelper.drawPanel(context, contentX, contentPanelY,
-                contentWidth, contentPanelBottom - contentPanelY);
-        this.viewContentArea.render(context, mouseX, mouseY, delta);
-
-        int nextY = contentPanelBottom;
-
-        // --- Metadata bar (pre-computed in initViewMode) ---
+        FlowLayout metadataRow = root.childById(FlowLayout.class, "metadata-row");
         if (hasCoords) {
-            nextY += ScreenLayouts.PANEL_SPACING;
-            UIHelper.drawPanel(context, contentX, nextY, contentWidth, metadataHeight);
+            root.childById(LabelComponent.class, "coords-label")
+                    .text(Text.literal(buildCoordsText()).withColor(Colors.TEXT_MUTED));
 
-            int textY = nextY + (metadataHeight - 8) / 2;
-            int textX = contentX + 5;
-
-            context.drawText(this.textRenderer, viewCoordsText, textX, textY, Colors.TEXT_MUTED, false);
-
-            if (viewMapText != null) {
-                int coordsWidth = this.textRenderer.getWidth(viewCoordsText);
-                context.drawText(this.textRenderer, viewMapText,
-                        textX + coordsWidth + 12, textY, Colors.TEXT_MUTED, false);
+            if (quest.getMap() != null) {
+                root.childById(LabelComponent.class, "map-label")
+                        .text(Text.literal("Map: " + quest.getMap()).withColor(Colors.TEXT_MUTED));
             }
-            nextY += metadataHeight;
+
+            // BlueMap button
+            String bluemapUrl = BlueMapHelper.buildUrl(quest);
+            if (bluemapUrl != null) {
+                final String url = bluemapUrl;
+                ButtonComponent bmBtn = UIComponents.button(Text.literal("View on BlueMap"), b -> {
+                    try {
+                        net.minecraft.util.Util.getOperatingSystem().open(URI.create(url));
+                    } catch (Exception ignored) {}
+                });
+                bmBtn.sizing(Sizing.content(), Sizing.fixed(14));
+                metadataRow.child(bmBtn);
+            }
+        } else {
+            metadataRow.sizing(Sizing.fixed(0), Sizing.fixed(0));
         }
 
-        // --- Contributors ---
-        if (hasContributors) {
-            nextY += ScreenLayouts.PANEL_SPACING;
-            context.drawText(this.textRenderer, "Contributors: " + viewContributorsText,
-                    contentX + 5, nextY + 2, Colors.TEXT_MUTED, false);
+        // Contributors row
+        FlowLayout contributorsRow = root.childById(FlowLayout.class, "contributors-row");
+        if (!quest.getContributors().isEmpty()) {
+            String contribText = "Contributors: " + quest.getContributors().stream()
+                    .map(c -> c.getName())
+                    .collect(Collectors.joining(", "));
+            root.childById(LabelComponent.class, "contributors-label")
+                    .text(Text.literal(contribText).withColor(Colors.TEXT_MUTED));
+        } else {
+            contributorsRow.sizing(Sizing.fixed(0), Sizing.fixed(0));
         }
+
+        // Buttons
+        ButtonComponent editBtn = root.childById(ButtonComponent.class, "btn-edit");
+        editBtn.onPress(b -> enterEditMode());
+        editBtn.active = canEdit;
+
+        ButtonComponent leaveBtn = root.childById(ButtonComponent.class, "btn-leave");
+        if (isContributor && !isOwner) {
+            leaveBtn.onPress(b -> leaveQuest());
+        } else {
+            leaveBtn.sizing(Sizing.fixed(0), Sizing.fixed(0));
+        }
+
+        ButtonComponent deleteBtn = root.childById(ButtonComponent.class, "btn-delete");
+        deleteBtn.onPress(b -> confirmDelete());
+        deleteBtn.active = isOwner;
+
+        root.childById(ButtonComponent.class, "btn-close")
+                .onPress(b -> this.close());
     }
 
     // ===================== EDIT MODE =====================
 
-    private void initEditMode() {
-        int contentWidth = (int) (this.width * ScreenLayouts.CONTENT_WIDTH_RATIO);
-        int contentX = (this.width - contentWidth) / 2;
-
-        // --- LAYOUT: optional fields panel + settings row (owner only) ---
-        int optionalFieldsHeight = 30; // coords row height
-        if (regionEnabled) {
-            optionalFieldsHeight += 18; // corner 2 row
-        }
-        optionalFieldsHeight += 18; // map row
-        optionalFieldsHeight += 8;  // padding
-
-        int settingsRowHeight = isOwner ? 24 : 0;
-
-        int bottomMargin = ScreenLayouts.getBottomMarginSingleRow();
-        int buttonsY = UIHelper.getBottomButtonY(this);
-
-        // --- BOTTOM BUTTONS: Save, Cancel ---
-        List<Text> bottomButtonTexts = List.of(
-                Text.literal("Save"),
-                Text.literal("Cancel")
-        );
-        UIHelper.createButtonRow(this, buttonsY, bottomButtonTexts, (index, x, width) -> {
-            switch (index) {
-                case 0 -> this.addDrawableChild(new DarkButtonWidget(
-                        x, buttonsY, width, UIHelper.BUTTON_HEIGHT,
-                        bottomButtonTexts.get(0), b -> saveAndView()));
-                case 1 -> this.addDrawableChild(new DarkButtonWidget(
-                        x, buttonsY, width, UIHelper.BUTTON_HEIGHT,
-                        bottomButtonTexts.get(1), b -> cancelEdit()));
-            }
-        });
-
-        // --- TITLE FIELD ---
-        int titleY = ScreenLayouts.TOP_MARGIN + 5;
-        this.editTitleField = new MultiLineTextFieldWidget(
-                this.textRenderer, contentX, titleY,
-                contentWidth, ScreenLayouts.TITLE_PANEL_HEIGHT,
-                quest.getTitle(), "Quest title...", 1, false
-        );
-        this.addSelectableChild(this.editTitleField);
-
-        // Save original values for dirty tracking (only on first init)
+    private void buildEditMode(FlowLayout root) {
+        // Snapshot originals for dirty tracking
         if (originalTitle == null) {
             originalTitle = quest.getTitle() != null ? quest.getTitle() : "";
             originalContent = quest.getContent() != null ? quest.getContent() : "";
         }
 
-        // --- CONTENT FIELD ---
-        int contentPanelY = ScreenLayouts.TOP_MARGIN + ScreenLayouts.TITLE_PANEL_HEIGHT + ScreenLayouts.PANEL_SPACING;
-        int contentPanelBottom = this.height - bottomMargin
-                - optionalFieldsHeight - ScreenLayouts.PANEL_SPACING
-                - settingsRowHeight - (settingsRowHeight > 0 ? ScreenLayouts.PANEL_SPACING : 0);
-        int contentPanelHeight = Math.max(30, contentPanelBottom - contentPanelY);
+        // Title field
+        FlowLayout titleRow = root.childById(FlowLayout.class, "title-row");
+        MultiLineTextFieldWidget titleField = new MultiLineTextFieldWidget(
+                client.textRenderer, 0, 0, 300, 16,
+                quest.getTitle(), "Quest title...", 1, false);
+        titleFieldComponent = new TextFieldComponent(titleField);
+        titleFieldComponent.sizing(Sizing.fill(90), Sizing.fixed(16));
+        titleRow.child(titleFieldComponent);
 
-        int editorWidth = contentWidth;
-        if (showFormattingHelp) {
-            editorWidth -= FORMATTING_PANEL_WIDTH + ScreenLayouts.PANEL_SPACING;
+        // Help toggle button
+        ButtonComponent helpBtn = UIComponents.button(Text.literal("?"), b -> toggleFormattingHelp());
+        helpBtn.sizing(Sizing.fixed(14), Sizing.fixed(14));
+        helpBtn.tooltip(Text.literal("Toggle formatting reference"));
+        titleRow.child(helpBtn);
+
+        // Content editor
+        FlowLayout editorPanel = root.childById(FlowLayout.class, "editor-panel");
+        MultiLineTextFieldWidget contentField = new MultiLineTextFieldWidget(
+                client.textRenderer, 0, 0, 400, 200,
+                quest.getContent() != null ? quest.getContent() : "",
+                "Quest content...", Integer.MAX_VALUE, true, true);
+        contentFieldComponent = new TextFieldComponent(contentField);
+        contentFieldComponent.sizing(Sizing.fill(100), Sizing.fill(100));
+        editorPanel.child(contentFieldComponent);
+
+        // Formatting help panel visibility
+        FlowLayout formattingPanel = root.childById(FlowLayout.class, "formatting-panel");
+        if (!showFormattingHelp) {
+            formattingPanel.sizing(Sizing.fixed(0), Sizing.fixed(0));
         }
 
-        this.editContentField = new MultiLineTextFieldWidget(
-                this.textRenderer, contentX, contentPanelY,
-                editorWidth, contentPanelHeight,
-                quest.getContent() != null ? quest.getContent() : "",
-                "Quest content...", Integer.MAX_VALUE, true, true
-        );
-        this.addSelectableChild(this.editContentField);
+        // Coords section
+        buildCoordsSection(root);
 
-        // --- FORMATTING HELP TOGGLE BUTTON ---
-        int helpBtnSize = 14;
-        this.helpButton = this.addDrawableChild(new DarkButtonWidget(
-                contentX + contentWidth - helpBtnSize - 2,
-                titleY + (ScreenLayouts.TITLE_PANEL_HEIGHT - helpBtnSize) / 2,
-                helpBtnSize, helpBtnSize,
-                Text.literal("?"), b -> toggleFormattingHelp()
-        ));
-        this.helpButton.setTooltip(Tooltip.of(Text.literal("Toggle formatting reference")));
+        // Settings row (owner only)
+        FlowLayout settingsRow = root.childById(FlowLayout.class, "settings-row");
+        if (isOwner) {
+            String visText = "Visibility: " + quest.getVisibility().name();
+            ButtonComponent visBtn = root.childById(ButtonComponent.class, "btn-visibility");
+            visBtn.setMessage(Text.literal(visText));
+            visBtn.onPress(b -> cycleVisibility());
 
-        // --- OPTIONAL FIELDS PANEL ---
-        int optPanelY = contentPanelY + contentPanelHeight + ScreenLayouts.PANEL_SPACING;
-        int rowY = optPanelY + 4;
+            int contribCount = quest.getContributors() != null ? quest.getContributors().size() : 0;
+            int pendingReqCount = ClientCache.getPendingCount(quest.getId());
+            Text contribText;
+            if (pendingReqCount > 0) {
+                contribText = Text.literal("Contributors (" + contribCount + " ")
+                        .append(Text.literal("+ " + pendingReqCount).withColor(Colors.AMBER))
+                        .append(Text.literal(")"));
+            } else {
+                contribText = Text.literal("Contributors (" + contribCount + ")");
+            }
+            ButtonComponent contribBtn = root.childById(ButtonComponent.class, "btn-contributors");
+            contribBtn.setMessage(contribText);
+            contribBtn.onPress(b -> openContributors());
+        } else {
+            settingsRow.sizing(Sizing.fixed(0), Sizing.fixed(0));
+        }
 
-        // Coords row
-        buildCoordsRow(contentX, rowY);
-        rowY += 18;
+        // Bottom buttons
+        root.childById(ButtonComponent.class, "btn-save")
+                .onPress(b -> saveAndView());
+        root.childById(ButtonComponent.class, "btn-cancel")
+                .onPress(b -> cancelEdit());
+    }
 
-        // Region corner 2 row (if region enabled)
+    private void buildCoordsSection(FlowLayout root) {
+        CoordinatesData c = quest.getCoordinates();
+        FlowLayout coordsRow = root.childById(FlowLayout.class, "coords-row");
+
+        // X/Y/Z fields
+        coordXComponent = createCoordField(c != null ? String.valueOf((int) c.x()) : "", "X");
+        coordYComponent = createCoordField(c != null ? String.valueOf((int) c.y()) : "", "Y");
+        coordZComponent = createCoordField(c != null ? String.valueOf((int) c.z()) : "", "Z");
+
+        coordsRow.child(labelFor("X:"));
+        coordsRow.child(coordXComponent);
+        coordsRow.child(labelFor("Y:"));
+        coordsRow.child(coordYComponent);
+        coordsRow.child(labelFor("Z:"));
+        coordsRow.child(coordZComponent);
+
+        // Set Pos button
+        ButtonComponent setPosBtn = UIComponents.button(Text.literal("Set Pos"), b -> setPlayerPosition());
+        setPosBtn.sizing(Sizing.fixed(50), Sizing.fixed(14));
+        coordsRow.child(setPosBtn);
+
+        // Region toggle
+        String regionText = regionEnabled ? "[x] Region" : "[ ] Region";
+        ButtonComponent regionBtn = UIComponents.button(Text.literal(regionText), b -> toggleRegion());
+        regionBtn.sizing(Sizing.content(), Sizing.fixed(14));
+        coordsRow.child(regionBtn);
+
+        // Clear button
+        ButtonComponent clearBtn = UIComponents.button(Text.literal("Clear"), b -> clearCoords());
+        clearBtn.sizing(Sizing.fixed(50), Sizing.fixed(14));
+        coordsRow.child(clearBtn);
+
+        // Corner 2 row
+        FlowLayout corner2Row = root.childById(FlowLayout.class, "corner2-row");
         if (regionEnabled) {
-            buildCorner2Row(contentX, rowY);
-            rowY += 18;
+            CoordinatesData c2 = quest.getCoordinates2();
+            coord2XComponent = createCoordField(c2 != null ? String.valueOf((int) c2.x()) : "", "X");
+            coord2YComponent = createCoordField(c2 != null ? String.valueOf((int) c2.y()) : "", "Y");
+            coord2ZComponent = createCoordField(c2 != null ? String.valueOf((int) c2.z()) : "", "Z");
+
+            corner2Row.child(labelFor("C2 X:"));
+            corner2Row.child(coord2XComponent);
+            corner2Row.child(labelFor("Y:"));
+            corner2Row.child(coord2YComponent);
+            corner2Row.child(labelFor("Z:"));
+            corner2Row.child(coord2ZComponent);
+
+            ButtonComponent setPos2Btn = UIComponents.button(Text.literal("Set Pos"), b -> setCorner2Position());
+            setPos2Btn.sizing(Sizing.fixed(50), Sizing.fixed(14));
+            corner2Row.child(setPos2Btn);
+        } else {
+            corner2Row.sizing(Sizing.fixed(0), Sizing.fixed(0));
         }
 
         // Map row
-        buildMapRow(contentX, rowY);
-
-        // --- SETTINGS ROW (owner only) ---
-        if (isOwner) {
-            int settingsY = optPanelY + optionalFieldsHeight + ScreenLayouts.PANEL_SPACING;
-            buildSettingsRow(contentX, settingsY);
-        }
-
-        this.setInitialFocus(this.editTitleField);
-    }
-
-    private void renderEditMode(DrawContext context, int mouseX, int mouseY, float delta) {
-        int contentWidth = (int) (this.width * ScreenLayouts.CONTENT_WIDTH_RATIO);
-        int contentX = (this.width - contentWidth) / 2;
-
-        int optionalFieldsHeight = 30;
-        if (regionEnabled) {
-            optionalFieldsHeight += 18;
-        }
-        optionalFieldsHeight += 18;
-        optionalFieldsHeight += 8;
-
-        int settingsRowHeight = isOwner ? 24 : 0;
-        int bottomMargin = ScreenLayouts.getBottomMarginSingleRow();
-
-        // Screen title
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 8, Colors.TEXT_PRIMARY);
-
-        // Title Panel
-        UIHelper.drawPanel(context, contentX, ScreenLayouts.TOP_MARGIN,
-                contentWidth, ScreenLayouts.TITLE_PANEL_HEIGHT);
-        this.editTitleField.render(context, mouseX, mouseY, delta);
-
-        // Content Panel
-        int contentPanelY = ScreenLayouts.TOP_MARGIN + ScreenLayouts.TITLE_PANEL_HEIGHT + ScreenLayouts.PANEL_SPACING;
-        int contentPanelBottom = this.height - bottomMargin
-                - optionalFieldsHeight - ScreenLayouts.PANEL_SPACING
-                - settingsRowHeight - (settingsRowHeight > 0 ? ScreenLayouts.PANEL_SPACING : 0);
-        int contentPanelHeight = Math.max(30, contentPanelBottom - contentPanelY);
-
-        int editorWidth = contentWidth;
-        if (showFormattingHelp) {
-            editorWidth -= FORMATTING_PANEL_WIDTH + ScreenLayouts.PANEL_SPACING;
-        }
-
-        UIHelper.drawPanel(context, contentX, contentPanelY, editorWidth, contentPanelHeight);
-        this.editContentField.render(context, mouseX, mouseY, delta);
-
-        // Formatting help side panel (two-column: syntax | rendered preview)
-        if (showFormattingHelp) {
-            int panelX = contentX + contentWidth - FORMATTING_PANEL_WIDTH;
-            UIHelper.drawPanel(context, panelX, contentPanelY, FORMATTING_PANEL_WIDTH, contentPanelHeight);
-
-            int textX = panelX + 5;
-            int textY = contentPanelY + 5;
-            int lineH = this.textRenderer.fontHeight + 2;
-            int colSplit = panelX + 80;
-
-            context.drawText(this.textRenderer, "Formatting", textX, textY, Colors.TEXT_PRIMARY, false);
-            textY += lineH + 4;
-
-            // Bold
-            context.drawText(this.textRenderer, "**text**", textX, textY, Colors.TEXT_MUTED, false);
-            context.drawText(this.textRenderer, FMT_BOLD, colSplit, textY, Colors.TEXT_PRIMARY, false);
-            textY += lineH;
-
-            // Italic
-            context.drawText(this.textRenderer, "*text*", textX, textY, Colors.TEXT_MUTED, false);
-            context.drawText(this.textRenderer, FMT_ITALIC, colSplit, textY, Colors.TEXT_PRIMARY, false);
-            textY += lineH;
-
-            // Strikethrough
-            context.drawText(this.textRenderer, "~~text~~", textX, textY, Colors.TEXT_MUTED, false);
-            context.drawText(this.textRenderer, FMT_STRIKE, colSplit, textY, Colors.TEXT_PRIMARY, false);
-            textY += lineH;
-
-            // Heading
-            context.drawText(this.textRenderer, "# Heading", textX, textY, Colors.TEXT_MUTED, false);
-            context.drawText(this.textRenderer, FMT_HEADING, colSplit, textY, 0xFFFFFF55, false);
-            textY += lineH;
-
-            // Checkbox
-            context.drawText(this.textRenderer, "- [ ] task", textX, textY, Colors.TEXT_MUTED, false);
-            context.drawText(this.textRenderer, "[ ] task", colSplit, textY, Colors.TEXT_PRIMARY, false);
-            textY += lineH;
-
-            // Checked
-            context.drawText(this.textRenderer, "- [x] done", textX, textY, Colors.TEXT_MUTED, false);
-            context.drawText(this.textRenderer, "[x] done", colSplit, textY, 0xFF88FF88, false);
-            textY += lineH;
-
-            // Quote
-            context.drawText(this.textRenderer, "> text", textX, textY, Colors.TEXT_MUTED, false);
-            context.drawText(this.textRenderer, "| text", colSplit, textY, 0xFFAAAAFF, false);
-            textY += lineH;
-
-            // Link
-            context.drawText(this.textRenderer, "[a](url)", textX, textY, Colors.TEXT_MUTED, false);
-            context.drawText(this.textRenderer, FMT_LINK, colSplit, textY, 0xFF5599FF, false);
-        }
-
-        // Optional fields panel
-        int optPanelY = contentPanelY + contentPanelHeight + ScreenLayouts.PANEL_SPACING;
-        UIHelper.drawPanel(context, contentX, optPanelY, contentWidth, optionalFieldsHeight);
-
-        int rowY = optPanelY + 4;
-
-        // Coords: editable X/Y/Z fields with labels
-        int curX = contentX + 5;
-        int coordFieldWidth = 50;
-        int coordSpacing = 4;
-
-        int xLabelWidth = this.textRenderer.getWidth("X:");
-        context.drawText(this.textRenderer, "X:", curX, rowY + 3, Colors.TEXT_MUTED, false);
-        curX += xLabelWidth + 2;
-        if (this.coordXField != null) this.coordXField.render(context, mouseX, mouseY, delta);
-        curX += coordFieldWidth + coordSpacing;
-
-        int yLabelWidth = this.textRenderer.getWidth("Y:");
-        context.drawText(this.textRenderer, "Y:", curX, rowY + 3, Colors.TEXT_MUTED, false);
-        curX += yLabelWidth + 2;
-        if (this.coordYField != null) this.coordYField.render(context, mouseX, mouseY, delta);
-        curX += coordFieldWidth + coordSpacing;
-
-        int zLabelWidth = this.textRenderer.getWidth("Z:");
-        context.drawText(this.textRenderer, "Z:", curX, rowY + 3, Colors.TEXT_MUTED, false);
-        if (this.coordZField != null) this.coordZField.render(context, mouseX, mouseY, delta);
-        rowY += 18;
-
-        // Corner 2 row (if region)
-        if (regionEnabled) {
-            int c2CurX = contentX + 5;
-            context.drawText(this.textRenderer, "C2 ", c2CurX, rowY + 3, Colors.TEXT_MUTED, false);
-            c2CurX += this.textRenderer.getWidth("C2 ");
-
-            context.drawText(this.textRenderer, "X:", c2CurX, rowY + 3, Colors.TEXT_MUTED, false);
-            c2CurX += this.textRenderer.getWidth("X:") + 2;
-            if (this.coord2XField != null) this.coord2XField.render(context, mouseX, mouseY, delta);
-            c2CurX += 50 + 4;
-
-            context.drawText(this.textRenderer, "Y:", c2CurX, rowY + 3, Colors.TEXT_MUTED, false);
-            c2CurX += this.textRenderer.getWidth("Y:") + 2;
-            if (this.coord2YField != null) this.coord2YField.render(context, mouseX, mouseY, delta);
-            c2CurX += 50 + 4;
-
-            context.drawText(this.textRenderer, "Z:", c2CurX, rowY + 3, Colors.TEXT_MUTED, false);
-            if (this.coord2ZField != null) this.coord2ZField.render(context, mouseX, mouseY, delta);
-            rowY += 18;
-        }
-
-        // Map label + value
-        context.drawText(this.textRenderer, "Map: ", contentX + 5, rowY + 3, Colors.TEXT_MUTED, false);
-        int mapLabelWidth = this.textRenderer.getWidth("Map: ");
+        FlowLayout mapRow = root.childById(FlowLayout.class, "map-row");
         String mapText = quest.getMap() != null ? quest.getMap() : "Any";
         int mapColor = quest.getMap() != null ? Colors.TEXT_PRIMARY : Colors.TEXT_DISABLED;
-        context.drawText(this.textRenderer, mapText, contentX + 5 + mapLabelWidth, rowY + 3, mapColor, false);
+        LabelComponent mapLabel = UIComponents.label(Text.literal("Map: " + mapText).withColor(mapColor));
+        mapLabel.shadow(true);
+        mapRow.child(mapLabel);
+
+        ButtonComponent autoBtn = UIComponents.button(Text.literal("Auto"), b -> autoMap());
+        autoBtn.sizing(Sizing.fixed(50), Sizing.fixed(14));
+        mapRow.child(autoBtn);
+
+        ButtonComponent clearMapBtn = UIComponents.button(Text.literal("Clear"), b -> clearMap());
+        clearMapBtn.sizing(Sizing.fixed(50), Sizing.fixed(14));
+        mapRow.child(clearMapBtn);
     }
 
-    // ===================== EDIT MODE ROWS =====================
-
-    private void buildCoordsRow(int panelX, int rowY) {
-        int btnWidth = 50;
-        int btnHeight = 14;
-        int fieldWidth = 50;
-        int fieldHeight = 14;
-        int spacing = 4;
-
-        int curX = panelX + 5;
-
-        // X label + field
-        int xLabelWidth = this.textRenderer.getWidth("X:");
-        curX += xLabelWidth + 2;
-        CoordinatesData c = quest.getCoordinates();
-        String xText = c != null ? String.valueOf((int) c.x()) : "";
-        this.coordXField = new MultiLineTextFieldWidget(
-                this.textRenderer, curX, rowY, fieldWidth, fieldHeight,
-                xText, "X", 1, false);
-        this.addSelectableChild(this.coordXField);
-        curX += fieldWidth + spacing;
-
-        // Y label + field
-        int yLabelWidth = this.textRenderer.getWidth("Y:");
-        curX += yLabelWidth + 2;
-        String yText = c != null ? String.valueOf((int) c.y()) : "";
-        this.coordYField = new MultiLineTextFieldWidget(
-                this.textRenderer, curX, rowY, fieldWidth, fieldHeight,
-                yText, "Y", 1, false);
-        this.addSelectableChild(this.coordYField);
-        curX += fieldWidth + spacing;
-
-        // Z label + field
-        int zLabelWidth = this.textRenderer.getWidth("Z:");
-        curX += zLabelWidth + 2;
-        String zText = c != null ? String.valueOf((int) c.z()) : "";
-        this.coordZField = new MultiLineTextFieldWidget(
-                this.textRenderer, curX, rowY, fieldWidth, fieldHeight,
-                zText, "Z", 1, false);
-        this.addSelectableChild(this.coordZField);
-        curX += fieldWidth + spacing;
-
-        // Set Pos button
-        this.addDrawableChild(new DarkButtonWidget(
-                curX, rowY, btnWidth, btnHeight,
-                Text.literal("Set Pos"), b -> setPlayerPosition()));
-        curX += btnWidth + spacing;
-
-        // Region toggle button
-        String regionText = regionEnabled ? "[x] Region" : "[ ] Region";
-        int regionBtnWidth = this.textRenderer.getWidth(regionText) + UIHelper.BUTTON_TEXT_PADDING;
-        this.regionButton = this.addDrawableChild(new DarkButtonWidget(
-                curX, rowY, regionBtnWidth, btnHeight,
-                Text.literal(regionText), b -> toggleRegion()));
-        this.regionButton.setTooltip(Tooltip.of(Text.literal("Define a rectangular area with two corners")));
-        curX += regionBtnWidth + spacing;
-
-        // Clear button
-        this.addDrawableChild(new DarkButtonWidget(
-                curX, rowY, btnWidth, btnHeight,
-                Text.literal("Clear"), b -> clearCoords()));
+    private TextFieldComponent createCoordField(String value, String placeholder) {
+        MultiLineTextFieldWidget field = new MultiLineTextFieldWidget(
+                client.textRenderer, 0, 0, 50, 14,
+                value, placeholder, 1, false);
+        TextFieldComponent component = new TextFieldComponent(field);
+        component.sizing(Sizing.fixed(50), Sizing.fixed(14));
+        return component;
     }
 
-    private void buildCorner2Row(int panelX, int rowY) {
-        int fieldWidth = 50;
-        int fieldHeight = 14;
-        int spacing = 4;
-        int btnWidth = 50;
-        int btnHeight = 14;
-
-        int curX = panelX + 5;
-
-        // "C2" label
-        int labelWidth = this.textRenderer.getWidth("C2 ");
-        curX += labelWidth;
-
-        CoordinatesData c2 = quest.getCoordinates2();
-
-        // X field
-        int xLabelWidth = this.textRenderer.getWidth("X:");
-        curX += xLabelWidth + 2;
-        String xText = c2 != null ? String.valueOf((int) c2.x()) : "";
-        this.coord2XField = new MultiLineTextFieldWidget(
-                this.textRenderer, curX, rowY, fieldWidth, fieldHeight,
-                xText, "X", 1, false);
-        this.addSelectableChild(this.coord2XField);
-        curX += fieldWidth + spacing;
-
-        // Y field
-        int yLabelWidth = this.textRenderer.getWidth("Y:");
-        curX += yLabelWidth + 2;
-        String yText = c2 != null ? String.valueOf((int) c2.y()) : "";
-        this.coord2YField = new MultiLineTextFieldWidget(
-                this.textRenderer, curX, rowY, fieldWidth, fieldHeight,
-                yText, "Y", 1, false);
-        this.addSelectableChild(this.coord2YField);
-        curX += fieldWidth + spacing;
-
-        // Z field
-        int zLabelWidth = this.textRenderer.getWidth("Z:");
-        curX += zLabelWidth + 2;
-        String zText = c2 != null ? String.valueOf((int) c2.z()) : "";
-        this.coord2ZField = new MultiLineTextFieldWidget(
-                this.textRenderer, curX, rowY, fieldWidth, fieldHeight,
-                zText, "Z", 1, false);
-        this.addSelectableChild(this.coord2ZField);
-        curX += fieldWidth + spacing;
-
-        // Set Pos button
-        this.addDrawableChild(new DarkButtonWidget(
-                curX, rowY, btnWidth, btnHeight,
-                Text.literal("Set Pos"), b -> setCorner2Position()));
+    private LabelComponent labelFor(String text) {
+        LabelComponent label = UIComponents.label(Text.literal(text).withColor(Colors.TEXT_MUTED));
+        label.shadow(true);
+        return label;
     }
 
-    private void buildMapRow(int panelX, int rowY) {
-        int labelWidth = this.textRenderer.getWidth("Map: ");
-        String mapText = quest.getMap() != null ? quest.getMap() : "Any";
-        int mapTextWidth = this.textRenderer.getWidth(mapText);
-        int btnWidth = 50;
-        int btnHeight = 14;
-        int spacing = 4;
+    // ===================== MODE SWITCHING =====================
 
-        int autoBtnX = panelX + labelWidth + mapTextWidth + spacing;
-        this.addDrawableChild(new DarkButtonWidget(
-                autoBtnX, rowY, btnWidth, btnHeight,
-                Text.literal("Auto"), b -> autoMap()));
-
-        int clearBtnX = autoBtnX + btnWidth + spacing;
-        this.addDrawableChild(new DarkButtonWidget(
-                clearBtnX, rowY, btnWidth, btnHeight,
-                Text.literal("Clear"), b -> clearMap()));
-    }
-
-    private void buildSettingsRow(int panelX, int settingsY) {
-        int btnHeight = 16;
-        int spacing = 8;
-
-        String visText = "Visibility: " + quest.getVisibility().name();
-        int visBtnWidth = this.textRenderer.getWidth(visText) + UIHelper.BUTTON_TEXT_PADDING * 2;
-        visBtnWidth = Math.max(visBtnWidth, UIHelper.MIN_BUTTON_WIDTH);
-        this.visibilityButton = this.addDrawableChild(new DarkButtonWidget(
-                panelX, settingsY, visBtnWidth, btnHeight,
-                Text.literal(visText), b -> cycleVisibility()));
-
-        String visTooltip = switch (quest.getVisibility()) {
-            case PRIVATE -> "Only you can see this quest";
-            case CLOSED -> "Visible to all, join by request";
-            case OPEN -> "Visible to all, anyone can join";
-        };
-        this.visibilityButton.setTooltip(Tooltip.of(Text.literal(visTooltip)));
-
-        int contribCount = quest.getContributors() != null ? quest.getContributors().size() : 0;
-        int pendingReqCount = ClientCache.getPendingCount(quest.getId());
-        Text contribText;
-        if (pendingReqCount > 0) {
-            contribText = Text.literal("Contributors (" + contribCount + " ")
-                    .append(Text.literal("+ " + pendingReqCount).withColor(Colors.AMBER))
-                    .append(Text.literal(")"));
-        } else {
-            contribText = Text.literal("Contributors (" + contribCount + ")");
+    private void enterEditMode() {
+        if (!canEdit) return;
+        persistFieldValues();
+        String origTitle = quest.getTitle() != null ? quest.getTitle() : "";
+        String origContent = quest.getContent() != null ? quest.getContent() : "";
+        if (this.client != null) {
+            this.client.setScreen(new QuestScreen(this.parent, quest, true, isNewQuest, true, origTitle, origContent));
         }
-        int contribBtnWidth = this.textRenderer.getWidth(contribText) + UIHelper.BUTTON_TEXT_PADDING * 2;
-        contribBtnWidth = Math.max(contribBtnWidth, UIHelper.MIN_BUTTON_WIDTH);
-        this.contributorsButton = this.addDrawableChild(new DarkButtonWidget(
-                panelX + visBtnWidth + spacing, settingsY, contribBtnWidth, btnHeight,
-                contribText, b -> openContributors()));
-        this.contributorsButton.setTooltip(Tooltip.of(Text.literal("Manage who can view/edit this quest")));
+    }
+
+    private void cancelEdit() {
+        if (isDirty()) {
+            if (this.client != null) {
+                this.client.setScreen(new ConfirmScreen(this,
+                        Text.literal("Discard unsaved changes?"),
+                        () -> {
+                            quest.setTitle(originalTitle);
+                            quest.setContent(originalContent);
+                            exitToViewMode();
+                        },
+                        () -> {
+                            if (this.client != null) this.client.setScreen(this);
+                        }));
+            }
+        } else {
+            exitToViewMode();
+        }
+    }
+
+    private void exitToViewMode() {
+        if (isNewQuest) {
+            if (this.client != null) this.client.setScreen(this.parent);
+        } else {
+            if (this.client != null) {
+                this.client.setScreen(new QuestScreen(this.parent, quest));
+            }
+        }
+    }
+
+    private void saveAndView() {
+        persistFieldValues();
+        ClientCache.addOrUpdateMyQuest(quest);
+        PacketSender.saveQuest(quest.getId(), quest.getTitle(), quest.getContent(),
+                quest.getCoordinates(), quest.isRegion(), quest.getCoordinates2(), quest.getMap());
+
+        UUID myUuid = ClientSession.getEffectivePlayerUuid();
+        if (quest.getOwnerUuid().equals(myUuid)) {
+            PacketSender.updateVisibility(quest.getId(), quest.getVisibility());
+        }
+
+        if (this.client != null) {
+            this.client.setScreen(new QuestScreen(this.parent, quest));
+        }
+    }
+
+    // ===================== VIEW MODE ACTIONS =====================
+
+    private void confirmDelete() {
+        if (this.client != null) {
+            this.client.setScreen(new ConfirmScreen(this,
+                    Text.literal("Delete quest \"" + quest.getTitle() + "\"?"),
+                    () -> {
+                        ClientCache.removeQuestById(quest.getId());
+                        PacketSender.deleteQuest(quest.getId());
+                        if (this.client != null) this.client.setScreen(this.parent);
+                    },
+                    () -> {
+                        if (this.client != null) this.client.setScreen(this);
+                    }));
+        }
+    }
+
+    private void leaveQuest() {
+        if (this.client != null) {
+            this.client.setScreen(new ConfirmScreen(this,
+                    Text.literal("Leave this quest? You'll lose contributor access."),
+                    () -> {
+                        PacketSender.leaveQuest(quest.getId());
+                        ClientSession.setPendingToast("Left \"" + quest.getTitle() + "\"");
+                        if (this.client != null) this.client.setScreen(this.parent);
+                    },
+                    () -> {
+                        if (this.client != null) this.client.setScreen(this);
+                    }));
+        }
     }
 
     // ===================== EDIT MODE ACTIONS =====================
@@ -777,7 +475,7 @@ public class QuestScreen extends BaseScreen {
             if (quest.getMap() == null && client.world != null) {
                 quest.setMap(client.world.getRegistryKey().getValue().getPath());
             }
-            this.clearAndInit();
+            rebuildEditMode();
         }
     }
 
@@ -786,7 +484,7 @@ public class QuestScreen extends BaseScreen {
             persistFieldValues();
             quest.setCoordinates2(new CoordinatesData(
                     client.player.getX(), client.player.getY(), client.player.getZ()));
-            this.clearAndInit();
+            rebuildEditMode();
         }
     }
 
@@ -797,7 +495,7 @@ public class QuestScreen extends BaseScreen {
         if (!this.regionEnabled) {
             quest.setCoordinates2(null);
         }
-        this.clearAndInit();
+        rebuildEditMode();
     }
 
     private void clearCoords() {
@@ -806,21 +504,21 @@ public class QuestScreen extends BaseScreen {
         quest.setCoordinates2(null);
         this.regionEnabled = false;
         quest.setRegion(false);
-        this.clearAndInit();
+        rebuildEditMode();
     }
 
     private void autoMap() {
         if (client != null && client.world != null) {
             quest.setMap(client.world.getRegistryKey().getValue().getPath());
             persistFieldValues();
-            this.clearAndInit();
+            rebuildEditMode();
         }
     }
 
     private void clearMap() {
         quest.setMap(null);
         persistFieldValues();
-        this.clearAndInit();
+        rebuildEditMode();
     }
 
     private void cycleVisibility() {
@@ -832,141 +530,62 @@ public class QuestScreen extends BaseScreen {
         };
         quest.setVisibility(next);
         persistFieldValues();
-        this.clearAndInit();
+        rebuildEditMode();
     }
 
     private void openContributors() {
         persistFieldValues();
-        open(new ContributorScreen(this, quest));
-    }
-
-    // ===================== MODE SWITCHING =====================
-
-    private void enterEditMode() {
-        if (!canEdit) return;
-        this.editing = true;
-        // Snapshot originals for dirty tracking when entering edit mode
-        this.originalTitle = quest.getTitle() != null ? quest.getTitle() : "";
-        this.originalContent = quest.getContent() != null ? quest.getContent() : "";
-        this.clearAndInit();
-    }
-
-    private void cancelEdit() {
-        if (isDirty()) {
-            showConfirm(Text.literal("Discard unsaved changes?"), () -> {
-                // Restore original values
-                quest.setTitle(originalTitle);
-                quest.setContent(originalContent);
-                exitToViewMode();
-            });
-        } else {
-            exitToViewMode();
+        if (this.client != null) {
+            this.client.setScreen(new ContributorScreen(this, quest));
         }
     }
 
-    private void exitToViewMode() {
-        if (isNewQuest) {
-            // For new quests, cancel means go back to parent
-            if (this.client != null) {
-                open(this.parent);
-            }
-        } else {
-            this.editing = false;
-            this.originalTitle = null;
-            this.originalContent = null;
-            this.clearAndInit();
-        }
-    }
-
-    private void saveAndView() {
-        persistFieldValues();
-        // Optimistically add to cache so tick() won't auto-close
-        // before the server's UPDATE_QUEST response arrives.
-        ClientCache.addOrUpdateMyQuest(quest);
-        PacketSender.saveQuest(
-                quest.getId(),
-                quest.getTitle(),
-                quest.getContent(),
-                quest.getCoordinates(),
-                quest.isRegion(),
-                quest.getCoordinates2(),
-                quest.getMap()
-        );
-        // Also send visibility update if owner
-        UUID myUuid = ClientSession.getEffectivePlayerUuid();
-        if (quest.getOwnerUuid().equals(myUuid)) {
-            PacketSender.updateVisibility(quest.getId(), quest.getVisibility());
-        }
-        // Switch to view mode
-        this.editing = false;
-        this.originalTitle = null;
-        this.originalContent = null;
-        this.clearAndInit();
-    }
-
-    // ===================== VIEW MODE ACTIONS =====================
-
-    private void confirmDelete() {
-        showConfirm(Text.literal("Delete quest \"" + quest.getTitle() + "\"?"), () -> {
-            ClientCache.removeQuestById(quest.getId());
-            PacketSender.deleteQuest(quest.getId());
-            this.close();
-        });
-    }
-
-    private void leaveQuest() {
-        showConfirm(Text.literal("Leave this quest? You'll lose contributor access."),
-                () -> {
-                    PacketSender.leaveQuest(quest.getId());
-                    ClientSession.setPendingToast("Left \"" + quest.getTitle() + "\"");
-                    this.close();
-                });
-    }
-
-    public boolean hasLeaveButton() {
-        return isContributor && !isOwner && !editing;
-    }
-
-    // ===================== SHARED HELPERS =====================
-
-
-    public void toggleFormattingHelp() {
+    private void toggleFormattingHelp() {
         persistFieldValues();
         showFormattingHelp = !showFormattingHelp;
-        this.clearAndInit();
+        rebuildEditMode();
     }
 
+    private void rebuildEditMode() {
+        if (this.client != null) {
+            this.client.setScreen(new QuestScreen(this.parent, quest, true, isNewQuest,
+                    showFormattingHelp, originalTitle, originalContent));
+        }
+    }
+
+    // ===================== HELPERS =====================
+
     private void persistFieldValues() {
-        if (this.editTitleField != null) {
-            quest.setTitle(this.editTitleField.getText());
+        if (titleFieldComponent != null) {
+            quest.setTitle(titleFieldComponent.getText());
         }
-        if (this.editContentField != null) {
-            quest.setContent(this.editContentField.getText());
+        if (contentFieldComponent != null) {
+            quest.setContent(contentFieldComponent.getText());
         }
-        if (this.coordXField != null) {
+        if (coordXComponent != null && coordYComponent != null && coordZComponent != null) {
             try {
-                double x = Double.parseDouble(coordXField.getText().trim());
-                double y = Double.parseDouble(coordYField.getText().trim());
-                double z = Double.parseDouble(coordZField.getText().trim());
+                double x = Double.parseDouble(coordXComponent.getText().trim());
+                double y = Double.parseDouble(coordYComponent.getText().trim());
+                double z = Double.parseDouble(coordZComponent.getText().trim());
                 quest.setCoordinates(new CoordinatesData(x, y, z));
             } catch (NumberFormatException e) {
-                if (coordXField.getText().trim().isEmpty()
-                        && coordYField.getText().trim().isEmpty()
-                        && coordZField.getText().trim().isEmpty()) {
+                if (coordXComponent.getText().trim().isEmpty()
+                        && coordYComponent.getText().trim().isEmpty()
+                        && coordZComponent.getText().trim().isEmpty()) {
                     quest.setCoordinates(null);
                 }
             }
         }
-        if (this.coord2XField != null && this.coord2YField != null && this.coord2ZField != null) {
+        if (coord2XComponent != null && coord2YComponent != null && coord2ZComponent != null) {
             try {
-                double x2 = Double.parseDouble(coord2XField.getText().trim());
-                double y2 = Double.parseDouble(coord2YField.getText().trim());
-                double z2 = Double.parseDouble(coord2ZField.getText().trim());
+                double x2 = Double.parseDouble(coord2XComponent.getText().trim());
+                double y2 = Double.parseDouble(coord2YComponent.getText().trim());
+                double z2 = Double.parseDouble(coord2ZComponent.getText().trim());
                 quest.setCoordinates2(new CoordinatesData(x2, y2, z2));
             } catch (NumberFormatException e) {
-                if (coord2XField.getText().trim().isEmpty()
-                        && coord2YField.getText().trim().isEmpty()
-                        && coord2ZField.getText().trim().isEmpty()) {
+                if (coord2XComponent.getText().trim().isEmpty()
+                        && coord2YComponent.getText().trim().isEmpty()
+                        && coord2ZComponent.getText().trim().isEmpty()) {
                     quest.setCoordinates2(null);
                 }
             }
@@ -974,16 +593,13 @@ public class QuestScreen extends BaseScreen {
     }
 
     private boolean isDirty() {
-        String currentTitle = this.editTitleField != null ? this.editTitleField.getText() : quest.getTitle();
-        String currentContent = this.editContentField != null ? this.editContentField.getText() : quest.getContent();
+        String currentTitle = titleFieldComponent != null ? titleFieldComponent.getText() : quest.getTitle();
+        String currentContent = contentFieldComponent != null ? contentFieldComponent.getText() : quest.getContent();
         if (currentTitle == null) currentTitle = "";
         if (currentContent == null) currentContent = "";
         return !currentTitle.equals(originalTitle) || !currentContent.equals(originalContent);
     }
 
-    /**
-     * Toggle the Nth checkbox in the raw markdown content.
-     */
     private String toggleCheckbox(String content, int index, boolean nowChecked) {
         int count = 0;
         int i = 0;
@@ -995,7 +611,6 @@ public class QuestScreen extends BaseScreen {
             if (idx < 0) found = idx2;
             else if (idx2 < 0) found = idx;
             else found = Math.min(idx, idx2);
-            // Verify it's part of a task list: preceded by "- "
             if (found >= 2 && content.substring(found - 2, found).equals("- ")) {
                 if (count == index) {
                     String replacement = nowChecked ? "[x]" : "[ ]";
@@ -1025,77 +640,14 @@ public class QuestScreen extends BaseScreen {
     @Override
     public void tick() {
         super.tick();
-        if (isNewQuest) {
-            // New quests won't be in cache yet; skip auto-close
-            return;
-        }
+        if (isNewQuest) return;
         if (ClientCache.getQuestById(quest.getId()) == null) {
             this.close();
         }
     }
 
-    // ===================== RENDERING =====================
-
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        super.render(context, mouseX, mouseY, delta);
-
-        if (editing) {
-            renderEditMode(context, mouseX, mouseY, delta);
-        } else {
-            renderViewMode(context, mouseX, mouseY, delta);
-        }
-    }
-
-    // ===================== INPUT DELEGATION =====================
-
-    @Override
-    public boolean mouseClicked(Click click, boolean simulated) {
-        // Intercept help button clicks before title field can swallow them
-        if (editing && helpButton != null && click.button() == 0) {
-            double mx = click.x();
-            double my = click.y();
-            if (mx >= helpButton.getX() && mx < helpButton.getX() + helpButton.getWidth()
-                    && my >= helpButton.getY() && my < helpButton.getY() + helpButton.getHeight()) {
-                toggleFormattingHelp();
-                return true;
-            }
-        }
-        // Let MarkdownWidget handle checkbox clicks first
-        if (!editing && this.viewContentArea != null) {
-            if (this.viewContentArea.mouseClicked(click, simulated)) {
-                return true;
-            }
-        }
-        return super.mouseClicked(click, simulated);
-    }
-
-    @Override
-    public boolean keyPressed(KeyInput keyInput) {
-        if (!editing && this.viewTitleArea != null && this.viewTitleArea.keyPressed(keyInput)) {
-            return true;
-        }
-        return super.keyPressed(keyInput);
-    }
-
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        if (editing) {
-            if (this.editContentField != null && this.editContentField.isMouseOver(mouseX, mouseY)) {
-                return this.editContentField.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
-            }
-            if (this.editTitleField != null && this.editTitleField.isMouseOver(mouseX, mouseY)) {
-                return this.editTitleField.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
-            }
-        } else {
-            if (this.viewTitleArea != null && this.viewTitleArea.isMouseOver(mouseX, mouseY)) {
-                return this.viewTitleArea.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
-            }
-            if (this.viewContentArea != null && this.viewContentArea.isMouseOver(mouseX, mouseY)) {
-                return this.viewContentArea.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
-            }
-        }
+    public boolean shouldPause() {
         return false;
     }
-
 }
