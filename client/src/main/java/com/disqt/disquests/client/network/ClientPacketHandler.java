@@ -95,6 +95,12 @@ public class ClientPacketHandler {
             ClientCache.addOrUpdateServerQuest(quest);
             ClientCache.removeFromMyQuests(quest.getId());
         }
+
+        // Refresh the MainScreen list if it's currently open
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.currentScreen instanceof MainScreen mainScreen) {
+            mainScreen.refreshListContents();
+        }
     }
 
     private static void handleDeleteQuestS2C(ByteBufReader r) {
