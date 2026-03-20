@@ -11,7 +11,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public class DataManager {
@@ -366,6 +368,26 @@ public class DataManager {
             throw new RuntimeException("Failed to get pending requests", e);
         }
         return requests;
+    }
+
+    public synchronized Map<UUID, Integer> getPendingCountByQuest(UUID ownerUuid) {
+        Map<UUID, Integer> counts = new HashMap<>();
+        try (PreparedStatement stmt = connection.prepareStatement("""
+                SELECT cr.quest_id, COUNT(*) as cnt
+                FROM collaboration_requests cr
+                JOIN quests q ON cr.quest_id = q.id
+                WHERE q.owner_uuid = ?
+                GROUP BY cr.quest_id
+                """)) {
+            stmt.setString(1, ownerUuid.toString());
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                counts.put(UUID.fromString(rs.getString("quest_id")), rs.getInt("cnt"));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to count pending requests by quest", e);
+        }
+        return counts;
     }
 
     public synchronized int getPendingRequestCount(UUID ownerUuid) {

@@ -79,8 +79,12 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
         UUID uuid = player.getUniqueId();
         List<QuestData> myQuests = dataManager.getQuestsForPlayer(uuid);
         List<QuestData> serverQuests = dataManager.getServerQuests(uuid);
-        sendPacket(player, PacketCodec.writeSyncMyQuests(myQuests));
+        Map<UUID, Integer> pendingCounts = dataManager.getPendingCountByQuest(uuid);
+        List<CollaborationRequestData> pendingRequests = dataManager.getPendingRequestsForOwner(uuid);
+
+        sendPacket(player, PacketCodec.writeSyncMyQuests(myQuests, pendingCounts));
         sendPacket(player, PacketCodec.writeSyncServerQuests(serverQuests));
+        sendPacket(player, PacketCodec.writeSyncPendingRequests(pendingRequests));
     }
 
     private void handleSaveQuest(Player player, PacketCodec.SaveQuestPayload payload) {

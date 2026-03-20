@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -408,6 +409,25 @@ class DataManagerTest {
         assertFalse(dm.isContributor(questId, PLAYER2));
         assertFalse(dm.isQuestPinned(PLAYER2, questId));
         assertNotNull(dm.getQuest(questId)); // quest still exists
+    }
+
+    @Test
+    void getPendingCountByQuest_returnsMapOfCounts() {
+        UUID questId1 = UUID.randomUUID();
+        UUID questId2 = UUID.randomUUID();
+        dm.upsertPlayerName(OWNER, "Owner");
+        dm.upsertPlayerName(PLAYER2, "Player2");
+        dm.upsertPlayerName(PLAYER3, "Player3");
+        dm.saveQuest(new QuestData(questId1, "Q1", "", OWNER, null,
+                Visibility.CLOSED, List.of(), System.currentTimeMillis(), null, false, null, null));
+        dm.saveQuest(new QuestData(questId2, "Q2", "", OWNER, null,
+                Visibility.CLOSED, List.of(), System.currentTimeMillis(), null, false, null, null));
+        dm.createCollaborationRequest(questId1, PLAYER2);
+        dm.createCollaborationRequest(questId1, PLAYER3);
+        dm.createCollaborationRequest(questId2, PLAYER2);
+        Map<UUID, Integer> counts = dm.getPendingCountByQuest(OWNER);
+        assertEquals(2, counts.get(questId1));
+        assertEquals(1, counts.get(questId2));
     }
 
     // -------------------------------------------------------------------------
