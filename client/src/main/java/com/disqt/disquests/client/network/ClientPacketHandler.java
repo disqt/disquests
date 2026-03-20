@@ -88,6 +88,12 @@ public class ClientPacketHandler {
         final UUID myUuid = ClientSession.getEffectivePlayerUuid();
         boolean isMine = data.ownerUuid().equals(myUuid) ||
                 data.contributors().stream().anyMatch(c -> c.uuid().equals(myUuid));
+
+        // Detect join: quest is now mine but wasn't previously in my quests
+        boolean wasInMyQuests = ClientCache.getMyQuests().stream()
+                .anyMatch(q -> q.getId().equals(quest.getId()));
+        boolean justJoined = isMine && !wasInMyQuests;
+
         if (isMine) {
             ClientCache.addOrUpdateMyQuest(quest);
             ClientCache.removeFromServerQuests(quest.getId());
@@ -100,6 +106,11 @@ public class ClientPacketHandler {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.currentScreen instanceof MainScreen mainScreen) {
             mainScreen.refreshListContents();
+            if (justJoined) {
+                mainScreen.showToast("Joined \"" + quest.getTitle() + "\" \u2014 see My Quests");
+            }
+        } else if (justJoined) {
+            ClientSession.setPendingToast("Joined \"" + quest.getTitle() + "\" \u2014 see My Quests");
         }
     }
 
