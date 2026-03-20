@@ -204,7 +204,8 @@ public class QuestScreen extends DisquestsBaseScreen {
         if (isContributor && !isOwner) {
             leaveBtn.onPress(b -> leaveQuest());
         } else {
-            leaveBtn.sizing(Sizing.fixed(0), Sizing.fixed(0));
+            FlowLayout buttonRow = root.childById(FlowLayout.class, "button-row");
+            buttonRow.removeChild(leaveBtn);
         }
 
         ButtonComponent deleteBtn = root.childById(ButtonComponent.class, "btn-delete");

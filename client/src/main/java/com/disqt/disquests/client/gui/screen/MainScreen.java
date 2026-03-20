@@ -174,15 +174,18 @@ public class MainScreen extends DisquestsBaseScreen {
         btnJoin.active(!isMyQuests);
         btnRequest.active(!isMyQuests);
 
-        // Use sizing to hide buttons not relevant to the current tab
+        // Hide/show buttons by removing/re-adding to parent flow
+        FlowLayout actionRow = rootLayout.childById(FlowLayout.class, "action-row");
+        actionRow.removeChild(btnNewQuest);
+        actionRow.removeChild(btnJoin);
+        actionRow.removeChild(btnRequest);
         if (isMyQuests) {
-            btnNewQuest.sizing(Sizing.fixed(70), Sizing.fixed(20));
-            btnJoin.sizing(Sizing.fixed(0), Sizing.fixed(0));
-            btnRequest.sizing(Sizing.fixed(0), Sizing.fixed(0));
+            // Insert New Quest before Open and Close
+            actionRow.child(0, btnNewQuest);
         } else {
-            btnNewQuest.sizing(Sizing.fixed(0), Sizing.fixed(0));
-            btnJoin.sizing(Sizing.fixed(70), Sizing.fixed(20));
-            btnRequest.sizing(Sizing.fixed(70), Sizing.fixed(20));
+            // Insert Join and Request before Open and Close
+            actionRow.child(0, btnRequest);
+            actionRow.child(0, btnJoin);
         }
 
         refreshListContents();
