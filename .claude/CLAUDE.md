@@ -39,15 +39,21 @@ All versions (MC, Fabric, Paper, Java) are in `gradle.properties` — that is th
 
 ## E2E Tests
 
-The old testmod (`client/src/testmod/`) was deleted as part of the Disquests rewrite. E2E tests need to be rewritten against the new protocol and quest model. The `runClientGameTest` Loom run config has been removed from `client/build.gradle.kts`.
+Client game tests live in `client/src/testmod/java/com/disqt/disquests/test/QuestScreenTest.java`. Run via:
+
+```bash
+./gradlew :client:runClientGameTest   # requires Paper dev server running
+```
+
+Tests use `FabricClientGameTest` API: `setScreen`, `waitForScreen`, `computeOnClient`, `runOnClient`. Quests must be added to `ClientCache` before opening screens to prevent auto-close (`tick()` closes screens when quest is not in cache).
 
 ## Networking Protocol
 
 Channel: `disquests:main`. First byte = PacketType ID.
 
-**C2S**: REQUEST_SYNC, SAVE_QUEST, DELETE_QUEST, JOIN_QUEST, REQUEST_COLLABORATION, RESPOND_COLLABORATION, UPDATE_CONTRIBUTORS, UPDATE_VISIBILITY, PIN_QUEST
+**C2S**: REQUEST_SYNC, SAVE_QUEST, DELETE_QUEST, JOIN_QUEST, REQUEST_COLLABORATION, RESPOND_COLLABORATION, UPDATE_CONTRIBUTORS, UPDATE_VISIBILITY, PIN_QUEST, LEAVE_QUEST
 
-**S2C**: HANDSHAKE, SYNC_MY_QUESTS, SYNC_SERVER_QUESTS, UPDATE_QUEST, DELETE_QUEST_S2C, COLLABORATION_REQUEST, COLLABORATION_RESPONSE
+**S2C**: HANDSHAKE, SYNC_MY_QUESTS, SYNC_SERVER_QUESTS, UPDATE_QUEST, DELETE_QUEST_S2C, COLLABORATION_REQUEST, COLLABORATION_RESPONSE, SYNC_PENDING_REQUESTS
 
 ## Key Files
 
@@ -59,7 +65,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 | `client/src/main/java/com/disqt/disquests/client/DisquestsClient.java` | Fabric mod entrypoint, keybinds, channel registration |
 | `client/src/main/java/com/disqt/disquests/client/ClientSession.java` | Tracks connection state, dispatches S2C packets |
 | `client/src/main/java/com/disqt/disquests/client/ClientCache.java` | Client-side quest cache |
-| `client/src/main/java/com/disqt/disquests/client/gui/screen/` | MainScreen, EditQuestScreen, ViewQuestScreen, ContributorScreen, ConfirmScreen |
+| `client/src/main/java/com/disqt/disquests/client/gui/screen/` | MainScreen, QuestScreen (unified view/edit), ContributorScreen, ConfirmScreen |
 | `client/src/main/java/com/disqt/disquests/client/gui/helper/ColorConfig.java` | Color config loader (parses hex/rgb/rgba strings) |
 | `paper/src/main/java/com/disqt/disquests/paper/DisquestsPlugin.java` | Plugin entry, channel registration |
 | `paper/src/main/java/com/disqt/disquests/paper/ServerPacketHandler.java` | Handles C2S, broadcasts S2C |
@@ -78,14 +84,32 @@ Channel: `disquests:main`. First byte = PacketType ID.
 
 ## Deploy
 
-- **Paper plugin**: `scp paper/build/libs/disquests-paper-*.jar minecraft:~/server/plugins/Disquests.jar`
-- **Client mod**: distribute `client/build/libs/disquests-*.jar` to players for Fabric `mods/` directory
+- **Paper plugin**: `scp paper/build/libs/paper.jar minecraft:~/serverfiles/plugins/Disquests.jar` then `ssh minecraft "tmux -S /tmp/tmux-1000/pmcserver-bb664df1 send-keys -t pmcserver 'plugman reload Disquests' Enter"`
+- **Client mod**: `cp client/build/libs/client.jar "C:/Users/leole/AppData/Roaming/PrismLauncher/instances/1.21.11 v2.7/.minecraft/mods/disquests-client-0.2.4.jar"`
 
 ## Release
 
 Tag-triggered via GitHub Actions (`.github/workflows/release.yml`). Pushes a `v*` tag, runs E2E tests, generates changelog from conventional commits, creates GitHub release with `disquests-client-{version}.jar` and `disquests-paper-{version}.jar`.
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.2.4
+git push origin v0.2.4
 ```
+
+## References
+
+Library docs and design specs live in the repo, not in memory or CLAUDE.md:
+
+| Path | Contents |
+|------|----------|
+| `docs/references/owo-ui.md` | owo-ui API reference (layout, components, surfaces, animations, XML hot-reload) |
+| `docs/superpowers/specs/` | Design specs for features |
+| `docs/superpowers/plans/` | Implementation plans |
+
+Read these on-demand when working on the relevant area. For owo-ui, Context7 MCP can also fetch live docs (`resolve-library-id` for "owo-lib").
+
+## Gotchas (additional)
+
+- **MC 1.21.11 ClickEvent API** — sealed classes, not enum. Use `new ClickEvent.OpenUrl(URI)` and `instanceof ClickEvent.OpenUrl openUrl` for pattern matching.
+- **Contributor is immutable** — `canEdit` is final. To update, replace with `new Contributor(new ContributorData(...))`.
+- **QuestScreen auto-close** — `tick()` closes the screen if the quest is not in `ClientCache`. E2E tests must add quests to cache before opening screens.
