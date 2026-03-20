@@ -794,6 +794,16 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
                     }
                     return true;
                 }
+                // Smart tab deletion: if 4 spaces precede cursor, delete all 4
+                if (cursorX >= 4) {
+                    String line = this.lines.get(this.cursorY);
+                    if (cursorX <= line.length() && line.substring(cursorX - 4, cursorX).equals("    ")) {
+                        setSelectionAbsolute(getAbsoluteIndex(cursorY, cursorX - 4), getAbsoluteIndex(cursorY, cursorX));
+                        deleteSelection();
+                        onChanged();
+                        return true;
+                    }
+                }
                 if (cursorX == 0 && cursorY > 0) {
                     String lineToMerge = this.lines.remove(this.cursorY);
                     int prevLineIndex = this.cursorY - 1;
