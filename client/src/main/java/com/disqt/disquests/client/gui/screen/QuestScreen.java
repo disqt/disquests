@@ -411,7 +411,7 @@ public class QuestScreen extends BaseScreen {
                 this.textRenderer, contentX, contentPanelY,
                 editorWidth, contentPanelHeight,
                 quest.getContent() != null ? quest.getContent() : "",
-                "Quest content...", Integer.MAX_VALUE, true
+                "Quest content...", Integer.MAX_VALUE, true, true
         );
         this.addSelectableChild(this.editContentField);
 
