@@ -6,6 +6,7 @@ import com.disqt.disquests.client.data.Contributor;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.helper.DisquestsConfig;
 import com.disqt.disquests.client.gui.screen.ConfigScreen;
+import com.disqt.disquests.client.gui.component.QuestEntryComponent;
 import com.disqt.disquests.client.gui.screen.ContributorScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
@@ -65,6 +66,8 @@ public class QuestScreenTest implements FabricClientGameTest {
             testLeaveButtonVisibility(context);
             testContributorScreenNoInvite(context);
             testMarkdownLeadingWhitespace(context);
+            testEntryClickThroughScreen(context);
+            testPinClickThroughScreen(context);
         } finally {
             ClientCache.clear();
             ClientSession.leaveServer();
@@ -429,6 +432,96 @@ public class QuestScreenTest implements FabricClientGameTest {
             throw new AssertionError("QuestScreen should render leading-whitespace markdown without crashing");
         }
 
+        ClientCache.removeQuestById(quest.getId());
+        context.setScreen(() -> null);
+        context.waitTick();
+    }
+
+    /**
+     * Clicking on a quest entry through the screen dispatches to QuestEntryComponent.
+     * Tests the full click path: Screen.mouseClicked -> owo-ui dispatch -> QuestEntryComponent.onMouseDown.
+     */
+    private void testEntryClickThroughScreen(ClientGameTestContext context) {
+        Quest quest = createTestQuest();
+        quest.setTitle("Click Test Quest");
+        ClientCache.addOrUpdateMyQuest(quest);
+
+        context.setScreen(MainScreen::new);
+        context.waitForScreen(MainScreen.class);
+        context.waitTicks(3);
+
+        // Click on the center of the first entry through the screen's mouseClicked
+        String clickResult = context.computeOnClient(client -> {
+            if (!(client.currentScreen instanceof MainScreen screen)) return "NO_SCREEN";
+            var entries = screen.getQuestEntries();
+            if (entries.isEmpty()) return "NO_ENTRIES";
+
+            QuestEntryComponent entry = entries.get(0);
+
+            // Click center of entry (should trigger selection)
+            double clickX = entry.x() + entry.width() / 2.0;
+            double clickY = entry.y() + entry.height() / 2.0;
+
+            net.minecraft.client.input.MouseInput mouseInput = new net.minecraft.client.input.MouseInput(0, 0);
+            net.minecraft.client.gui.Click click = new net.minecraft.client.gui.Click(clickX, clickY, mouseInput);
+            screen.mouseClicked(click, false);
+
+            return entries.get(0).isSelected() ? "SELECTED" : "NOT_SELECTED";
+        });
+
+        if (!"SELECTED".equals(clickResult)) {
+            throw new AssertionError("Clicking entry through screen should select it, got: " + clickResult);
+        }
+
+        // Cleanup
+        ClientCache.removeQuestById(quest.getId());
+        context.setScreen(() -> null);
+        context.waitTick();
+    }
+
+    /**
+     * Clicking the pin icon area through the screen dispatches correctly.
+     * Verifies owo-ui passes component-relative coordinates.
+     */
+    private void testPinClickThroughScreen(ClientGameTestContext context) {
+        Quest quest = createTestQuest();
+        quest.setTitle("Pin Click Test");
+        ClientCache.addOrUpdateMyQuest(quest);
+        ClientSession.removePinnedQuest(quest.getId());
+
+        context.setScreen(MainScreen::new);
+        context.waitForScreen(MainScreen.class);
+        context.waitTicks(3);
+
+        // Click on the pin icon area through the screen
+        boolean pinned = context.computeOnClient(client -> {
+            if (!(client.currentScreen instanceof MainScreen screen)) return false;
+            var entries = screen.getQuestEntries();
+            if (entries.isEmpty()) return false;
+
+            QuestEntryComponent entry = entries.get(0);
+            // Pin icon is at rightmost area. owo-ui translates to relative coords,
+            // so click at absolute (entry.x + width - 7, entry.y + 18)
+            double clickX = entry.x() + entry.width() - 7;
+            double clickY = entry.y() + 18;
+
+            net.minecraft.client.input.MouseInput mouseInput = new net.minecraft.client.input.MouseInput(0, 0);
+            net.minecraft.client.gui.Click click = new net.minecraft.client.gui.Click(clickX, clickY, mouseInput);
+            try {
+                screen.mouseClicked(click, false);
+            } catch (Exception ignored) {
+                // PacketSender throws when no server connection -- pin state is already updated locally
+            }
+
+            return ClientSession.isPinned(quest.getId());
+        });
+
+        if (!pinned) {
+            throw new AssertionError("Clicking pin icon through screen should pin the quest");
+        }
+
+        // Cleanup
+        ClientSession.removePinnedQuest(quest.getId());
         ClientCache.removeQuestById(quest.getId());
         context.setScreen(() -> null);
         context.waitTick();

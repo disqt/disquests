@@ -287,10 +287,9 @@ public class QuestEntryComponent extends BaseUIComponent {
     public boolean onMouseDown(Click click, boolean doubled) {
         if (click.button() != 0) return false;
 
-        // Use relative coordinates (click pos minus component pos)
-        // to avoid scroll-offset issues
-        double relX = click.x() - this.x();
-        double relY = click.y() - this.y();
+        // owo-ui passes component-relative coordinates in Click
+        double relX = click.x();
+        double relY = click.y();
 
         // Pin icon hit area: rightmost 20px, row 2 (y+12 to y+26)
         if (relX >= this.width() - 20 && relX <= this.width()
