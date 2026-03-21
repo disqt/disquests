@@ -19,6 +19,7 @@ public class DisquestsConfig {
     public static final int MIN_PINNED_WIDTH = 100;
     public static final int MAX_PINNED_WIDTH = 400;
     private static int pinnedWidth = 200;
+    private static Theme theme = Theme.VANILLA;
 
     public static void load() {
         if (!Files.exists(CONFIG_PATH)) {
@@ -30,6 +31,13 @@ public class DisquestsConfig {
             ConfigData data = GSON.fromJson(json, ConfigData.class);
             if (data != null) {
                 pinnedWidth = Math.max(MIN_PINNED_WIDTH, Math.min(MAX_PINNED_WIDTH, data.pinnedWidth));
+                if (data.theme != null) {
+                    try {
+                        theme = Theme.valueOf(data.theme);
+                    } catch (IllegalArgumentException e) {
+                        theme = Theme.VANILLA;
+                    }
+                }
             }
         } catch (Exception e) {
             LOGGER.warn("Failed to load disquests config, using defaults", e);
@@ -45,6 +53,7 @@ public class DisquestsConfig {
             Files.createDirectories(CONFIG_PATH.getParent());
             ConfigData data = new ConfigData();
             data.pinnedWidth = pinnedWidth;
+            data.theme = theme.name();
             Files.writeString(CONFIG_PATH, GSON.toJson(data));
         } catch (IOException e) {
             LOGGER.warn("Failed to save disquests config", e);
@@ -53,7 +62,11 @@ public class DisquestsConfig {
 
     public static int getPinnedWidth() { return pinnedWidth; }
 
+    public static Theme getTheme() { return theme; }
+    public static void setTheme(Theme t) { theme = t; }
+
     private static class ConfigData {
         int pinnedWidth = 200;
+        String theme = "VANILLA";
     }
 }
