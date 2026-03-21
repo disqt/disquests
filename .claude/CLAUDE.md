@@ -102,13 +102,28 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **owo-ui `onMouseDown` coordinates are relative** — `Click.x()`/`Click.y()` are already relative to the component. Do NOT subtract `this.x()`/`this.y()`.
 - **owo-ui XML scroll container** — child element must be FIRST (before `<sizing>`, `<surface>`, `<padding>`). `WrappingParentUIComponent.parseProperties` takes first element child.
 - **owo-ui XML requires `<components>` wrapper** — root component must be inside `<components>` tag, not directly under `<owo-ui>`.
-- **No owo-ui visibility API** — use `component.sizing(Sizing.fixed(0), Sizing.fixed(0))` to hide, `Sizing.content()` to show.
+- **owo-ui zero-sizing doesn't hide buttons** — text still renders. Use `parent.removeChild(component)` instead of zero-sizing.
+- **owo-ui keyboard input requires `GreedyInputUIComponent`** — custom `BaseUIComponent` subclasses that need key/char events must implement this marker interface, and the screen must override `charTyped()` to route to the focused greedy component (see `DisquestsBaseScreen.charTyped()`).
+- **owo-ui delegate focus desync** — `MultiLineTextFieldWidget.focused` can be reset by `mouseClicked()` after `onFocusGained` sets it. Force `delegate.setFocused(true)` in `onKeyPress`/`onCharTyped` before forwarding.
+- **XML comments cannot contain `--`** — causes `SAXParseException`. Use commas instead.
 
 ## Deploy
 
 - **Paper plugin**: `scp paper/build/libs/paper.jar minecraft:~/serverfiles/plugins/Disquests.jar` then `ssh minecraft "tmux -S /tmp/tmux-1000/pmcserver-bb664df1 send-keys -t pmcserver 'plugman reload Disquests' Enter"`
 - **Client mod**: `cp client/build/libs/client.jar "C:/Users/leole/AppData/Roaming/PrismLauncher/instances/1.21.11 v2.7/.minecraft/mods/disquests-client-0.2.4.jar"`
 - **owo-lib (Prism)**: Must be in Prism mods folder alongside client mod. Find in `~/.gradle/caches/modules-2/files-2.1/io.wispforest/owo-lib/`.
+
+## Integration Tests
+
+Two-client parallel integration test framework at `client/src/testmod/.../integration/`. Run via `./gradlew :client:runIntegrationTest`.
+
+- **Paper server auto-managed** — task starts server, deploys plugin jar, runs tests, stops server
+- **Two clients in parallel** — `IntegrationPlayerA` uses `client/run/`, `IntegrationPlayerB` uses `client/run-b/`
+- **PhaseSync coordination** — file-based signals, MUST use `context.waitFor()` not `Thread.sleep()` (sleeping blocks packet processing)
+- **Loom property passing** — use `-P` (Gradle property) not `-D` (JVM system property) for subprocess invocation. Run configs read via `providers.gradleProperty()`
+- **Plugin deployment** — `runIntegrationTest` must copy `paper/build/libs/paper.jar` to `paper/run/plugins/Disquests.jar` (unlike `runServer` which does this automatically)
+- **Prism mods incompatible with `runClient`** — production jars use intermediary mappings, dev environment uses named mappings. Mixin crashes guaranteed.
+- **Status**: Journeys 1-2 pass (lifecycle, discovery). Collaboration/leave/pin have a timing issue under investigation — see `docs/in-progress-integration-debug.md`
 
 ## Release
 
