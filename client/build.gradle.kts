@@ -1,3 +1,8 @@
+import java.io.DataInputStream
+import java.net.Socket
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+
 plugins {
     id("fabric-loom") version "1.15.5"
 }
@@ -84,6 +89,8 @@ loom {
             if (journey.isPresent) vmArg("-Ddisquests.test.journey=${journey.get()}")
             if (phase.isPresent) vmArg("-Ddisquests.test.phase=${phase.get()}")
             if (username.isPresent) programArgs("--username", username.get())
+            val harness = providers.gradleProperty("harness")
+            if (harness.isPresent) vmArg("-Ddisquests.test.harness=true")
         }
         // Second client run config for Player B (separate run directory)
         create("clientGameTestB") {
@@ -103,6 +110,8 @@ loom {
             if (journeyB.isPresent) vmArg("-Ddisquests.test.journey=${journeyB.get()}")
             if (phaseB.isPresent) vmArg("-Ddisquests.test.phase=${phaseB.get()}")
             if (usernameB.isPresent) programArgs("--username", usernameB.get())
+            val harnessB = providers.gradleProperty("harness")
+            if (harnessB.isPresent) vmArg("-Ddisquests.test.harness=true")
         }
     }
 }
@@ -114,128 +123,261 @@ tasks.named("runClientGameTest") {
     }
 }
 
+fun sendRconCommand(host: String, port: Int, password: String, command: String): String {
+    val socket = Socket(host, port)
+    socket.soTimeout = 5000
+    val out = socket.getOutputStream()
+    val inp = socket.getInputStream()
+    val dins = DataInputStream(inp)
+
+    fun writePacket(id: Int, type: Int, body: String) {
+        val bodyBytes = body.toByteArray(Charsets.UTF_8)
+        val length = 4 + 4 + bodyBytes.size + 1 + 1
+        val buf = ByteBuffer.allocate(4 + length).order(ByteOrder.LITTLE_ENDIAN)
+        buf.putInt(length)
+        buf.putInt(id)
+        buf.putInt(type)
+        buf.put(bodyBytes)
+        buf.put(0.toByte())
+        buf.put(0.toByte())
+        out.write(buf.array())
+        out.flush()
+    }
+
+    fun readPacket(): Triple<Int, Int, String> {
+        val lenBuf = ByteArray(4)
+        dins.readFully(lenBuf)
+        val length = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
+        val payload = ByteArray(length)
+        dins.readFully(payload)
+        val buf = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN)
+        val reqId = buf.int
+        val type = buf.int
+        val body = String(payload, 8, length - 10, Charsets.UTF_8)
+        return Triple(reqId, type, body)
+    }
+
+    // Login
+    writePacket(1, 3, password)
+    val loginResp = readPacket()
+    if (loginResp.first == -1) {
+        socket.close()
+        throw RuntimeException("RCON authentication failed")
+    }
+
+    // Command
+    writePacket(2, 2, command)
+    val cmdResp = readPacket()
+    socket.close()
+    return cmdResp.third
+}
+
 tasks.register("runIntegrationTest") {
     group = "verification"
-    description = "Run integration E2E tests: starts Paper server, runs two clients in parallel"
+    description = "Run integration E2E tests with optional harness mode for persistent clients"
     dependsOn(":paper:jar", ":client:build")
 
     doLast {
         val isWin = System.getProperty("os.name").lowercase().contains("win")
         val gradlew = File(rootProject.projectDir, if (isWin) "gradlew.bat" else "gradlew").absolutePath
+        val noStart = project.hasProperty("noStart")
+        val harness = project.hasProperty("harness")
+        val testFilter = project.findProperty("test")?.toString()
 
-        // Clean DB + sync dir
-        val db = file("../paper/run/plugins/Disquests/disquests.db")
-        val walFile = file("../paper/run/plugins/Disquests/disquests.db-wal")
-        val shmFile = file("../paper/run/plugins/Disquests/disquests.db-shm")
-        listOf(db, walFile, shmFile).forEach { if (it.exists()) it.delete() }
         val syncDir = File(rootProject.projectDir, "integration-sync")
+        val serverDir = file("../paper/run")
+        val processes = mutableListOf<Process>()
+        var serverProcess: Process? = null
+        var startedServer = false
+        var startedClients = false
+
+        // --- Step 1: Clean sync directory ---
         if (syncDir.exists()) syncDir.listFiles()?.forEach { it.delete() }
         syncDir.mkdirs()
-        logger.lifecycle("Cleaned test database and sync directory")
-
-        // Start Paper server
-        val serverDir = file("../paper/run")
-
-        // Deploy plugin jar
-        val pluginJar = file("../paper/build/libs/paper.jar")
-        val pluginDest = File(serverDir, "plugins/Disquests.jar")
-        pluginJar.copyTo(pluginDest, overwrite = true)
-        logger.lifecycle("Deployed plugin jar")
-        val paperJar = File(serverDir, "paper.jar")
-        val serverProcess = ProcessBuilder(
-            "java", "-Xmx1G", "-jar", paperJar.absolutePath, "--nogui"
-        ).directory(serverDir).redirectErrorStream(true).start()
-
-        // Drain server stdout in background to prevent buffer blocking
-        val serverOutput = StringBuilder()
-        val serverReader = Thread {
-            serverProcess.inputStream.bufferedReader().lines().forEach { serverOutput.appendLine(it) }
-        }
-        serverReader.isDaemon = true
-        serverReader.start()
+        logger.lifecycle("Cleaned sync directory")
 
         try {
-            logger.lifecycle("Waiting for Paper server...")
-            val logFile = File(serverDir, "logs/latest.log")
-            val deadline = System.currentTimeMillis() + 60000
-            while (System.currentTimeMillis() < deadline) {
-                if (logFile.exists() && logFile.readText().contains("Done (")) break
-                Thread.sleep(1000)
-            }
-            if (!logFile.exists() || !logFile.readText().contains("Done (")) {
-                throw RuntimeException("Paper server failed to start within 60s")
-            }
-            logger.lifecycle("Paper server ready")
+            // --- Step 2: Server ---
+            if (!noStart) {
+                val serverRunning = try {
+                    Socket("localhost", 25565).use { true }
+                } catch (_: Exception) { false }
 
-            // Ensure run-b directory exists
-            file("run-b").mkdirs()
+                if (!serverRunning) {
+                    // Clean DB for fresh start
+                    val db = file("../paper/run/plugins/Disquests/disquests.db")
+                    val walFile = file("../paper/run/plugins/Disquests/disquests.db-wal")
+                    val shmFile = file("../paper/run/plugins/Disquests/disquests.db-shm")
+                    listOf(db, walFile, shmFile).forEach { if (it.exists()) it.delete() }
 
-            // Launch both clients in parallel (separate run dirs)
-            fun launchClient(journey: String, username: String, taskName: String = ":client:runClientGameTest"): Process {
-                val cmd = if (isWin) {
-                    listOf("cmd", "/c", gradlew, taskName, "--no-daemon",
-                        "-PtestJourney=$journey", "-PtestUsername=$username")
+                    // Deploy plugin jar
+                    val pluginJar = file("../paper/build/libs/paper.jar")
+                    val pluginDest = File(serverDir, "plugins/Disquests.jar")
+                    pluginJar.copyTo(pluginDest, overwrite = true)
+                    logger.lifecycle("Deployed plugin jar")
+
+                    val paperJar = File(serverDir, "paper.jar")
+                    serverProcess = ProcessBuilder(
+                        "java", "-Xmx1G", "-Ddisquests.debug=true",
+                        "-jar", paperJar.absolutePath, "--nogui"
+                    ).directory(serverDir).redirectErrorStream(true).start()
+                    startedServer = true
+
+                    // Drain server stdout
+                    val sp = serverProcess!!
+                    Thread { sp.inputStream.bufferedReader().lines().forEach { } }.apply { isDaemon = true; start() }
+
+                    // Wait for server startup
+                    logger.lifecycle("Waiting for Paper server...")
+                    val logFile = File(serverDir, "logs/latest.log")
+                    val deadline = System.currentTimeMillis() + 60000
+                    while (System.currentTimeMillis() < deadline) {
+                        if (logFile.exists() && logFile.readText().contains("Done (")) break
+                        Thread.sleep(1000)
+                    }
+                    if (!logFile.exists() || !logFile.readText().contains("Done (")) {
+                        throw RuntimeException("Paper server failed to start within 60s")
+                    }
+                    logger.lifecycle("Paper server ready")
                 } else {
-                    listOf(gradlew, taskName, "--no-daemon",
-                        "-PtestJourney=$journey", "-PtestUsername=$username")
+                    logger.lifecycle("Server already running on port 25565")
+                    // RCON reset for re-runs against existing server
+                    try {
+                        sendRconCommand("localhost", 25575, "testpassword", "disquests reset")
+                        logger.lifecycle("Sent RCON reset")
+                    } catch (e: Exception) {
+                        logger.warn("RCON reset failed: ${e.message}")
+                    }
                 }
-                logger.lifecycle("  Starting $journey as $username")
-                return ProcessBuilder(cmd)
-                    .directory(rootProject.projectDir)
-                    .redirectErrorStream(true)
-                    .start()
+            } else {
+                // -PnoStart: verify clients are ready
+                val readyDeadline = System.currentTimeMillis() + 10000
+                while (System.currentTimeMillis() < readyDeadline) {
+                    if (File(syncDir, "client-a-ready.done").exists() &&
+                        File(syncDir, "client-b-ready.done").exists()) break
+                    Thread.sleep(500)
+                }
+                if (!File(syncDir, "client-a-ready.done").exists() ||
+                    !File(syncDir, "client-b-ready.done").exists()) {
+                    throw RuntimeException("Clients not running. Start them first or remove -PnoStart.")
+                }
+                // RCON reset
+                try {
+                    // Clean sync dir except ready markers
+                    syncDir.listFiles()?.filter { !it.name.startsWith("client-") }?.forEach { it.delete() }
+                    sendRconCommand("localhost", 25575, "testpassword", "disquests reset")
+                    logger.lifecycle("Sent RCON reset")
+                    Thread.sleep(1000)
+                } catch (e: Exception) {
+                    logger.warn("RCON reset failed: ${e.message}")
+                }
             }
 
-            val procA = launchClient("IntegrationPlayerA", "IntTestPlayerA")
-            val procB = launchClient("IntegrationPlayerB", "IntTestPlayerB", ":client:runClientGameTestB")
+            // --- Step 3: Clients ---
+            if (!noStart) {
+                val clientAReady = File(syncDir, "client-a-ready.done").exists()
+                val clientBReady = File(syncDir, "client-b-ready.done").exists()
 
-            // Read output in threads to prevent blocking
-            val outputA = StringBuilder()
-            val outputB = StringBuilder()
-            val readerA = Thread { procA.inputStream.bufferedReader().lines().forEach { outputA.appendLine(it) } }
-            val readerB = Thread { procB.inputStream.bufferedReader().lines().forEach { outputB.appendLine(it) } }
-            readerA.start()
-            readerB.start()
+                if (!clientAReady || !clientBReady) {
+                    file("run-b").mkdirs()
 
-            val exitA = procA.waitFor()
-            val exitB = procB.waitFor()
-            readerA.join(5000)
-            readerB.join(5000)
+                    fun launchClient(journey: String, username: String, taskName: String): Process {
+                        val cmd = mutableListOf<String>()
+                        if (isWin) cmd.addAll(listOf("cmd", "/c"))
+                        cmd.add(gradlew)
+                        cmd.addAll(listOf(taskName, "--no-daemon",
+                            "-PtestJourney=$journey", "-PtestUsername=$username"))
+                        if (harness) cmd.add("-Pharness")
+                        logger.lifecycle("  Starting $journey as $username")
+                        return ProcessBuilder(cmd)
+                            .directory(rootProject.projectDir)
+                            .redirectErrorStream(true)
+                            .start()
+                    }
 
+                    val procA = launchClient("HarnessPlayerA", "IntTestPlayerA", ":client:runClientGameTest")
+                    val procB = launchClient("HarnessPlayerB", "IntTestPlayerB", ":client:runClientGameTestB")
+                    processes.addAll(listOf(procA, procB))
+                    startedClients = true
+
+                    // Drain output
+                    Thread { procA.inputStream.bufferedReader().lines().forEach { } }.apply { isDaemon = true; start() }
+                    Thread { procB.inputStream.bufferedReader().lines().forEach { } }.apply { isDaemon = true; start() }
+
+                    if (harness) {
+                        // Wait for clients to signal ready
+                        logger.lifecycle("Waiting for clients to be ready...")
+                        val readyDeadline = System.currentTimeMillis() + 120000
+                        while (System.currentTimeMillis() < readyDeadline) {
+                            if (File(syncDir, "client-a-ready.done").exists() &&
+                                File(syncDir, "client-b-ready.done").exists()) break
+                            Thread.sleep(1000)
+                        }
+                        if (!File(syncDir, "client-a-ready.done").exists() ||
+                            !File(syncDir, "client-b-ready.done").exists()) {
+                            throw RuntimeException("Clients failed to signal ready within 120s")
+                        }
+                        logger.lifecycle("Clients ready")
+
+                        // RCON reset (fresh DB for first run)
+                        try {
+                            sendRconCommand("localhost", 25575, "testpassword", "disquests reset")
+                            logger.lifecycle("Sent RCON reset")
+                            Thread.sleep(1000)
+                        } catch (e: Exception) {
+                            logger.warn("RCON reset failed: ${e.message}")
+                        }
+                    }
+                } else {
+                    logger.lifecycle("Clients already running (ready markers found)")
+                }
+            }
+
+            // --- Step 4: Write run signal ---
+            val signalContent = testFilter ?: "*"
+            File(syncDir, "run.signal").writeText(signalContent)
+            logger.lifecycle("Triggered test run: $signalContent")
+
+            // --- Step 5: Wait for results ---
+            val resultA = File(syncDir, "results-a.txt")
+            val resultB = File(syncDir, "results-b.txt")
+            val resultsDeadline = System.currentTimeMillis() + 180000
+            while (System.currentTimeMillis() < resultsDeadline) {
+                if (resultA.exists() && resultB.exists()) break
+                // Check for process crashes in one-shot mode
+                if (!harness && startedClients && processes.all { !it.isAlive }) break
+                Thread.sleep(500)
+            }
+
+            // --- Step 6: Report results ---
             logger.lifecycle("\n=== Integration Test Results ===")
-            if (exitA == 0) {
-                logger.lifecycle("  Player A: PASSED")
-            } else {
-                logger.error("  Player A: FAILED (exit=$exitA)")
-                logger.lifecycle("  Output (last 500): ${outputA.takeLast(500)}")
-            }
-            if (exitB == 0) {
-                logger.lifecycle("  Player B: PASSED")
-            } else {
-                logger.error("  Player B: FAILED (exit=$exitB)")
-                logger.lifecycle("  Output (last 500): ${outputB.takeLast(500)}")
-            }
+            val aResult = if (resultA.exists()) resultA.readText().trim() else "NO RESULT (timeout or crash)"
+            val bResult = if (resultB.exists()) resultB.readText().trim() else "NO RESULT (timeout or crash)"
+            logger.lifecycle("  Player A: $aResult")
+            logger.lifecycle("  Player B: $bResult")
 
-            // Print server plugin output on failure for diagnostics
-            if (exitA != 0 || exitB != 0) {
-                val serverDebug = serverOutput.lines().filter { it.contains("Disquests") }
-                if (serverDebug.isNotEmpty()) {
-                    logger.lifecycle("\n=== Server Plugin Output ===")
-                    serverDebug.forEach { logger.lifecycle("  $it") }
-                }
-                throw RuntimeException("Integration tests failed: A=${if (exitA==0) "PASS" else "FAIL"}, B=${if (exitB==0) "PASS" else "FAIL"}")
+            val passed = aResult.startsWith("PASS") && bResult.startsWith("PASS")
+            if (!passed) {
+                throw RuntimeException("Integration tests failed")
             }
-            logger.lifecycle("  All journeys PASSED")
+            logger.lifecycle("  All tests PASSED")
 
         } finally {
-            // Graceful shutdown: send "stop" to stdin so logs flush
-            try {
-                serverProcess.outputStream.write("stop\n".toByteArray())
-                serverProcess.outputStream.flush()
-                Thread.sleep(5000)
-            } catch (_: Exception) {}
-            if (serverProcess.isAlive) serverProcess.destroyForcibly()
-            logger.lifecycle("Paper server stopped")
+            // --- Step 7: Teardown ---
+            if (!harness && !noStart) {
+                processes.forEach { it.destroyForcibly() }
+                if (serverProcess != null) {
+                    try {
+                        serverProcess.outputStream.write("stop\n".toByteArray())
+                        serverProcess.outputStream.flush()
+                        Thread.sleep(5000)
+                    } catch (_: Exception) {}
+                    if (serverProcess.isAlive) serverProcess.destroyForcibly()
+                }
+                logger.lifecycle("Teardown complete")
+            } else {
+                logger.lifecycle("Harness mode: server and clients left running")
+            }
         }
     }
 }
