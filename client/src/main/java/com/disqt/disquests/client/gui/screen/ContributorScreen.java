@@ -13,6 +13,7 @@ import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.core.ParentUIComponent;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.minecraft.client.gui.screen.Screen;
@@ -34,6 +35,10 @@ public class ContributorScreen extends DisquestsBaseScreen {
 
     @Override
     protected void build(FlowLayout root) {
+        applyThemeRoot(root);
+        applyThemePanel(root.childById(ParentUIComponent.class, "contributor-scroll"));
+        applyThemePanel(root.childById(ParentUIComponent.class, "pending-list"));
+
         List<CollaborationRequestData> pendingRequests = ClientCache.getPendingRequestsForQuest(quest.getId());
         List<Contributor> contributors = quest.getContributors();
 

@@ -13,6 +13,7 @@ import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.TextBoxComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.core.ParentUIComponent;
 import io.wispforest.owo.ui.core.Sizing;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -89,6 +90,9 @@ public class MainScreen extends DisquestsBaseScreen {
 
     @Override
     protected void build(FlowLayout root) {
+        applyThemeRoot(root);
+        applyThemePanel(root.childById(ParentUIComponent.class, "quest-scroll"));
+
         this.rootLayout = root;
 
         // --- Look up components by ID ---

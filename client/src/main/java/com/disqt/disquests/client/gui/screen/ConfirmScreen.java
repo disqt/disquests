@@ -23,6 +23,9 @@ public class ConfirmScreen extends DisquestsBaseScreen {
 
     @Override
     protected void build(FlowLayout root) {
+        applyThemeRoot(root);
+        applyThemePanel(root.childById(FlowLayout.class, "panel"));
+
         root.childById(LabelComponent.class, "message-label")
                 .text(message);
 

@@ -17,6 +17,7 @@ import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.core.ParentUIComponent;
 import io.wispforest.owo.ui.core.Sizing;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
@@ -99,6 +100,24 @@ public class QuestScreen extends DisquestsBaseScreen {
 
     @Override
     protected void build(FlowLayout root) {
+        applyThemeRoot(root);
+
+        // View mode panels
+        ParentUIComponent contentScroll = root.childById(ParentUIComponent.class, "content-scroll");
+        if (contentScroll != null) applyThemePanel(contentScroll);
+        ParentUIComponent metadataRow = root.childById(ParentUIComponent.class, "metadata-row");
+        if (metadataRow != null) applyThemePanel(metadataRow);
+
+        // Edit mode panels
+        ParentUIComponent titleRow = root.childById(ParentUIComponent.class, "title-row");
+        if (titleRow != null) applyThemePanel(titleRow);
+        ParentUIComponent editorPanel = root.childById(ParentUIComponent.class, "editor-panel");
+        if (editorPanel != null) applyThemePanel(editorPanel);
+        ParentUIComponent formattingPanel = root.childById(ParentUIComponent.class, "formatting-panel");
+        if (formattingPanel != null) applyThemePanel(formattingPanel);
+        ParentUIComponent coordsSection = root.childById(ParentUIComponent.class, "coords-section");
+        if (coordsSection != null) applyThemePanel(coordsSection);
+
         UUID myUuid = ClientSession.getEffectivePlayerUuid();
         this.isOwner = quest.getOwnerUuid().equals(myUuid);
         this.canEdit = isOwner || quest.getContributors().stream()
@@ -196,6 +215,30 @@ public class QuestScreen extends DisquestsBaseScreen {
         }
 
         // Buttons
+        FlowLayout buttonRow = root.childById(FlowLayout.class, "button-row");
+        boolean canJoinOrRequest = !isOwner && !isContributor;
+
+        // Join button (OPEN quests, not yet a member)
+        ButtonComponent joinBtn = root.childById(ButtonComponent.class, "btn-join");
+        if (canJoinOrRequest && quest.getVisibility() == Visibility.OPEN) {
+            joinBtn.onPress(b -> joinQuest());
+        } else {
+            buttonRow.removeChild(joinBtn);
+        }
+
+        // Request button (CLOSED quests, not yet a member)
+        ButtonComponent requestBtn = root.childById(ButtonComponent.class, "btn-request");
+        if (canJoinOrRequest && quest.getVisibility() == Visibility.CLOSED) {
+            if (ClientSession.isRequested(quest.getId())) {
+                requestBtn.active = false;
+                requestBtn.setMessage(Text.literal("Requested"));
+            } else {
+                requestBtn.onPress(b -> requestAccess());
+            }
+        } else {
+            buttonRow.removeChild(requestBtn);
+        }
+
         ButtonComponent editBtn = root.childById(ButtonComponent.class, "btn-edit");
         editBtn.onPress(b -> enterEditMode());
         editBtn.active = canEdit;
@@ -204,7 +247,6 @@ public class QuestScreen extends DisquestsBaseScreen {
         if (isContributor && !isOwner) {
             leaveBtn.onPress(b -> leaveQuest());
         } else {
-            FlowLayout buttonRow = root.childById(FlowLayout.class, "button-row");
             buttonRow.removeChild(leaveBtn);
         }
 
@@ -465,6 +507,19 @@ public class QuestScreen extends DisquestsBaseScreen {
                         if (this.client != null) this.client.setScreen(this);
                     }));
         }
+    }
+
+    private void joinQuest() {
+        PacketSender.joinQuest(quest.getId());
+        ClientSession.setPendingToast("Joined \"" + quest.getTitle() + "\"");
+        if (this.client != null) this.client.setScreen(this.parent);
+    }
+
+    private void requestAccess() {
+        PacketSender.requestCollaboration(quest.getId());
+        ClientSession.markRequested(quest.getId());
+        ClientSession.setPendingToast("Request sent to " + quest.getOwnerName());
+        if (this.client != null) this.client.setScreen(this.parent);
     }
 
     // ===================== EDIT MODE ACTIONS =====================
