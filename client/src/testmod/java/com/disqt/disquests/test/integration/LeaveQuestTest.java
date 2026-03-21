@@ -50,10 +50,14 @@ public class LeaveQuestTest implements FabricClientGameTest {
     }
 
     private void phaseB_leaveQuest(ClientGameTestContext context) {
+        // Wait for sync to include the quest we joined in phase 2
         context.waitFor(client ->
             ClientCache.getMyQuests().stream().anyMatch(q -> q.getId().equals(QUEST_ID)),
             TIMEOUT);
+
+        // Send leave and wait for server's DELETE_QUEST_S2C response
         context.runOnClient(client -> PacketSender.leaveQuest(QUEST_ID));
+        context.waitTicks(20); // allow server processing
         waitForQuestRemoved(context, QUEST_ID);
     }
 }

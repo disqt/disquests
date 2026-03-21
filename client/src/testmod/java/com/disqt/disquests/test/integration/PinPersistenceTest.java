@@ -33,11 +33,12 @@ public class PinPersistenceTest implements FabricClientGameTest {
             PacketSender.saveQuest(QUEST_ID, "Pin Test", "Pin me", null, false, null, null));
         waitForQuestByTitle(context, "Pin Test", true);
 
-        context.runOnClient(client -> PacketSender.pinQuest(QUEST_ID));
+        // Use HudPinManager.toggle which sets local state AND sends packet
+        context.runOnClient(client ->
+            com.disqt.disquests.client.hud.HudPinManager.toggle(QUEST_ID));
         context.waitTicks(10);
 
-        boolean pinned = context.computeOnClient(client -> ClientSession.isPinned(QUEST_ID));
-        if (!pinned) throw new AssertionError("Quest should be pinned after PIN_QUEST");
+        context.waitFor(client -> ClientSession.isPinned(QUEST_ID), TIMEOUT);
     }
 
     private void phaseA_verifyPinRestored(ClientGameTestContext context) {

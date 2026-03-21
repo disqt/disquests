@@ -51,7 +51,13 @@ public class CollaborationTest implements FabricClientGameTest {
     }
 
     private void phaseA_acceptRequest(ClientGameTestContext context) {
+        // Wait for pending count to sync (server sends SYNC_PENDING_REQUESTS after handshake)
+        context.waitTicks(20); // extra time for sync
         context.waitFor(client -> ClientCache.getPendingCount(QUEST_ID) > 0, TIMEOUT);
+
+        // Get the request details
+        context.waitFor(client ->
+            !ClientCache.getPendingRequestsForQuest(QUEST_ID).isEmpty(), TIMEOUT);
 
         var requests = context.computeOnClient(client ->
             ClientCache.getPendingRequestsForQuest(QUEST_ID));
@@ -59,7 +65,9 @@ public class CollaborationTest implements FabricClientGameTest {
 
         UUID requestId = requests.get(0).id();
 
+        // Accept and wait for count to drop
         context.runOnClient(client -> PacketSender.respondCollaboration(requestId, true));
+        context.waitTicks(20);
         context.waitFor(client -> ClientCache.getPendingCount(QUEST_ID) == 0, TIMEOUT);
     }
 }

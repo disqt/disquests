@@ -8,11 +8,8 @@
     "fabric-client-gametest": [
       "com.disqt.disquests.test.QuestScreenTest",
       "com.disqt.disquests.test.DisquestsE2ETest",
-      "com.disqt.disquests.test.integration.QuestLifecycleTest",
-      "com.disqt.disquests.test.integration.QuestDiscoveryTest",
-      "com.disqt.disquests.test.integration.CollaborationTest",
-      "com.disqt.disquests.test.integration.LeaveQuestTest",
-      "com.disqt.disquests.test.integration.PinPersistenceTest"
+      "com.disqt.disquests.test.integration.IntegrationPlayerA",
+      "com.disqt.disquests.test.integration.IntegrationPlayerB"
     ]
   },
   "depends": {

@@ -26,7 +26,9 @@ public class DisquestsE2ETest implements FabricClientGameTest {
 
     @Override
     public void runTest(ClientGameTestContext context) {
-        if (System.getProperty("disquests.test.journey") != null) return;
+        // Only run when explicitly selected (requires a running Paper server)
+        String journey = System.getProperty("disquests.test.journey");
+        if (!"DisquestsE2ETest".equals(journey)) return;
 
         String host = System.getProperty("disquests.test.server.host", "localhost");
         int port = Integer.parseInt(System.getProperty("disquests.test.server.port", "25565"));

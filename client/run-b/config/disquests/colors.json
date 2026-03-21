@@ -1,0 +1,18 @@
+{
+  "PANEL_BACKGROUND": "rgba(0, 0, 0, 0.467)",
+  "TEXT_PRIMARY": "rgba(255, 255, 255, 1.000)",
+  "TEXT_MUTED": "rgba(204, 204, 204, 1.000)",
+  "TEXT_DISABLED": "rgba(136, 136, 136, 1.000)",
+  "SELECTION_BACKGROUND": "rgba(85, 170, 221, 0.533)",
+  "CARET_PRIMARY": "rgba(255, 255, 255, 1.000)",
+  "BUTTON_DISABLED": "rgba(0, 0, 0, 0.267)",
+  "BUTTON_HOVER": "rgba(0, 0, 0, 0.667)",
+  "TAB_INACTIVE": "rgba(0, 0, 0, 0.267)",
+  "SCROLLBAR_THUMB_INACTIVE": "rgba(255, 255, 255, 0.533)",
+  "SCROLLBAR_THUMB_ACTIVE": "rgba(255, 255, 255, 1.000)",
+  "GRADIENT_START": "rgba(16, 16, 16, 1.000)",
+  "GRADIENT_END": "rgba(16, 16, 16, 1.000)",
+  "FADE_GRADIENT_TOP": "rgba(0, 0, 0, 0.376)",
+  "FADE_GRADIENT_BOTTOM": "rgba(0, 0, 0, 0.000)",
+  "AMBER": "rgba(255, 170, 51, 1.000)"
+}

@@ -70,13 +70,32 @@ loom {
             vmArg("-Ddisquests.test.server.port=25565")
             vmArg("-Ddisquests.test.rcon.port=25575")
             vmArg("-Ddisquests.test.rcon.password=testpassword")
-            // Integration test properties (passed via -P or -D from orchestrator)
-            val journey = System.getProperty("disquests.test.journey")
-            val phase = System.getProperty("disquests.test.phase")
-            if (journey != null) vmArg("-Ddisquests.test.journey=$journey")
-            if (phase != null) vmArg("-Ddisquests.test.phase=$phase")
+            // Integration test properties (passed via -P from orchestrator)
+            val journey = providers.gradleProperty("testJourney")
+            val phase = providers.gradleProperty("testPhase")
             val username = providers.gradleProperty("testUsername")
+            if (journey.isPresent) vmArg("-Ddisquests.test.journey=${journey.get()}")
+            if (phase.isPresent) vmArg("-Ddisquests.test.phase=${phase.get()}")
             if (username.isPresent) programArgs("--username", username.get())
+        }
+        // Second client run config for Player B (separate run directory)
+        create("clientGameTestB") {
+            client()
+            configName = "Client Game Test B"
+            runDir = "run-b"
+            source(sourceSets.getByName("testmod"))
+            vmArg("-Dfabric.client.gametest")
+            vmArg("-Dfabric.client.gametest.disableNetworkSynchronizer=true")
+            vmArg("-Ddisquests.test.server.host=localhost")
+            vmArg("-Ddisquests.test.server.port=25565")
+            vmArg("-Ddisquests.test.rcon.port=25575")
+            vmArg("-Ddisquests.test.rcon.password=testpassword")
+            val journeyB = providers.gradleProperty("testJourney")
+            val phaseB = providers.gradleProperty("testPhase")
+            val usernameB = providers.gradleProperty("testUsername")
+            if (journeyB.isPresent) vmArg("-Ddisquests.test.journey=${journeyB.get()}")
+            if (phaseB.isPresent) vmArg("-Ddisquests.test.phase=${phaseB.get()}")
+            if (usernameB.isPresent) programArgs("--username", usernameB.get())
         }
     }
 }
@@ -88,30 +107,39 @@ tasks.named("runClientGameTest") {
     }
 }
 
-data class JourneyPhase(val journey: String, val phase: Int, val player: String)
-
 tasks.register("runIntegrationTest") {
     group = "verification"
-    description = "Run integration E2E tests against a Paper dev server"
+    description = "Run integration E2E tests: starts Paper server, runs two clients in parallel"
     dependsOn(":paper:build", ":client:build")
 
     doLast {
-        // Clean DB
+        val isWin = System.getProperty("os.name").lowercase().contains("win")
+        val gradlew = File(rootProject.projectDir, if (isWin) "gradlew.bat" else "gradlew").absolutePath
+
+        // Clean DB + sync dir
         val db = file("../paper/run/plugins/Disquests/disquests.db")
         val walFile = file("../paper/run/plugins/Disquests/disquests.db-wal")
         val shmFile = file("../paper/run/plugins/Disquests/disquests.db-shm")
         listOf(db, walFile, shmFile).forEach { if (it.exists()) it.delete() }
-        logger.lifecycle("Cleaned test database")
+        val syncDir = File(rootProject.projectDir, "integration-sync")
+        if (syncDir.exists()) syncDir.listFiles()?.forEach { it.delete() }
+        syncDir.mkdirs()
+        logger.lifecycle("Cleaned test database and sync directory")
 
         // Start Paper server
-        val paperJar = file("../paper/run/paper.jar")
         val serverDir = file("../paper/run")
+
+        // Deploy plugin jar
+        val pluginJar = file("../paper/build/libs/paper.jar")
+        val pluginDest = File(serverDir, "plugins/Disquests.jar")
+        pluginJar.copyTo(pluginDest, overwrite = true)
+        logger.lifecycle("Deployed plugin jar")
+        val paperJar = File(serverDir, "paper.jar")
         val serverProcess = ProcessBuilder(
             "java", "-Xmx1G", "-jar", paperJar.absolutePath, "--nogui"
         ).directory(serverDir).redirectErrorStream(true).start()
 
         try {
-            // Wait for server ready
             logger.lifecycle("Waiting for Paper server...")
             val logFile = File(serverDir, "logs/latest.log")
             val deadline = System.currentTimeMillis() + 60000
@@ -124,76 +152,59 @@ tasks.register("runIntegrationTest") {
             }
             logger.lifecycle("Paper server ready")
 
-            // Define journeys
-            val journeys = listOf(
-                listOf(JourneyPhase("QuestLifecycleTest", 1, "IntTestPlayerA")),
-                listOf(
-                    JourneyPhase("QuestDiscoveryTest", 1, "IntTestPlayerA"),
-                    JourneyPhase("QuestDiscoveryTest", 2, "IntTestPlayerB"),
-                ),
-                listOf(
-                    JourneyPhase("CollaborationTest", 1, "IntTestPlayerA"),
-                    JourneyPhase("CollaborationTest", 2, "IntTestPlayerB"),
-                    JourneyPhase("CollaborationTest", 3, "IntTestPlayerA"),
-                ),
-                listOf(
-                    JourneyPhase("LeaveQuestTest", 1, "IntTestPlayerA"),
-                    JourneyPhase("LeaveQuestTest", 2, "IntTestPlayerB"),
-                    JourneyPhase("LeaveQuestTest", 3, "IntTestPlayerB"),
-                ),
-                listOf(
-                    JourneyPhase("PinPersistenceTest", 1, "IntTestPlayerA"),
-                    JourneyPhase("PinPersistenceTest", 2, "IntTestPlayerA"),
-                ),
-            )
+            // Ensure run-b directory exists
+            file("run-b").mkdirs()
 
-            var totalPassed = 0
-            var totalFailed = 0
-
-            for (journey in journeys) {
-                val journeyName = journey.first().journey
-                logger.lifecycle("=== Journey: $journeyName ===")
-                var failed = false
-
-                for (jp in journey) {
-                    if (failed) {
-                        logger.lifecycle("  Skipping phase ${jp.phase} (previous failed)")
-                        continue
-                    }
-                    logger.lifecycle("  Phase ${jp.phase} as ${jp.player}...")
-
-                    val isWin = System.getProperty("os.name").lowercase().contains("win")
-                    val cmd = if (isWin) {
-                        listOf("cmd", "/c", "gradlew.bat", ":client:runClientGameTest", "--no-daemon",
-                            "-Ddisquests.test.journey=${jp.journey}",
-                            "-Ddisquests.test.phase=${jp.phase}",
-                            "-PtestUsername=${jp.player}")
-                    } else {
-                        listOf("./gradlew", ":client:runClientGameTest", "--no-daemon",
-                            "-Ddisquests.test.journey=${jp.journey}",
-                            "-Ddisquests.test.phase=${jp.phase}",
-                            "-PtestUsername=${jp.player}")
-                    }
-                    val proc = ProcessBuilder(cmd)
-                        .directory(rootProject.projectDir)
-                        .inheritIO()
-                        .start()
-                    val exitCode = proc.waitFor()
-
-                    if (exitCode != 0) {
-                        logger.error("  FAILED: $journeyName phase ${jp.phase} as ${jp.player}")
-                        failed = true
-                        totalFailed++
-                    } else {
-                        logger.lifecycle("  PASSED")
-                        totalPassed++
-                    }
+            // Launch both clients in parallel (separate run dirs)
+            fun launchClient(journey: String, username: String, taskName: String = ":client:runClientGameTest"): Process {
+                val cmd = if (isWin) {
+                    listOf("cmd", "/c", gradlew, taskName, "--no-daemon",
+                        "-PtestJourney=$journey", "-PtestUsername=$username")
+                } else {
+                    listOf(gradlew, taskName, "--no-daemon",
+                        "-PtestJourney=$journey", "-PtestUsername=$username")
                 }
-                if (!failed) logger.lifecycle("=== $journeyName: ALL PHASES PASSED ===")
+                logger.lifecycle("  Starting $journey as $username")
+                return ProcessBuilder(cmd)
+                    .directory(rootProject.projectDir)
+                    .redirectErrorStream(true)
+                    .start()
             }
 
-            logger.lifecycle("\n=== Integration Test Results: $totalPassed passed, $totalFailed failed ===")
-            if (totalFailed > 0) throw RuntimeException("$totalFailed integration test phase(s) failed")
+            val procA = launchClient("IntegrationPlayerA", "IntTestPlayerA")
+            val procB = launchClient("IntegrationPlayerB", "IntTestPlayerB", ":client:runClientGameTestB")
+
+            // Read output in threads to prevent blocking
+            val outputA = StringBuilder()
+            val outputB = StringBuilder()
+            val readerA = Thread { procA.inputStream.bufferedReader().lines().forEach { outputA.appendLine(it) } }
+            val readerB = Thread { procB.inputStream.bufferedReader().lines().forEach { outputB.appendLine(it) } }
+            readerA.start()
+            readerB.start()
+
+            val exitA = procA.waitFor()
+            val exitB = procB.waitFor()
+            readerA.join(5000)
+            readerB.join(5000)
+
+            logger.lifecycle("\n=== Integration Test Results ===")
+            if (exitA == 0) {
+                logger.lifecycle("  Player A: PASSED")
+            } else {
+                logger.error("  Player A: FAILED (exit=$exitA)")
+                logger.lifecycle("  Output (last 500): ${outputA.takeLast(500)}")
+            }
+            if (exitB == 0) {
+                logger.lifecycle("  Player B: PASSED")
+            } else {
+                logger.error("  Player B: FAILED (exit=$exitB)")
+                logger.lifecycle("  Output (last 500): ${outputB.takeLast(500)}")
+            }
+
+            if (exitA != 0 || exitB != 0) {
+                throw RuntimeException("Integration tests failed: A=${if (exitA==0) "PASS" else "FAIL"}, B=${if (exitB==0) "PASS" else "FAIL"}")
+            }
+            logger.lifecycle("  All journeys PASSED")
 
         } finally {
             serverProcess.destroyForcibly()
