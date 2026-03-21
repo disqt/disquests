@@ -7,7 +7,8 @@
   "entrypoints": {
     "fabric-client-gametest": [
       "com.disqt.disquests.test.QuestScreenTest",
-      "com.disqt.disquests.test.DisquestsE2ETest"
+      "com.disqt.disquests.test.DisquestsE2ETest",
+      "com.disqt.disquests.test.integration.QuestLifecycleTest"
     ]
   },
   "depends": {
