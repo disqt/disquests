@@ -4,6 +4,8 @@ import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.helper.DisquestsConfig;
+import com.disqt.disquests.client.gui.helper.Theme;
 import com.disqt.disquests.client.hud.HudPinManager;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.common.model.CoordinatesData;
@@ -211,9 +213,23 @@ public class QuestEntryComponent extends BaseUIComponent {
                 && mouseY >= entryY && mouseY < entryY + ENTRY_HEIGHT;
 
         if (selected) {
-            context.fill(entryX, entryY, entryX + entryWidth, entryY + ENTRY_HEIGHT, 0x44FFFFFF);
+            context.fill(entryX, entryY, entryX + entryWidth, entryY + ENTRY_HEIGHT, Colors.ENTRY_SELECTED);
         } else if (hovered) {
-            context.fill(entryX, entryY, entryX + entryWidth, entryY + ENTRY_HEIGHT, 0x22FFFFFF);
+            context.fill(entryX, entryY, entryX + entryWidth, entryY + ENTRY_HEIGHT, Colors.ENTRY_HOVER);
+        }
+
+        // Accent line (no-op when ACCENT_LINE_ACTIVE is transparent)
+        if (Colors.ACCENT_LINE_ACTIVE != 0x00000000) {
+            int stripeColor = selected ? Colors.ACCENT_LINE_ACTIVE : Colors.ACCENT_LINE_INACTIVE;
+            context.fill(entryX, entryY, entryX + 2, entryY + ENTRY_HEIGHT, stripeColor);
+        }
+
+        // Inset bevel for selected entries
+        if (selected && DisquestsConfig.getTheme() == Theme.INSET) {
+            context.fill(entryX, entryY, entryX + entryWidth, entryY + 1, 0xFF0A0A0A);
+            context.fill(entryX, entryY, entryX + 1, entryY + ENTRY_HEIGHT, 0xFF0A0A0A);
+            context.fill(entryX, entryY + ENTRY_HEIGHT - 1, entryX + entryWidth, entryY + ENTRY_HEIGHT, 0xFF2A2A2A);
+            context.fill(entryX + entryWidth - 1, entryY, entryX + entryWidth, entryY + ENTRY_HEIGHT, 0xFF2A2A2A);
         }
 
         // --- Row 1: Title + visibility badge + pending + owner ---
