@@ -4,6 +4,7 @@ import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import io.wispforest.owo.ui.base.BaseUIComponent;
 import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.Sizing;
+import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.input.CharInput;
@@ -13,8 +14,9 @@ import net.minecraft.client.input.KeyInput;
  * Thin owo-ui wrapper around MultiLineTextFieldWidget.
  * Delegates all rendering and input to the underlying vanilla widget,
  * using graphics translation to match the owo-ui layout position.
+ * Implements GreedyInputUIComponent so owo-ui routes key/char events to it.
  */
-public class TextFieldComponent extends BaseUIComponent {
+public class TextFieldComponent extends BaseUIComponent implements GreedyInputUIComponent {
 
     private final MultiLineTextFieldWidget delegate;
     private final int preferredWidth;
