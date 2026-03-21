@@ -51,6 +51,8 @@ public class QuestScreenTest implements FabricClientGameTest {
 
     @Override
     public void runTest(ClientGameTestContext context) {
+        if (System.getProperty("disquests.test.journey") != null) return;
+
         ClientSession.joinServer(null, 0, new ArrayList<>(), TEST_PLAYER_UUID);
 
         try {

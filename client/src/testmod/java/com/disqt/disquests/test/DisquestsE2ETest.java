@@ -26,6 +26,8 @@ public class DisquestsE2ETest implements FabricClientGameTest {
 
     @Override
     public void runTest(ClientGameTestContext context) {
+        if (System.getProperty("disquests.test.journey") != null) return;
+
         String host = System.getProperty("disquests.test.server.host", "localhost");
         int port = Integer.parseInt(System.getProperty("disquests.test.server.port", "25565"));
         String address = host + ":" + port;

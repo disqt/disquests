@@ -18,7 +18,7 @@ public class IntegrationTestHelper {
 
     public static boolean shouldSkip(String journeyName) {
         String selected = System.getProperty("disquests.test.journey");
-        return selected != null && !selected.equals(journeyName);
+        return selected == null || !selected.equals(journeyName);
     }
 
     public static void connectAndWait(ClientGameTestContext context) {
