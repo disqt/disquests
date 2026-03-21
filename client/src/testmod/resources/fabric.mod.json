@@ -8,8 +8,8 @@
     "fabric-client-gametest": [
       "com.disqt.disquests.test.QuestScreenTest",
       "com.disqt.disquests.test.DisquestsE2ETest",
-      "com.disqt.disquests.test.integration.IntegrationPlayerA",
-      "com.disqt.disquests.test.integration.IntegrationPlayerB"
+      "com.disqt.disquests.test.integration.harness.HarnessPlayerA",
+      "com.disqt.disquests.test.integration.harness.HarnessPlayerB"
     ]
   },
   "depends": {
