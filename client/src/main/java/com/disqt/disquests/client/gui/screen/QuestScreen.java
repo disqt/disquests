@@ -331,7 +331,7 @@ public class QuestScreen extends DisquestsBaseScreen {
             coord2YComponent = createCoordField(c2 != null ? String.valueOf((int) c2.y()) : "", "Y");
             coord2ZComponent = createCoordField(c2 != null ? String.valueOf((int) c2.z()) : "", "Z");
 
-            corner2Row.child(labelFor("C2 X:"));
+            corner2Row.child(labelFor("Corner 2 X:"));
             corner2Row.child(coord2XComponent);
             corner2Row.child(labelFor("Y:"));
             corner2Row.child(coord2YComponent);
@@ -456,6 +456,7 @@ public class QuestScreen extends DisquestsBaseScreen {
             this.client.setScreen(new ConfirmScreen(this,
                     Text.literal("Leave this quest? You'll lose contributor access."),
                     () -> {
+                        ClientCache.removeFromMyQuests(quest.getId());
                         PacketSender.leaveQuest(quest.getId());
                         ClientSession.setPendingToast("Left \"" + quest.getTitle() + "\"");
                         if (this.client != null) this.client.setScreen(this.parent);

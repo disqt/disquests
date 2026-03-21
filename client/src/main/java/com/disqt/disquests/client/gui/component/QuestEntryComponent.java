@@ -42,6 +42,7 @@ public class QuestEntryComponent extends BaseUIComponent {
     private final String firstLine;
     private final String formattedDateTime;
     private final boolean isOwnedByPlayer;
+    private final boolean isContributor;
     private final boolean hideContent;
 
     // Cached visibility badge (fix 1)
@@ -80,7 +81,7 @@ public class QuestEntryComponent extends BaseUIComponent {
 
         UUID playerUuid = ClientSession.getEffectivePlayerUuid();
         this.isOwnedByPlayer = playerUuid != null && playerUuid.equals(quest.getOwnerUuid());
-        boolean isContributor = quest.getContributors().stream()
+        this.isContributor = quest.getContributors().stream()
                 .anyMatch(c -> c.getUuid().equals(playerUuid));
 
         this.hideContent = quest.getVisibility() == Visibility.CLOSED
@@ -314,6 +315,10 @@ public class QuestEntryComponent extends BaseUIComponent {
         // Pin icon hit area: rightmost 20px, row 2 (y+12 to y+26)
         if (relX >= this.width() - 20 && relX <= this.width()
                 && relY >= 12 && relY <= 26) {
+            if (!isOwnedByPlayer && !isContributor) {
+                LOGGER.debug("  -> PIN CLICK blocked: player is not owner or contributor of {}", quest.getTitle());
+                return true;
+            }
             LOGGER.debug("  -> PIN CLICK detected, toggling pin for {}", quest.getTitle());
             HudPinManager.toggle(quest.getId());
             LOGGER.debug("  -> after toggle, isPinned={}", ClientSession.isPinned(quest.getId()));

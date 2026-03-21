@@ -42,8 +42,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
         FlowLayout pendingList = root.childById(FlowLayout.class, "pending-list");
 
         if (pendingRequests.isEmpty()) {
-            // Hide pending section via zero-sizing
-            pendingSection.sizing(Sizing.fixed(0), Sizing.fixed(0));
+            root.removeChild(pendingSection);
         } else {
             for (CollaborationRequestData req : pendingRequests) {
                 String name = req.requesterName() != null ? req.requesterName() : "Unknown";
@@ -85,11 +84,10 @@ public class ContributorScreen extends DisquestsBaseScreen {
 
         if (contributors.isEmpty() && pendingRequests.isEmpty()) {
             // Show empty label, hide contributor scroll
-            root.childById(io.wispforest.owo.ui.container.ScrollContainer.class, "contributor-scroll")
-                    .sizing(Sizing.fixed(0), Sizing.fixed(0));
+            root.removeChild(root.childById(io.wispforest.owo.ui.container.ScrollContainer.class, "contributor-scroll"));
         } else {
             // Hide empty label
-            emptyLabel.sizing(Sizing.fixed(0), Sizing.fixed(0));
+            root.removeChild(emptyLabel);
 
             for (int i = 0; i < contributors.size(); i++) {
                 Contributor contrib = contributors.get(i);

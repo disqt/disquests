@@ -33,8 +33,8 @@ public final class Colors {
     public static int SCROLLBAR_THUMB_ACTIVE = 0xFFFFFFFF;
 
     // --- Background ---
-    public static int GRADIENT_START = 0xC0101010;
-    public static int GRADIENT_END = 0xD0101010;
+    public static int GRADIENT_START = 0xFF101010;
+    public static int GRADIENT_END = 0xFF101010;
 
     // --- Fade Gradient ---
     public static int FADE_GRADIENT_TOP = 0x60000000;

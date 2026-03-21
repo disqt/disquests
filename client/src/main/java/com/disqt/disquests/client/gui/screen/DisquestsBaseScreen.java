@@ -2,7 +2,9 @@ package com.disqt.disquests.client.gui.screen;
 
 import io.wispforest.owo.ui.base.BaseUIModelScreen;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.input.CharInput;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> {
@@ -20,5 +22,18 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
         if (this.client != null) {
             this.client.setScreen(parent);
         }
+    }
+
+    @Override
+    public boolean charTyped(CharInput charInput) {
+        if (this.uiAdapter != null) {
+            var focused = this.uiAdapter.rootComponent.focusHandler().focused();
+            if (focused instanceof GreedyInputUIComponent inputComponent) {
+                if (inputComponent.onCharTyped(charInput)) {
+                    return true;
+                }
+            }
+        }
+        return super.charTyped(charInput);
     }
 }

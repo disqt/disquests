@@ -107,13 +107,13 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
 
     @Override
     public boolean onKeyPress(KeyInput keyInput) {
-        if (!delegate.isFocused()) return false;
+        delegate.setFocused(true);
         return delegate.keyPressed(keyInput);
     }
 
     @Override
     public boolean onCharTyped(CharInput charInput) {
-        if (!delegate.isFocused()) return false;
+        delegate.setFocused(true);
         return delegate.charTyped(charInput);
     }
 
