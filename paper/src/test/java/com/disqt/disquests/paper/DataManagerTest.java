@@ -431,6 +431,28 @@ class DataManagerTest {
     }
 
     // -------------------------------------------------------------------------
+    // Reset Database
+    // -------------------------------------------------------------------------
+
+    @Test
+    void resetDatabase_clearsAllTables() {
+        UUID questId = UUID.randomUUID();
+        dm.upsertPlayerName(OWNER, "Alice");
+        dm.saveQuest(makeQuest(questId, OWNER, "Test Quest", Visibility.OPEN));
+        dm.pinQuest(OWNER, questId);
+        dm.addContributor(questId, PLAYER2, false);
+        dm.createCollaborationRequest(questId, PLAYER2);
+
+        dm.resetDatabase();
+
+        assertTrue(dm.getQuestsForPlayer(OWNER).isEmpty());
+        assertTrue(dm.getPinnedQuestIds(OWNER).isEmpty());
+        assertFalse(dm.isContributor(questId, PLAYER2));
+        assertTrue(dm.getPendingRequestsForOwner(OWNER).isEmpty());
+        assertNull(dm.getPlayerName(OWNER));
+    }
+
+    // -------------------------------------------------------------------------
     // Cascade Deletes
     // -------------------------------------------------------------------------
 

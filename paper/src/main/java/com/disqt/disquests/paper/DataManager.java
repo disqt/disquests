@@ -541,6 +541,18 @@ public class DataManager {
         }
     }
 
+    public synchronized void resetDatabase() {
+        try (var stmt = connection.createStatement()) {
+            stmt.executeUpdate("DELETE FROM pinned_quests");
+            stmt.executeUpdate("DELETE FROM collaboration_requests");
+            stmt.executeUpdate("DELETE FROM contributors");
+            stmt.executeUpdate("DELETE FROM quests");
+            stmt.executeUpdate("DELETE FROM player_names");
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to reset database", e);
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Migrations
     // -------------------------------------------------------------------------

@@ -9,6 +9,7 @@ import java.util.Map;
 public class Config {
     private String bluemapUrl;
     private Map<String, String> bluemapMapNames;
+    private boolean debug;
 
     public Config(JavaPlugin plugin) {
         plugin.saveDefaultConfig();
@@ -26,8 +27,13 @@ public class Config {
                 bluemapMapNames.put(key, section.getString(key));
             }
         }
+        this.debug = cfg.getBoolean("debug", false);
+        if (Boolean.getBoolean("disquests.debug")) {
+            this.debug = true;
+        }
     }
 
+    public boolean isDebug() { return debug; }
     public String getBluemapUrl() { return bluemapUrl; }
     public Map<String, String> getBluemapMapNames() { return bluemapMapNames; }
 }

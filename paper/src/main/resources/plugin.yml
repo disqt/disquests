@@ -6,7 +6,7 @@ commands:
   disquests:
     description: Disquests admin commands
     permission: disquests.admin
-    usage: /disquests <reload>
+    usage: /disquests <reload|reset>
 permissions:
   disquests.admin:
     description: Admin access to Disquests commands

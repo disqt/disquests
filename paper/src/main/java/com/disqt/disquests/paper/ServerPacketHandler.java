@@ -174,14 +174,9 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
             UUID requestId = dataManager.createCollaborationRequest(questId, player.getUniqueId());
             // Notify quest owner if online
             Player owner = Bukkit.getPlayer(quest.ownerUuid());
-            plugin.getLogger().info("[DEBUG] Collaboration request from " + player.getName() +
-                " for quest " + questId + ". Owner UUID=" + quest.ownerUuid() +
-                ", owner online=" + (owner != null) +
-                ", isModPlayer=" + (owner != null && isModPlayer(owner)));
             if (owner != null && isModPlayer(owner)) {
                 sendPacket(owner, PacketCodec.writeCollaborationRequest(
                     requestId, questId, quest.title(), player.getName()));
-                plugin.getLogger().info("[DEBUG] Sent COLLABORATION_REQUEST to " + owner.getName());
             }
         } catch (RuntimeException e) {
             if (e.getCause() instanceof java.sql.SQLException) {
@@ -348,6 +343,14 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
         QuestData updated = dataManager.getQuest(questId);
         if (updated != null) {
             broadcastQuestUpdate(updated);
+        }
+    }
+
+    // --- Public API ---
+
+    public void resendHandshakes() {
+        for (Player p : getModPlayers()) {
+            sendHandshake(p);
         }
     }
 

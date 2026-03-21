@@ -26,7 +26,7 @@ public class DisquestsPlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(packetHandler, this);
         Bukkit.getPluginManager().registerEvents(new PlayerNameTracker(dataManager), this);
 
-        getCommand("disquests").setExecutor(new Commands(this));
+        getCommand("disquests").setExecutor(new Commands(this, dataManager, packetHandler));
 
         getLogger().info("Disquests enabled");
     }
