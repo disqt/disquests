@@ -47,6 +47,7 @@ dependencies {
     include("org.commonmark:commonmark:0.27.1")
     include("org.commonmark:commonmark-ext-gfm-strikethrough:0.27.1")
     include("org.commonmark:commonmark-ext-task-list-items:0.27.1")
+
 }
 
 sourceSets {
@@ -56,6 +57,12 @@ sourceSets {
         runtimeClasspath += sourceSets.main.get().output
         runtimeClasspath += sourceSets.main.get().runtimeClasspath
     }
+}
+
+dependencies {
+    // JUnit 5 for integration test harness (programmatic launcher inside MC client)
+    "testmodImplementation"("org.junit.jupiter:junit-jupiter:5.11.4")
+    "testmodImplementation"("org.junit.platform:junit-platform-launcher:1.11.4")
 }
 
 loom {
@@ -110,7 +117,7 @@ tasks.named("runClientGameTest") {
 tasks.register("runIntegrationTest") {
     group = "verification"
     description = "Run integration E2E tests: starts Paper server, runs two clients in parallel"
-    dependsOn(":paper:build", ":client:build")
+    dependsOn(":paper:jar", ":client:build")
 
     doLast {
         val isWin = System.getProperty("os.name").lowercase().contains("win")
@@ -138,6 +145,14 @@ tasks.register("runIntegrationTest") {
         val serverProcess = ProcessBuilder(
             "java", "-Xmx1G", "-jar", paperJar.absolutePath, "--nogui"
         ).directory(serverDir).redirectErrorStream(true).start()
+
+        // Drain server stdout in background to prevent buffer blocking
+        val serverOutput = StringBuilder()
+        val serverReader = Thread {
+            serverProcess.inputStream.bufferedReader().lines().forEach { serverOutput.appendLine(it) }
+        }
+        serverReader.isDaemon = true
+        serverReader.start()
 
         try {
             logger.lifecycle("Waiting for Paper server...")
@@ -201,13 +216,25 @@ tasks.register("runIntegrationTest") {
                 logger.lifecycle("  Output (last 500): ${outputB.takeLast(500)}")
             }
 
+            // Print server plugin output on failure for diagnostics
             if (exitA != 0 || exitB != 0) {
+                val serverDebug = serverOutput.lines().filter { it.contains("Disquests") }
+                if (serverDebug.isNotEmpty()) {
+                    logger.lifecycle("\n=== Server Plugin Output ===")
+                    serverDebug.forEach { logger.lifecycle("  $it") }
+                }
                 throw RuntimeException("Integration tests failed: A=${if (exitA==0) "PASS" else "FAIL"}, B=${if (exitB==0) "PASS" else "FAIL"}")
             }
             logger.lifecycle("  All journeys PASSED")
 
         } finally {
-            serverProcess.destroyForcibly()
+            // Graceful shutdown: send "stop" to stdin so logs flush
+            try {
+                serverProcess.outputStream.write("stop\n".toByteArray())
+                serverProcess.outputStream.flush()
+                Thread.sleep(5000)
+            } catch (_: Exception) {}
+            if (serverProcess.isAlive) serverProcess.destroyForcibly()
             logger.lifecycle("Paper server stopped")
         }
     }
