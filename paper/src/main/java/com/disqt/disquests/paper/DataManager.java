@@ -32,6 +32,7 @@ public class DataManager {
             connection = DriverManager.getConnection(url);
             try (Statement stmt = connection.createStatement()) {
                 stmt.executeUpdate("PRAGMA foreign_keys = ON");
+                stmt.executeUpdate("PRAGMA journal_mode = WAL");
             }
             createTables();
             migratePinnedQuests();
