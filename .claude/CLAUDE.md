@@ -83,6 +83,9 @@ Channel: `disquests:main`. First byte = PacketType ID.
 | `paper/src/main/java/com/disqt/disquests/paper/ServerPacketHandler.java` | Handles C2S, broadcasts S2C |
 | `paper/src/main/java/com/disqt/disquests/paper/DataManager.java` | SQLite persistence |
 | `paper/src/main/java/com/disqt/disquests/paper/PlayerNameTracker.java` | Tracks online player display names |
+| `paper/src/main/java/com/disqt/disquests/paper/Commands.java` | `/disquests reload` and `/disquests reset` (debug mode) |
+| `client/src/testmod/.../integration/harness/` | JUnit 5 harness: TestContext, IntegrationTestExtension, annotations, RconClient |
+| `client/src/testmod/.../integration/tests/` | JUnit test classes (Lifecycle, Discovery, Collaboration, Leave, Pin) |
 
 ## Dependencies
 
@@ -106,6 +109,8 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **owo-ui keyboard input requires `GreedyInputUIComponent`** — custom `BaseUIComponent` subclasses that need key/char events must implement this marker interface, and the screen must override `charTyped()` to route to the focused greedy component (see `DisquestsBaseScreen.charTyped()`).
 - **owo-ui delegate focus desync** — `MultiLineTextFieldWidget.focused` can be reset by `mouseClicked()` after `onFocusGained` sets it. Force `delegate.setFocused(true)` in `onKeyPress`/`onCharTyped` before forwarding.
 - **XML comments cannot contain `--`** — causes `SAXParseException`. Use commas instead.
+- **Fire-and-forget C2S race** — `PacketSender.pinQuest()`, `respondCollaboration()` etc. have no server acknowledgment. Add `waitTicks(40)` before disconnect/re-sync if the server must process the packet first. UI code using optimistic cache updates (e.g. `ContributorScreen.respondToRequest` calls `removePendingRequest` locally) must be replicated in tests.
+- **`ClientCache.getQuestById` searches both lists** — returns quests from myQuests AND serverQuests. After leaving an OPEN quest, it's removed from myQuests but still in serverQuests. Use `getMyQuests().stream()` to check membership specifically.
 
 ## Deploy
 
@@ -115,15 +120,24 @@ Channel: `disquests:main`. First byte = PacketType ID.
 
 ## Integration Tests
 
-Two-client parallel integration test framework at `client/src/testmod/.../integration/`. Run via `./gradlew :client:runIntegrationTest`.
+JUnit 5 harness at `client/src/testmod/.../integration/`. Two clients run in parallel with `PhaseSync` coordination.
 
-- **Paper server auto-managed** — task starts server, deploys plugin jar, runs tests, stops server
-- **Two clients in parallel** — `IntegrationPlayerA` uses `client/run/`, `IntegrationPlayerB` uses `client/run-b/`
-- **PhaseSync coordination** — file-based signals, MUST use `context.waitFor()` not `Thread.sleep()` (sleeping blocks packet processing)
-- **Loom property passing** — use `-P` (Gradle property) not `-D` (JVM system property) for subprocess invocation. Run configs read via `providers.gradleProperty()`
-- **Plugin deployment** — `runIntegrationTest` must copy `paper/build/libs/paper.jar` to `paper/run/plugins/Disquests.jar` (unlike `runServer` which does this automatically)
+```bash
+./gradlew :client:runIntegrationTest                                          # one-shot (CI)
+./gradlew :client:runIntegrationTest -Pharness                                # keep clients alive
+./gradlew :client:runIntegrationTest -PnoStart                                # re-run on existing clients
+./gradlew :client:runIntegrationTest -PnoStart -PtestFilter=CollaborationTest  # single test
+```
+
+- **JUnit 5 inside MC client** — `HarnessPlayerA`/`HarnessPlayerB` launch JUnit programmatically via `Launcher` API. Test classes in `tests/` package use `@IntegrationTest` annotation.
+- **`@PlayerA`/`@PlayerB` filtering** — `IntegrationTestExtension` (ExecutionCondition) skips methods tagged for the other player. Untagged methods run on both.
+- **PhaseSync coordination** — file-based signals, MUST use `context.waitFor()` not `Thread.sleep()` (sleeping blocks packet processing). Has cross-client error propagation for fast-fail.
+- **RCON reset** — `/disquests reset` (debug mode only) clears DB + resends handshakes. Used between test runs.
+- **`-PtestFilter` not `-Ptest`** — Gradle reserves `-Ptest` for its built-in test task.
+- **Loom property passing** — use `-P` (Gradle property) not `-D` (JVM system property) for subprocess invocation.
 - **Prism mods incompatible with `runClient`** — production jars use intermediary mappings, dev environment uses named mappings. Mixin crashes guaranteed.
-- **Status**: Journeys 1-2 pass (lifecycle, discovery). Collaboration/leave/pin have a timing issue under investigation — see `docs/in-progress-integration-debug.md`
+- **`paper/run/server.properties` `max-players`** — must be >= 4 (two test clients + reconnect headroom)
+- **testmod source set** — IDE (VSCode/Java LS) can't resolve JUnit imports in testmod files. This is cosmetic; Gradle compilation works fine.
 
 ## Release
 
