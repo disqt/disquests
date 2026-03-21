@@ -49,8 +49,10 @@ class LeaveTest {
         context.runOnClient(c -> PacketSender.leaveQuest(QUEST));
         waitForQuestRemoved(context, QUEST);
 
-        var quest = context.computeOnClient(c -> ClientCache.getQuestById(QUEST));
-        assertNull(quest, "Quest should be removed from My Quests after leaving");
+        // Verify quest is no longer in myQuests (it remains in serverQuests since it's OPEN)
+        var inMyQuests = context.computeOnClient(c ->
+            ClientCache.getMyQuests().stream().anyMatch(q -> q.getId().equals(QUEST)));
+        assertFalse((boolean) inMyQuests, "Quest should be removed from My Quests after leaving");
 
         PhaseSync.signal("leave-b-left");
     }

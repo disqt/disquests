@@ -182,7 +182,7 @@ tasks.register("runIntegrationTest") {
         val gradlew = File(rootProject.projectDir, if (isWin) "gradlew.bat" else "gradlew").absolutePath
         val noStart = project.hasProperty("noStart")
         val harness = project.hasProperty("harness")
-        val testFilter = project.findProperty("test")?.toString()
+        val testFilter = project.findProperty("testFilter")?.toString()
 
         val syncDir = File(rootProject.projectDir, "integration-sync")
         val serverDir = file("../paper/run")
