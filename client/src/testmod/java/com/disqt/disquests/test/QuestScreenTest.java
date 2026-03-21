@@ -4,7 +4,9 @@ import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Contributor;
 import com.disqt.disquests.client.data.Quest;
+import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.helper.DisquestsConfig;
+import com.disqt.disquests.client.gui.helper.Theme;
 import com.disqt.disquests.client.gui.screen.ConfigScreen;
 import com.disqt.disquests.client.gui.component.QuestEntryComponent;
 import com.disqt.disquests.client.gui.screen.ContributorScreen;
@@ -64,6 +66,9 @@ public class QuestScreenTest implements FabricClientGameTest {
             testRequestedState(context);
             testToastOverlay(context);
             testConfigScreen(context);
+            testThemeSwitcher(context);
+            testThemePersistence(context);
+            testAllThemesRenderMainScreen(context);
             testCheckboxNotClickableWithoutPermission(context);
             testLeaveButtonVisibility(context);
             testContributorScreenNoInvite(context);
@@ -570,5 +575,94 @@ public class QuestScreenTest implements FabricClientGameTest {
         ClientCache.removeQuestById(quest.getId());
         context.setScreen(() -> null);
         context.waitTick();
+    }
+
+    /**
+     * Opening ConfigScreen and closing without saving should not change the theme.
+     */
+    private void testThemeSwitcher(ClientGameTestContext context) {
+        Theme originalTheme = DisquestsConfig.getTheme();
+
+        context.setScreen(() -> new ConfigScreen(null));
+        context.waitForScreen(ConfigScreen.class);
+        context.waitTick();
+
+        boolean onConfigScreen = context.computeOnClient(client ->
+                client.currentScreen instanceof ConfigScreen);
+        if (!onConfigScreen) {
+            throw new AssertionError("ConfigScreen should be open");
+        }
+
+        Theme afterOpen = DisquestsConfig.getTheme();
+        if (afterOpen != originalTheme) {
+            throw new AssertionError("Theme should not change on open: expected "
+                + originalTheme + " but got " + afterOpen);
+        }
+
+        context.setScreen(() -> null);
+        context.waitTick();
+
+        Theme afterClose = DisquestsConfig.getTheme();
+        if (afterClose != originalTheme) {
+            throw new AssertionError("Theme should revert on close: expected "
+                + originalTheme + " but got " + afterClose);
+        }
+    }
+
+    /**
+     * Setting theme to FLAT and saving should persist after reload.
+     */
+    private void testThemePersistence(ClientGameTestContext context) {
+        Theme originalTheme = DisquestsConfig.getTheme();
+
+        DisquestsConfig.setTheme(Theme.FLAT);
+        Theme.FLAT.applyColors();
+        DisquestsConfig.save();
+
+        if (Colors.TEXT_PRIMARY != 0xFFE0E0E0) {
+            throw new AssertionError("FLAT theme TEXT_PRIMARY should be 0xFFE0E0E0, got 0x"
+                + Integer.toHexString(Colors.TEXT_PRIMARY));
+        }
+
+        DisquestsConfig.load();
+        if (DisquestsConfig.getTheme() != Theme.FLAT) {
+            throw new AssertionError("Theme should persist as FLAT after reload, got "
+                + DisquestsConfig.getTheme());
+        }
+
+        // Restore original
+        DisquestsConfig.setTheme(originalTheme);
+        originalTheme.applyColors();
+        DisquestsConfig.save();
+    }
+
+    /**
+     * Every theme should render MainScreen without crashing.
+     */
+    private void testAllThemesRenderMainScreen(ClientGameTestContext context) {
+        Quest quest = createTestQuest();
+        ClientCache.setMyQuests(List.of(quest));
+
+        for (Theme theme : Theme.values()) {
+            DisquestsConfig.setTheme(theme);
+            theme.applyColors();
+
+            context.setScreen(() -> new MainScreen());
+            context.waitForScreen(MainScreen.class);
+            context.waitTick();
+
+            boolean onMainScreen = context.computeOnClient(client ->
+                client.currentScreen instanceof MainScreen);
+            if (!onMainScreen) {
+                throw new AssertionError("MainScreen should render with theme: " + theme);
+            }
+
+            context.setScreen(() -> null);
+            context.waitTick();
+        }
+
+        // Restore default
+        DisquestsConfig.setTheme(Theme.VANILLA);
+        Theme.VANILLA.applyColors();
     }
 }
