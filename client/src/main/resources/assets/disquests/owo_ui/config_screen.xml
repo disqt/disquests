@@ -42,6 +42,29 @@
                         </sizing>
                     </label>
 
+                    <!-- Theme selector -->
+                    <flow-layout direction="horizontal" id="theme-row">
+                        <sizing>
+                            <horizontal method="content"/>
+                            <vertical method="content"/>
+                        </sizing>
+                        <vertical-alignment>center</vertical-alignment>
+                        <gap>8</gap>
+                        <children>
+                            <label id="theme-label">
+                                <text>Theme:</text>
+                                <shadow>true</shadow>
+                            </label>
+                            <button id="btn-theme">
+                                <text>Vanilla</text>
+                                <sizing>
+                                    <horizontal method="fixed">100</horizontal>
+                                    <vertical method="fixed">20</vertical>
+                                </sizing>
+                            </button>
+                        </children>
+                    </flow-layout>
+
                     <!-- Slider placeholder - added programmatically -->
                     <flow-layout direction="horizontal" id="slider-row">
                         <sizing>

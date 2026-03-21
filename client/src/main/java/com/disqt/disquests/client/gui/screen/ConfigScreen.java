@@ -1,6 +1,8 @@
 package com.disqt.disquests.client.gui.screen;
 
+import com.disqt.disquests.client.gui.helper.ColorConfig;
 import com.disqt.disquests.client.gui.helper.DisquestsConfig;
+import com.disqt.disquests.client.gui.helper.Theme;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
@@ -13,15 +15,36 @@ import org.jetbrains.annotations.Nullable;
 
 public class ConfigScreen extends DisquestsBaseScreen {
 
+    private static Theme originalThemeBeforeConfig = null;
+
     private int pinnedWidth;
+    private Theme selectedTheme;
 
     public ConfigScreen(@Nullable Screen parent) {
         super(DataSource.asset(Identifier.of("disquests", "config_screen")), parent);
         this.pinnedWidth = DisquestsConfig.getPinnedWidth();
+        this.selectedTheme = DisquestsConfig.getTheme();
+        if (originalThemeBeforeConfig == null) {
+            originalThemeBeforeConfig = this.selectedTheme;
+        }
     }
 
     @Override
     protected void build(FlowLayout root) {
+        applyThemeRoot(root);
+        applyThemePanel(root.childById(FlowLayout.class, "panel"));
+
+        // Wire theme cycle button
+        ButtonComponent themeBtn = root.childById(ButtonComponent.class, "btn-theme");
+        themeBtn.setMessage(Text.literal(selectedTheme.displayName()));
+        themeBtn.onPress(b -> {
+            Theme next = selectedTheme.next();
+            DisquestsConfig.setTheme(next);
+            next.applyColors();
+            ColorConfig.loadColors();
+            this.client.setScreen(new ConfigScreen(this.parent));
+        });
+
         // Create vanilla slider and wrap for owo-ui
         double initialValue = (double) (pinnedWidth - DisquestsConfig.MIN_PINNED_WIDTH)
                 / (DisquestsConfig.MAX_PINNED_WIDTH - DisquestsConfig.MIN_PINNED_WIDTH);
@@ -50,11 +73,20 @@ public class ConfigScreen extends DisquestsBaseScreen {
                 .onPress(b -> {
                     DisquestsConfig.setPinnedWidth(pinnedWidth);
                     DisquestsConfig.save();
+                    originalThemeBeforeConfig = null;
                     this.close();
                 });
 
         root.childById(ButtonComponent.class, "btn-cancel")
-                .onPress(b -> this.close());
+                .onPress(b -> {
+                    if (originalThemeBeforeConfig != null) {
+                        DisquestsConfig.setTheme(originalThemeBeforeConfig);
+                        originalThemeBeforeConfig.applyColors();
+                        ColorConfig.loadColors();
+                    }
+                    originalThemeBeforeConfig = null;
+                    this.close();
+                });
     }
 
     @Override
