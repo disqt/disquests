@@ -43,9 +43,18 @@ public final class Colors {
     // --- Accent ---
     public static int AMBER = 0xFFFFAA33;
 
+    // --- Entry Highlights ---
+    public static int ENTRY_HOVER = 0x22FFFFFF;
+    public static int ENTRY_SELECTED = 0x44FFFFFF;
+
+    // --- Accent Line ---
+    public static int ACCENT_LINE_ACTIVE = 0x00000000;
+    public static int ACCENT_LINE_INACTIVE = 0x00000000;
+
     private Colors() {}
 
     public static void reload() {
+        DisquestsConfig.getTheme().applyColors();
         ColorConfig.loadColors();
     }
 
