@@ -20,8 +20,9 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 public class DisquestsClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
-        ColorConfig.loadColors();
         DisquestsConfig.load();
+        DisquestsConfig.getTheme().applyColors();
+        ColorConfig.loadColors();
         KeyBinds.register();
         DebugScreenEvents.register();
 

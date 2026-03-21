@@ -37,7 +37,7 @@ public class ColorConfig {
                     }
                 }
             } else {
-                saveDefaultColors();
+                saveVanillaDefaults();
             }
         } catch (IOException e) {
             LOGGER.error("Error loading color config", e);
@@ -58,6 +58,13 @@ public class ColorConfig {
                 LOGGER.error("An unexpected error occurred while applying color '{}'", entry.getKey(), e);
             }
         }
+    }
+
+    private static void saveVanillaDefaults() {
+        Theme activeTheme = DisquestsConfig.getTheme();
+        Theme.VANILLA.applyColors();
+        saveDefaultColors();
+        activeTheme.applyColors();
     }
 
     private static void saveDefaultColors() {
