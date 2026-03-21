@@ -1,7 +1,10 @@
 package com.disqt.disquests.client.gui.screen;
 
+import com.disqt.disquests.client.gui.helper.DisquestsConfig;
+import com.disqt.disquests.client.gui.helper.Theme;
 import io.wispforest.owo.ui.base.BaseUIModelScreen;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.core.ParentUIComponent;
 import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.input.CharInput;
@@ -35,5 +38,13 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
             }
         }
         return super.charTyped(charInput);
+    }
+
+    protected void applyThemeRoot(FlowLayout root) {
+        root.surface(DisquestsConfig.getTheme().rootSurface());
+    }
+
+    protected void applyThemePanel(ParentUIComponent component) {
+        component.surface(DisquestsConfig.getTheme().panelSurface());
     }
 }
