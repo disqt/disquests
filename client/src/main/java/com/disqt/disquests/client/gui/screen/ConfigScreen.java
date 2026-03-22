@@ -17,6 +17,11 @@ public class ConfigScreen extends DisquestsBaseScreen {
 
     private static Theme originalThemeBeforeConfig = null;
 
+    /** Resets the static theme tracking state. Used by tests to ensure clean starting state. */
+    public static void resetOriginalTheme() {
+        originalThemeBeforeConfig = null;
+    }
+
     private int pinnedWidth;
     private Theme selectedTheme;
 

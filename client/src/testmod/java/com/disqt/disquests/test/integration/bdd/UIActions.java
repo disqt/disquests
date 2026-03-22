@@ -5,6 +5,8 @@ import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
+import com.disqt.disquests.test.integration.harness.RconClient;
+import com.disqt.disquests.test.integration.harness.TestContext;
 import io.wispforest.owo.ui.core.UIComponent;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
@@ -27,6 +29,37 @@ public final class UIActions {
     public static final int TIMEOUT = 30 * 20; // 30 seconds in ticks
 
     private UIActions() {}
+
+    // --- Server reset ---
+
+    /**
+     * Sends RCON "disquests reset" to wipe the server DB, then clears client cache
+     * and requests a fresh sync. Waits for the sync to complete.
+     * Call this from @BeforeAll in journey classes instead of raw RCON + Thread.sleep.
+     */
+    public static void resetServerAndSync() throws Exception {
+        var rcon = new RconClient("localhost",
+            Integer.parseInt(System.getProperty("disquests.test.rcon.port", "25575")));
+        rcon.login(System.getProperty("disquests.test.rcon.password", "testpassword"));
+        rcon.command("disquests reset");
+        rcon.close();
+
+        // Clear client cache and request sync using the test context.
+        // The RCON reset triggers a server-side re-handshake, but we must also
+        // clear the client cache to prevent stale quests from prior journeys.
+        ClientGameTestContext context = TestContext.get();
+        context.runOnClient(c -> {
+            ClientCache.clear();
+            c.setScreen(null); // close any open screen
+        });
+        // Wait for server re-handshake + sync to arrive
+        context.waitTicks(40);
+        // Request a fresh sync to ensure we have the latest (empty) data
+        context.runOnClient(c -> {
+            com.disqt.disquests.client.network.PacketSender.requestSync();
+        });
+        context.waitTicks(20);
+    }
 
     // --- Connection ---
 
@@ -150,16 +183,42 @@ public final class UIActions {
 
     /**
      * Type text into a focused text field.
-     * Must click the field first to focus it. Waits 1 tick for focus desync workaround.
+     * Must click the field first to focus it.
+     * Clears existing text by directly manipulating the widget,
+     * then types the new text via GLFW character input.
+     * Handles both TextFieldComponent (our custom multi-line) and
+     * TextBoxComponent (owo-ui single-line).
      */
     public static void type(ClientGameTestContext context, String componentId, String text) {
         click(context, componentId);
         context.waitTicks(1); // focus desync workaround for GreedyInputUIComponent
-        // Select all existing text (Ctrl+A) then delete to clear field
-        context.getInput().holdControl();
-        context.getInput().pressKey(GLFW.GLFW_KEY_A);
-        context.getInput().releaseControl();
-        context.getInput().pressKey(GLFW.GLFW_KEY_DELETE);
+        // Clear existing text by directly manipulating the widget.
+        // GLFW Ctrl+A routing can be unreliable through owo-ui layers,
+        // so we clear via runOnClient for robustness.
+        context.runOnClient(c -> {
+            if (c.currentScreen instanceof DisquestsBaseScreen dScreen) {
+                var root = dScreen.getRootComponent();
+                if (root != null) {
+                    // Try our custom TextFieldComponent first
+                    var textField = root.childById(
+                        com.disqt.disquests.client.gui.component.TextFieldComponent.class, componentId);
+                    if (textField != null) {
+                        textField.getDelegate().setText("");
+                        textField.getDelegate().setFocused(true);
+                        return;
+                    }
+                    // Fall back to owo-ui TextBoxComponent
+                    var textBox = root.childById(
+                        io.wispforest.owo.ui.component.TextBoxComponent.class, componentId);
+                    if (textBox != null) {
+                        textBox.text("");
+                    }
+                }
+            }
+        });
+        context.waitTicks(1);
+        // Re-click to ensure owo-ui focus is restored after setText (which clears focused)
+        click(context, componentId);
         context.waitTicks(1);
         // Type new text
         context.getInput().typeChars(text);
@@ -191,12 +250,38 @@ public final class UIActions {
     }
 
     /**
+     * Press Ctrl+Z repeatedly to undo N actions.
+     * Each typeChars character creates a separate undo action,
+     * so use this to undo an entire typed string.
+     */
+    public static void undoN(ClientGameTestContext context, int count) {
+        for (int i = 0; i < count; i++) {
+            context.getInput().holdControl();
+            context.getInput().pressKey(GLFW.GLFW_KEY_Z);
+            context.getInput().releaseControl();
+        }
+        context.waitTicks(2);
+    }
+
+    /**
      * Press Ctrl+Y (redo) on the currently focused field.
      */
     public static void redo(ClientGameTestContext context) {
         context.getInput().holdControl();
         context.getInput().pressKey(GLFW.GLFW_KEY_Y);
         context.getInput().releaseControl();
+        context.waitTicks(2);
+    }
+
+    /**
+     * Press Ctrl+Y repeatedly to redo N actions.
+     */
+    public static void redoN(ClientGameTestContext context, int count) {
+        for (int i = 0; i < count; i++) {
+            context.getInput().holdControl();
+            context.getInput().pressKey(GLFW.GLFW_KEY_Y);
+            context.getInput().releaseControl();
+        }
         context.waitTicks(2);
     }
 

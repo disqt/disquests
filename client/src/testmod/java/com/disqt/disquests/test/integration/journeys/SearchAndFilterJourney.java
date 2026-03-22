@@ -5,7 +5,6 @@ import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
 import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
-import com.disqt.disquests.test.integration.harness.RconClient;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -23,14 +22,8 @@ class SearchAndFilterJourney {
 
     @BeforeAll
     static void resetServer() throws Exception {
-        var rcon = new RconClient("localhost",
-            Integer.parseInt(System.getProperty("disquests.test.rcon.port", "25575")));
-        rcon.login(System.getProperty("disquests.test.rcon.password", "testpassword"));
-        rcon.command("disquests reset");
-        rcon.close();
+        resetServerAndSync();
         AbortOnFailureExtension.clearFailures();
-        // Wait for server re-handshake to complete
-        Thread.sleep(1000);
     }
 
     // Helper: create a quest with a given title and visibility cycle count

@@ -1,12 +1,13 @@
 package com.disqt.disquests.test.integration.journeys;
 
+import com.disqt.disquests.client.gui.helper.ColorConfig;
 import com.disqt.disquests.client.gui.helper.DisquestsConfig;
 import com.disqt.disquests.client.gui.helper.Theme;
 import com.disqt.disquests.client.gui.screen.ConfigScreen;
 import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
 import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
-import com.disqt.disquests.test.integration.harness.RconClient;
+import com.disqt.disquests.test.integration.harness.TestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -24,14 +25,19 @@ class ConfigJourney {
 
     @BeforeAll
     static void resetServer() throws Exception {
-        var rcon = new RconClient("localhost",
-            Integer.parseInt(System.getProperty("disquests.test.rcon.port", "25575")));
-        rcon.login(System.getProperty("disquests.test.rcon.password", "testpassword"));
-        rcon.command("disquests reset");
-        rcon.close();
+        resetServerAndSync();
         AbortOnFailureExtension.clearFailures();
-        // Wait for server re-handshake to complete
-        Thread.sleep(1000);
+        // Reset theme to VANILLA and clear ConfigScreen static state
+        // to ensure a clean starting point regardless of journey ordering.
+        TestContext.get().runOnClient(c -> {
+            ConfigScreen.resetOriginalTheme();
+            DisquestsConfig.setTheme(Theme.VANILLA);
+            Theme.VANILLA.applyColors();
+            ColorConfig.loadColors();
+            DisquestsConfig.save();
+            c.setScreen(null);
+        });
+        TestContext.get().waitTicks(2);
     }
 
     private void openConfigScreen(ClientGameTestContext context) {

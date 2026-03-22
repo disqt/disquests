@@ -7,7 +7,6 @@ import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
 import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
-import com.disqt.disquests.test.integration.harness.RconClient;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -25,14 +24,8 @@ class UndoRedoJourney {
 
     @BeforeAll
     static void resetServer() throws Exception {
-        var rcon = new RconClient("localhost",
-            Integer.parseInt(System.getProperty("disquests.test.rcon.port", "25575")));
-        rcon.login(System.getProperty("disquests.test.rcon.password", "testpassword"));
-        rcon.command("disquests reset");
-        rcon.close();
+        resetServerAndSync();
         AbortOnFailureExtension.clearFailures();
-        // Wait for server re-handshake to complete
-        Thread.sleep(1000);
     }
 
     /** Read the text from the content-field TextFieldComponent. */
@@ -71,21 +64,10 @@ class UndoRedoJourney {
     @DisplayName("Type 'Hello' in content field")
     void typeHello(ClientGameTestContext context) {
         given("player is in edit mode with empty content field");
-            // Clear content field first (it may contain the default empty string)
-            click(context, "content-field");
-            context.waitTicks(1);
 
         when("player types 'Hello' in content field");
-            // Use typeChars directly to avoid the Ctrl+A+Delete clear that 'type()' does,
-            // since we want to test undo of typed text specifically.
-            // First ensure field is cleared, then type without clearing
-            context.getInput().holdControl();
-            context.getInput().pressKey(org.lwjgl.glfw.GLFW.GLFW_KEY_A);
-            context.getInput().releaseControl();
-            context.getInput().pressKey(org.lwjgl.glfw.GLFW.GLFW_KEY_DELETE);
-            context.waitTicks(1);
-            context.getInput().typeChars("Hello");
-            context.waitTicks(2);
+            // Use type() which clears field then types new text
+            type(context, "content-field", "Hello");
 
         then("content field shows 'Hello'");
             String text = getContentFieldText(context);
@@ -96,16 +78,16 @@ class UndoRedoJourney {
     @DisplayName("Ctrl+Z reverts content to empty")
     void undoClearsHello(ClientGameTestContext context) {
         given("content field contains 'Hello'");
-        when("player presses Ctrl+Z (undo)");
+        when("player presses Ctrl+Z repeatedly to undo all 5 characters");
             // Click field to ensure focus
             click(context, "content-field");
             context.waitTicks(1);
-            undo(context);
+            // Each typeChars character creates a separate undo action,
+            // so we need 5 undos for "Hello" (5 chars)
+            undoN(context, 5);
 
         then("content field reverts to empty");
             String text = getContentFieldText(context);
-            // After undo, the typed text should be removed.
-            // MultiLineTextFieldWidget's UndoManager undoes the last edit.
             assertNotNull(text, "content-field should still be present");
             assertTrue(text.isEmpty(), "Content field should be empty after undo, was: '" + text + "'");
     }
@@ -114,10 +96,10 @@ class UndoRedoJourney {
     @DisplayName("Ctrl+Y redoes 'Hello'")
     void redoRestoresHello(ClientGameTestContext context) {
         given("content field is empty after undo");
-        when("player presses Ctrl+Y (redo)");
+        when("player presses Ctrl+Y repeatedly to redo all 5 characters");
             click(context, "content-field");
             context.waitTicks(1);
-            redo(context);
+            redoN(context, 5);
 
         then("content field shows 'Hello' again");
             String text = getContentFieldText(context);
@@ -141,10 +123,11 @@ class UndoRedoJourney {
     @DisplayName("Ctrl+Z reverts to 'Hello'")
     void undoWorld(ClientGameTestContext context) {
         given("content field shows 'Hello World'");
-        when("player presses Ctrl+Z (undo)");
+        when("player presses Ctrl+Z to undo ' World' (6 chars)");
             click(context, "content-field");
             context.waitTicks(1);
-            undo(context);
+            // " World" is 6 characters, so 6 undos
+            undoN(context, 6);
 
         then("content field reverts to 'Hello'");
             String text = getContentFieldText(context);
@@ -156,10 +139,10 @@ class UndoRedoJourney {
     @DisplayName("Ctrl+Z again reverts to empty")
     void undoHello(ClientGameTestContext context) {
         given("content field shows 'Hello'");
-        when("player presses Ctrl+Z again");
+        when("player presses Ctrl+Z to undo 'Hello' (5 chars)");
             click(context, "content-field");
             context.waitTicks(1);
-            undo(context);
+            undoN(context, 5);
 
         then("content field is empty");
             String text = getContentFieldText(context);

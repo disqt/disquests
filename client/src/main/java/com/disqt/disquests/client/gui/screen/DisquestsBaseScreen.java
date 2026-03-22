@@ -8,6 +8,7 @@ import io.wispforest.owo.ui.core.ParentUIComponent;
 import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.input.CharInput;
+import net.minecraft.client.input.KeyInput;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> {
@@ -25,6 +26,22 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
         if (this.client != null) {
             this.client.setScreen(parent);
         }
+    }
+
+    @Override
+    public boolean keyPressed(KeyInput keyInput) {
+        // BaseOwoScreen skips GreedyInputUIComponent routing when Ctrl is held,
+        // which prevents Ctrl+A, Ctrl+Z, Ctrl+Y etc from reaching text fields.
+        // Route ALL key events to the focused greedy component first.
+        if (this.uiAdapter != null) {
+            var focused = this.uiAdapter.rootComponent.focusHandler().focused();
+            if (focused instanceof GreedyInputUIComponent inputComponent) {
+                if (inputComponent.onKeyPress(keyInput)) {
+                    return true;
+                }
+            }
+        }
+        return super.keyPressed(keyInput);
     }
 
     @Override
