@@ -21,7 +21,7 @@ import static com.disqt.disquests.test.integration.bdd.UIAssertions.*;
 class QuestLifecycleJourney {
 
     @BeforeAll
-    static void resetServer() {
+    static void resetServer() throws Exception {
         resetServerAndSync();
         AbortOnFailureExtension.clearFailures();
     }

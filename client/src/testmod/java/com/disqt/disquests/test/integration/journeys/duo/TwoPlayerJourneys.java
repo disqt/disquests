@@ -9,7 +9,7 @@ import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.test.integration.PhaseSync;
 import com.disqt.disquests.test.integration.harness.PlayerA;
 import com.disqt.disquests.test.integration.harness.PlayerB;
-import com.disqt.disquests.test.integration.harness.TwoPlayerJourney;
+import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.container.FlowLayout;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -25,10 +25,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * All two-player journeys in one class with @Nested inner classes.
- * One @BeforeAll, one TwoPlayerSyncExtension barrier -- no cross-class signal races.
  * Order ranges: Collaboration 1-9, OpenQuest 10-19, LiveUpdate 20-29.
  */
-@TwoPlayerJourney
+@IntegrationTest
 @DisplayName("Two-Player Journeys")
 class TwoPlayerJourneys {
 
