@@ -10,7 +10,7 @@ public class BlueMapHelper {
 
     public static String buildUrl(Quest quest) {
         String base = ClientSession.getBluemapUrl();
-        if (base == null || base.isEmpty()) return null;
+        if (base == null || base.isEmpty()) base = "https://disqt.com/minecraft/map";
         if (quest.getCoordinates() == null) return null;
 
         Map<String, String> mapNames = ClientSession.getBluemapMapNames();
