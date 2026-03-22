@@ -41,20 +41,24 @@ All versions (MC, Fabric, Paper, Java) are in `gradle.properties` — that is th
 
 ## E2E Tests
 
-Client game tests live in `client/src/testmod/java/com/disqt/disquests/test/QuestScreenTest.java`. Run via:
+UX-driven journey tests in `client/src/testmod/java/com/disqt/disquests/test/integration/journeys/`. Run via:
 
 ```bash
-./gradlew :client:runClientGameTest   # requires Paper dev server running
-./gradlew :client:runClientGameTest -Pcoverage  # with JaCoCo coverage
-./gradlew :client:jacocoGameTestReport           # generate HTML report -> client/build/reports/jacoco/
+./gradlew :client:runIntegrationTest                                          # full suite (auto-starts Paper)
+./gradlew :client:runIntegrationTest -Pcoverage                               # with JaCoCo coverage
+./gradlew :client:runIntegrationTest -PtestFilter=QuestLifecycleJourney       # single journey
+./gradlew :client:runIntegrationTest -Pharness                                # keep clients alive for re-runs
+./gradlew :client:runIntegrationTest -PnoStart -PtestFilter=ConfigJourney     # re-run on existing clients
+./gradlew :client:jacocoIntegrationTestReport                                 # generate HTML report
 ```
 
-Tests use `FabricClientGameTest` API: `setScreen`, `waitForScreen`, `computeOnClient`, `runOnClient`. Quests must be added to `ClientCache` before opening screens to prevent auto-close (`tick()` closes screens when quest is not in cache).
+Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with GLFW physical input via `TestInput`. All tests connect to a live Paper server -- no mocking.
 
-- **Use `TestInput` for click simulation** -- `context.getInput().setCursorPos(x * scale, y * scale)` + `context.getInput().pressMouse(GLFW_MOUSE_BUTTON_LEFT)`. Never call `screen.mouseClicked()` directly -- it bypasses the real input pipeline and gives false test results.
-- **GLFW uses physical pixels** -- multiply logical coordinates by `client.getWindow().getScaleFactor()` before passing to `setCursorPos`.
-- **`TestLogCapture`** -- attach to any logger name, captures Log4j2 events at DEBUG level for assertions: `TestLogCapture.attach("Disquests/QuestEntry")` then `capture.hasMessageContaining("...")`.
-- **`DebugScreenEvents`** -- registered at mod init, logs all mouse events on Disquests screens at DEBUG level via Fabric `ScreenMouseEvents` hooks. Enable by setting `Disquests` logger to DEBUG in log4j2 config.
+- **`UIActions`** -- click, type, undo/redo, waitForScreen, openMainScreen, etc.
+- **`UIAssertions`** -- assertLabelText, assertButtonText, assertEntryCount, assertScreenIs, etc.
+- **Trust hierarchy:** UI state > component state > debug logs > cache state
+- **Two-player journeys** use `PhaseSync.signal()`/`waitFor()` for coordination
+- **`AbortOnFailureExtension`** skips remaining steps if a prior step fails
 
 ## Networking Protocol
 
@@ -126,16 +130,10 @@ Channel: `disquests:main`. First byte = PacketType ID.
 
 ## Integration Tests
 
-JUnit 5 harness at `client/src/testmod/.../integration/`. Two clients run in parallel with `PhaseSync` coordination.
+Integration tests are now part of the E2E test suite described above. All tests run via `runIntegrationTest`. See **E2E Tests** for the full command reference and gotchas.
 
-```bash
-./gradlew :client:runIntegrationTest                                          # one-shot (CI)
-./gradlew :client:runIntegrationTest -Pharness                                # keep clients alive
-./gradlew :client:runIntegrationTest -PnoStart                                # re-run on existing clients
-./gradlew :client:runIntegrationTest -PnoStart -PtestFilter=CollaborationTest  # single test
-```
-
-- **JUnit 5 inside MC client** — `HarnessPlayerA`/`HarnessPlayerB` launch JUnit programmatically via `Launcher` API. Test classes in `tests/` package use `@IntegrationTest` annotation.
+Key implementation notes:
+- **JUnit 5 inside MC client** — `HarnessPlayerA`/`HarnessPlayerB` launch JUnit programmatically via `Launcher` API. Test classes in `journeys/` package use `@IntegrationTest` annotation.
 - **`@PlayerA`/`@PlayerB` filtering** — `IntegrationTestExtension` (ExecutionCondition) skips methods tagged for the other player. Untagged methods run on both.
 - **PhaseSync coordination** — file-based signals, MUST use `context.waitFor()` not `Thread.sleep()` (sleeping blocks packet processing). Has cross-client error propagation for fast-fail.
 - **RCON reset** — `/disquests reset` (debug mode only) clears DB + resends handshakes. Used between test runs.
