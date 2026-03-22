@@ -400,12 +400,8 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
     // ---------- Rendering ----------
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        if (this.focused) {
-            Screen currentScreen = MinecraftClient.getInstance().currentScreen;
-            if (currentScreen != null && currentScreen.getFocused() != this) {
-                this.focused = false;
-            }
-        }
+        // Focus is managed by TextFieldComponent via setFocused() -- don't override it here.
+        // (Previously checked screen.getFocused() == this, but that fails when wrapped in owo-ui.)
 
         int padding = 5;
         int contentX = this.x + padding;
@@ -486,8 +482,8 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
                 int caretYPos = contentY + (displayLine * textRenderer.fontHeight) - (int) scrollY;
                 int top = caretYPos - paddingTop;
                 int bottom = caretYPos + textRenderer.fontHeight + paddingBottom;
-                // draw 2px wide vertical caret centered at caretPixelX
-                context.fill(caretPixelX, top, caretPixelX + 1, bottom, Colors.CARET_PRIMARY);
+                // draw 2px wide vertical caret
+                context.fill(caretPixelX, top, caretPixelX + 2, bottom, Colors.CARET_PRIMARY);
             }
         }
 
