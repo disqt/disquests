@@ -295,6 +295,11 @@ public class QuestScreen extends DisquestsBaseScreen {
             String visText = "Visibility: " + quest.getVisibility().name();
             ButtonComponent visBtn = root.childById(ButtonComponent.class, "btn-visibility");
             visBtn.setMessage(Text.literal(visText));
+            visBtn.tooltip(Text.literal(switch (quest.getVisibility()) {
+                case PRIVATE -> "Only you can see this quest";
+                case CLOSED -> "Visible on Quest Board, others must request access";
+                case OPEN -> "Anyone can join and view this quest";
+            }));
             visBtn.onPress(b -> cycleVisibility());
 
             int contribCount = quest.getContributors() != null ? quest.getContributors().size() : 0;
@@ -319,6 +324,14 @@ public class QuestScreen extends DisquestsBaseScreen {
                 .onPress(b -> saveAndView());
         root.childById(ButtonComponent.class, "btn-cancel")
                 .onPress(b -> cancelEdit());
+
+        // Style formatting panel labels with actual rendered examples
+        LabelComponent fmtBold = root.childById(LabelComponent.class, "fmt-bold");
+        if (fmtBold != null) fmtBold.text(Text.literal("**text**: ").append(Text.literal("text").styled(s -> s.withBold(true))));
+        LabelComponent fmtItalic = root.childById(LabelComponent.class, "fmt-italic");
+        if (fmtItalic != null) fmtItalic.text(Text.literal("*text*: ").append(Text.literal("text").styled(s -> s.withItalic(true))));
+        LabelComponent fmtStrike = root.childById(LabelComponent.class, "fmt-strike");
+        if (fmtStrike != null) fmtStrike.text(Text.literal("~~text~~: ").append(Text.literal("text").styled(s -> s.withStrikethrough(true))));
     }
 
     private void buildCoordsSection(FlowLayout root) {
