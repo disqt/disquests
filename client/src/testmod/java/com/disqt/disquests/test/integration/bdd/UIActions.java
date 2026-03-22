@@ -227,18 +227,12 @@ public final class UIActions {
             if (c.currentScreen instanceof DisquestsBaseScreen dScreen) {
                 var root = dScreen.getRootComponent();
                 if (root != null) {
-                    // Try our custom TextFieldComponent first
-                    var textField = root.childById(
-                        com.disqt.disquests.client.gui.component.TextFieldComponent.class, componentId);
-                    if (textField != null) {
+                    // Find component by ID as generic UIComponent, then check type
+                    var component = root.childById(UIComponent.class, componentId);
+                    if (component instanceof com.disqt.disquests.client.gui.component.TextFieldComponent textField) {
                         textField.getDelegate().setText("");
                         textField.getDelegate().setFocused(true);
-                        return;
-                    }
-                    // Fall back to owo-ui TextBoxComponent
-                    var textBox = root.childById(
-                        io.wispforest.owo.ui.component.TextBoxComponent.class, componentId);
-                    if (textBox != null) {
+                    } else if (component instanceof io.wispforest.owo.ui.component.TextBoxComponent textBox) {
                         textBox.text("");
                     }
                 }
