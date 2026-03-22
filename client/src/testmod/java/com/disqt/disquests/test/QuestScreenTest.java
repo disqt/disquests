@@ -13,6 +13,7 @@ import com.disqt.disquests.client.gui.screen.ContributorScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.client.hud.HudPinRenderer;
+import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.Visibility;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -69,6 +70,9 @@ public class QuestScreenTest implements FabricClientGameTest {
             testThemeSwitcher(context);
             testThemePersistence(context);
             testAllThemesRenderMainScreen(context);
+            testFormattingPanelAlwaysVisible(context);
+            testEditScreenWithMapValues(context);
+            testRegionCoordsAlignment(context);
             testCheckboxNotClickableWithoutPermission(context);
             testLeaveButtonVisibility(context);
             testContributorScreenNoInvite(context);
@@ -634,6 +638,99 @@ public class QuestScreenTest implements FabricClientGameTest {
         DisquestsConfig.setTheme(originalTheme);
         originalTheme.applyColors();
         DisquestsConfig.save();
+    }
+
+    /**
+     * Formatting panel should always be visible in edit mode (no zero-sizing).
+     * Verifies the edit screen opens and renders without crashing.
+     */
+    private void testFormattingPanelAlwaysVisible(ClientGameTestContext context) {
+        Quest quest = createTestQuest();
+        ClientCache.addOrUpdateMyQuest(quest);
+
+        context.setScreen(() -> new QuestScreen(null, quest, true));
+        context.waitForScreen(QuestScreen.class);
+        context.waitTicks(3);
+
+        String screenInfo = context.computeOnClient(client -> {
+            if (!(client.currentScreen instanceof QuestScreen screen)) {
+                return "not QuestScreen: " + (client.currentScreen == null ? "null"
+                        : client.currentScreen.getClass().getSimpleName());
+            }
+            return "editing=" + screen.isEditing();
+        });
+
+        if (!screenInfo.contains("editing=true")) {
+            throw new AssertionError("Formatting panel test: expected edit mode but got: " + screenInfo);
+        }
+
+        ClientCache.removeQuestById(quest.getId());
+        context.setScreen(() -> null);
+        context.waitTick();
+    }
+
+    /**
+     * Edit screen should render without crashing for each map value:
+     * null (any), overworld, the_nether, the_end.
+     */
+    private void testEditScreenWithMapValues(ClientGameTestContext context) {
+        String[] maps = {null, "overworld", "the_nether", "the_end"};
+        for (String map : maps) {
+            Quest quest = createTestQuest();
+            quest.setMap(map);
+            ClientCache.addOrUpdateMyQuest(quest);
+
+            context.setScreen(() -> new QuestScreen(null, quest, true));
+            context.waitForScreen(QuestScreen.class);
+            context.waitTicks(2);
+
+            String screenInfo = context.computeOnClient(client -> {
+                if (!(client.currentScreen instanceof QuestScreen screen)) {
+                    return "not QuestScreen";
+                }
+                return "editing=" + screen.isEditing();
+            });
+
+            if (!screenInfo.contains("editing=true")) {
+                throw new AssertionError(
+                        "Edit screen should render with map=" + map + " but got: " + screenInfo);
+            }
+
+            ClientCache.removeQuestById(quest.getId());
+            context.setScreen(() -> null);
+            context.waitTick();
+        }
+    }
+
+    /**
+     * Edit screen with region mode enabled and both coordinate sets should render without crashing.
+     */
+    private void testRegionCoordsAlignment(ClientGameTestContext context) {
+        Quest quest = createTestQuest();
+        quest.setCoordinates(new CoordinatesData(100, 64, -200));
+        quest.setRegion(true);
+        quest.setCoordinates2(new CoordinatesData(200, 80, -100));
+        ClientCache.addOrUpdateMyQuest(quest);
+
+        context.setScreen(() -> new QuestScreen(null, quest, true));
+        context.waitForScreen(QuestScreen.class);
+        context.waitTicks(2);
+
+        String screenInfo = context.computeOnClient(client -> {
+            if (!(client.currentScreen instanceof QuestScreen screen)) {
+                return "not QuestScreen";
+            }
+            return "editing=" + screen.isEditing();
+        });
+
+        if (!screenInfo.contains("editing=true")) {
+            throw new AssertionError(
+                    "Edit screen should render with region coords but got: " + screenInfo);
+        }
+
+        ClientCache.removeQuestById(quest.getId());
+        context.setScreen(() -> null);
+        context.waitTick();
     }
 
     /**
