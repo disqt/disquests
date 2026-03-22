@@ -325,13 +325,21 @@ public class QuestScreen extends DisquestsBaseScreen {
         root.childById(ButtonComponent.class, "btn-cancel")
                 .onPress(b -> cancelEdit());
 
-        // Style formatting panel labels with actual rendered examples
+        // Style formatting panel labels with rendered examples
         LabelComponent fmtBold = root.childById(LabelComponent.class, "fmt-bold");
         if (fmtBold != null) fmtBold.text(Text.literal("**text**: ").append(Text.literal("text").styled(s -> s.withBold(true))));
         LabelComponent fmtItalic = root.childById(LabelComponent.class, "fmt-italic");
         if (fmtItalic != null) fmtItalic.text(Text.literal("*text*: ").append(Text.literal("text").styled(s -> s.withItalic(true))));
         LabelComponent fmtStrike = root.childById(LabelComponent.class, "fmt-strike");
         if (fmtStrike != null) fmtStrike.text(Text.literal("~~text~~: ").append(Text.literal("text").styled(s -> s.withStrikethrough(true))));
+        LabelComponent fmtHeading = root.childById(LabelComponent.class, "fmt-heading");
+        if (fmtHeading != null) fmtHeading.text(Text.literal("# ").append(Text.literal("Heading").styled(s -> s.withBold(true))));
+        LabelComponent fmtCheckbox = root.childById(LabelComponent.class, "fmt-checkbox");
+        if (fmtCheckbox != null) fmtCheckbox.text(Text.literal("- [ ] todo  - [x] ").append(Text.literal("done").styled(s -> s.withStrikethrough(true).withColor(0x55FF55))));
+        LabelComponent fmtQuote = root.childById(LabelComponent.class, "fmt-quote");
+        if (fmtQuote != null) fmtQuote.text(Text.literal("> ").append(Text.literal("quote").styled(s -> s.withItalic(true).withColor(0xAAAAAA))));
+        LabelComponent fmtLink = root.childById(LabelComponent.class, "fmt-link");
+        if (fmtLink != null) fmtLink.text(Text.literal("[text](url): ").append(Text.literal("link").styled(s -> s.withUnderline(true).withColor(0x5555FF))));
     }
 
     private void buildCoordsSection(FlowLayout root) {
