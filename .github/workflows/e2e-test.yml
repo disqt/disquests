@@ -43,70 +43,13 @@ jobs:
       - name: Build all JARs
         run: ./gradlew build
 
-      - name: Configure Paper server
+      - name: Run integration tests
         run: |
-          mkdir -p paper/run/plugins
-          cp paper/build/libs/*.jar paper/run/plugins/Disquests.jar
-          echo "eula=true" > paper/run/eula.txt
-          cat > paper/run/server.properties << 'PROPS'
-          online-mode=false
-          enable-rcon=true
-          rcon.password=testpassword
-          rcon.port=25575
-          level-type=flat
-          difficulty=peaceful
-          spawn-protection=0
-          max-players=2
-          PROPS
-
-      - name: Download and start Paper server
-        env:
-          CI: true
-        run: |
-          MC_VERSION=$(grep '^minecraft_version=' gradle.properties | cut -d= -f2)
-          echo "Minecraft version: $MC_VERSION"
-          cd paper/run
-          if [ ! -f paper.jar ]; then
-            BUILDS_JSON=$(curl -sf "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds")
-            BUILD=$(echo "$BUILDS_JSON" | jq '.builds[-1].build')
-            DOWNLOAD_NAME="paper-${MC_VERSION}-${BUILD}.jar"
-            echo "Downloading Paper build $BUILD..."
-            curl -sfL "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds/${BUILD}/downloads/${DOWNLOAD_NAME}" -o paper.jar
-          fi
-          java -Xmx512m -jar paper.jar --nogui > server-stdout.log 2>&1 &
-          echo $! > server.pid
-          echo "Waiting for server to start..."
-          timeout 120 bash -c 'until grep -q "Done" logs/latest.log 2>/dev/null; do sleep 2; done'
-          echo "Paper server started"
-
-      - name: Seed test data
-        run: |
-          DB_PATH="paper/run/plugins/Disquests/disquests.db"
-          timeout 30 bash -c "until [ -f '$DB_PATH' ]; do sleep 1; done"
-          sqlite3 "$DB_PATH" "
-          INSERT INTO quests (id, title, content, owner_uuid, visibility, last_modified)
-          VALUES ('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'Test Open Quest', '- [ ] Task one\n- [x] Task two\n\nA **public** quest.', '11111111-2222-3333-4444-555555555555', 'OPEN', strftime('%s','now'));
-          INSERT INTO quests (id, title, content, owner_uuid, visibility, last_modified)
-          VALUES ('ffffffff-aaaa-bbbb-cccc-dddddddddddd', 'Test Closed Quest', '- [ ] Secret task\n\n*Request access* needed.', '11111111-2222-3333-4444-555555555555', 'CLOSED', strftime('%s','now'));
-          INSERT INTO player_names (uuid, name, last_seen) VALUES ('11111111-2222-3333-4444-555555555555', 'TestPlayer', strftime('%s','now'))
-          ON CONFLICT(uuid) DO UPDATE SET name = 'TestPlayer', last_seen = strftime('%s','now');
-          "
-          echo "Test data seeded"
-
-      - name: Run E2E tests
-        run: |
-          sudo apt-get install -y xvfb sqlite3
+          sudo apt-get install -y xvfb
           Xvfb :99 -ac -screen 0 854x480x24 &
           sleep 2
-          DISPLAY=:99 ./gradlew runClientGameTest
+          DISPLAY=:99 ./gradlew :client:runIntegrationTest
         timeout-minutes: 10
-
-      - name: Stop Paper server
-        if: always()
-        run: |
-          if [ -f paper/run/server.pid ]; then
-            kill "$(cat paper/run/server.pid)" 2>/dev/null || true
-          fi
 
       - name: Upload test artifacts
         if: always()
@@ -114,8 +57,8 @@ jobs:
         with:
           name: e2e-results
           path: |
-            client/build/run/clientGameTest/screenshots/
-            client/build/run/clientGameTest/logs/
+            client/run/logs/
+            client/run-b/logs/
             paper/run/logs/
-            paper/run/server-stdout.log
+            integration-sync/
           retention-days: 14
