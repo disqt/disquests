@@ -166,6 +166,27 @@ tasks.register<JacocoReport>("jacocoGameTestReport") {
     }
 }
 
+tasks.register<JacocoReport>("jacocoIntegrationTestReport") {
+    group = "verification"
+    description = "Generate code coverage report from integration E2E tests"
+    dependsOn("compileJava")
+
+    executionData(layout.buildDirectory.file("jacoco/gameTest.exec"))
+    sourceDirectories.from(files("src/main/java"))
+    classDirectories.from(
+        fileTree(layout.buildDirectory.dir("classes/java/main")) {
+            include("com/disqt/disquests/**")
+        }
+    )
+
+    reports {
+        html.required.set(true)
+        xml.required.set(true)
+        html.outputLocation.set(layout.buildDirectory.dir("reports/jacoco/integrationTest/html"))
+        xml.outputLocation.set(layout.buildDirectory.file("reports/jacoco/integrationTest/report.xml"))
+    }
+}
+
 fun sendRconCommand(host: String, port: Int, password: String, command: String): String {
     val socket = Socket(host, port)
     socket.soTimeout = 5000
@@ -331,6 +352,7 @@ tasks.register("runIntegrationTest") {
                         cmd.addAll(listOf(taskName, "--no-daemon",
                             "-PtestJourney=$journey", "-PtestUsername=$username"))
                         if (harness) cmd.add("-Pharness")
+                        if (project.hasProperty("coverage")) cmd.add("-Pcoverage")
                         logger.lifecycle("  Starting $journey as $username")
                         return ProcessBuilder(cmd)
                             .directory(rootProject.projectDir)
