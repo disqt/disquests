@@ -1,4 +1,4 @@
-package com.disqt.disquests.test.integration.journeys;
+package com.disqt.disquests.test.integration.journeys.solo;
 
 import com.disqt.disquests.client.gui.helper.ColorConfig;
 import com.disqt.disquests.client.gui.helper.DisquestsConfig;

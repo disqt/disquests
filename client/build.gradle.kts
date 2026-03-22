@@ -92,6 +92,8 @@ loom {
             if (username.isPresent) programArgs("--username", username.get())
             val harness = providers.gradleProperty("harness")
             if (harness.isPresent) vmArg("-Ddisquests.test.harness=true")
+            val testPackage = providers.gradleProperty("testPackage")
+            if (testPackage.isPresent) vmArg("-Ddisquests.test.package=${testPackage.get()}")
         }
         // Second client run config for Player B (separate run directory)
         create("clientGameTestB") {
@@ -113,6 +115,8 @@ loom {
             if (usernameB.isPresent) programArgs("--username", usernameB.get())
             val harnessB = providers.gradleProperty("harness")
             if (harnessB.isPresent) vmArg("-Ddisquests.test.harness=true")
+            val testPackageB = providers.gradleProperty("testPackage")
+            if (testPackageB.isPresent) vmArg("-Ddisquests.test.package=${testPackageB.get()}")
         }
     }
 }
@@ -236,23 +240,114 @@ fun sendRconCommand(host: String, port: Int, password: String, command: String):
     return cmdResp.third
 }
 
-tasks.register("runIntegrationTest") {
+// --- Shared helpers for solo/duo test orchestrators ---
+
+fun ensureServer(serverDir: File, logger: org.gradle.api.logging.Logger, pluginJar: File): Process? {
+    val serverRunning = try {
+        Socket("localhost", 25565).use { true }
+    } catch (_: Exception) { false }
+
+    if (!serverRunning) {
+        // Clean DB for fresh start
+        val db = File(serverDir, "plugins/Disquests/disquests.db")
+        val walFile = File(serverDir, "plugins/Disquests/disquests.db-wal")
+        val shmFile = File(serverDir, "plugins/Disquests/disquests.db-shm")
+        listOf(db, walFile, shmFile).forEach { if (it.exists()) it.delete() }
+
+        // Deploy plugin jar
+        val pluginDest = File(serverDir, "plugins/Disquests.jar")
+        pluginJar.copyTo(pluginDest, overwrite = true)
+        logger.lifecycle("Deployed plugin jar")
+
+        val paperJar = File(serverDir, "paper.jar")
+        val serverProcess = ProcessBuilder(
+            "java", "-Xmx1G", "-Ddisquests.debug=true",
+            "-jar", paperJar.absolutePath, "--nogui"
+        ).directory(serverDir).redirectErrorStream(true).start()
+
+        // Drain server stdout
+        Thread { serverProcess.inputStream.bufferedReader().lines().forEach { } }.apply { isDaemon = true; start() }
+
+        // Wait for server startup
+        logger.lifecycle("Waiting for Paper server...")
+        val logFile = File(serverDir, "logs/latest.log")
+        val deadline = System.currentTimeMillis() + 60000
+        while (System.currentTimeMillis() < deadline) {
+            if (logFile.exists() && logFile.readText().contains("Done (")) break
+            Thread.sleep(1000)
+        }
+        if (!logFile.exists() || !logFile.readText().contains("Done (")) {
+            throw RuntimeException("Paper server failed to start within 60s")
+        }
+        logger.lifecycle("Paper server ready")
+        return serverProcess
+    } else {
+        logger.lifecycle("Server already running on port 25565")
+        return null
+    }
+}
+
+fun rconReset(logger: org.gradle.api.logging.Logger) {
+    try {
+        sendRconCommand("localhost", 25575, "testpassword", "disquests reset")
+        logger.lifecycle("Sent RCON reset")
+        Thread.sleep(1000)
+    } catch (e: Exception) {
+        logger.warn("RCON reset failed: ${e.message}")
+    }
+}
+
+fun launchClient(
+    gradlew: String, isWin: Boolean, rootDir: File,
+    journey: String, username: String, taskName: String,
+    harness: Boolean, coverage: Boolean, testPackage: String?,
+    logger: org.gradle.api.logging.Logger
+): Process {
+    val cmd = mutableListOf<String>()
+    if (isWin) cmd.addAll(listOf("cmd", "/c"))
+    cmd.add(gradlew)
+    cmd.addAll(listOf(taskName, "--no-daemon",
+        "-PtestJourney=$journey", "-PtestUsername=$username"))
+    if (harness) cmd.add("-Pharness")
+    if (coverage) cmd.add("-Pcoverage")
+    if (testPackage != null) cmd.add("-PtestPackage=$testPackage")
+    logger.lifecycle("  Starting $journey as $username")
+    return ProcessBuilder(cmd)
+        .directory(rootDir)
+        .redirectErrorStream(true)
+        .start()
+}
+
+fun stopServer(serverProcess: Process?) {
+    if (serverProcess != null) {
+        try {
+            serverProcess.outputStream.write("stop\n".toByteArray())
+            serverProcess.outputStream.flush()
+            Thread.sleep(5000)
+        } catch (_: Exception) {}
+        if (serverProcess.isAlive) serverProcess.destroyForcibly()
+    }
+}
+
+// --- runSoloTests: single-player journeys with one client ---
+
+tasks.register("runSoloTests") {
     group = "verification"
-    description = "Run integration E2E tests with optional harness mode for persistent clients"
+    description = "Run single-player E2E journey tests (one client only)"
     dependsOn(":paper:jar", ":client:build")
 
     doLast {
         val isWin = System.getProperty("os.name").lowercase().contains("win")
         val gradlew = File(rootProject.projectDir, if (isWin) "gradlew.bat" else "gradlew").absolutePath
         val noStart = project.hasProperty("noStart")
-        val harness = project.hasProperty("harness")
         val testFilter = project.findProperty("testFilter")?.toString()
+        val coverage = project.hasProperty("coverage")
+        val soloPackage = "com.disqt.disquests.test.integration.journeys.solo"
 
         val syncDir = File(rootProject.projectDir, "integration-sync")
         val serverDir = file("../paper/run")
         val processes = mutableListOf<Process>()
         var serverProcess: Process? = null
-        var startedServer = false
         var startedClients = false
 
         // --- Step 1: Clean sync directory ---
@@ -263,58 +358,111 @@ tasks.register("runIntegrationTest") {
         try {
             // --- Step 2: Server ---
             if (!noStart) {
-                val serverRunning = try {
-                    Socket("localhost", 25565).use { true }
-                } catch (_: Exception) { false }
-
-                if (!serverRunning) {
-                    // Clean DB for fresh start
-                    val db = file("../paper/run/plugins/Disquests/disquests.db")
-                    val walFile = file("../paper/run/plugins/Disquests/disquests.db-wal")
-                    val shmFile = file("../paper/run/plugins/Disquests/disquests.db-shm")
-                    listOf(db, walFile, shmFile).forEach { if (it.exists()) it.delete() }
-
-                    // Deploy plugin jar
-                    val pluginJar = file("../paper/build/libs/paper.jar")
-                    val pluginDest = File(serverDir, "plugins/Disquests.jar")
-                    pluginJar.copyTo(pluginDest, overwrite = true)
-                    logger.lifecycle("Deployed plugin jar")
-
-                    val paperJar = File(serverDir, "paper.jar")
-                    serverProcess = ProcessBuilder(
-                        "java", "-Xmx1G", "-Ddisquests.debug=true",
-                        "-jar", paperJar.absolutePath, "--nogui"
-                    ).directory(serverDir).redirectErrorStream(true).start()
-                    startedServer = true
-
-                    // Drain server stdout
-                    val sp = serverProcess!!
-                    Thread { sp.inputStream.bufferedReader().lines().forEach { } }.apply { isDaemon = true; start() }
-
-                    // Wait for server startup
-                    logger.lifecycle("Waiting for Paper server...")
-                    val logFile = File(serverDir, "logs/latest.log")
-                    val deadline = System.currentTimeMillis() + 60000
-                    while (System.currentTimeMillis() < deadline) {
-                        if (logFile.exists() && logFile.readText().contains("Done (")) break
-                        Thread.sleep(1000)
-                    }
-                    if (!logFile.exists() || !logFile.readText().contains("Done (")) {
-                        throw RuntimeException("Paper server failed to start within 60s")
-                    }
-                    logger.lifecycle("Paper server ready")
-                } else {
-                    logger.lifecycle("Server already running on port 25565")
-                    // RCON reset for re-runs against existing server
-                    try {
-                        sendRconCommand("localhost", 25575, "testpassword", "disquests reset")
-                        logger.lifecycle("Sent RCON reset")
-                    } catch (e: Exception) {
-                        logger.warn("RCON reset failed: ${e.message}")
-                    }
-                }
+                val pluginJar = file("../paper/build/libs/paper.jar")
+                serverProcess = ensureServer(serverDir, logger, pluginJar)
+                rconReset(logger)
             } else {
-                // -PnoStart: verify clients are ready
+                // -PnoStart: verify client A is ready
+                val readyDeadline = System.currentTimeMillis() + 10000
+                while (System.currentTimeMillis() < readyDeadline) {
+                    if (File(syncDir, "client-a-ready.done").exists()) break
+                    Thread.sleep(500)
+                }
+                if (!File(syncDir, "client-a-ready.done").exists()) {
+                    throw RuntimeException("Client A not running. Start it first or remove -PnoStart.")
+                }
+                syncDir.listFiles()?.filter { !it.name.startsWith("client-") }?.forEach { it.delete() }
+                rconReset(logger)
+            }
+
+            // --- Step 3: Launch PlayerA only ---
+            if (!noStart) {
+                val clientAReady = File(syncDir, "client-a-ready.done").exists()
+
+                if (!clientAReady) {
+                    val procA = launchClient(
+                        gradlew, isWin, rootProject.projectDir,
+                        "HarnessPlayerA", "IntTestPlayerA", ":client:runClientGameTest",
+                        false, coverage, soloPackage, logger
+                    )
+                    processes.add(procA)
+                    startedClients = true
+
+                    Thread { procA.inputStream.bufferedReader().lines().forEach { } }.apply { isDaemon = true; start() }
+                } else {
+                    logger.lifecycle("Client A already running (ready marker found)")
+                }
+            }
+
+            // --- Step 4: Write run signal ---
+            val signalContent = testFilter ?: "*"
+            File(syncDir, "run.signal").writeText(signalContent)
+            logger.lifecycle("Triggered solo test run: $signalContent")
+
+            // --- Step 5: Wait for results (Player A only) ---
+            val resultA = File(syncDir, "results-a.txt")
+            val resultsDeadline = System.currentTimeMillis() + 180000
+            while (System.currentTimeMillis() < resultsDeadline) {
+                if (resultA.exists()) break
+                if (startedClients && processes.all { !it.isAlive }) break
+                Thread.sleep(500)
+            }
+
+            // --- Step 6: Report results ---
+            logger.lifecycle("\n=== Solo Test Results ===")
+            val aResult = if (resultA.exists()) resultA.readText().trim() else "NO RESULT (timeout or crash)"
+            logger.lifecycle("  Player A: $aResult")
+
+            if (!aResult.startsWith("PASS")) {
+                throw RuntimeException("Solo tests failed")
+            }
+            logger.lifecycle("  Solo tests PASSED")
+
+        } finally {
+            if (!noStart) {
+                processes.forEach { it.destroyForcibly() }
+                stopServer(serverProcess)
+                logger.lifecycle("Solo teardown complete")
+            }
+        }
+    }
+}
+
+// --- runDuoTests: two-player journeys with both clients ---
+
+tasks.register("runDuoTests") {
+    group = "verification"
+    description = "Run two-player E2E journey tests (both clients)"
+    dependsOn(":paper:jar", ":client:build")
+
+    doLast {
+        val isWin = System.getProperty("os.name").lowercase().contains("win")
+        val gradlew = File(rootProject.projectDir, if (isWin) "gradlew.bat" else "gradlew").absolutePath
+        val noStart = project.hasProperty("noStart")
+        val harness = project.hasProperty("harness")
+        val testFilter = project.findProperty("testFilter")?.toString()
+        val coverage = project.hasProperty("coverage")
+        val duoPackage = "com.disqt.disquests.test.integration.journeys.duo"
+
+        val syncDir = File(rootProject.projectDir, "integration-sync")
+        val serverDir = file("../paper/run")
+        val processes = mutableListOf<Process>()
+        var serverProcess: Process? = null
+        var startedClients = false
+
+        // --- Step 1: Clean sync directory ---
+        if (syncDir.exists()) syncDir.listFiles()?.forEach { it.delete() }
+        syncDir.mkdirs()
+        logger.lifecycle("Cleaned sync directory")
+
+        try {
+            // --- Step 2: Server ---
+            if (!noStart) {
+                val pluginJar = file("../paper/build/libs/paper.jar")
+                serverProcess = ensureServer(serverDir, logger, pluginJar)
+                rconReset(logger)
+            } else {
+                // -PnoStart: verify both clients are ready
                 val readyDeadline = System.currentTimeMillis() + 10000
                 while (System.currentTimeMillis() < readyDeadline) {
                     if (File(syncDir, "client-a-ready.done").exists() &&
@@ -325,19 +473,11 @@ tasks.register("runIntegrationTest") {
                     !File(syncDir, "client-b-ready.done").exists()) {
                     throw RuntimeException("Clients not running. Start them first or remove -PnoStart.")
                 }
-                // RCON reset
-                try {
-                    // Clean sync dir except ready markers
-                    syncDir.listFiles()?.filter { !it.name.startsWith("client-") }?.forEach { it.delete() }
-                    sendRconCommand("localhost", 25575, "testpassword", "disquests reset")
-                    logger.lifecycle("Sent RCON reset")
-                    Thread.sleep(1000)
-                } catch (e: Exception) {
-                    logger.warn("RCON reset failed: ${e.message}")
-                }
+                syncDir.listFiles()?.filter { !it.name.startsWith("client-") }?.forEach { it.delete() }
+                rconReset(logger)
             }
 
-            // --- Step 3: Clients ---
+            // --- Step 3: Launch both clients ---
             if (!noStart) {
                 val clientAReady = File(syncDir, "client-a-ready.done").exists()
                 val clientBReady = File(syncDir, "client-b-ready.done").exists()
@@ -345,32 +485,23 @@ tasks.register("runIntegrationTest") {
                 if (!clientAReady || !clientBReady) {
                     file("run-b").mkdirs()
 
-                    fun launchClient(journey: String, username: String, taskName: String): Process {
-                        val cmd = mutableListOf<String>()
-                        if (isWin) cmd.addAll(listOf("cmd", "/c"))
-                        cmd.add(gradlew)
-                        cmd.addAll(listOf(taskName, "--no-daemon",
-                            "-PtestJourney=$journey", "-PtestUsername=$username"))
-                        if (harness) cmd.add("-Pharness")
-                        if (project.hasProperty("coverage")) cmd.add("-Pcoverage")
-                        logger.lifecycle("  Starting $journey as $username")
-                        return ProcessBuilder(cmd)
-                            .directory(rootProject.projectDir)
-                            .redirectErrorStream(true)
-                            .start()
-                    }
-
-                    val procA = launchClient("HarnessPlayerA", "IntTestPlayerA", ":client:runClientGameTest")
-                    val procB = launchClient("HarnessPlayerB", "IntTestPlayerB", ":client:runClientGameTestB")
+                    val procA = launchClient(
+                        gradlew, isWin, rootProject.projectDir,
+                        "HarnessPlayerA", "IntTestPlayerA", ":client:runClientGameTest",
+                        harness, coverage, duoPackage, logger
+                    )
+                    val procB = launchClient(
+                        gradlew, isWin, rootProject.projectDir,
+                        "HarnessPlayerB", "IntTestPlayerB", ":client:runClientGameTestB",
+                        harness, coverage, duoPackage, logger
+                    )
                     processes.addAll(listOf(procA, procB))
                     startedClients = true
 
-                    // Drain output
                     Thread { procA.inputStream.bufferedReader().lines().forEach { } }.apply { isDaemon = true; start() }
                     Thread { procB.inputStream.bufferedReader().lines().forEach { } }.apply { isDaemon = true; start() }
 
                     if (harness) {
-                        // Wait for clients to signal ready
                         logger.lifecycle("Waiting for clients to be ready...")
                         val readyDeadline = System.currentTimeMillis() + 120000
                         while (System.currentTimeMillis() < readyDeadline) {
@@ -383,15 +514,7 @@ tasks.register("runIntegrationTest") {
                             throw RuntimeException("Clients failed to signal ready within 120s")
                         }
                         logger.lifecycle("Clients ready")
-
-                        // RCON reset (fresh DB for first run)
-                        try {
-                            sendRconCommand("localhost", 25575, "testpassword", "disquests reset")
-                            logger.lifecycle("Sent RCON reset")
-                            Thread.sleep(1000)
-                        } catch (e: Exception) {
-                            logger.warn("RCON reset failed: ${e.message}")
-                        }
+                        rconReset(logger)
                     }
                 } else {
                     logger.lifecycle("Clients already running (ready markers found)")
@@ -401,21 +524,20 @@ tasks.register("runIntegrationTest") {
             // --- Step 4: Write run signal ---
             val signalContent = testFilter ?: "*"
             File(syncDir, "run.signal").writeText(signalContent)
-            logger.lifecycle("Triggered test run: $signalContent")
+            logger.lifecycle("Triggered duo test run: $signalContent")
 
-            // --- Step 5: Wait for results ---
+            // --- Step 5: Wait for results (both players) ---
             val resultA = File(syncDir, "results-a.txt")
             val resultB = File(syncDir, "results-b.txt")
             val resultsDeadline = System.currentTimeMillis() + 180000
             while (System.currentTimeMillis() < resultsDeadline) {
                 if (resultA.exists() && resultB.exists()) break
-                // Check for process crashes in one-shot mode
                 if (!harness && startedClients && processes.all { !it.isAlive }) break
                 Thread.sleep(500)
             }
 
             // --- Step 6: Report results ---
-            logger.lifecycle("\n=== Integration Test Results ===")
+            logger.lifecycle("\n=== Duo Test Results ===")
             val aResult = if (resultA.exists()) resultA.readText().trim() else "NO RESULT (timeout or crash)"
             val bResult = if (resultB.exists()) resultB.readText().trim() else "NO RESULT (timeout or crash)"
             logger.lifecycle("  Player A: $aResult")
@@ -423,27 +545,57 @@ tasks.register("runIntegrationTest") {
 
             val passed = aResult.startsWith("PASS") && bResult.startsWith("PASS")
             if (!passed) {
-                throw RuntimeException("Integration tests failed")
+                throw RuntimeException("Duo tests failed")
             }
-            logger.lifecycle("  All tests PASSED")
+            logger.lifecycle("  Duo tests PASSED")
 
         } finally {
-            // --- Step 7: Teardown ---
             if (!harness && !noStart) {
                 processes.forEach { it.destroyForcibly() }
-                if (serverProcess != null) {
-                    try {
-                        serverProcess.outputStream.write("stop\n".toByteArray())
-                        serverProcess.outputStream.flush()
-                        Thread.sleep(5000)
-                    } catch (_: Exception) {}
-                    if (serverProcess.isAlive) serverProcess.destroyForcibly()
-                }
-                logger.lifecycle("Teardown complete")
+                stopServer(serverProcess)
+                logger.lifecycle("Duo teardown complete")
             } else {
                 logger.lifecycle("Harness mode: server and clients left running")
             }
         }
+    }
+}
+
+// --- runIntegrationTest: runs solo then duo sequentially ---
+
+tasks.register("runIntegrationTest") {
+    group = "verification"
+    description = "Run all integration E2E tests: solo first, then duo"
+    dependsOn(":paper:jar", ":client:build")
+
+    doLast {
+        val isWin = System.getProperty("os.name").lowercase().contains("win")
+        val gradlew = File(rootProject.projectDir, if (isWin) "gradlew.bat" else "gradlew").absolutePath
+
+        fun runSubTask(taskName: String) {
+            val cmd = mutableListOf<String>()
+            if (isWin) cmd.addAll(listOf("cmd", "/c"))
+            cmd.add(gradlew)
+            cmd.addAll(listOf(taskName, "--no-daemon"))
+            if (project.hasProperty("coverage")) cmd.add("-Pcoverage")
+            if (project.hasProperty("noStart")) cmd.add("-PnoStart")
+            if (project.hasProperty("harness")) cmd.add("-Pharness")
+            if (project.hasProperty("testFilter")) cmd.add("-PtestFilter=${project.findProperty("testFilter")}")
+
+            logger.lifecycle("=== Running $taskName ===")
+            val process = ProcessBuilder(cmd)
+                .directory(rootProject.projectDir)
+                .inheritIO()
+                .start()
+            val exitCode = process.waitFor()
+            if (exitCode != 0) {
+                throw RuntimeException("$taskName failed with exit code $exitCode")
+            }
+        }
+
+        runSubTask(":client:runSoloTests")
+        runSubTask(":client:runDuoTests")
+        logger.lifecycle("\n=== All integration tests PASSED ===")
     }
 }
 

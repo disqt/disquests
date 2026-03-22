@@ -1,4 +1,4 @@
-package com.disqt.disquests.test.integration.journeys;
+package com.disqt.disquests.test.integration.journeys.duo;
 
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;

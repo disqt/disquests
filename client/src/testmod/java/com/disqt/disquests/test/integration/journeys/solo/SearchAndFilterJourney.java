@@ -1,4 +1,4 @@
-package com.disqt.disquests.test.integration.journeys;
+package com.disqt.disquests.test.integration.journeys.solo;
 
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;

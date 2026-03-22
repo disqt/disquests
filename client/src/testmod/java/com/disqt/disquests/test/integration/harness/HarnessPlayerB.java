@@ -18,7 +18,8 @@ import static com.disqt.disquests.test.integration.bdd.UIActions.*;
 public class HarnessPlayerB implements FabricClientGameTest {
 
     private static final String PLAYER_ROLE = "PlayerB";
-    private static final String TESTS_PACKAGE = "com.disqt.disquests.test.integration.journeys";
+    private static final String TESTS_PACKAGE = System.getProperty(
+        "disquests.test.package", "com.disqt.disquests.test.integration.journeys");
 
     @Override
     public void runTest(ClientGameTestContext context) {
