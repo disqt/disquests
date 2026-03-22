@@ -73,6 +73,6 @@ class QuestContentJourney {
             click(context, "btn-close");
         then("MainScreen is shown with one quest");
             waitForScreen(context, MainScreen.class);
-            assertEntryCount(context, 1);
+            waitForEntryCount(context, 1);
     }
 }

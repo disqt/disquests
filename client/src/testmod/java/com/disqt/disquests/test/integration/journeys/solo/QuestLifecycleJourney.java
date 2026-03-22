@@ -76,7 +76,7 @@ class QuestLifecycleJourney {
             click(context, "btn-close");
         then("MainScreen shows the quest in My Quests");
             waitForScreen(context, MainScreen.class);
-            assertEntryCount(context, 1);
+            waitForEntryCount(context, 1);
     }
 
     @Test @Order(6) @PlayerA

@@ -52,7 +52,7 @@ class SearchAndFilterJourney {
             // PRIVATE -> CLOSED -> OPEN = 2 cycles
             createQuestWithVisibility(context, "Alpha", 2);
         then("Alpha appears in My Quests");
-            assertEntryCount(context, 1);
+            waitForEntryCount(context, 1);
     }
 
     @Test @Order(2) @PlayerA
@@ -62,7 +62,7 @@ class SearchAndFilterJourney {
             // PRIVATE -> CLOSED = 1 cycle
             createQuestWithVisibility(context, "Beta", 1);
         then("Beta appears in My Quests alongside Alpha");
-            assertEntryCount(context, 2);
+            waitForEntryCount(context, 2);
     }
 
     @Test @Order(3) @PlayerA
@@ -71,7 +71,7 @@ class SearchAndFilterJourney {
         when("player creates quest Gamma with PRIVATE visibility (default)");
             createQuestWithVisibility(context, "Gamma", 0);
         then("Gamma appears in My Quests");
-            assertEntryCount(context, 3);
+            waitForEntryCount(context, 3);
     }
 
     @Test @Order(4) @PlayerA
@@ -85,7 +85,7 @@ class SearchAndFilterJourney {
         then("filter row appears");
             assertComponentExists(context, "filter-row");
         and("Alpha (OPEN) and Beta (CLOSED) are visible (Gamma is PRIVATE, not shown)");
-            assertEntryCount(context, 2);
+            waitForEntryCount(context, 2);
     }
 
     @Test @Order(5) @PlayerA
@@ -95,7 +95,7 @@ class SearchAndFilterJourney {
             click(context, "filter-open");
             context.waitTicks(2);
         then("only Alpha (OPEN) is shown");
-            assertEntryCount(context, 1);
+            waitForEntryCount(context, 1);
     }
 
     @Test @Order(6) @PlayerA
@@ -105,7 +105,7 @@ class SearchAndFilterJourney {
             click(context, "filter-closed");
             context.waitTicks(2);
         then("only Beta (CLOSED) is shown");
-            assertEntryCount(context, 1);
+            waitForEntryCount(context, 1);
     }
 
     @Test @Order(7) @PlayerA
@@ -115,7 +115,7 @@ class SearchAndFilterJourney {
             click(context, "filter-all");
             context.waitTicks(2);
         then("both Alpha (OPEN) and Beta (CLOSED) are shown");
-            assertEntryCount(context, 2);
+            waitForEntryCount(context, 2);
     }
 
     @Test @Order(8) @PlayerA
@@ -125,7 +125,7 @@ class SearchAndFilterJourney {
             type(context, "search-box", "Alpha");
             context.waitTicks(2);
         then("only Alpha is shown");
-            assertEntryCount(context, 1);
+            waitForEntryCount(context, 1);
     }
 
     @Test @Order(9) @PlayerA
@@ -141,7 +141,7 @@ class SearchAndFilterJourney {
             context.getInput().pressKey(GLFW.GLFW_KEY_DELETE);
             context.waitTicks(2);
         then("both Alpha and Beta are shown again");
-            assertEntryCount(context, 2);
+            waitForEntryCount(context, 2);
     }
 
     @Test @Order(10) @PlayerA
@@ -151,7 +151,7 @@ class SearchAndFilterJourney {
             click(context, "tab-my-quests");
             context.waitTicks(4);
         then("all 3 quests are shown in My Quests");
-            assertEntryCount(context, 3);
+            waitForEntryCount(context, 3);
         and("filter row is zero-sized (hidden on My Quests tab)");
             assertComponent(context, "filter-row",
                 io.wispforest.owo.ui.core.UIComponent.class,

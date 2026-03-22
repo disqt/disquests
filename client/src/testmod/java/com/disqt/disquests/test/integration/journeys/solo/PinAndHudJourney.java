@@ -61,7 +61,7 @@ class PinAndHudJourney {
             waitForScreen(context, MainScreen.class);
 
         then("both quests appear in My Quests");
-            assertEntryCount(context, 2);
+            waitForEntryCount(context, 2);
 
         // Capture quest IDs for later steps
         firstQuestId = context.computeOnClient(c -> {
@@ -83,7 +83,7 @@ class PinAndHudJourney {
     void pinSecondQuest(ClientGameTestContext context) {
         given("player is on MainScreen with two quests, none pinned");
             openMainScreen(context);
-            assertEntryCount(context, 2);
+            waitForEntryCount(context, 2);
 
         // "Second" (created last) is at index 0 due to lastModified sort
         when("player clicks the pin icon on Second (index 0)");
@@ -183,7 +183,7 @@ class PinAndHudJourney {
             assertNotNull(firstName, "First entry should exist after unpinning");
 
         and("list has 2 entries (both quests still present)");
-            assertEntryCount(context, 2);
+            waitForEntryCount(context, 2);
 
         and("neither quest is pinned");
             boolean noPins = context.computeOnClient(c ->
