@@ -45,6 +45,8 @@ Client game tests live in `client/src/testmod/java/com/disqt/disquests/test/Ques
 
 ```bash
 ./gradlew :client:runClientGameTest   # requires Paper dev server running
+./gradlew :client:runClientGameTest -Pcoverage  # with JaCoCo coverage
+./gradlew :client:jacocoGameTestReport           # generate HTML report -> client/build/reports/jacoco/
 ```
 
 Tests use `FabricClientGameTest` API: `setScreen`, `waitForScreen`, `computeOnClient`, `runOnClient`. Quests must be added to `ClientCache` before opening screens to prevent auto-close (`tick()` closes screens when quest is not in cache).
@@ -77,6 +79,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 | `client/src/main/java/com/disqt/disquests/client/gui/component/QuestEntryComponent.java` | Custom owo-ui component for quest list entries |
 | `client/src/main/java/com/disqt/disquests/client/gui/component/TextFieldComponent.java` | BaseUIComponent wrapper for MultiLineTextFieldWidget |
 | `client/src/main/java/com/disqt/disquests/client/gui/helper/Colors.java` | Color constants (AMBER, TEXT_PRIMARY, etc.) |
+| `client/src/main/java/com/disqt/disquests/client/gui/helper/Theme.java` | Theme enum (VANILLA, FLAT, INSET, FROSTED, ACCENT_LINE) with color palettes and surfaces |
 | `client/src/main/java/com/disqt/disquests/client/debug/DebugScreenEvents.java` | Fabric screen event hooks for debug logging |
 | `client/src/main/resources/assets/disquests/owo_ui/*.xml` | XML UI models for all screens (hot-reloadable) |
 | `paper/src/main/java/com/disqt/disquests/paper/DisquestsPlugin.java` | Plugin entry, channel registration |
@@ -108,6 +111,9 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **owo-ui zero-sizing doesn't hide buttons** — text still renders. Use `parent.removeChild(component)` instead of zero-sizing.
 - **owo-ui keyboard input requires `GreedyInputUIComponent`** — custom `BaseUIComponent` subclasses that need key/char events must implement this marker interface, and the screen must override `charTyped()` to route to the focused greedy component (see `DisquestsBaseScreen.charTyped()`).
 - **owo-ui delegate focus desync** — `MultiLineTextFieldWidget.focused` can be reset by `mouseClicked()` after `onFocusGained` sets it. Force `delegate.setFocused(true)` in `onKeyPress`/`onCharTyped` before forwarding.
+- **owo-ui `ParentUIComponent` not `ParentComponent`** — v0.13.0 renamed to `ParentUIComponent`. Use this for `childById` when targeting `<scroll>` containers.
+- **owo-ui Surface composing** — `Surface.flat(color).and(Surface.outline(color))` chains surfaces. Available: `flat`, `outline`, `blur`, `DARK_PANEL`, `PANEL_INSET`, `panelWithInset`, `VANILLA_TRANSLUCENT`, `BLANK`.
+- **owo-ui no `clearAndInit()`** — to rebuild a screen after state change, reopen it: `client.setScreen(new MyScreen(parent))`. There is no method to re-trigger `build()` on an existing screen.
 - **XML comments cannot contain `--`** — causes `SAXParseException`. Use commas instead.
 - **Fire-and-forget C2S race** — `PacketSender.pinQuest()`, `respondCollaboration()` etc. have no server acknowledgment. Add `waitTicks(40)` before disconnect/re-sync if the server must process the packet first. UI code using optimistic cache updates (e.g. `ContributorScreen.respondToRequest` calls `removePendingRequest` locally) must be replicated in tests.
 - **`ClientCache.getQuestById` searches both lists** — returns quests from myQuests AND serverQuests. After leaving an OPEN quest, it's removed from myQuests but still in serverQuests. Use `getMyQuests().stream()` to check membership specifically.
@@ -136,6 +142,7 @@ JUnit 5 harness at `client/src/testmod/.../integration/`. Two clients run in par
 - **`-PtestFilter` not `-Ptest`** — Gradle reserves `-Ptest` for its built-in test task.
 - **Loom property passing** — use `-P` (Gradle property) not `-D` (JVM system property) for subprocess invocation.
 - **Prism mods incompatible with `runClient`** — production jars use intermediary mappings, dev environment uses named mappings. Mixin crashes guaranteed.
+- **ModMenu incompatible with `runClient`** — ModMenu's TitleScreen mixin crashes in dev (named vs intermediary mappings). Use F6 keybind to open ConfigScreen instead.
 - **`paper/run/server.properties` `max-players`** — must be >= 4 (two test clients + reconnect headroom)
 - **testmod source set** — IDE (VSCode/Java LS) can't resolve JUnit imports in testmod files. This is cosmetic; Gradle compilation works fine.
 
