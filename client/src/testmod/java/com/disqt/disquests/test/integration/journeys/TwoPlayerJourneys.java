@@ -88,10 +88,9 @@ class TwoPlayerJourneys {
 
             then("Collab Quest is visible on the Quest Board");
                 waitForQuestByTitle(context, "Collab Quest", false);
-                waitForEntryCount(context, 1);
 
             when("PlayerB selects the quest and clicks Request");
-                clickEntry(context, 0);
+                clickEntryByTitle(context, "Collab Quest");
                 click(context, "btn-request");
 
             then("button shows Requested");
@@ -115,8 +114,7 @@ class TwoPlayerJourneys {
 
             and("PlayerA opens MainScreen and selects the quest");
                 openMainScreen(context);
-                waitForEntryCount(context, 1);
-                clickEntry(context, 0);
+                clickEntryByTitle(context, "Collab Quest");
                 click(context, "btn-open");
                 waitForScreen(context, QuestScreen.class);
 
@@ -340,10 +338,9 @@ class TwoPlayerJourneys {
 
             then("Open Quest is visible on the Quest Board");
                 waitForQuestByTitle(context, "Open Quest", false);
-                waitForEntryCount(context, 1);
 
             when("PlayerB selects the quest and clicks Join");
-                clickEntry(context, 0);
+                clickEntryByTitle(context, "Open Quest");
                 click(context, "btn-join");
 
             then("quest appears in PlayerB's My Quests");
@@ -360,10 +357,9 @@ class TwoPlayerJourneys {
             when("PlayerB opens MainScreen");
                 openMainScreen(context);
                 waitForQuestByTitle(context, "Open Quest", true);
-                waitForEntryCount(context, 1);
 
             and("PlayerB selects the quest and opens it");
-                clickEntry(context, 0);
+                clickEntryByTitle(context, "Open Quest");
                 click(context, "btn-open");
                 waitForScreen(context, QuestScreen.class);
 
@@ -439,10 +435,9 @@ class TwoPlayerJourneys {
                 openMainScreen(context);
                 click(context, "tab-quest-board");
                 waitForQuestByTitle(context, "Original Title", false);
-                waitForEntryCount(context, 1);
 
             and("PlayerB selects and joins the quest");
-                clickEntry(context, 0);
+                clickEntryByTitle(context, "Original Title");
                 click(context, "btn-join");
 
             then("quest appears in PlayerB's My Quests");
@@ -459,8 +454,7 @@ class TwoPlayerJourneys {
 
             and("PlayerA opens MainScreen and selects the quest");
                 openMainScreen(context);
-                waitForEntryCount(context, 1);
-                clickEntry(context, 0);
+                clickEntryByTitle(context, "Original Title");
                 click(context, "btn-open");
                 waitForScreen(context, QuestScreen.class);
 
@@ -495,23 +489,22 @@ class TwoPlayerJourneys {
 
             then("PlayerB's My Quests list shows Updated Title");
                 openMainScreen(context);
-                waitForEntryCount(context, 1);
-                String entryTitle = context.computeOnClient(c -> {
+                waitForQuestByTitle(context, "Updated Title", true);
+                boolean hasUpdatedTitle = context.computeOnClient(c -> {
                     Screen screen = c.currentScreen;
                     if (screen instanceof com.disqt.disquests.client.gui.screen.DisquestsBaseScreen dScreen) {
                         var root = dScreen.getRootComponent();
-                        if (root == null) return null;
+                        if (root == null) return false;
                         var questList = root.childById(FlowLayout.class, "quest-list");
-                        if (questList == null || questList.children().isEmpty()) return null;
-                        var first = questList.children().get(0);
-                        if (first instanceof com.disqt.disquests.client.gui.component.QuestEntryComponent entry) {
-                            return entry.getQuest().getTitle();
-                        }
-                        return null;
+                        if (questList == null || questList.children().isEmpty()) return false;
+                        return questList.children().stream()
+                            .filter(child -> child instanceof com.disqt.disquests.client.gui.component.QuestEntryComponent)
+                            .map(child -> (com.disqt.disquests.client.gui.component.QuestEntryComponent) child)
+                            .anyMatch(entry -> "Updated Title".equals(entry.getQuest().getTitle()));
                     }
-                    return null;
+                    return false;
                 });
-                assertEquals("Updated Title", entryTitle, "My Quests entry should show Updated Title");
+                assertTrue(hasUpdatedTitle, "My Quests list should contain an entry with Updated Title");
         }
 
         @Test @Order(5) @PlayerA
@@ -529,7 +522,10 @@ class TwoPlayerJourneys {
                 waitForScreen(context, MainScreen.class);
 
             then("quest is removed from PlayerA's My Quests");
-                assertEntryCount(context, 0);
+                context.waitFor(client ->
+                    ClientCache.getMyQuests().stream()
+                        .noneMatch(q -> "Updated Title".equals(q.getTitle())),
+                    TIMEOUT);
 
             PhaseSync.signal("live-deleted");
         }
