@@ -276,12 +276,6 @@ public class QuestScreen extends DisquestsBaseScreen {
         titleFieldComponent.sizing(Sizing.fill(90), Sizing.fixed(16));
         titleRow.child(titleFieldComponent);
 
-        // Help toggle button
-        ButtonComponent helpBtn = UIComponents.button(Text.literal("?"), b -> toggleFormattingHelp());
-        helpBtn.sizing(Sizing.fixed(14), Sizing.fixed(14));
-        helpBtn.tooltip(Text.literal("Toggle formatting reference"));
-        titleRow.child(helpBtn);
-
         // Content editor
         FlowLayout editorPanel = root.childById(FlowLayout.class, "editor-panel");
         MultiLineTextFieldWidget contentField = new MultiLineTextFieldWidget(
@@ -291,12 +285,6 @@ public class QuestScreen extends DisquestsBaseScreen {
         contentFieldComponent = new TextFieldComponent(contentField);
         contentFieldComponent.sizing(Sizing.fill(100), Sizing.fill(100));
         editorPanel.child(contentFieldComponent);
-
-        // Formatting help panel visibility
-        FlowLayout formattingPanel = root.childById(FlowLayout.class, "formatting-panel");
-        if (!showFormattingHelp) {
-            formattingPanel.sizing(Sizing.fixed(0), Sizing.fixed(0));
-        }
 
         // Coords section
         buildCoordsSection(root);
@@ -342,6 +330,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         coordYComponent = createCoordField(c != null ? String.valueOf((int) c.y()) : "", "Y");
         coordZComponent = createCoordField(c != null ? String.valueOf((int) c.z()) : "", "Z");
 
+        coordsRow.child(labelFor("1:"));
         coordsRow.child(labelFor("X:"));
         coordsRow.child(coordXComponent);
         coordsRow.child(labelFor("Y:"));
@@ -373,7 +362,8 @@ public class QuestScreen extends DisquestsBaseScreen {
             coord2YComponent = createCoordField(c2 != null ? String.valueOf((int) c2.y()) : "", "Y");
             coord2ZComponent = createCoordField(c2 != null ? String.valueOf((int) c2.z()) : "", "Z");
 
-            corner2Row.child(labelFor("Corner 2 X:"));
+            corner2Row.child(labelFor("2:"));
+            corner2Row.child(labelFor("X:"));
             corner2Row.child(coord2XComponent);
             corner2Row.child(labelFor("Y:"));
             corner2Row.child(coord2YComponent);
@@ -389,19 +379,10 @@ public class QuestScreen extends DisquestsBaseScreen {
 
         // Map row
         FlowLayout mapRow = root.childById(FlowLayout.class, "map-row");
-        String mapText = quest.getMap() != null ? quest.getMap() : "Any";
-        int mapColor = quest.getMap() != null ? Colors.TEXT_PRIMARY : Colors.TEXT_DISABLED;
-        LabelComponent mapLabel = UIComponents.label(Text.literal("Map: " + mapText).withColor(mapColor));
-        mapLabel.shadow(true);
-        mapRow.child(mapLabel);
-
-        ButtonComponent autoBtn = UIComponents.button(Text.literal("Auto"), b -> autoMap());
-        autoBtn.sizing(Sizing.fixed(50), Sizing.fixed(14));
-        mapRow.child(autoBtn);
-
-        ButtonComponent clearMapBtn = UIComponents.button(Text.literal("Clear"), b -> clearMap());
-        clearMapBtn.sizing(Sizing.fixed(50), Sizing.fixed(14));
-        mapRow.child(clearMapBtn);
+        String mapDisplay = quest.getMap() != null ? quest.getMap() : "any";
+        ButtonComponent mapBtn = UIComponents.button(Text.literal("Map: " + mapDisplay), b -> cycleMap());
+        mapBtn.sizing(Sizing.content(), Sizing.fixed(14));
+        mapRow.child(mapBtn);
     }
 
     private TextFieldComponent createCoordField(String value, String placeholder) {
@@ -564,17 +545,19 @@ public class QuestScreen extends DisquestsBaseScreen {
         rebuildEditMode();
     }
 
-    private void autoMap() {
-        if (client != null && client.world != null) {
-            quest.setMap(client.world.getRegistryKey().getValue().getPath());
-            persistFieldValues();
-            rebuildEditMode();
-        }
-    }
-
-    private void clearMap() {
-        quest.setMap(null);
+    private void cycleMap() {
         persistFieldValues();
+        String current = quest.getMap();
+        if (current == null) {
+            quest.setMap("overworld");
+        } else {
+            quest.setMap(switch (current) {
+                case "overworld" -> "the_nether";
+                case "the_nether" -> "the_end";
+                case "the_end" -> null; // cycles back to "any"
+                default -> "overworld";
+            });
+        }
         rebuildEditMode();
     }
 
@@ -595,12 +578,6 @@ public class QuestScreen extends DisquestsBaseScreen {
         if (this.client != null) {
             this.client.setScreen(new ContributorScreen(this, quest));
         }
-    }
-
-    private void toggleFormattingHelp() {
-        persistFieldValues();
-        showFormattingHelp = !showFormattingHelp;
-        rebuildEditMode();
     }
 
     private void rebuildEditMode() {

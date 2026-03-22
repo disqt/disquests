@@ -289,12 +289,15 @@ public class QuestEntryComponent extends BaseUIComponent {
                     entryX + 4, entryY + 14, Colors.TEXT_MUTED, false);
         }
 
-        int pinIconSize = 10;
-        int pinIconX = entryX + entryWidth - pinIconSize - 4;
-        int pinIconY = entryY + 14;
-        boolean pinned = ClientSession.isPinned(quest.getId());
-        Identifier pinIcon = pinned ? PIN_ACTIVE_ICON : PIN_ICON;
-        context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, pinIcon, pinIconX, pinIconY, pinIconSize, pinIconSize);
+        // Only show pin icon for quests the player is part of
+        if (isOwnedByPlayer || isContributor) {
+            int pinIconSize = 10;
+            int pinIconX = entryX + entryWidth - pinIconSize - 4;
+            int pinIconY = entryY + 14;
+            boolean pinned = ClientSession.isPinned(quest.getId());
+            Identifier pinIcon = pinned ? PIN_ACTIVE_ICON : PIN_ICON;
+            context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, pinIcon, pinIconX, pinIconY, pinIconSize, pinIconSize);
+        }
 
         // --- Row 3: Last modified + location / requested ---
         context.drawText(textRenderer, "Last Modified: " + formattedDateTime,
