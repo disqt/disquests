@@ -10,6 +10,7 @@ public class KeyBinds {
 
     public static KeyBinding openGuiKey;
     public static KeyBinding pinKey;
+    public static KeyBinding openConfigKey;
 
     private static final KeyBinding.Category MOD_CATEGORY = KeyBinding.Category.create(Identifier.of("disquests", "main"));
 
@@ -25,6 +26,13 @@ public class KeyBinds {
                 "key.disquests.togglepin",
                 InputUtil.Type.KEYSYM,
                 GLFW.GLFW_KEY_UNKNOWN, // unbound by default
+                MOD_CATEGORY
+        ));
+
+        openConfigKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.disquests.openconfig",
+                InputUtil.Type.KEYSYM,
+                GLFW.GLFW_KEY_F6,
                 MOD_CATEGORY
         ));
     }

@@ -39,6 +39,11 @@ public class DisquestsClient implements ClientModInitializer {
             while (KeyBinds.pinKey.wasPressed()) {
                 HudPinRenderer.toggleVisibility();
             }
+            while (KeyBinds.openConfigKey.wasPressed()) {
+                if (client.currentScreen == null) {
+                    client.setScreen(new com.disqt.disquests.client.gui.screen.ConfigScreen(null));
+                }
+            }
         });
 
         ClientPlayNetworking.registerGlobalReceiver(RawPayload.ID, ClientPacketHandler::handleRawPayload);

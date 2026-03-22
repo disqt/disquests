@@ -111,10 +111,10 @@ public enum Theme {
     public Surface rootSurface() {
         return switch (this) {
             case VANILLA -> Surface.VANILLA_TRANSLUCENT;
-            case FLAT -> Surface.flat(0xFF0E0E0E);
-            case INSET -> Surface.flat(0xFF181818);
+            case FLAT -> Surface.flat(0xC00E0E0E);
+            case INSET -> Surface.flat(0xC0181818);
             case FROSTED -> Surface.BLANK;
-            case ACCENT_LINE -> Surface.flat(0xFF0C0C0C);
+            case ACCENT_LINE -> Surface.flat(0xC00C0C0C);
         };
     }
 

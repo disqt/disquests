@@ -5,6 +5,7 @@ import java.nio.ByteOrder
 
 plugins {
     id("fabric-loom") version "1.15.5"
+    jacoco
 }
 
 repositories {
@@ -116,10 +117,52 @@ loom {
     }
 }
 
-tasks.named("runClientGameTest") {
+// --- JaCoCo coverage for game tests ---
+val jacocoExecFile = layout.buildDirectory.file("jacoco/gameTest.exec")
+
+// JaCoCo runtime agent (with Premain-Class manifest)
+val jacocoRuntime by configurations.creating
+
+dependencies {
+    jacocoRuntime("org.jacoco:org.jacoco.agent:0.8.14:runtime")
+}
+
+tasks.named<JavaExec>("runClientGameTest") {
     doFirst {
         val requireFreeRam = rootProject.extra["requireFreeRam"] as (String, Long) -> Unit
         requireFreeRam("runClientGameTest", 4096L)
+    }
+    // Attach JaCoCo agent if -Pcoverage is passed
+    if (project.hasProperty("coverage")) {
+        doFirst {
+            val agentJar = jacocoRuntime.singleFile
+            val destFile = jacocoExecFile.get().asFile
+            destFile.parentFile.mkdirs()
+            val agentArg = "-javaagent:$agentJar=destfile=$destFile,includes=com.disqt.disquests.*"
+            jvmArgs(agentArg)
+            logger.lifecycle("JaCoCo agent attached, writing to: $destFile")
+        }
+    }
+}
+
+tasks.register<JacocoReport>("jacocoGameTestReport") {
+    group = "verification"
+    description = "Generate code coverage report from E2E game tests"
+    dependsOn("compileJava")
+
+    executionData(jacocoExecFile)
+    sourceDirectories.from(files("src/main/java"))
+    classDirectories.from(
+        fileTree(layout.buildDirectory.dir("classes/java/main")) {
+            include("com/disqt/disquests/**")
+        }
+    )
+
+    reports {
+        html.required.set(true)
+        xml.required.set(true)
+        html.outputLocation.set(layout.buildDirectory.dir("reports/jacoco/gameTest/html"))
+        xml.outputLocation.set(layout.buildDirectory.file("reports/jacoco/gameTest/report.xml"))
     }
 }
 
