@@ -38,27 +38,48 @@ public final class UIActions {
      * Call this from @BeforeAll in journey classes instead of raw RCON + Thread.sleep.
      */
     public static void resetServerAndSync() throws Exception {
-        var rcon = new RconClient("localhost",
-            Integer.parseInt(System.getProperty("disquests.test.rcon.port", "25575")));
-        rcon.login(System.getProperty("disquests.test.rcon.password", "testpassword"));
-        rcon.command("disquests reset");
-        rcon.close();
+        // RCON reset -- only do this once per journey (idempotent, but avoid races).
+        // Safe to call from both clients; the server handles concurrent resets.
+        try {
+            var rcon = new RconClient("localhost",
+                Integer.parseInt(System.getProperty("disquests.test.rcon.port", "25575")));
+            rcon.login(System.getProperty("disquests.test.rcon.password", "testpassword"));
+            rcon.command("disquests reset");
+            rcon.close();
+        } catch (Exception e) {
+            LOG.warn("RCON reset failed (may be expected on PlayerB): {}", e.getMessage());
+        }
 
-        // Clear client cache and request sync using the test context.
-        // The RCON reset triggers a server-side re-handshake, but we must also
-        // clear the client cache to prevent stale quests from prior journeys.
+        // Clean PhaseSync signals from previous journeys
+        try {
+            var syncDir = com.disqt.disquests.test.integration.PhaseSync.getSyncDir();
+            if (java.nio.file.Files.exists(syncDir)) {
+                try (var stream = java.nio.file.Files.list(syncDir)) {
+                    stream.filter(p -> p.toString().endsWith(".done"))
+                          .forEach(p -> { try { java.nio.file.Files.delete(p); } catch (Exception ignored) {} });
+                }
+            }
+        } catch (Exception e) {
+            LOG.warn("PhaseSync cleanup failed: {}", e.getMessage());
+        }
+
+        // Clear client cache and close screens. Safe even if not connected.
         ClientGameTestContext context = TestContext.get();
         context.runOnClient(c -> {
             ClientCache.clear();
-            c.setScreen(null); // close any open screen
+            if (c.currentScreen != null) c.setScreen(null);
         });
-        // Wait for server re-handshake + sync to arrive
+
+        // Wait for server re-handshake to arrive after RCON reset
         context.waitTicks(40);
-        // Request a fresh sync to ensure we have the latest (empty) data
-        context.runOnClient(c -> {
-            com.disqt.disquests.client.network.PacketSender.requestSync();
-        });
-        context.waitTicks(20);
+
+        // Request fresh sync if connected
+        if (ClientSession.isOnServer()) {
+            context.runOnClient(c -> {
+                com.disqt.disquests.client.network.PacketSender.requestSync();
+            });
+            context.waitTicks(20);
+        }
     }
 
     // --- Connection ---
