@@ -30,8 +30,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class CollaborationJourney {
 
     @BeforeAll
-    static void resetServer() throws Exception {
-        resetServerAndSync();
+    static void resetServer() {
+        resetLocalState();
         AbortOnFailureExtension.clearFailures();
     }
 

@@ -28,8 +28,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class LiveUpdateJourney {
 
     @BeforeAll
-    static void resetServer() throws Exception {
-        resetServerAndSync();
+    static void resetServer() {
+        resetLocalState();
         AbortOnFailureExtension.clearFailures();
     }
 

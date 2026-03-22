@@ -24,8 +24,8 @@ import static com.disqt.disquests.test.integration.bdd.UIAssertions.*;
 class OpenQuestJourney {
 
     @BeforeAll
-    static void resetServer() throws Exception {
-        resetServerAndSync();
+    static void resetServer() {
+        resetLocalState();
         AbortOnFailureExtension.clearFailures();
     }
 

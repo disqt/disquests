@@ -37,25 +37,46 @@ public final class UIActions {
      * and requests a fresh sync. Waits for the sync to complete.
      * Call this from @BeforeAll in journey classes instead of raw RCON + Thread.sleep.
      */
+    /**
+     * Full reset for single-player journeys: RCON reset + cache clear + sync.
+     * Only call from @BeforeAll in @PlayerA-only journeys.
+     */
     public static void resetServerAndSync() throws Exception {
-        // RCON reset -- only do this once per journey (idempotent, but avoid races).
-        // Safe to call from both clients; the server handles concurrent resets.
-        try {
-            var rcon = new RconClient("localhost",
-                Integer.parseInt(System.getProperty("disquests.test.rcon.port", "25575")));
-            rcon.login(System.getProperty("disquests.test.rcon.password", "testpassword"));
-            rcon.command("disquests reset");
-            rcon.close();
-        } catch (Exception e) {
-            LOG.warn("RCON reset failed (may be expected on PlayerB): {}", e.getMessage());
-        }
+        // RCON reset
+        var rcon = new RconClient("localhost",
+            Integer.parseInt(System.getProperty("disquests.test.rcon.port", "25575")));
+        rcon.login(System.getProperty("disquests.test.rcon.password", "testpassword"));
+        rcon.command("disquests reset");
+        rcon.close();
 
+        // Clear client cache and close screens
+        ClientGameTestContext context = TestContext.get();
+        context.runOnClient(c -> {
+            ClientCache.clear();
+            if (c.currentScreen != null) c.setScreen(null);
+        });
+
+        // Wait for server re-handshake + sync
+        context.waitTicks(40);
+        context.runOnClient(c -> {
+            com.disqt.disquests.client.network.PacketSender.requestSync();
+        });
+        context.waitTicks(20);
+    }
+
+    /**
+     * Lightweight reset for two-player journeys: clear local cache only.
+     * RCON reset is done once by the orchestrator at the start of the run.
+     * PhaseSync signals are cleaned so previous journey signals don't leak.
+     */
+    public static void resetLocalState() {
         // Clean PhaseSync signals from previous journeys
         try {
             var syncDir = com.disqt.disquests.test.integration.PhaseSync.getSyncDir();
             if (java.nio.file.Files.exists(syncDir)) {
                 try (var stream = java.nio.file.Files.list(syncDir)) {
                     stream.filter(p -> p.toString().endsWith(".done"))
+                          .filter(p -> !p.getFileName().toString().startsWith("client-"))
                           .forEach(p -> { try { java.nio.file.Files.delete(p); } catch (Exception ignored) {} });
                 }
             }
@@ -63,22 +84,16 @@ public final class UIActions {
             LOG.warn("PhaseSync cleanup failed: {}", e.getMessage());
         }
 
-        // Clear client cache and close screens. Safe even if not connected.
-        ClientGameTestContext context = TestContext.get();
-        context.runOnClient(c -> {
-            ClientCache.clear();
-            if (c.currentScreen != null) c.setScreen(null);
-        });
-
-        // Wait for server re-handshake to arrive after RCON reset
-        context.waitTicks(40);
-
-        // Request fresh sync if connected
-        if (ClientSession.isOnServer()) {
+        // Clear client cache
+        try {
+            ClientGameTestContext context = TestContext.get();
             context.runOnClient(c -> {
-                com.disqt.disquests.client.network.PacketSender.requestSync();
+                ClientCache.clear();
+                if (c.currentScreen != null) c.setScreen(null);
             });
-            context.waitTicks(20);
+            context.waitTicks(5);
+        } catch (Exception e) {
+            LOG.warn("Local state reset failed: {}", e.getMessage());
         }
     }
 
