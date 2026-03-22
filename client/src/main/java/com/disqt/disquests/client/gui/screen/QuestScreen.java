@@ -274,6 +274,7 @@ public class QuestScreen extends DisquestsBaseScreen {
                 quest.getTitle(), "Quest title...", 1, false);
         titleFieldComponent = new TextFieldComponent(titleField);
         titleFieldComponent.sizing(Sizing.fill(90), Sizing.fixed(16));
+        titleFieldComponent.id("title-field");
         titleRow.child(titleFieldComponent);
 
         // Content editor
@@ -284,6 +285,7 @@ public class QuestScreen extends DisquestsBaseScreen {
                 "Quest content...", Integer.MAX_VALUE, true, true);
         contentFieldComponent = new TextFieldComponent(contentField);
         contentFieldComponent.sizing(Sizing.fill(100), Sizing.fill(100));
+        contentFieldComponent.id("content-field");
         editorPanel.child(contentFieldComponent);
 
         // Coords section
@@ -329,6 +331,9 @@ public class QuestScreen extends DisquestsBaseScreen {
         coordXComponent = createCoordField(c != null ? String.valueOf((int) c.x()) : "", "X");
         coordYComponent = createCoordField(c != null ? String.valueOf((int) c.y()) : "", "Y");
         coordZComponent = createCoordField(c != null ? String.valueOf((int) c.z()) : "", "Z");
+        coordXComponent.id("coord-x1");
+        coordYComponent.id("coord-y1");
+        coordZComponent.id("coord-z1");
 
         coordsRow.child(labelFor("1:"));
         coordsRow.child(labelFor("X:"));
@@ -341,17 +346,20 @@ public class QuestScreen extends DisquestsBaseScreen {
         // Set Pos button
         ButtonComponent setPosBtn = UIComponents.button(Text.literal("Set Pos"), b -> setPlayerPosition());
         setPosBtn.sizing(Sizing.fixed(50), Sizing.fixed(14));
+        setPosBtn.id("btn-set-pos");
         coordsRow.child(setPosBtn);
 
         // Region toggle
         String regionText = regionEnabled ? "[x] Region" : "[ ] Region";
         ButtonComponent regionBtn = UIComponents.button(Text.literal(regionText), b -> toggleRegion());
         regionBtn.sizing(Sizing.content(), Sizing.fixed(14));
+        regionBtn.id("btn-region");
         coordsRow.child(regionBtn);
 
         // Clear button
         ButtonComponent clearBtn = UIComponents.button(Text.literal("Clear"), b -> clearCoords());
         clearBtn.sizing(Sizing.fixed(50), Sizing.fixed(14));
+        clearBtn.id("btn-clear");
         coordsRow.child(clearBtn);
 
         // Corner 2 row
@@ -361,6 +369,9 @@ public class QuestScreen extends DisquestsBaseScreen {
             coord2XComponent = createCoordField(c2 != null ? String.valueOf((int) c2.x()) : "", "X");
             coord2YComponent = createCoordField(c2 != null ? String.valueOf((int) c2.y()) : "", "Y");
             coord2ZComponent = createCoordField(c2 != null ? String.valueOf((int) c2.z()) : "", "Z");
+            coord2XComponent.id("coord-x2");
+            coord2YComponent.id("coord-y2");
+            coord2ZComponent.id("coord-z2");
 
             corner2Row.child(labelFor("2:"));
             corner2Row.child(labelFor("X:"));
@@ -382,6 +393,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         String mapDisplay = quest.getMap() != null ? quest.getMap() : "any";
         ButtonComponent mapBtn = UIComponents.button(Text.literal("Map: " + mapDisplay), b -> cycleMap());
         mapBtn.sizing(Sizing.content(), Sizing.fixed(14));
+        mapBtn.id("btn-map");
         mapRow.child(mapBtn);
     }
 

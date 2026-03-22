@@ -138,6 +138,7 @@ public class MainScreen extends DisquestsBaseScreen {
         this.searchField.text(this.searchTerm);
         this.searchField.setPlaceholder(Text.literal("Search..."));
         this.searchField.onChanged().subscribe(this::onSearchTermChanged);
+        this.searchField.id("search-box");
         this.searchRow.child(this.searchField);
 
         // Cache title width
