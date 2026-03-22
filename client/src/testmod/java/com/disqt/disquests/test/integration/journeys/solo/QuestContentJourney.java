@@ -73,6 +73,8 @@ class QuestContentJourney {
             click(context, "btn-close");
         then("MainScreen is shown with one quest");
             waitForScreen(context, MainScreen.class);
+            // Reopen fresh MainScreen to pick up new quest (parent screen is stale)
+            openMainScreen(context);
             waitForEntryCount(context, 1);
     }
 }

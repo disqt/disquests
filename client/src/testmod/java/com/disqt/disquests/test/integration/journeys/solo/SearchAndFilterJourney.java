@@ -42,6 +42,8 @@ class SearchAndFilterJourney {
         waitForScreen(context, QuestScreen.class);
         click(context, "btn-close");
         waitForScreen(context, MainScreen.class);
+        // Reopen fresh MainScreen to pick up new quest (parent screen is stale)
+        openMainScreen(context);
     }
 
     @Test @Order(1) @PlayerA

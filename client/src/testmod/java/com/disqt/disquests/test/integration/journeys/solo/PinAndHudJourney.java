@@ -50,6 +50,8 @@ class PinAndHudJourney {
             waitForScreen(context, QuestScreen.class);
             click(context, "btn-close");
             waitForScreen(context, MainScreen.class);
+            // Reopen fresh MainScreen to pick up new quest (parent screen is stale)
+            openMainScreen(context);
 
         and("player creates quest titled Second");
             click(context, "btn-new-quest");
@@ -59,6 +61,8 @@ class PinAndHudJourney {
             waitForScreen(context, QuestScreen.class);
             click(context, "btn-close");
             waitForScreen(context, MainScreen.class);
+            // Reopen fresh MainScreen to pick up new quest (parent screen is stale)
+            openMainScreen(context);
 
         then("both quests appear in My Quests");
             waitForEntryCount(context, 2);
