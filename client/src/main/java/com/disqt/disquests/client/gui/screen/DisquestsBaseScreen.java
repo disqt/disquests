@@ -47,4 +47,12 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     protected void applyThemePanel(ParentUIComponent component) {
         component.surface(DisquestsConfig.getTheme().panelSurface());
     }
+
+    /**
+     * Exposes the root component for test access.
+     * Only valid after the screen has been initialized.
+     */
+    public FlowLayout getRootComponent() {
+        return this.uiAdapter != null ? this.uiAdapter.rootComponent : null;
+    }
 }
