@@ -42,7 +42,6 @@ public class QuestScreen extends DisquestsBaseScreen {
 
     // Edit mode state preserved across rebuilds
     private boolean regionEnabled;
-    private boolean showFormattingHelp;
     private String originalTitle;
     private String originalContent;
 
@@ -66,28 +65,27 @@ public class QuestScreen extends DisquestsBaseScreen {
      * Open in view mode for an existing quest.
      */
     public QuestScreen(@Nullable Screen parent, Quest quest) {
-        this(parent, quest, false, false, true, null, null);
+        this(parent, quest, false, false, null, null);
     }
 
     /**
      * Open in edit mode when startInEditMode is true (e.g. new quest).
      */
     public QuestScreen(@Nullable Screen parent, Quest quest, boolean startInEditMode) {
-        this(parent, quest, startInEditMode, startInEditMode, true, null, null);
+        this(parent, quest, startInEditMode, startInEditMode, null, null);
     }
 
     /**
      * Internal constructor preserving edit state across mode switches.
      */
     private QuestScreen(@Nullable Screen parent, Quest quest, boolean editing, boolean isNewQuest,
-                        boolean showFormattingHelp, @Nullable String originalTitle, @Nullable String originalContent) {
+                        @Nullable String originalTitle, @Nullable String originalContent) {
         super(DataSource.asset(Identifier.of("disquests",
                 editing ? "quest_screen_edit" : "quest_screen_view")), parent);
         this.quest = quest;
         this.editing = editing;
         this.isNewQuest = isNewQuest;
         this.regionEnabled = quest.isRegion();
-        this.showFormattingHelp = showFormattingHelp;
         this.originalTitle = originalTitle;
         this.originalContent = originalContent;
     }
@@ -420,7 +418,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         String origTitle = quest.getTitle() != null ? quest.getTitle() : "";
         String origContent = quest.getContent() != null ? quest.getContent() : "";
         if (this.client != null) {
-            this.client.setScreen(new QuestScreen(this.parent, quest, true, isNewQuest, true, origTitle, origContent));
+            this.client.setScreen(new QuestScreen(this.parent, quest, true, isNewQuest, origTitle, origContent));
         }
     }
 
@@ -595,7 +593,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     private void rebuildEditMode() {
         if (this.client != null) {
             this.client.setScreen(new QuestScreen(this.parent, quest, true, isNewQuest,
-                    showFormattingHelp, originalTitle, originalContent));
+                    originalTitle, originalContent));
         }
     }
 

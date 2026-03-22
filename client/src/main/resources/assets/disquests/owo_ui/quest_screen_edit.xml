@@ -64,7 +64,7 @@
                     <!-- Editor panel -->
                     <flow-layout direction="vertical" id="editor-panel">
                         <sizing>
-                            <horizontal method="fill">100</horizontal>
+                            <horizontal method="fill">70</horizontal>
                             <vertical method="fill">100</vertical>
                         </sizing>
                         <surface>

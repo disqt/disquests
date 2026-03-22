@@ -19,7 +19,7 @@ public class DisquestsConfig {
     public static final int MIN_PINNED_WIDTH = 100;
     public static final int MAX_PINNED_WIDTH = 400;
     private static int pinnedWidth = 200;
-    private static Theme theme = Theme.VANILLA;
+    private static Theme theme = Theme.FROSTED;
 
     public static void load() {
         if (!Files.exists(CONFIG_PATH)) {
@@ -35,7 +35,7 @@ public class DisquestsConfig {
                     try {
                         theme = Theme.valueOf(data.theme);
                     } catch (IllegalArgumentException e) {
-                        theme = Theme.VANILLA;
+                        theme = Theme.FROSTED;
                     }
                 }
             }
@@ -67,6 +67,6 @@ public class DisquestsConfig {
 
     private static class ConfigData {
         int pinnedWidth = 200;
-        String theme = "VANILLA";
+        String theme = "FROSTED";
     }
 }
