@@ -42,19 +42,7 @@ public final class UIActions {
      * Safe to call from @BeforeAll on any client -- guards against missing client.
      */
     public static void resetServerAndSync() {
-        // Guard: skip entirely if client isn't running
-        // (e.g. PlayerB executing @BeforeAll on a PlayerA-only journey class)
-        ClientGameTestContext context;
-        try {
-            context = TestContext.get();
-            // Test that runOnClient works
-            context.computeOnClient(c -> c.player != null);
-        } catch (Exception e) {
-            LOG.info("resetServerAndSync skipped (no client): {}", e.getMessage());
-            return;
-        }
-
-        // RCON reset
+        // RCON reset ALWAYS fires -- wipes DB, re-sends handshakes
         try {
             var rcon = new RconClient("localhost",
                 Integer.parseInt(System.getProperty("disquests.test.rcon.port", "25575")));
@@ -65,18 +53,21 @@ public final class UIActions {
             LOG.warn("RCON reset failed: {}", e.getMessage());
         }
 
-        // Clear client cache and close screens
-        context.runOnClient(c -> {
-            ClientCache.clear();
-            if (c.currentScreen != null) c.setScreen(null);
-        });
-
-        // Wait for server re-handshake + sync
-        context.waitTicks(40);
-        context.runOnClient(c -> {
-            com.disqt.disquests.client.network.PacketSender.requestSync();
-        });
-        context.waitTicks(20);
+        // Client-side cleanup (skip if client not available, e.g. PlayerB on PlayerA-only class)
+        try {
+            ClientGameTestContext context = TestContext.get();
+            context.runOnClient(c -> {
+                ClientCache.clear();
+                if (c.currentScreen != null) c.setScreen(null);
+            });
+            context.waitTicks(40);
+            context.runOnClient(c -> {
+                com.disqt.disquests.client.network.PacketSender.requestSync();
+            });
+            context.waitTicks(20);
+        } catch (Exception e) {
+            LOG.info("Client-side reset skipped (expected on wrong player): {}", e.getMessage());
+        }
     }
 
     /**
@@ -191,6 +182,35 @@ public final class UIActions {
                 if (index >= children.size()) throw new AssertionError("Entry index " + index + " out of bounds, size=" + children.size());
                 var entry = children.get(index);
                 return new double[]{entry.x() + entry.width() / 2.0, entry.y() + entry.height() / 2.0};
+            }
+            throw new AssertionError("Current screen is not a Disquests screen");
+        });
+        context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
+        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+        context.waitTicks(2);
+    }
+
+    /**
+     * Click a QuestEntryComponent by matching quest title.
+     * Searches all children of "quest-list" for a QuestEntryComponent with the given title.
+     */
+    public static void clickEntryByTitle(ClientGameTestContext context, String title) {
+        double scale = context.computeOnClient(c -> (double) c.getWindow().getScaleFactor());
+        double[] pos = context.computeOnClient(c -> {
+            Screen screen = c.currentScreen;
+            if (screen instanceof DisquestsBaseScreen dScreen) {
+                var root = dScreen.getRootComponent();
+                if (root == null) throw new AssertionError("Screen root not initialized");
+                var questList = root.childById(io.wispforest.owo.ui.container.FlowLayout.class, "quest-list");
+                if (questList == null) throw new AssertionError("quest-list not found");
+                for (var child : questList.children()) {
+                    if (child instanceof com.disqt.disquests.client.gui.component.QuestEntryComponent entry) {
+                        if (title.equals(entry.getQuest().getTitle())) {
+                            return new double[]{entry.x() + entry.width() / 2.0, entry.y() + entry.height() / 2.0};
+                        }
+                    }
+                }
+                throw new AssertionError("No entry with title '" + title + "' found in quest list");
             }
             throw new AssertionError("Current screen is not a Disquests screen");
         });
