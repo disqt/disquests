@@ -73,9 +73,9 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
         double absY = click.y() + this.y() - offsetY;
         Click delegateClick = new Click(absX, absY, click.buttonInfo());
         boolean result = delegate.mouseClicked(delegateClick, false);
-        if (result) {
-            delegate.setFocused(true);
-        }
+        // Always force focus when clicked -- delegate.mouseClicked may not set it
+        // if coordinate translation causes isMouseOver to fail
+        delegate.setFocused(true);
         return result || super.onMouseDown(click, doubled);
     }
 
