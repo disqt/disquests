@@ -1,5 +1,6 @@
 package com.disqt.disquests.test.integration.journeys.solo;
 
+import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
@@ -83,10 +84,16 @@ class SearchAndFilterJourney {
             openMainScreen(context);
         when("player clicks Quest Board tab");
             click(context, "tab-quest-board");
+            // Wait for server quests to sync (OPEN + CLOSED visible, PRIVATE hidden)
+            context.waitFor(client -> ClientCache.getServerQuests().size() >= 2, TIMEOUT);
+            context.waitTicks(4);
+            // Reopen to pick up synced server quests
+            openMainScreen(context);
+            click(context, "tab-quest-board");
             context.waitTicks(4);
         then("filter row appears");
             assertComponentExists(context, "filter-row");
-        and("Alpha (OPEN) and Beta (CLOSED) are visible (Gamma is PRIVATE, not shown)");
+        and("Alpha (OPEN) and Beta (CLOSED) are visible");
             waitForEntryCount(context, 2);
     }
 

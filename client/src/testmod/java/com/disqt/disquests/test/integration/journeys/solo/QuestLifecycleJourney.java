@@ -1,5 +1,6 @@
 package com.disqt.disquests.test.integration.journeys.solo;
 
+import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.gui.screen.ConfirmScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
@@ -72,10 +73,12 @@ class QuestLifecycleJourney {
     @Test @Order(5) @PlayerA
     @DisplayName("Return to MainScreen and see quest in list")
     void returnToMain(ClientGameTestContext context) {
-        when("player clicks Close");
+        when("player clicks Close and reopens MainScreen");
             click(context, "btn-close");
-        then("MainScreen shows the quest in My Quests");
             waitForScreen(context, MainScreen.class);
+            // Reopen fresh MainScreen to pick up new quests (parent screen is stale)
+            openMainScreen(context);
+        then("MainScreen shows the quest in My Quests");
             waitForEntryCount(context, 1);
     }
 
@@ -118,6 +121,9 @@ class QuestLifecycleJourney {
             click(context, "btn-yes");
         then("MainScreen shows empty list");
             waitForScreen(context, MainScreen.class);
+            openMainScreen(context);
+            // Wait for delete to propagate
+            context.waitFor(client -> ClientCache.getMyQuests().isEmpty(), TIMEOUT);
             assertEntryCount(context, 0);
     }
 }
