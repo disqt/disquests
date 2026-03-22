@@ -17,11 +17,18 @@ import java.nio.file.Files;
 public class TwoPlayerSyncExtension implements BeforeAllCallback {
     @Override
     public void beforeAll(ExtensionContext ctx) throws Exception {
+        // Skip for @Nested inner classes -- only run for the outer class.
+        // @Nested classes share the outer class's lifecycle; running cleanup
+        // per-nested-class would delete PhaseSync signals mid-journey.
+        if (ctx.getRequiredTestClass().isMemberClass()) {
+            return;
+        }
+
         String className = ctx.getRequiredTestClass().getSimpleName();
         String role = TestContext.getPlayerRole();
         ClientGameTestContext context = TestContext.get();
 
-        // 1. Clean PhaseSync .done files from previous journeys (but not client-ready markers)
+        // 1. Clean PhaseSync .done files from previous journey classes
         try {
             var syncDir = PhaseSync.getSyncDir();
             if (Files.exists(syncDir)) {
@@ -41,7 +48,7 @@ public class TwoPlayerSyncExtension implements BeforeAllCallback {
         });
         context.waitTicks(5);
 
-        // 3. Clear AbortOnFailureExtension state from previous journey
+        // 3. Clear AbortOnFailureExtension state
         AbortOnFailureExtension.clearFailures();
 
         // 4. Signal "I'm ready for this class"
@@ -51,7 +58,7 @@ public class TwoPlayerSyncExtension implements BeforeAllCallback {
         String otherRole = role.equals("PlayerA") ? "PlayerB" : "PlayerA";
         PhaseSync.waitFor(className + "-" + otherRole + "-ready", context);
 
-        // 6. Small settle time after both clients ready
+        // 6. Small settle time
         context.waitTicks(5);
     }
 }
