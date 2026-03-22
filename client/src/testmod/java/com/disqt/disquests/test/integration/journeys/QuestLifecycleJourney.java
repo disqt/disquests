@@ -28,7 +28,7 @@ class QuestLifecycleJourney {
 
     @Test @Order(1) @PlayerA
     @DisplayName("Open MainScreen with empty My Quests")
-    void openMainScreen(ClientGameTestContext context) {
+    void verifyEmptyMainScreen(ClientGameTestContext context) {
         given("player is connected to the server");
         when("player opens MainScreen");
             openMainScreen(context);
