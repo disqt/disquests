@@ -67,6 +67,7 @@ public class MainScreen extends DisquestsBaseScreen {
     private int currentTab;
     private int serverFilter;
     private int tickCounter = 0;
+    private long lastCacheVersion = -1;
     private final ToastOverlay toast = new ToastOverlay();
 
     // Selection tracking
@@ -398,8 +399,10 @@ public class MainScreen extends DisquestsBaseScreen {
         toast.tick();
         String pending = ClientSession.consumePendingToast();
         if (pending != null) toast.show(pending);
-        // Auto-refresh list every second to pick up changes from other screens
-        if (tickCounter % 20 == 0) {
+        // Refresh list when cache changes (quest created, deleted, synced from server)
+        long currentVersion = ClientCache.getVersion();
+        if (currentVersion != lastCacheVersion) {
+            lastCacheVersion = currentVersion;
             refreshListContents();
         }
     }
