@@ -35,6 +35,11 @@ public class HarnessPlayerB implements FabricClientGameTest {
         } else {
             String result = runJUnitSuite(null);
             writeResult(result);
+            // Wait for PlayerA to finish before exiting (prevents disconnecting mid-test)
+            PhaseSync.signal("player-b-done");
+            try {
+                context.waitFor(client -> Files.exists(PhaseSync.getSyncDir().resolve("player-a-done.done")), Integer.MAX_VALUE / 2);
+            } catch (Exception ignored) {}
             System.exit(result.startsWith("PASS") ? 0 : 1);
         }
     }
