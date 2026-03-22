@@ -35,6 +35,7 @@ class TwoPlayerJourneys {
     // Collaboration: request, accept, permissions, remove
     // =========================================================================
 
+    // Collaboration: A creates(1), B requests(1), A accepts(2), B verifies(2), A manages(3)
     @Test @Order(1) @PlayerA
     @DisplayName("Collab: A creates CLOSED quest")
     void collab_a_creates_closed_quest(ClientGameTestContext context) {
@@ -68,7 +69,7 @@ class TwoPlayerJourneys {
         PhaseSync.signal("collab-quest-created");
     }
 
-    @Test @Order(2) @PlayerB
+    @Test @Order(1) @PlayerB
     @DisplayName("Collab: B finds quest on board and sends request")
     void collab_b_finds_and_requests(ClientGameTestContext context) {
         given("PlayerB is connected to the server");
@@ -94,7 +95,7 @@ class TwoPlayerJourneys {
         PhaseSync.signal("collab-request-sent");
     }
 
-    @Test @Order(3) @PlayerA
+    @Test @Order(2) @PlayerA
     @DisplayName("Collab: A sees pending request and accepts")
     void collab_a_accepts_request(ClientGameTestContext context) {
         when("PlayerA waits for request to be sent");
@@ -180,7 +181,7 @@ class TwoPlayerJourneys {
         PhaseSync.signal("collab-accepted");
     }
 
-    @Test @Order(4) @PlayerB
+    @Test @Order(2) @PlayerB
     @DisplayName("Collab: B sees quest in My Quests after accept")
     void collab_b_sees_quest_in_my_quests(ClientGameTestContext context) {
         when("PlayerB waits for request to be accepted");
@@ -195,7 +196,7 @@ class TwoPlayerJourneys {
             assertEntryCount(context, 1);
     }
 
-    @Test @Order(5) @PlayerA
+    @Test @Order(3) @PlayerA
     @DisplayName("Collab: A toggles permission and removes contributor")
     void collab_a_manages_contributor(ClientGameTestContext context) {
         given("PlayerA is still on ContributorScreen");
@@ -313,7 +314,7 @@ class TwoPlayerJourneys {
         PhaseSync.signal("open-quest-created");
     }
 
-    @Test @Order(11) @PlayerB
+    @Test @Order(10) @PlayerB
     @DisplayName("Open: B joins the OPEN quest")
     void open_b_joins_quest(ClientGameTestContext context) {
         given("PlayerB is connected to the server");
@@ -339,7 +340,7 @@ class TwoPlayerJourneys {
         PhaseSync.signal("open-quest-joined");
     }
 
-    @Test @Order(12) @PlayerB
+    @Test @Order(11) @PlayerB
     @DisplayName("Open: B opens quest, views content, and leaves")
     void open_b_opens_and_leaves(ClientGameTestContext context) {
         given("PlayerB has joined Open Quest");
