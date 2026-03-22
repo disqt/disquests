@@ -7,15 +7,13 @@ import com.disqt.disquests.client.gui.screen.ContributorScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.test.integration.PhaseSync;
-import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
-import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
 import com.disqt.disquests.test.integration.harness.PlayerB;
+import com.disqt.disquests.test.integration.harness.TwoPlayerJourney;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.container.FlowLayout;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.client.gui.screen.Screen;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -25,15 +23,9 @@ import static com.disqt.disquests.test.integration.bdd.UIActions.*;
 import static com.disqt.disquests.test.integration.bdd.UIAssertions.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-@IntegrationTest
+@TwoPlayerJourney
 @DisplayName("Collaboration Journey")
 class CollaborationJourney {
-
-    @BeforeAll
-    static void resetServer() {
-        resetLocalState();
-        AbortOnFailureExtension.clearFailures();
-    }
 
     // Step 1: A creates a CLOSED quest and signals B
     @Test @Order(1) @PlayerA

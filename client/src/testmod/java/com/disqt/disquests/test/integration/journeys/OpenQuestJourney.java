@@ -5,12 +5,10 @@ import com.disqt.disquests.client.gui.screen.ConfirmScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.test.integration.PhaseSync;
-import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
-import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
 import com.disqt.disquests.test.integration.harness.PlayerB;
+import com.disqt.disquests.test.integration.harness.TwoPlayerJourney;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -19,15 +17,9 @@ import static com.disqt.disquests.test.integration.bdd.BDD.*;
 import static com.disqt.disquests.test.integration.bdd.UIActions.*;
 import static com.disqt.disquests.test.integration.bdd.UIAssertions.*;
 
-@IntegrationTest
+@TwoPlayerJourney
 @DisplayName("Open Quest Journey")
 class OpenQuestJourney {
-
-    @BeforeAll
-    static void resetServer() {
-        resetLocalState();
-        AbortOnFailureExtension.clearFailures();
-    }
 
     // Step 1: A creates an OPEN quest (PRIVATE -> CLOSED -> OPEN)
     @Test @Order(1) @PlayerA
