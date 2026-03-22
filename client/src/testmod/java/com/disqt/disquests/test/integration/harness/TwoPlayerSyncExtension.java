@@ -17,9 +17,7 @@ import java.nio.file.Files;
 public class TwoPlayerSyncExtension implements BeforeAllCallback {
     @Override
     public void beforeAll(ExtensionContext ctx) throws Exception {
-        // Skip for @Nested inner classes -- only run for the outer class.
-        // @Nested classes share the outer class's lifecycle; running cleanup
-        // per-nested-class would delete PhaseSync signals mid-journey.
+        // Skip for @Nested inner classes -- only run once for the outer class.
         if (ctx.getRequiredTestClass().isMemberClass()) {
             return;
         }
@@ -28,17 +26,13 @@ public class TwoPlayerSyncExtension implements BeforeAllCallback {
         String role = TestContext.getPlayerRole();
         ClientGameTestContext context = TestContext.get();
 
-        // 1. Clean PhaseSync .done files from previous journey classes
+        // 1. Nuke server state via RCON reset (wipes DB, re-sends handshakes)
         try {
-            var syncDir = PhaseSync.getSyncDir();
-            if (Files.exists(syncDir)) {
-                try (var stream = Files.list(syncDir)) {
-                    stream.filter(p -> p.toString().endsWith(".done"))
-                          .filter(p -> !p.getFileName().toString().startsWith("client-"))
-                          .filter(p -> !p.getFileName().toString().contains("-ready"))
-                          .forEach(p -> { try { Files.delete(p); } catch (Exception ignored) {} });
-                }
-            }
+            var rcon = new com.disqt.disquests.test.integration.harness.RconClient("localhost",
+                Integer.parseInt(System.getProperty("disquests.test.rcon.port", "25575")));
+            rcon.login(System.getProperty("disquests.test.rcon.password", "testpassword"));
+            rcon.command("disquests reset");
+            rcon.close();
         } catch (Exception ignored) {}
 
         // 2. Clear local cache and close screens
@@ -46,19 +40,15 @@ public class TwoPlayerSyncExtension implements BeforeAllCallback {
             ClientCache.clear();
             if (c.currentScreen != null) c.setScreen(null);
         });
-        context.waitTicks(5);
+        context.waitTicks(40); // wait for server re-handshake
 
-        // 3. Clear AbortOnFailureExtension state
+        // 3. Clear failure state
         AbortOnFailureExtension.clearFailures();
 
-        // 4. Signal "I'm ready for this class"
+        // 4. Barrier: both clients must be ready before tests start
         PhaseSync.signal(className + "-" + role + "-ready");
-
-        // 5. Wait for the OTHER client to be ready
         String otherRole = role.equals("PlayerA") ? "PlayerB" : "PlayerA";
         PhaseSync.waitFor(className + "-" + otherRole + "-ready", context);
-
-        // 6. Small settle time
         context.waitTicks(5);
     }
 }
