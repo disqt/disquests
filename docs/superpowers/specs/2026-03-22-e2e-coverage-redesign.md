@@ -56,15 +56,27 @@ Add JaCoCo agent to integration test client JVM args (same pattern as `runClient
 
 ### RCON reset between journeys
 
-Each journey test class calls `rcon.send("disquests reset")` in `@BeforeAll` to wipe server state. Within a journey, ordered steps build on previous state.
+Each journey test class calls `rcon.send("disquests reset")` in `@BeforeAll` to wipe server state. This runs **after** `IntegrationTestExtension.beforeAll()` (per JUnit 5 ordering: extensions before class callbacks). The extension's `beforeAll` handles `ClientCache.clear()` + `PacketSender.requestSync()`. The journey's `@BeforeAll` then does the RCON reset, which triggers server-side DB wipe + re-handshake. The re-handshake sends a fresh sync that overwrites whatever the extension's sync returned, giving us clean state. Order is: extension sync (gets stale data) -> RCON reset (wipes DB) -> server re-handshakes (sends empty sync). Net result: clean empty state.
 
-### Remove runClientGameTest
+### Update harness package scanning
 
-Delete `QuestScreenTest.java` and `DisquestsE2ETest.java`. Remove or alias the `runClientGameTest` Gradle task. All E2E coverage comes from `runIntegrationTest`.
+`HarnessPlayerA` and `HarnessPlayerB` currently scan `TESTS_PACKAGE = "com.disqt.disquests.test.integration.tests"`. Update to `"com.disqt.disquests.test.integration.journeys"` to discover the new journey test classes.
 
-### Replace existing integration tests
+### Update CI workflow
 
-Rewrite the 5 current test classes (LifecycleTest, DiscoveryTest, CollaborationTest, LeaveTest, PinPersistenceTest) as UX-driven journeys that interact through the UI.
+`.github/workflows/e2e-test.yml` currently runs `runClientGameTest` (single client, no server auto-start, seeds data via SQLite). Replace with `runIntegrationTest` which handles server lifecycle, plugin deployment, and multi-client coordination. Remove the manual Paper server setup, data seeding, and xvfb steps that the integration task handles internally.
+
+### Alias runClientGameTest
+
+Keep `runClientGameTest` as an alias for `runIntegrationTest` in `build.gradle.kts` for backward compatibility, but the real work happens in `runIntegrationTest`.
+
+### Replace existing tests
+
+Delete all existing test files and replace with UX-driven journeys. See Files Changed section for full list.
+
+### Failure handling within journeys
+
+Steps within a journey build on previous state via `@Order`. Add a custom JUnit 5 extension (`AbortOnFailureExtension`) that tracks whether any prior test in the class failed and skips remaining tests via `ConditionEvaluationResult.disabled("prior step failed")`. This prevents cascading failures from producing noise. The extension checks a static `Map<Class<?>, Throwable>` populated by an `AfterTestExecutionCallback`.
 
 ## Trust Hierarchy
 
@@ -74,6 +86,8 @@ Tests verify results through the highest-trust signal available:
 2. **UI component state** -- button became disabled, field contains text, entry appeared in list, screen auto-closed.
 3. **Debug logs** -- via `TestLogCapture`. Useful for diagnosing failures, secondary to UI.
 4. **Cache/network state** (lowest) -- only when UI can't observe the result (e.g., verifying a packet was sent).
+
+**Exception: HUD rendering.** `HudPinRenderer` renders during the HUD render pass, not inside a Screen. There are no owo-ui components to query. For HUD assertions, we use trust level 3 (debug logs from HudPinRenderer) and level 4 (HudPinManager.isPinned() state). This is an acknowledged gap -- HUD rendering correctness is verified by the renderer being invoked with correct data, not by inspecting rendered pixels.
 
 Example step assertion:
 
@@ -93,11 +107,38 @@ and("edit button is visible");
 
 All UI interactions use GLFW physical input (TestInput), never direct method calls:
 
-- `click(ctx, componentId)` -- finds component by XML id, computes center, uses `setCursorPos` + `pressMouse`
-- `type(ctx, componentId, text)` -- clicks field to focus, then types via key events
-- `waitForScreen(ctx, screenClass)` -- polls until screen matches, timeout fails
+- `click(ctx, componentId)` -- finds component by XML id or programmatic id, computes center, uses `setCursorPos` + `pressMouse`. For components added programmatically (title field, content field, coordinate fields, search box), these must have IDs assigned in Java code via `component.id("my-id")` at construction time. If a component has no ID, fall back to `findByType(ctx, componentClass)` or positional lookup.
+- `type(ctx, componentId, text)` -- clicks field to focus, then types via GLFW key events. For `TextFieldComponent` (which wraps `MultiLineTextFieldWidget` and implements `GreedyInputUIComponent`): the click triggers `onFocusGained` which sets the delegate's focus. The screen's `charTyped()` override routes key events to the focused greedy component. The helper must account for the delegate focus desync gotcha by waiting a tick after click before typing. This matches the real user's input path.
+- `waitForScreen(ctx, screenClass)` -- polls until screen class matches, timeout fails
 - `assertComponent(ctx, componentId, predicate)` -- finds component, runs assertion
 - `waitForCondition(predicate)` -- polls with timeout for async state (server round-trips)
+
+## Two-Player Coordination
+
+Two-player journeys use `@PlayerA` / `@PlayerB` annotations with `@Order` to interleave steps. Within each step, `PhaseSync.signal()` and `PhaseSync.waitFor()` coordinate between clients. Pattern:
+
+```java
+@Test @Order(1) @PlayerA
+void a_creates_quest(TestContext ctx) {
+    // ... create quest through UI ...
+    PhaseSync.signal("quest-created");
+}
+
+@Test @Order(2) @PlayerB
+void b_finds_quest_on_board(TestContext ctx) {
+    PhaseSync.waitFor("quest-created");
+    // ... open Quest Board, find quest ...
+    PhaseSync.signal("quest-found");
+}
+
+@Test @Order(3) @PlayerA
+void a_checks_pending_request(TestContext ctx) {
+    PhaseSync.waitFor("request-sent");
+    // ... open ContributorScreen ...
+}
+```
+
+Each step signals completion so the other client knows when to proceed. `PhaseSync.waitFor()` uses file-based polling (not `Thread.sleep`) to avoid blocking packet processing.
 
 ## Journey Map
 
@@ -164,14 +205,18 @@ MainScreen tabs, filters, and search.
 
 | Step | Action | Assertion |
 |------|--------|-----------|
-| 1 | Create 3 quests with distinct titles, set visibility: PRIVATE, CLOSED, OPEN | Quests in My Quests |
-| 2 | Switch to Quest Board tab | Filter row appears, OPEN quest visible |
-| 3 | Click "Open" filter | Only OPEN quest shown |
-| 4 | Click "Closed" filter | Only CLOSED quest shown |
-| 5 | Click "All" filter | Both OPEN and CLOSED shown |
-| 6 | Type search term matching one quest | Only matching quest shown |
-| 7 | Clear search | All quests return |
-| 8 | Switch back to My Quests tab | Filter row hidden, all 3 quests shown |
+| 1 | Create quest "Alpha", save | Quest in My Quests |
+| 2 | Edit, cycle visibility to OPEN, save | Visibility set |
+| 3 | Return to MainScreen, create quest "Beta", save | Second quest |
+| 4 | Edit, cycle visibility to CLOSED, save | Visibility set |
+| 5 | Return to MainScreen, create quest "Gamma", save | Third quest (PRIVATE) |
+| 6 | Switch to Quest Board tab | Filter row appears, "Alpha" (OPEN) visible |
+| 7 | Click "Open" filter | Only "Alpha" shown |
+| 8 | Click "Closed" filter | Only "Beta" shown |
+| 9 | Click "All" filter | Both "Alpha" and "Beta" shown |
+| 10 | Type "Alpha" in search box | Only "Alpha" shown |
+| 11 | Clear search | Both quests return |
+| 12 | Switch back to My Quests tab | Filter row hidden, all 3 quests shown |
 
 **Covers:** screen (MainScreen tabs, filter buttons, search box), data (filtering logic)
 
@@ -181,14 +226,14 @@ Pin icon, sort order, HUD rendering, config.
 
 | Step | Action | Assertion |
 |------|--------|-----------|
-| 1 | Create 2 quests | Both in My Quests |
-| 2 | Click pin icon on second quest | Pin icon changes to active state |
-| 3 | Verify pinned quest sorts first | First entry in list is pinned quest |
-| 4 | Verify HUD renders pinned quest | HudPinRenderer draws pin (log or component check) |
+| 1 | Create 2 quests ("First", "Second") | Both in My Quests |
+| 2 | Click pin icon on "Second" quest | Pin icon changes to active state |
+| 3 | Verify pinned quest sorts first | First entry in list is "Second" (pinned) |
+| 4 | Verify HUD pin state | HudPinManager.isPinned() returns true (trust level 4 -- HUD renders outside Screen, no component to query) |
 | 5 | Unpin quest | Pin icon returns to inactive |
-| 6 | Verify sort order restored | Original order |
+| 6 | Verify sort order restored | "First" is back on top |
 
-**Covers:** hud (HudPinManager, HudPinRenderer), screen (pin icon, sort), gui/component (QuestEntryComponent pin area)
+**Covers:** hud (HudPinManager, HudPinRenderer invocation), screen (pin icon, sort), gui/component (QuestEntryComponent pin area)
 
 #### 6. ConfigJourney
 
@@ -240,74 +285,79 @@ Unsaved changes detection and confirm dialog.
 
 #### 9. CollaborationJourney
 
-Full collaboration request flow through the UI.
+Full collaboration request flow through the UI. Uses PhaseSync for cross-client coordination.
 
-| Step | Player | Action | Assertion |
-|------|--------|--------|-----------|
-| 1 | A | Create CLOSED quest, save | Quest in A's My Quests |
-| 2 | B | Open Quest Board, find A's quest | Quest visible on board |
-| 3 | B | Select quest, click Request | Toast shows "Request sent", button changes to "Requested" |
-| 4 | A | Open quest, enter edit mode | Contributors button shows "(1 pending)" |
-| 5 | A | Click Contributors | ContributorScreen shows pending request from B |
-| 6 | A | Click Accept | Request removed, B appears in contributor list |
-| 7 | B | Quest appears in My Quests | Entry visible in My Quests tab |
-| 8 | A | Toggle B's permission to "View Only" | Button text changes |
-| 9 | A | Click Remove on B, confirm | B removed from contributor list |
+| Step | Player | Action | Signal | Assertion |
+|------|--------|--------|--------|-----------|
+| 1 | A | Create CLOSED quest, save | `quest-created` | Quest in A's My Quests |
+| 2 | B | Wait for `quest-created`, open Quest Board, find A's quest | | Quest visible on board |
+| 3 | B | Select quest, click Request | `request-sent` | Toast shows "Request sent", button changes to "Requested" |
+| 4 | A | Wait for `request-sent`, open quest, enter edit mode | | Contributors button shows "(1 pending)" |
+| 5 | A | Click Contributors | | ContributorScreen shows pending request from B |
+| 6 | A | Click Accept | `request-accepted` | Request removed, B appears in contributor list |
+| 7 | B | Wait for `request-accepted`, check My Quests | | Quest appears in My Quests tab |
+| 8 | A | Toggle B's permission to "View Only" | | Button text changes |
+| 9 | A | Click Remove on B, confirm | | B removed from contributor list |
 
-**Covers:** screen (ContributorScreen, accept/deny, permission toggle, remove), network (collaboration packets)
+**Covers:** screen (ContributorScreen, accept/deny, permission toggle, remove), network (collaboration packets: REQUEST_COLLABORATION, RESPOND_COLLABORATION, COLLABORATION_REQUEST S2C, COLLABORATION_RESPONSE S2C, UPDATE_CONTRIBUTORS)
 
 #### 10. OpenQuestJourney
 
 Join and leave an OPEN quest through the UI.
 
-| Step | Player | Action | Assertion |
-|------|--------|--------|-----------|
-| 1 | A | Create OPEN quest, save | Quest in A's My Quests |
-| 2 | B | Open Quest Board, find A's quest | Quest visible, Join button enabled |
-| 3 | B | Click Join | Toast shows "Joined", quest appears in B's My Quests |
-| 4 | B | Open quest, verify content visible | Content rendered in view mode |
-| 5 | B | Click Leave | ConfirmScreen appears |
-| 6 | B | Click Yes | Quest removed from B's My Quests, still on Quest Board |
+| Step | Player | Action | Signal | Assertion |
+|------|--------|--------|--------|-----------|
+| 1 | A | Create OPEN quest, save | `quest-created` | Quest in A's My Quests |
+| 2 | B | Wait for `quest-created`, open Quest Board, find A's quest | | Quest visible, Join button enabled |
+| 3 | B | Click Join | `joined` | Toast shows "Joined", quest appears in B's My Quests |
+| 4 | B | Open quest, verify content visible | | Content rendered in view mode |
+| 5 | B | Click Leave | | ConfirmScreen appears |
+| 6 | B | Click Yes | | Quest removed from B's My Quests, still on Quest Board |
 
-**Covers:** screen (join/leave buttons, ConfirmScreen), network (join/leave packets)
+**Covers:** screen (join/leave buttons, ConfirmScreen), network (JOIN_QUEST, LEAVE_QUEST, UPDATE_QUEST S2C)
 
 #### 11. LiveUpdateJourney
 
 Server pushes updates to other connected clients.
 
-| Step | Player | Action | Assertion |
-|------|--------|--------|-----------|
-| 1 | A | Create OPEN quest "Original Title" | Saved |
-| 2 | B | Join quest | Quest in B's My Quests |
-| 3 | A | Edit title to "Updated Title", save | A sees "Updated Title" |
-| 4 | B | Open MainScreen | Entry shows "Updated Title" (S2C update received) |
-| 5 | A | Delete quest, confirm | Quest removed from A |
-| 6 | B | Quest disappears from My Quests | Entry removed (S2C delete received) |
+| Step | Player | Action | Signal | Assertion |
+|------|--------|--------|--------|-----------|
+| 1 | A | Create OPEN quest "Original Title", save | `quest-created` | Saved |
+| 2 | B | Wait for `quest-created`, join quest | `joined` | Quest in B's My Quests |
+| 3 | A | Wait for `joined`, edit title to "Updated Title", save | `title-updated` | A sees "Updated Title" |
+| 4 | B | Wait for `title-updated`, open MainScreen | | Entry shows "Updated Title" (S2C UPDATE_QUEST received) |
+| 5 | A | Delete quest, confirm | `deleted` | Quest removed from A |
+| 6 | B | Wait for `deleted`, check MainScreen | | Quest disappeared from My Quests (S2C DELETE_QUEST received) |
 
-**Covers:** network (S2C update/delete handlers), screen (live updates)
+**Covers:** network (S2C UPDATE_QUEST, DELETE_QUEST_S2C handlers), screen (live updates)
 
 ## Coverage Projection
 
-| Package | Current | Target | How |
-|---------|---------|--------|-----|
+| Package | Current | Target | Exercised By |
+|---------|---------|--------|--------------|
 | gui/screen | 45.5% | 85%+ | All journeys exercise screens |
 | gui/widget | 33.2% | 75%+ | Content, undo/redo, coord field journeys |
 | gui/component | 61.0% | 85%+ | Entry clicks, pin icon, all journeys |
 | gui/helper | 70.1% | 85%+ | Config + theme journeys |
 | markdown | 57.4% | 80%+ | Content journey with markdown |
-| network | 3.9% | 70%+ | All server-connected, collaboration + live update |
-| hud | 9.7% | 60%+ | Pin journey |
+| network | 3.9% | 50%+ | Collaboration (REQUEST_COLLABORATION, RESPOND_COLLABORATION, COLLABORATION_REQUEST, COLLABORATION_RESPONSE, UPDATE_CONTRIBUTORS, SYNC_PENDING_REQUESTS), OpenQuest (JOIN_QUEST, LEAVE_QUEST), LiveUpdate (UPDATE_QUEST, DELETE_QUEST_S2C), all journeys (HANDSHAKE, SYNC_MY_QUESTS, SYNC_SERVER_QUESTS, SAVE_QUEST). Remaining uncovered: edge cases in handler branching, error paths, RawPayload codec |
+| hud | 9.7% | 40%+ | Pin journey exercises HudPinManager fully, HudPinRenderer.rebuildCache partially (via pin triggering cache build). Rendering internals (wrapText, draw calls) not directly assertable |
 | data | 72.6% | 85%+ | All journeys create/modify quests |
 | debug | 85.0% | 85%+ | Already high |
+| mixin | 0% | 0% | Mixin classes are Fabric internals, not exercisable via UI |
+| migration | 0% | 0% | BuildNotes migration, one-time path, not worth testing |
+| compat | 0% | 0% | ModMenu compat, crashes in dev env |
 | **Overall** | **42.9%** | **~80%** | |
 
 ## Files Changed
 
 | Action | Path |
 |--------|------|
+| **Create** | |
 | Create | `client/src/testmod/.../integration/bdd/BDD.java` |
 | Create | `client/src/testmod/.../integration/bdd/UIActions.java` (click, type, wait helpers) |
 | Create | `client/src/testmod/.../integration/bdd/UIAssertions.java` (assertComponent, waitForCondition) |
+| Create | `client/src/testmod/.../integration/bdd/AbortOnFailureExtension.java` |
 | Create | `client/src/testmod/.../integration/journeys/QuestLifecycleJourney.java` |
 | Create | `client/src/testmod/.../integration/journeys/QuestContentJourney.java` |
 | Create | `client/src/testmod/.../integration/journeys/CoordinatesJourney.java` |
@@ -319,6 +369,7 @@ Server pushes updates to other connected clients.
 | Create | `client/src/testmod/.../integration/journeys/CollaborationJourney.java` |
 | Create | `client/src/testmod/.../integration/journeys/OpenQuestJourney.java` |
 | Create | `client/src/testmod/.../integration/journeys/LiveUpdateJourney.java` |
+| **Delete** | |
 | Delete | `client/src/testmod/.../test/QuestScreenTest.java` |
 | Delete | `client/src/testmod/.../test/DisquestsE2ETest.java` |
 | Delete | `client/src/testmod/.../integration/tests/LifecycleTest.java` |
@@ -326,4 +377,16 @@ Server pushes updates to other connected clients.
 | Delete | `client/src/testmod/.../integration/tests/CollaborationTest.java` |
 | Delete | `client/src/testmod/.../integration/tests/LeaveTest.java` |
 | Delete | `client/src/testmod/.../integration/tests/PinPersistenceTest.java` |
-| Modify | `client/build.gradle.kts` (JaCoCo on integration test, remove runClientGameTest or alias) |
+| Delete | `client/src/testmod/.../integration/QuestLifecycleTest.java` (old standalone) |
+| Delete | `client/src/testmod/.../integration/QuestDiscoveryTest.java` (old standalone) |
+| Delete | `client/src/testmod/.../integration/CollaborationTest.java` (old standalone) |
+| Delete | `client/src/testmod/.../integration/LeaveQuestTest.java` (old standalone) |
+| Delete | `client/src/testmod/.../integration/PinPersistenceTest.java` (old standalone) |
+| Delete | `client/src/testmod/.../integration/IntegrationTestHelper.java` (old helper, replaced by UIActions) |
+| **Modify** | |
+| Modify | `client/build.gradle.kts` -- JaCoCo on integration test, alias runClientGameTest to runIntegrationTest |
+| Modify | `client/src/testmod/.../integration/harness/HarnessPlayerA.java` -- update TESTS_PACKAGE to `journeys` |
+| Modify | `client/src/testmod/.../integration/harness/HarnessPlayerB.java` -- update TESTS_PACKAGE to `journeys` |
+| Modify | `.github/workflows/e2e-test.yml` -- replace manual Paper setup + runClientGameTest with runIntegrationTest |
+| Modify | `.claude/CLAUDE.md` -- update E2E Tests and Integration Tests sections to reflect new structure |
+| Modify | Production code: assign IDs to programmatically-added components (title field, content field, coord fields, search box) via `component.id("my-id")` so UIActions can find them |
