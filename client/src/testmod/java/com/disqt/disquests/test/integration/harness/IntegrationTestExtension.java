@@ -7,7 +7,7 @@ import org.junit.jupiter.api.extension.*;
 
 import java.lang.reflect.Method;
 
-import static com.disqt.disquests.test.integration.IntegrationTestHelper.connectAndWait;
+import static com.disqt.disquests.test.integration.bdd.UIActions.connectAndWait;
 
 public class IntegrationTestExtension implements
         ExecutionCondition,

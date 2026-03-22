@@ -13,12 +13,12 @@ import org.junit.platform.launcher.listeners.TestExecutionSummary;
 import java.io.IOException;
 import java.nio.file.*;
 
-import static com.disqt.disquests.test.integration.IntegrationTestHelper.*;
+import static com.disqt.disquests.test.integration.bdd.UIActions.*;
 
 public class HarnessPlayerB implements FabricClientGameTest {
 
     private static final String PLAYER_ROLE = "PlayerB";
-    private static final String TESTS_PACKAGE = "com.disqt.disquests.test.integration.tests";
+    private static final String TESTS_PACKAGE = "com.disqt.disquests.test.integration.journeys";
 
     @Override
     public void runTest(ClientGameTestContext context) {
