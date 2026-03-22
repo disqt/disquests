@@ -398,6 +398,10 @@ public class MainScreen extends DisquestsBaseScreen {
         toast.tick();
         String pending = ClientSession.consumePendingToast();
         if (pending != null) toast.show(pending);
+        // Auto-refresh list every second to pick up changes from other screens
+        if (tickCounter % 20 == 0) {
+            refreshListContents();
+        }
     }
 
     public void showToast(String message) {
