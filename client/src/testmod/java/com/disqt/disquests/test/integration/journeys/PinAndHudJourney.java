@@ -30,7 +30,7 @@ class PinAndHudJourney {
     private static UUID secondQuestId;
 
     @BeforeAll
-    static void resetServer() throws Exception {
+    static void resetServer() {
         resetServerAndSync();
         AbortOnFailureExtension.clearFailures();
     }

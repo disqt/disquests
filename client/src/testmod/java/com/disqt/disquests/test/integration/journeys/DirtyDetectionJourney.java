@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class DirtyDetectionJourney {
 
     @BeforeAll
-    static void resetServer() throws Exception {
+    static void resetServer() {
         resetServerAndSync();
         AbortOnFailureExtension.clearFailures();
     }

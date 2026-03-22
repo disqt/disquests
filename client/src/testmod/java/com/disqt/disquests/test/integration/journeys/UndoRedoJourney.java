@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class UndoRedoJourney {
 
     @BeforeAll
-    static void resetServer() throws Exception {
+    static void resetServer() {
         resetServerAndSync();
         AbortOnFailureExtension.clearFailures();
     }

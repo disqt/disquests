@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ConfigJourney {
 
     @BeforeAll
-    static void resetServer() throws Exception {
+    static void resetServer() {
         resetServerAndSync();
         AbortOnFailureExtension.clearFailures();
         // Reset theme to VANILLA and clear ConfigScreen static state

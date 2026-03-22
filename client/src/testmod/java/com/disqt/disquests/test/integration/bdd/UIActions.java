@@ -41,8 +41,20 @@ public final class UIActions {
      * Full reset for single-player journeys: RCON reset + cache clear + sync.
      * Safe to call from @BeforeAll on any client -- guards against missing client.
      */
-    public static void resetServerAndSync() throws Exception {
-        // RCON reset (idempotent, safe from either client)
+    public static void resetServerAndSync() {
+        // Guard: skip entirely if client isn't running
+        // (e.g. PlayerB executing @BeforeAll on a PlayerA-only journey class)
+        ClientGameTestContext context;
+        try {
+            context = TestContext.get();
+            // Test that runOnClient works
+            context.computeOnClient(c -> c.player != null);
+        } catch (Exception e) {
+            LOG.info("resetServerAndSync skipped (no client): {}", e.getMessage());
+            return;
+        }
+
+        // RCON reset
         try {
             var rcon = new RconClient("localhost",
                 Integer.parseInt(System.getProperty("disquests.test.rcon.port", "25575")));
@@ -51,24 +63,20 @@ public final class UIActions {
             rcon.close();
         } catch (Exception e) {
             LOG.warn("RCON reset failed: {}", e.getMessage());
-            return; // Can't proceed without server
         }
 
-        // Guard: if client isn't running (e.g. PlayerB on a PlayerA-only class), skip
-        try {
-            ClientGameTestContext context = TestContext.get();
-            context.runOnClient(c -> {
-                ClientCache.clear();
-                if (c.currentScreen != null) c.setScreen(null);
-            });
-            context.waitTicks(40);
-            context.runOnClient(c -> {
-                com.disqt.disquests.client.network.PacketSender.requestSync();
-            });
-            context.waitTicks(20);
-        } catch (Exception e) {
-            LOG.warn("Client-side reset skipped: {}", e.getMessage());
-        }
+        // Clear client cache and close screens
+        context.runOnClient(c -> {
+            ClientCache.clear();
+            if (c.currentScreen != null) c.setScreen(null);
+        });
+
+        // Wait for server re-handshake + sync
+        context.waitTicks(40);
+        context.runOnClient(c -> {
+            com.disqt.disquests.client.network.PacketSender.requestSync();
+        });
+        context.waitTicks(20);
     }
 
     /**
