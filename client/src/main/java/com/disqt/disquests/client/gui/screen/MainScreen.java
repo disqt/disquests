@@ -33,15 +33,6 @@ public class MainScreen extends DisquestsBaseScreen {
 
     private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger("Disquests.MainScreen");
 
-    // Tabs
-    private static final int TAB_MY_QUESTS = 0;
-    private static final int TAB_SERVER_QUESTS = 1;
-
-    // Sub-filter constants
-    private static final int FILTER_ALL = 0;
-    private static final int FILTER_OPEN = 1;
-    private static final int FILTER_CLOSED = 2;
-
     // Component references (looked up by ID from XML model)
     private FlowLayout rootLayout;
     private LabelComponent titleLabel;
@@ -64,8 +55,8 @@ public class MainScreen extends DisquestsBaseScreen {
     private String searchTerm;
 
     // State
-    private int currentTab;
-    private int serverFilter;
+    private ClientSession.Tab currentTab;
+    private ClientSession.QuestFilter serverFilter;
     private int tickCounter = 0;
     private long lastCacheVersion = -1;
     private final ToastOverlay toast = new ToastOverlay();
@@ -113,13 +104,13 @@ public class MainScreen extends DisquestsBaseScreen {
         this.btnClose = root.childById(ButtonComponent.class, "btn-close");
 
         // --- Wire tab button handlers ---
-        this.tabMyQuests.onPress(btn -> selectTab(TAB_MY_QUESTS));
-        this.tabQuestBoard.onPress(btn -> selectTab(TAB_SERVER_QUESTS));
+        this.tabMyQuests.onPress(btn -> selectTab(ClientSession.Tab.MY_QUESTS));
+        this.tabQuestBoard.onPress(btn -> selectTab(ClientSession.Tab.SERVER_QUESTS));
 
         // --- Wire filter button handlers ---
-        this.filterAll.onPress(btn -> selectServerFilter(FILTER_ALL));
-        this.filterOpen.onPress(btn -> selectServerFilter(FILTER_OPEN));
-        this.filterClosed.onPress(btn -> selectServerFilter(FILTER_CLOSED));
+        this.filterAll.onPress(btn -> selectServerFilter(ClientSession.QuestFilter.ALL));
+        this.filterOpen.onPress(btn -> selectServerFilter(ClientSession.QuestFilter.OPEN));
+        this.filterClosed.onPress(btn -> selectServerFilter(ClientSession.QuestFilter.CLOSED));
 
         this.filterAll.tooltip(Text.literal("Show all visible quests"));
         this.filterOpen.tooltip(Text.literal("Quests anyone can join"));
@@ -152,12 +143,12 @@ public class MainScreen extends DisquestsBaseScreen {
 
     // --- TAB SWITCHING ---
 
-    private void selectTab(int tab) {
+    private void selectTab(ClientSession.Tab tab) {
         LOGGER.debug("selectTab({})", tab);
         this.currentTab = tab;
         ClientSession.setActiveTab(tab);
 
-        boolean isMyQuests = tab == TAB_MY_QUESTS;
+        boolean isMyQuests = tab == ClientSession.Tab.MY_QUESTS;
 
         // Toggle tab active states (active selected tab appears pressed/disabled)
         tabMyQuests.active(!isMyQuests);
@@ -200,15 +191,15 @@ public class MainScreen extends DisquestsBaseScreen {
 
     // --- SERVER FILTER ---
 
-    private void selectServerFilter(int filter) {
+    private void selectServerFilter(ClientSession.QuestFilter filter) {
         LOGGER.debug("selectServerFilter({})", filter);
         this.serverFilter = filter;
         ClientSession.setServerQuestsFilter(filter);
 
         // Active = clickable, so the currently-selected filter is NOT active (appears pressed)
-        filterAll.active(filter != FILTER_ALL);
-        filterOpen.active(filter != FILTER_OPEN);
-        filterClosed.active(filter != FILTER_CLOSED);
+        filterAll.active(filter != ClientSession.QuestFilter.ALL);
+        filterOpen.active(filter != ClientSession.QuestFilter.OPEN);
+        filterClosed.active(filter != ClientSession.QuestFilter.CLOSED);
 
         refreshListContents();
         updateActionButtons();
@@ -243,7 +234,7 @@ public class MainScreen extends DisquestsBaseScreen {
 
         List<Quest> quests;
 
-        if (currentTab == TAB_MY_QUESTS) {
+        if (currentTab == ClientSession.Tab.MY_QUESTS) {
             quests = new ArrayList<>(ClientCache.getMyQuests());
 
             // Filter by search term
@@ -261,11 +252,11 @@ public class MainScreen extends DisquestsBaseScreen {
             quests = new ArrayList<>(ClientCache.getServerQuests());
 
             // Apply sub-filter
-            if (serverFilter == FILTER_OPEN) {
+            if (serverFilter == ClientSession.QuestFilter.OPEN) {
                 quests = quests.stream()
                         .filter(q -> q.getVisibility() == Visibility.OPEN)
                         .collect(Collectors.toList());
-            } else if (serverFilter == FILTER_CLOSED) {
+            } else if (serverFilter == ClientSession.QuestFilter.CLOSED) {
                 quests = quests.stream()
                         .filter(q -> q.getVisibility() == Visibility.CLOSED)
                         .collect(Collectors.toList());
@@ -337,7 +328,7 @@ public class MainScreen extends DisquestsBaseScreen {
     }
 
     private void updateActionButtons() {
-        if (currentTab == TAB_MY_QUESTS) {
+        if (currentTab == ClientSession.Tab.MY_QUESTS) {
             boolean hasSelection = getSelectedQuest() != null;
             btnOpen.active(hasSelection);
         } else {
@@ -451,7 +442,7 @@ public class MainScreen extends DisquestsBaseScreen {
         }
 
         // Notification badge on My Quests tab (fix 13: only query when on My Quests)
-        if (currentTab == TAB_MY_QUESTS && tabMyQuests != null) {
+        if (currentTab == ClientSession.Tab.MY_QUESTS && tabMyQuests != null) {
             int pendingCount = ClientSession.getPendingRequestCount();
             if (pendingCount > 0) {
                 renderNotificationBadge(context, pendingCount);
@@ -493,8 +484,7 @@ public class MainScreen extends DisquestsBaseScreen {
         int badgeY = tabMyQuests.getY() - badgeHeight / 2;
 
         // Draw red badge background
-        int badgeColor = 0xFFCC3333;
-        context.fill(badgeX, badgeY, badgeX + badgeWidth, badgeY + badgeHeight, badgeColor);
+        context.fill(badgeX, badgeY, badgeX + badgeWidth, badgeY + badgeHeight, Colors.BADGE_RED);
 
         // Draw count text centered in badge
         int textX = badgeX + (badgeWidth - textWidth) / 2;

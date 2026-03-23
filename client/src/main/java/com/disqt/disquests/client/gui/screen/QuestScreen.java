@@ -36,6 +36,10 @@ import java.util.stream.Collectors;
  */
 public class QuestScreen extends DisquestsBaseScreen {
 
+    private static final String MAP_OVERWORLD = "overworld";
+    private static final String MAP_NETHER = "the_nether";
+    private static final String MAP_END = "the_end";
+
     private final Quest quest;
     private final boolean editing;
     private final boolean isNewQuest;
@@ -566,13 +570,13 @@ public class QuestScreen extends DisquestsBaseScreen {
         persistFieldValues();
         String current = quest.getMap();
         if (current == null) {
-            quest.setMap("overworld");
+            quest.setMap(MAP_OVERWORLD);
         } else {
             quest.setMap(switch (current) {
-                case "overworld" -> "the_nether";
-                case "the_nether" -> "the_end";
-                case "the_end" -> null; // cycles back to "any"
-                default -> "overworld";
+                case MAP_OVERWORLD -> MAP_NETHER;
+                case MAP_NETHER -> MAP_END;
+                case MAP_END -> null; // cycles back to "any"
+                default -> MAP_OVERWORLD;
             });
         }
         rebuildEditMode();
