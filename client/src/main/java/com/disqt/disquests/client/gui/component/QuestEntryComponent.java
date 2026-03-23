@@ -320,7 +320,7 @@ public class QuestEntryComponent extends BaseUIComponent {
 
     private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger("Disquests.QuestEntry");
     private static final long DOUBLE_CLICK_MS = 300;
-    private static QuestEntryComponent lastClickedEntry;
+    private static java.lang.ref.WeakReference<QuestEntryComponent> lastClickedEntry = new java.lang.ref.WeakReference<>(null);
     private static long lastClickTime;
 
     @Override
@@ -351,8 +351,8 @@ public class QuestEntryComponent extends BaseUIComponent {
         // Per-component double-click: ignore vanilla's screen-level doubled flag,
         // only treat as double-click if the same entry was clicked twice
         long now = System.currentTimeMillis();
-        boolean isDoubleClick = lastClickedEntry == this && (now - lastClickTime) < DOUBLE_CLICK_MS;
-        lastClickedEntry = this;
+        boolean isDoubleClick = lastClickedEntry.get() == this && (now - lastClickTime) < DOUBLE_CLICK_MS;
+        lastClickedEntry = new java.lang.ref.WeakReference<>(this);
         lastClickTime = now;
 
         if (isDoubleClick) {
