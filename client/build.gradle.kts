@@ -72,6 +72,7 @@ dependencies {
 }
 
 loom {
+    log4jConfigs.from(file("src/testmod/resources/log4j2-test.xml"))
     runs {
         create("clientGameTest") {
             client()
@@ -388,7 +389,12 @@ tasks.register("runSoloTests") {
                     processes.add(procA)
                     startedClients = true
 
-                    Thread { procA.inputStream.bufferedReader().lines().forEach { } }.apply { isDaemon = true; start() }
+                    val logA = File(syncDir, "client-a-output.log")
+                    Thread {
+                        logA.outputStream().use { out ->
+                            procA.inputStream.copyTo(out)
+                        }
+                    }.apply { isDaemon = true; start() }
                 } else {
                     logger.lifecycle("Client A already running (ready marker found)")
                 }
@@ -414,6 +420,8 @@ tasks.register("runSoloTests") {
             logger.lifecycle("  Player A: $aResult")
 
             if (!aResult.startsWith("PASS")) {
+                val logA = File(syncDir, "client-a-output.log")
+                if (logA.exists()) logger.lifecycle("  Client A log: ${logA.absolutePath}")
                 throw RuntimeException("Solo tests failed")
             }
             logger.lifecycle("  Solo tests PASSED")
@@ -498,8 +506,18 @@ tasks.register("runDuoTests") {
                     processes.addAll(listOf(procA, procB))
                     startedClients = true
 
-                    Thread { procA.inputStream.bufferedReader().lines().forEach { } }.apply { isDaemon = true; start() }
-                    Thread { procB.inputStream.bufferedReader().lines().forEach { } }.apply { isDaemon = true; start() }
+                    val logA = File(syncDir, "client-a-output.log")
+                    val logB = File(syncDir, "client-b-output.log")
+                    Thread {
+                        logA.outputStream().use { out ->
+                            procA.inputStream.copyTo(out)
+                        }
+                    }.apply { isDaemon = true; start() }
+                    Thread {
+                        logB.outputStream().use { out ->
+                            procB.inputStream.copyTo(out)
+                        }
+                    }.apply { isDaemon = true; start() }
 
                     if (harness) {
                         logger.lifecycle("Waiting for clients to be ready...")
@@ -545,6 +563,10 @@ tasks.register("runDuoTests") {
 
             val passed = aResult.startsWith("PASS") && bResult.startsWith("PASS")
             if (!passed) {
+                val logA = File(syncDir, "client-a-output.log")
+                val logB = File(syncDir, "client-b-output.log")
+                if (logA.exists()) logger.lifecycle("  Client A log: ${logA.absolutePath}")
+                if (logB.exists()) logger.lifecycle("  Client B log: ${logB.absolutePath}")
                 throw RuntimeException("Duo tests failed")
             }
             logger.lifecycle("  Duo tests PASSED")

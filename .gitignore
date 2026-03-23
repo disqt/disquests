@@ -6,6 +6,7 @@ build/
 .vscode/
 *.code-workspace
 run/
+run-b/
 logs/
 .DS_Store
 Thumbs.db

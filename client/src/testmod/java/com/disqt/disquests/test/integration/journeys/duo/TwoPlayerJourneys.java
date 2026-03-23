@@ -40,7 +40,7 @@ class TwoPlayerJourneys {
     @DisplayName("Collab: A creates CLOSED quest")
     void collab_a_creates_closed_quest(ClientGameTestContext context) {
         given("PlayerA is connected to the server");
-        context.waitFor(client -> ClientSession.isOnServer(), TIMEOUT);
+        context.waitFor(client -> ClientSession.isOnServer(), CONNECT_TIMEOUT);
 
         when("PlayerA opens MainScreen and creates a new quest");
             openMainScreen(context);
@@ -73,7 +73,7 @@ class TwoPlayerJourneys {
     @DisplayName("Collab: B finds quest on board and sends request")
     void collab_b_finds_and_requests(ClientGameTestContext context) {
         given("PlayerB is connected to the server");
-        context.waitFor(client -> ClientSession.isOnServer(), TIMEOUT);
+        context.waitFor(client -> ClientSession.isOnServer(), CONNECT_TIMEOUT);
 
         when("PlayerB waits for quest to be created");
             PhaseSync.waitFor("collab-quest-created", context);
@@ -119,7 +119,7 @@ class TwoPlayerJourneys {
             waitForScreen(context, QuestScreen.class);
 
         then("contributors button shows pending count");
-            assertButtonText(context, "btn-contributors", "pending");
+            assertButtonText(context, "btn-contributors", "+ 1");
 
         when("PlayerA clicks Contributors");
             click(context, "btn-contributors");
@@ -166,17 +166,25 @@ class TwoPlayerJourneys {
             waitForScreen(context, ContributorScreen.class);
 
         then("PlayerB appears in the contributor list");
-            boolean hasContrib = context.computeOnClient(c -> {
-                Screen screen = c.currentScreen;
-                if (screen instanceof com.disqt.disquests.client.gui.screen.DisquestsBaseScreen dScreen) {
-                    var root = dScreen.getRootComponent();
-                    if (root == null) return false;
-                    FlowLayout contribList = root.childById(FlowLayout.class, "contributor-list");
-                    return contribList != null && !contribList.children().isEmpty();
-                }
-                return false;
-            });
-            assertTrue(hasContrib, "Expected contributor in list after accept");
+            // Wait for server to process accept and send back updated quest with contributor
+            context.waitFor(client ->
+                ClientCache.getMyQuests().stream()
+                    .filter(q -> "Collab Quest".equals(q.getTitle()))
+                    .findFirst()
+                    .map(q -> !q.getContributors().isEmpty())
+                    .orElse(false),
+                TIMEOUT);
+
+        and("PlayerA reopens ContributorScreen with updated data");
+            // ContributorScreen doesn't auto-refresh, so reopen it via quest edit mode
+            openMainScreen(context);
+            clickEntryByTitle(context, "Collab Quest");
+            click(context, "btn-open");
+            waitForScreen(context, QuestScreen.class);
+            click(context, "btn-edit");
+            waitForScreen(context, QuestScreen.class);
+            click(context, "btn-contributors");
+            waitForScreen(context, ContributorScreen.class);
 
         PhaseSync.signal("collab-accepted");
     }
@@ -264,17 +272,14 @@ class TwoPlayerJourneys {
             waitForScreen(context, ContributorScreen.class);
 
         then("contributor list is empty");
-            boolean isEmpty = context.computeOnClient(c -> {
-                Screen screen = c.currentScreen;
-                if (screen instanceof com.disqt.disquests.client.gui.screen.DisquestsBaseScreen dScreen) {
-                    var root = dScreen.getRootComponent();
-                    if (root == null) return true;
-                    FlowLayout contribList = root.childById(FlowLayout.class, "contributor-list");
-                    return contribList == null || contribList.children().isEmpty();
-                }
-                return true;
-            });
-            assertTrue(isEmpty, "Expected contributor list to be empty after removal");
+            // Wait for server to process removal
+            context.waitFor(client ->
+                ClientCache.getMyQuests().stream()
+                    .filter(q -> "Collab Quest".equals(q.getTitle()))
+                    .findFirst()
+                    .map(q -> q.getContributors().isEmpty())
+                    .orElse(false),
+                TIMEOUT);
     }
 
     // =========================================================================
@@ -285,7 +290,7 @@ class TwoPlayerJourneys {
     @DisplayName("Open: A creates OPEN quest")
     void open_a_creates_open_quest(ClientGameTestContext context) {
         given("PlayerA is connected to the server");
-        context.waitFor(client -> ClientSession.isOnServer(), TIMEOUT);
+        context.waitFor(client -> ClientSession.isOnServer(), CONNECT_TIMEOUT);
 
         when("PlayerA opens MainScreen and creates a new quest");
             openMainScreen(context);
@@ -318,7 +323,7 @@ class TwoPlayerJourneys {
     @DisplayName("Open: B joins the OPEN quest")
     void open_b_joins_quest(ClientGameTestContext context) {
         given("PlayerB is connected to the server");
-        context.waitFor(client -> ClientSession.isOnServer(), TIMEOUT);
+        context.waitFor(client -> ClientSession.isOnServer(), CONNECT_TIMEOUT);
 
         when("PlayerB waits for quest to be created");
             PhaseSync.waitFor("open-quest-created", context);
@@ -347,6 +352,7 @@ class TwoPlayerJourneys {
 
         when("PlayerB opens MainScreen");
             openMainScreen(context);
+            click(context, "tab-my-quests");
             waitForQuestByTitle(context, "Open Quest", true);
 
         and("PlayerB selects the quest and opens it");

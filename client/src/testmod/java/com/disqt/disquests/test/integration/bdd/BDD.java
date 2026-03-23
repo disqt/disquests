@@ -4,7 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public final class BDD {
-    private static final Logger LOG = LoggerFactory.getLogger("Disquests/E2E");
+    private static final Logger LOG = LoggerFactory.getLogger("Disquests.E2E");
 
     private BDD() {}
 
