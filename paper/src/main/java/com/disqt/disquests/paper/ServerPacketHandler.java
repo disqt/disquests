@@ -217,11 +217,13 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
         if (quest == null) return;
         if (!quest.ownerUuid().equals(player.getUniqueId())) return; // owner only
 
+        // Track players that need notification
+        List<UUID> notifyPlayers = new ArrayList<>();
+
         for (PacketCodec.ContributorOpEntry op : payload.ops()) {
             switch (op.action()) {
                 case ADD -> {
                     UUID targetUuid = op.playerUuid();
-                    // If playerName is provided instead of UUID, resolve it
                     if (targetUuid == null && op.playerName() != null) {
                         targetUuid = dataManager.getPlayerUuidByName(op.playerName());
                     }
@@ -229,27 +231,13 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
                         && !targetUuid.equals(quest.ownerUuid())
                         && !dataManager.isContributor(payload.questId(), targetUuid)) {
                         dataManager.addContributor(payload.questId(), targetUuid, op.canEdit());
-                        // Notify the added player
-                        Player added = Bukkit.getPlayer(targetUuid);
-                        if (added != null && isModPlayer(added)) {
-                            QuestData updated = dataManager.getQuest(payload.questId());
-                            sendPacket(added, PacketCodec.writeUpdateQuest(updated));
-                        }
+                        notifyPlayers.add(targetUuid);
                     }
                 }
                 case REMOVE -> {
                     if (op.playerUuid() != null) {
                         dataManager.removeContributor(payload.questId(), op.playerUuid());
-                        // Notify the removed player
-                        Player removed = Bukkit.getPlayer(op.playerUuid());
-                        if (removed != null && isModPlayer(removed)) {
-                            if (quest.visibility() == Visibility.PRIVATE) {
-                                sendPacket(removed, PacketCodec.writeDeleteQuestS2C(payload.questId()));
-                            } else {
-                                QuestData updated = dataManager.getQuest(payload.questId());
-                                sendPacket(removed, PacketCodec.writeUpdateQuest(updated));
-                            }
-                        }
+                        notifyPlayers.add(op.playerUuid());
                     }
                 }
                 case UPDATE -> {
@@ -260,9 +248,27 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
             }
         }
 
-        // Send updated quest back to owner
+        // Fetch updated quest once after all ops
         QuestData updated = dataManager.getQuest(payload.questId());
-        sendPacket(player, PacketCodec.writeUpdateQuest(updated));
+        byte[] updatePacket = PacketCodec.writeUpdateQuest(updated);
+
+        // Notify affected players
+        for (UUID targetUuid : notifyPlayers) {
+            Player target = Bukkit.getPlayer(targetUuid);
+            if (target != null && isModPlayer(target)) {
+                // For removed contributors of PRIVATE quests, send delete instead
+                if (updated.visibility() == Visibility.PRIVATE &&
+                    updated.contributors().stream().noneMatch(c -> c.uuid().equals(targetUuid)) &&
+                    !updated.ownerUuid().equals(targetUuid)) {
+                    sendPacket(target, PacketCodec.writeDeleteQuestS2C(payload.questId()));
+                } else {
+                    sendPacket(target, updatePacket);
+                }
+            }
+        }
+
+        // Send updated quest back to owner
+        sendPacket(player, updatePacket);
     }
 
     private void handleUpdateVisibility(Player player, PacketCodec.UpdateVisibilityPayload payload) {
