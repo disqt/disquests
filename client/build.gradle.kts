@@ -1,5 +1,9 @@
 import java.io.DataInputStream
 import java.net.Socket
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -243,7 +247,53 @@ fun sendRconCommand(host: String, port: Int, password: String, command: String):
 
 // --- Shared helpers for solo/duo test orchestrators ---
 
-fun ensureServer(serverDir: File, logger: org.gradle.api.logging.Logger, pluginJar: File): Process? {
+fun bootstrapServerDir(serverDir: File, mcVersion: String, logger: org.gradle.api.logging.Logger) {
+    serverDir.mkdirs()
+    File(serverDir, "plugins").mkdirs()
+    File(serverDir, "logs").mkdirs()
+
+    // Download paper.jar from Paper API
+    logger.lifecycle("Downloading Paper $mcVersion...")
+    val client = HttpClient.newBuilder()
+        .followRedirects(HttpClient.Redirect.NORMAL).build()
+    val versionResp = client.send(
+        HttpRequest.newBuilder()
+            .uri(URI("https://api.papermc.io/v2/projects/paper/versions/$mcVersion"))
+            .GET().build(),
+        HttpResponse.BodyHandlers.ofString()
+    )
+    val buildsMatch = Regex("""\"builds"\s*:\s*\[([^\]]+)\]""").find(versionResp.body())
+        ?: throw RuntimeException("Could not parse Paper API response for MC $mcVersion")
+    val latestBuild = buildsMatch.groupValues[1].split(",").last().trim()
+    val downloadName = "paper-$mcVersion-$latestBuild.jar"
+    val downloadUrl = "https://api.papermc.io/v2/projects/paper/versions/$mcVersion/builds/$latestBuild/downloads/$downloadName"
+    logger.lifecycle("Downloading $downloadUrl")
+    client.send(
+        HttpRequest.newBuilder().uri(URI(downloadUrl)).GET().build(),
+        HttpResponse.BodyHandlers.ofFile(File(serverDir, "paper.jar").toPath())
+    )
+    logger.lifecycle("Downloaded paper.jar (${File(serverDir, "paper.jar").length() / 1024 / 1024}MB)")
+
+    // Create eula.txt
+    File(serverDir, "eula.txt").writeText("eula=true\n")
+
+    // Create server.properties with test settings
+    File(serverDir, "server.properties").writeText(
+        """
+        |online-mode=false
+        |max-players=4
+        |enable-rcon=true
+        |rcon.password=testpassword
+        |rcon.port=25575
+        |server-port=25565
+        |level-type=flat
+        |spawn-protection=0
+        |""".trimMargin()
+    )
+    logger.lifecycle("Server directory bootstrapped at ${serverDir.absolutePath}")
+}
+
+fun ensureServer(serverDir: File, logger: org.gradle.api.logging.Logger, pluginJar: File, mcVersion: String): Process? {
     val serverRunning = try {
         Socket("localhost", 25565).use { true }
     } catch (_: Exception) { false }
@@ -262,7 +312,7 @@ fun ensureServer(serverDir: File, logger: org.gradle.api.logging.Logger, pluginJ
 
         val paperJar = File(serverDir, "paper.jar")
         if (!paperJar.exists()) {
-            throw RuntimeException("paper.jar not found at ${paperJar.absolutePath}. Run ':paper:runServer' once to download it.")
+            bootstrapServerDir(serverDir, mcVersion, logger)
         }
         val serverProcess = ProcessBuilder(
             "java", "-Xmx1G", "-Ddisquests.debug=true",
@@ -374,7 +424,7 @@ tasks.register("runSoloTests") {
             // --- Step 2: Server ---
             if (!noStart) {
                 val pluginJar = file("../paper/build/libs/paper.jar")
-                serverProcess = ensureServer(serverDir, logger, pluginJar)
+                serverProcess = ensureServer(serverDir, logger, pluginJar, minecraft_version)
                 rconReset(logger)
             } else {
                 // -PnoStart: verify client A is ready
@@ -481,7 +531,7 @@ tasks.register("runDuoTests") {
             // --- Step 2: Server ---
             if (!noStart) {
                 val pluginJar = file("../paper/build/libs/paper.jar")
-                serverProcess = ensureServer(serverDir, logger, pluginJar)
+                serverProcess = ensureServer(serverDir, logger, pluginJar, minecraft_version)
                 rconReset(logger)
             } else {
                 // -PnoStart: verify both clients are ready
