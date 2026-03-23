@@ -261,13 +261,21 @@ fun ensureServer(serverDir: File, logger: org.gradle.api.logging.Logger, pluginJ
         logger.lifecycle("Deployed plugin jar")
 
         val paperJar = File(serverDir, "paper.jar")
+        if (!paperJar.exists()) {
+            throw RuntimeException("paper.jar not found at ${paperJar.absolutePath}. Run ':paper:runServer' once to download it.")
+        }
         val serverProcess = ProcessBuilder(
             "java", "-Xmx1G", "-Ddisquests.debug=true",
             "-jar", paperJar.absolutePath, "--nogui"
         ).directory(serverDir).redirectErrorStream(true).start()
 
-        // Drain server stdout
-        Thread { serverProcess.inputStream.bufferedReader().lines().forEach { } }.apply { isDaemon = true; start() }
+        // Capture server stdout for debugging
+        val serverLog = File(serverDir, "logs/server-stdout.log")
+        Thread {
+            serverLog.outputStream().use { out ->
+                serverProcess.inputStream.copyTo(out)
+            }
+        }.apply { isDaemon = true; start() }
 
         // Wait for server to accept connections
         logger.lifecycle("Waiting for Paper server...")
