@@ -607,8 +607,12 @@ tasks.register("runIntegrationTest") {
             logger.lifecycle("=== Running $taskName ===")
             val process = ProcessBuilder(cmd)
                 .directory(rootProject.projectDir)
-                .inheritIO()
+                .redirectErrorStream(true)
                 .start()
+            // Pipe subprocess output through Gradle's logger so it appears in CI
+            Thread {
+                process.inputStream.bufferedReader().forEachLine { logger.lifecycle(it) }
+            }.apply { isDaemon = true; start() }
             val exitCode = process.waitFor()
             if (exitCode != 0) {
                 throw RuntimeException("$taskName failed with exit code $exitCode")
