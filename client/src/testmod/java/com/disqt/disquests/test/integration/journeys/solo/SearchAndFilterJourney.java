@@ -70,19 +70,16 @@ class SearchAndFilterJourney {
 
         when("player types 'Alpha' in the search box");
             type(context, "search-box", "Alpha");
-            context.waitTicks(4);
         then("only Alpha is shown");
             waitForEntryCount(context, 1);
 
         when("player changes search to 'Beta'");
             type(context, "search-box", "Beta");
-            context.waitTicks(4);
         then("only Beta is shown");
             waitForEntryCount(context, 1);
 
         when("player clears the search");
             type(context, "search-box", "");
-            context.waitTicks(4);
         then("all three quests return");
             waitForEntryCount(context, 3);
     }

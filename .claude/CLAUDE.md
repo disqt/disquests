@@ -52,13 +52,34 @@ UX-driven journey tests in `client/src/testmod/java/com/disqt/disquests/test/int
 ./gradlew :client:jacocoIntegrationTestReport                                 # generate HTML report
 ```
 
+**Quick iteration** -- when debugging a known failure, run the minimal subset:
+```bash
+./gradlew :client:runDuoTests                                                 # duo tests only (two-player)
+./gradlew :client:runSoloTests                                                # solo tests only
+./gradlew :client:runDuoTests -PtestFilter=TwoPlayerJourneys                  # specific test class
+```
+
+**CI status:** The `e2e-test.yml` workflow has never passed on CI (Paper server setup issue). E2E tests only run locally.
+
 Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with GLFW physical input via `TestInput`. All tests connect to a live Paper server -- no mocking.
 
-- **`UIActions`** -- click, type, undo/redo, waitForScreen, openMainScreen, etc.
+- **`UIActions`** -- click, type, undo/redo, waitForScreen, openMainScreen, findComponent, waitForQuestCondition, etc.
 - **`UIAssertions`** -- assertLabelText, assertButtonText, assertEntryCount, assertScreenIs, etc.
+- **`seconds(N)`** -- converts seconds to game ticks (20 ticks/sec). Use instead of `N * 20`.
+- **`CONNECT_TIMEOUT`** (30s) for server connection, **`TIMEOUT`** (10s) for UI operations.
 - **Trust hierarchy:** UI state > component state > debug logs > cache state
 - **Two-player journeys** use `PhaseSync.signal()`/`waitFor()` for coordination
 - **`AbortOnFailureExtension`** skips remaining steps if a prior step fails
+- **Verify testmod compilation** with `:client:compileTestmodJava`, not `:client:classes` (separate classpath)
+- **JUnit 5 inside MC client** — `HarnessCommon` launches JUnit programmatically via `Launcher` API. `HarnessPlayerA`/`HarnessPlayerB` are thin wrappers passing role `"a"`/`"b"`.
+- **`@PlayerA`/`@PlayerB` filtering** — `IntegrationTestExtension` (ExecutionCondition) skips methods tagged for the other player.
+- **PhaseSync coordination** — file-based signals, MUST use `context.waitFor()` not `Thread.sleep()` (sleeping blocks packet processing). Has cross-client error propagation for fast-fail.
+- **RCON reset** — `/disquests reset` (debug mode only) clears DB + resends handshakes. Used between test runs via `resetServerAndSync()`.
+- **`-PtestFilter` not `-Ptest`** — Gradle reserves `-Ptest` for its built-in test task.
+- **Loom property passing** — use `-P` (Gradle property) not `-D` (JVM system property) for subprocess invocation.
+- **Prism mods incompatible with `runClient`** — production jars use intermediary mappings, dev environment uses named mappings. Mixin crashes guaranteed.
+- **ModMenu incompatible with `runClient`** — ModMenu's TitleScreen mixin crashes in dev. Use F6 keybind to open ConfigScreen instead.
+- **`paper/run/server.properties` `max-players`** — must be >= 4 (two test clients + reconnect headroom)
 
 ## Networking Protocol
 
@@ -91,8 +112,8 @@ Channel: `disquests:main`. First byte = PacketType ID.
 | `paper/src/main/java/com/disqt/disquests/paper/DataManager.java` | SQLite persistence |
 | `paper/src/main/java/com/disqt/disquests/paper/PlayerNameTracker.java` | Tracks online player display names |
 | `paper/src/main/java/com/disqt/disquests/paper/Commands.java` | `/disquests reload` and `/disquests reset` (debug mode) |
-| `client/src/testmod/.../integration/harness/` | JUnit 5 harness: TestContext, IntegrationTestExtension, annotations, RconClient |
-| `client/src/testmod/.../integration/tests/` | JUnit test classes (Lifecycle, Discovery, Collaboration, Leave, Pin) |
+| `client/src/testmod/.../integration/harness/` | JUnit 5 harness: HarnessCommon, TestContext, IntegrationTestExtension, RconClient |
+| `client/src/testmod/.../integration/journeys/` | Solo and duo journey test classes |
 
 ## Dependencies
 
@@ -119,30 +140,18 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **owo-ui Surface composing** — `Surface.flat(color).and(Surface.outline(color))` chains surfaces. Available: `flat`, `outline`, `blur`, `DARK_PANEL`, `PANEL_INSET`, `panelWithInset`, `VANILLA_TRANSLUCENT`, `BLANK`.
 - **owo-ui no `clearAndInit()`** — to rebuild a screen after state change, reopen it: `client.setScreen(new MyScreen(parent))`. There is no method to re-trigger `build()` on an existing screen.
 - **XML comments cannot contain `--`** — causes `SAXParseException`. Use commas instead.
-- **Fire-and-forget C2S race** — `PacketSender.pinQuest()`, `respondCollaboration()` etc. have no server acknowledgment. Add `waitTicks(40)` before disconnect/re-sync if the server must process the packet first. UI code using optimistic cache updates (e.g. `ContributorScreen.respondToRequest` calls `removePendingRequest` locally) must be replicated in tests.
+- **Fire-and-forget C2S race** — `PacketSender.pinQuest()`, `respondCollaboration()` etc. have no server acknowledgment. In tests, use `waitForQuestCondition()` or `waitFor` with cache version polling instead of fixed `waitTicks`. UI code using optimistic cache updates (e.g. `ContributorScreen.respondToRequest` calls `removePendingRequest` locally) must be replicated in tests.
 - **`ClientCache.getQuestById` searches both lists** — returns quests from myQuests AND serverQuests. After leaving an OPEN quest, it's removed from myQuests but still in serverQuests. Use `getMyQuests().stream()` to check membership specifically.
+- **Logger names use `.` not `/`** — `LoggerFactory.getLogger("Disquests.MainScreen")` not `"Disquests/MainScreen"`. Log4j2 uses `.` for hierarchy; `/` creates flat names that don't inherit parent logger config (e.g. test log4j2-test.xml).
+- **owo-ui `doubled` flag is screen-level** — The `boolean doubled` in `onMouseDown(Click, boolean)` comes from vanilla Minecraft's `Screen` class, not per-component. Clicking two different components quickly registers as a double-click. Components that care must track their own state (see `QuestEntryComponent`).
+- **`ClientCache.clear()` doesn't bump version** — Only `setMyQuests`/`setServerQuests`/`addOrUpdate`/`remove` methods increment the version counter.
+- **`javax.annotation` not on testmod classpath** — Don't use `@Nullable` etc. in testmod code. JUnit is also unresolvable in IDE (cosmetic, compiles fine via Gradle).
 
 ## Deploy
 
 - **Paper plugin**: `scp paper/build/libs/paper.jar minecraft:~/serverfiles/plugins/Disquests.jar` then `ssh minecraft "tmux -S /tmp/tmux-1000/pmcserver-bb664df1 send-keys -t pmcserver 'plugman reload Disquests' Enter"`
-- **Client mod**: `cp client/build/libs/client.jar "C:/Users/leole/AppData/Roaming/PrismLauncher/instances/1.21.11 v2.7/.minecraft/mods/disquests-client-0.2.4.jar"`
+- **Client mod**: `cp client/build/libs/client.jar "C:/Users/leole/AppData/Roaming/PrismLauncher/instances/1.21.11 v2.7/.minecraft/mods/disquests-client-0.2.5.jar"`
 - **owo-lib (Prism)**: Must be in Prism mods folder alongside client mod. Find in `~/.gradle/caches/modules-2/files-2.1/io.wispforest/owo-lib/`.
-
-## Integration Tests
-
-Integration tests are now part of the E2E test suite described above. All tests run via `runIntegrationTest`. See **E2E Tests** for the full command reference and gotchas.
-
-Key implementation notes:
-- **JUnit 5 inside MC client** — `HarnessPlayerA`/`HarnessPlayerB` launch JUnit programmatically via `Launcher` API. Test classes in `journeys/` package use `@IntegrationTest` annotation.
-- **`@PlayerA`/`@PlayerB` filtering** — `IntegrationTestExtension` (ExecutionCondition) skips methods tagged for the other player. Untagged methods run on both.
-- **PhaseSync coordination** — file-based signals, MUST use `context.waitFor()` not `Thread.sleep()` (sleeping blocks packet processing). Has cross-client error propagation for fast-fail.
-- **RCON reset** — `/disquests reset` (debug mode only) clears DB + resends handshakes. Used between test runs.
-- **`-PtestFilter` not `-Ptest`** — Gradle reserves `-Ptest` for its built-in test task.
-- **Loom property passing** — use `-P` (Gradle property) not `-D` (JVM system property) for subprocess invocation.
-- **Prism mods incompatible with `runClient`** — production jars use intermediary mappings, dev environment uses named mappings. Mixin crashes guaranteed.
-- **ModMenu incompatible with `runClient`** — ModMenu's TitleScreen mixin crashes in dev (named vs intermediary mappings). Use F6 keybind to open ConfigScreen instead.
-- **`paper/run/server.properties` `max-players`** — must be >= 4 (two test clients + reconnect headroom)
-- **testmod source set** — IDE (VSCode/Java LS) can't resolve JUnit imports in testmod files. This is cosmetic; Gradle compilation works fine.
 
 ## Release
 

@@ -26,10 +26,65 @@ import java.util.UUID;
  */
 public final class UIActions {
     private static final Logger LOG = LoggerFactory.getLogger("Disquests.E2E");
-    public static final int CONNECT_TIMEOUT = 30 * 20; // 30 seconds in ticks
-    public static final int TIMEOUT = 10 * 20; // 10 seconds in ticks
+
+    /** Convert seconds to game ticks (20 ticks/second). */
+    public static int seconds(int s) { return s * 20; }
+
+    public static final int CONNECT_TIMEOUT = seconds(30);
+    public static final int TIMEOUT = seconds(10);
+
+    private static final double PIN_ICON_CLICK_X = 10.0;  // offset from right edge
+    private static final double PIN_ICON_CLICK_Y = 19.0;  // offset from entry top
 
     private UIActions() {}
+
+    // --- Component lookup helpers ---
+
+    /**
+     * Find a component by ID on the current Disquests screen.
+     * Runs on the client thread. Throws AssertionError if screen or component not found.
+     */
+    public static <T extends UIComponent> T findComponent(ClientGameTestContext context, Class<T> type, String id) {
+        return context.computeOnClient(c -> {
+            if (c.currentScreen instanceof DisquestsBaseScreen dScreen) {
+                var root = dScreen.getRootComponent();
+                if (root == null) throw new AssertionError("Screen root not initialized");
+                T component = root.childById(type, id);
+                if (component == null) throw new AssertionError("Component not found: " + id);
+                return component;
+            }
+            throw new AssertionError("Current screen is not a Disquests screen");
+        });
+    }
+
+    /**
+     * Find a component by ID, returning null if not found.
+     */
+    public static <T extends UIComponent> T findComponentOrNull(ClientGameTestContext context, Class<T> type, String id) {
+        return context.computeOnClient(c -> {
+            if (c.currentScreen instanceof DisquestsBaseScreen dScreen) {
+                var root = dScreen.getRootComponent();
+                if (root == null) return null;
+                return root.childById(type, id);
+            }
+            return null;
+        });
+    }
+
+    /**
+     * Get the center coordinates of a component (screen-space, pre-scale).
+     */
+    public static double[] componentCenter(ClientGameTestContext context, UIComponent component) {
+        return context.computeOnClient(c ->
+            new double[]{component.x() + component.width() / 2.0, component.y() + component.height() / 2.0});
+    }
+
+    /**
+     * Get the window scale factor.
+     */
+    public static double scaleFactor(ClientGameTestContext context) {
+        return context.computeOnClient(c -> (double) c.getWindow().getScaleFactor());
+    }
 
     // --- Server reset ---
 
@@ -53,12 +108,13 @@ public final class UIActions {
             if (c.currentScreen != null) c.setScreen(null);
         });
 
-        // Wait for server re-handshake + fresh sync
-        context.waitTicks(40);
+        // Request sync and wait for cache to update (version bumps when SYNC packets arrive)
+        // Request sync and wait for cache to update (SYNC packets bump version)
+        long versionBefore = context.computeOnClient(c -> ClientCache.getVersion());
         context.runOnClient(c -> {
             com.disqt.disquests.client.network.PacketSender.requestSync();
         });
-        context.waitTicks(20);
+        context.waitFor(client -> ClientCache.getVersion() != versionBefore, TIMEOUT);
     }
 
     // --- Connection ---
@@ -106,18 +162,9 @@ public final class UIActions {
      * Uses GLFW physical input: setCursorPos + pressMouse.
      */
     public static void click(ClientGameTestContext context, String componentId) {
-        double scale = context.computeOnClient(c -> (double) c.getWindow().getScaleFactor());
-        double[] pos = context.computeOnClient(c -> {
-            Screen screen = c.currentScreen;
-            if (screen instanceof DisquestsBaseScreen dScreen) {
-                var root = dScreen.getRootComponent();
-                if (root == null) throw new AssertionError("Screen root not initialized");
-                var component = root.childById(UIComponent.class, componentId);
-                if (component == null) throw new AssertionError("Component not found: " + componentId);
-                return new double[]{component.x() + component.width() / 2.0, component.y() + component.height() / 2.0};
-            }
-            throw new AssertionError("Current screen is not a Disquests screen");
-        });
+        var component = findComponent(context, UIComponent.class, componentId);
+        double[] pos = componentCenter(context, component);
+        double scale = scaleFactor(context);
         context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
         context.waitTicks(2);
@@ -128,21 +175,14 @@ public final class UIActions {
      * Entries are children of the "quest-list" FlowLayout.
      */
     public static void clickEntry(ClientGameTestContext context, int index) {
-        double scale = context.computeOnClient(c -> (double) c.getWindow().getScaleFactor());
+        var questList = findComponent(context, io.wispforest.owo.ui.container.FlowLayout.class, "quest-list");
         double[] pos = context.computeOnClient(c -> {
-            Screen screen = c.currentScreen;
-            if (screen instanceof DisquestsBaseScreen dScreen) {
-                var root = dScreen.getRootComponent();
-                if (root == null) throw new AssertionError("Screen root not initialized");
-                var questList = root.childById(io.wispforest.owo.ui.container.FlowLayout.class, "quest-list");
-                if (questList == null) throw new AssertionError("quest-list not found");
-                var children = questList.children();
-                if (index >= children.size()) throw new AssertionError("Entry index " + index + " out of bounds, size=" + children.size());
-                var entry = children.get(index);
-                return new double[]{entry.x() + entry.width() / 2.0, entry.y() + entry.height() / 2.0};
-            }
-            throw new AssertionError("Current screen is not a Disquests screen");
+            var children = questList.children();
+            if (index >= children.size()) throw new AssertionError("Entry index " + index + " out of bounds, size=" + children.size());
+            var entry = children.get(index);
+            return new double[]{entry.x() + entry.width() / 2.0, entry.y() + entry.height() / 2.0};
         });
+        double scale = scaleFactor(context);
         context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
         context.waitTicks(2);
@@ -153,25 +193,18 @@ public final class UIActions {
      * Searches all children of "quest-list" for a QuestEntryComponent with the given title.
      */
     public static void clickEntryByTitle(ClientGameTestContext context, String title) {
-        double scale = context.computeOnClient(c -> (double) c.getWindow().getScaleFactor());
+        var questList = findComponent(context, io.wispforest.owo.ui.container.FlowLayout.class, "quest-list");
         double[] pos = context.computeOnClient(c -> {
-            Screen screen = c.currentScreen;
-            if (screen instanceof DisquestsBaseScreen dScreen) {
-                var root = dScreen.getRootComponent();
-                if (root == null) throw new AssertionError("Screen root not initialized");
-                var questList = root.childById(io.wispforest.owo.ui.container.FlowLayout.class, "quest-list");
-                if (questList == null) throw new AssertionError("quest-list not found");
-                for (var child : questList.children()) {
-                    if (child instanceof com.disqt.disquests.client.gui.component.QuestEntryComponent entry) {
-                        if (title.equals(entry.getQuest().getTitle())) {
-                            return new double[]{entry.x() + entry.width() / 2.0, entry.y() + entry.height() / 2.0};
-                        }
+            for (var child : questList.children()) {
+                if (child instanceof com.disqt.disquests.client.gui.component.QuestEntryComponent entry) {
+                    if (title.equals(entry.getQuest().getTitle())) {
+                        return new double[]{entry.x() + entry.width() / 2.0, entry.y() + entry.height() / 2.0};
                     }
                 }
-                throw new AssertionError("No entry with title '" + title + "' found in quest list");
             }
-            throw new AssertionError("Current screen is not a Disquests screen");
+            throw new AssertionError("No entry with title '" + title + "' found in quest list");
         });
+        double scale = scaleFactor(context);
         context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
         context.waitTicks(2);
@@ -191,20 +224,12 @@ public final class UIActions {
      * Pin icon is in the rightmost 20px of the entry, vertically centered.
      */
     public static void clickPinIcon(ClientGameTestContext context, int index) {
-        double scale = context.computeOnClient(c -> (double) c.getWindow().getScaleFactor());
+        var questList = findComponent(context, io.wispforest.owo.ui.container.FlowLayout.class, "quest-list");
         double[] pos = context.computeOnClient(c -> {
-            Screen screen = c.currentScreen;
-            if (screen instanceof DisquestsBaseScreen dScreen) {
-                var root = dScreen.getRootComponent();
-                if (root == null) throw new AssertionError("Screen root not initialized");
-                var questList = root.childById(io.wispforest.owo.ui.container.FlowLayout.class, "quest-list");
-                if (questList == null) throw new AssertionError("quest-list not found");
-                var entry = questList.children().get(index);
-                // Pin icon is rightmost 10px, vertically at y+19 (center of rows 2-3)
-                return new double[]{entry.x() + entry.width() - 10.0, entry.y() + 19.0};
-            }
-            throw new AssertionError("Current screen is not a Disquests screen");
+            var entry = questList.children().get(index);
+            return new double[]{entry.x() + entry.width() - PIN_ICON_CLICK_X, entry.y() + PIN_ICON_CLICK_Y};
         });
+        double scale = scaleFactor(context);
         context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
         context.waitTicks(2);
@@ -323,6 +348,22 @@ public final class UIActions {
             var list = myQuests ? ClientCache.getMyQuests() : ClientCache.getServerQuests();
             return list.stream().filter(q -> title.equals(q.getTitle())).findFirst().orElse(null);
         });
+    }
+
+    /**
+     * Wait for a quest matching title to satisfy a condition in the cache.
+     * @param myQuests true = search myQuests, false = search serverQuests
+     */
+    public static void waitForQuestCondition(
+            ClientGameTestContext context, String title, boolean myQuests, java.util.function.Predicate<Quest> condition) {
+        context.waitFor(client -> {
+            var list = myQuests ? ClientCache.getMyQuests() : ClientCache.getServerQuests();
+            return list.stream()
+                .filter(q -> title.equals(q.getTitle()))
+                .findFirst()
+                .map(condition::test)
+                .orElse(false);
+        }, TIMEOUT);
     }
 
     /**

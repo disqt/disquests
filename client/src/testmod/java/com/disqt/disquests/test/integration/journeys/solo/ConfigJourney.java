@@ -43,7 +43,6 @@ class ConfigJourney {
     private void openConfigScreen(ClientGameTestContext context) {
         context.runOnClient(c -> c.setScreen(new ConfigScreen(null)));
         waitForScreen(context, ConfigScreen.class);
-        context.waitTicks(2);
     }
 
     @Test @Order(1) @PlayerA
@@ -81,7 +80,6 @@ class ConfigJourney {
                 c.setScreen(new ConfigScreen(null));
             });
             waitForScreen(context, ConfigScreen.class);
-            context.waitTicks(2);
 
         when("player clicks btn-theme once (VANILLA -> FLAT)");
             click(context, "btn-theme");
@@ -126,7 +124,6 @@ class ConfigJourney {
                 c.setScreen(new ConfigScreen(null));
             });
             waitForScreen(context, ConfigScreen.class);
-            context.waitTicks(2);
 
         when("player cycles to FLAT theme");
             click(context, "btn-theme");
@@ -135,9 +132,9 @@ class ConfigJourney {
 
         and("player clicks Cancel");
             click(context, "btn-cancel");
-            context.waitTicks(4);
 
         then("theme reverts to VANILLA");
+            context.waitFor(client -> DisquestsConfig.getTheme() == Theme.VANILLA, TIMEOUT);
             Theme currentTheme = context.computeOnClient(c -> DisquestsConfig.getTheme());
             assertEquals(Theme.VANILLA, currentTheme,
                 "Cancelling should revert theme to VANILLA (the original before opening config)");
@@ -155,7 +152,6 @@ class ConfigJourney {
                 c.setScreen(new ConfigScreen(null));
             });
             waitForScreen(context, ConfigScreen.class);
-            context.waitTicks(2);
 
         when("player cycles to FLAT theme");
             click(context, "btn-theme");
@@ -164,11 +160,9 @@ class ConfigJourney {
 
         and("player clicks Save");
             click(context, "btn-save");
-            context.waitTicks(4);
 
         then("ConfigScreen closes");
-            boolean isClosed = context.computeOnClient(c -> !(c.currentScreen instanceof ConfigScreen));
-            assertTrue(isClosed, "ConfigScreen should close after saving");
+            context.waitFor(client -> !(client.currentScreen instanceof ConfigScreen), TIMEOUT);
 
         and("FLAT theme is persisted in config");
             Theme savedTheme = context.computeOnClient(c -> DisquestsConfig.getTheme());
