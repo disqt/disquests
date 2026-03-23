@@ -26,8 +26,12 @@ import java.util.UUID;
  */
 public final class UIActions {
     private static final Logger LOG = LoggerFactory.getLogger("Disquests.E2E");
-    public static final int CONNECT_TIMEOUT = 30 * 20; // 30 seconds in ticks
-    public static final int TIMEOUT = 10 * 20; // 10 seconds in ticks
+
+    /** Convert seconds to game ticks (20 ticks/second). */
+    public static int seconds(int s) { return s * 20; }
+
+    public static final int CONNECT_TIMEOUT = seconds(30);
+    public static final int TIMEOUT = seconds(10);
 
     private UIActions() {}
 

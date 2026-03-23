@@ -3,6 +3,8 @@ package com.disqt.disquests.test.integration;
 import com.disqt.disquests.test.integration.harness.TestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 
+import static com.disqt.disquests.test.integration.bdd.UIActions.seconds;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -70,7 +72,7 @@ public class PhaseSync {
                 throw new AssertionError("Other client failed while waiting for '" + phaseName + "': " + error);
             }
             return Files.exists(marker);
-        }, 15 * 20);
+        }, seconds(15));
     }
 
     private static String checkOtherClientError() {
