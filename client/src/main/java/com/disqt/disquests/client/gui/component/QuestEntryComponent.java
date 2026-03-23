@@ -85,12 +85,9 @@ public class QuestEntryComponent extends BaseUIComponent {
         this.quest = quest;
 
         UUID playerUuid = ClientSession.getEffectivePlayerUuid();
-        this.isOwnedByPlayer = playerUuid != null && playerUuid.equals(quest.getOwnerUuid());
-        this.isContributor = quest.getContributors().stream()
-                .anyMatch(c -> c.getUuid().equals(playerUuid));
-
-        this.hideContent = quest.getVisibility() == Visibility.CLOSED
-                && !isOwnedByPlayer && !isContributor;
+        this.isOwnedByPlayer = quest.isOwner(playerUuid);
+        this.isContributor = quest.isContributor(playerUuid);
+        this.hideContent = quest.isContentHidden(playerUuid);
 
         if (hideContent) {
             this.firstLine = "";

@@ -158,23 +158,23 @@ public class MarkdownRenderer {
                 lines.add(RenderedLine.normal(prefixed, indent));
             }
         } else if (node instanceof FencedCodeBlock code) {
-            String[] codeLines = code.getLiteral().split("\n", -1);
-            for (String cl : codeLines) {
-                lines.add(RenderedLine.normal(
-                        Text.literal(cl).setStyle(Style.EMPTY.withColor(Formatting.GRAY)), indent + 8));
-            }
+            renderCodeLines(code.getLiteral(), lines, indent);
         } else if (node instanceof IndentedCodeBlock code) {
-            String[] codeLines = code.getLiteral().split("\n", -1);
-            for (String cl : codeLines) {
-                lines.add(RenderedLine.normal(
-                        Text.literal(cl).setStyle(Style.EMPTY.withColor(Formatting.GRAY)), indent + 8));
-            }
+            renderCodeLines(code.getLiteral(), lines, indent);
         } else if (node instanceof ThematicBreak) {
             lines.add(RenderedLine.normal(
                     Text.literal("---").setStyle(Style.EMPTY.withColor(Formatting.DARK_GRAY)), indent));
         } else {
             // Fallback: try to render children
             renderChildren(node, lines, indent, style);
+        }
+    }
+
+    private static void renderCodeLines(String literal, List<RenderedLine> lines, int indent) {
+        String[] codeLines = literal.split("\n", -1);
+        for (String cl : codeLines) {
+            lines.add(RenderedLine.normal(
+                    Text.literal(cl).setStyle(Style.EMPTY.withColor(Formatting.GRAY)), indent + 8));
         }
     }
 

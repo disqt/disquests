@@ -51,6 +51,16 @@ public class ClientPacketHandler {
         });
     }
 
+    private static void showOrDeferToast(String message) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.currentScreen instanceof MainScreen mainScreen) {
+            mainScreen.refreshListContents();
+            mainScreen.showToast(message);
+        } else {
+            ClientSession.setPendingToast(message);
+        }
+    }
+
     private static void handleHandshake(ByteBufReader r) {
         PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(r);
         ClientSession.joinServer(payload.bluemapUrl(), payload.pendingRequestCount(),
@@ -93,8 +103,7 @@ public class ClientPacketHandler {
         QuestData data = PacketCodec.readUpdateQuest(r);
         Quest quest = Quest.fromNetwork(data);
         final UUID myUuid = ClientSession.getEffectivePlayerUuid();
-        boolean isMine = data.ownerUuid().equals(myUuid) ||
-                data.contributors().stream().anyMatch(c -> c.uuid().equals(myUuid));
+        boolean isMine = quest.isOwner(myUuid) || quest.isContributor(myUuid);
 
         // Detect join: quest is now mine but wasn't previously in my quests
         boolean wasInMyQuests = ClientCache.getMyQuests().stream()
@@ -113,11 +122,9 @@ public class ClientPacketHandler {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.currentScreen instanceof MainScreen mainScreen) {
             mainScreen.refreshListContents();
-            if (justJoined) {
-                mainScreen.showToast("Joined \"" + quest.getTitle() + "\" \u2014 see My Quests");
-            }
-        } else if (justJoined) {
-            ClientSession.setPendingToast("Joined \"" + quest.getTitle() + "\" \u2014 see My Quests");
+        }
+        if (justJoined) {
+            showOrDeferToast("Joined \"" + quest.getTitle() + "\" \u2014 see My Quests");
         }
     }
 
@@ -149,14 +156,7 @@ public class ClientPacketHandler {
             ClientCache.addOrUpdateMyQuest(quest);
             ClientCache.removeFromServerQuests(payload.questId());
 
-            String toastMsg = "Joined \"" + quest.getTitle() + "\" \u2014 see My Quests";
-            MinecraftClient client = MinecraftClient.getInstance();
-            if (client.currentScreen instanceof MainScreen mainScreen) {
-                mainScreen.refreshListContents();
-                mainScreen.showToast(toastMsg);
-            } else {
-                ClientSession.setPendingToast(toastMsg);
-            }
+            showOrDeferToast("Joined \"" + quest.getTitle() + "\" \u2014 see My Quests");
         }
     }
 }

@@ -117,12 +117,10 @@ public class QuestScreen extends DisquestsBaseScreen {
         if (coordsSection != null) applyThemePanel(coordsSection);
 
         UUID myUuid = ClientSession.getEffectivePlayerUuid();
-        this.isOwner = quest.getOwnerUuid().equals(myUuid);
-        this.canEdit = isOwner || quest.getContributors().stream()
-                .anyMatch(c -> c.getUuid().equals(myUuid) && c.canEdit());
-        this.isContributor = quest.getContributors().stream()
-                .anyMatch(c -> c.getUuid().equals(myUuid));
-        this.hideContent = quest.getVisibility() == Visibility.CLOSED && !isOwner && !isContributor;
+        this.isOwner = quest.isOwner(myUuid);
+        this.canEdit = quest.canEdit(myUuid);
+        this.isContributor = quest.isContributor(myUuid);
+        this.hideContent = quest.isContentHidden(myUuid);
 
         if (editing) {
             buildEditMode(root);
@@ -611,33 +609,29 @@ public class QuestScreen extends DisquestsBaseScreen {
         if (contentFieldComponent != null) {
             quest.setContent(contentFieldComponent.getText());
         }
-        if (coordXComponent != null && coordYComponent != null && coordZComponent != null) {
-            try {
-                double x = Double.parseDouble(coordXComponent.getText().trim());
-                double y = Double.parseDouble(coordYComponent.getText().trim());
-                double z = Double.parseDouble(coordZComponent.getText().trim());
-                quest.setCoordinates(new CoordinatesData(x, y, z));
-            } catch (NumberFormatException e) {
-                if (coordXComponent.getText().trim().isEmpty()
-                        && coordYComponent.getText().trim().isEmpty()
-                        && coordZComponent.getText().trim().isEmpty()) {
-                    quest.setCoordinates(null);
-                }
-            }
+        if (coordXComponent != null) {
+            quest.setCoordinates(parseCoordinates(coordXComponent, coordYComponent, coordZComponent));
         }
-        if (coord2XComponent != null && coord2YComponent != null && coord2ZComponent != null) {
-            try {
-                double x2 = Double.parseDouble(coord2XComponent.getText().trim());
-                double y2 = Double.parseDouble(coord2YComponent.getText().trim());
-                double z2 = Double.parseDouble(coord2ZComponent.getText().trim());
-                quest.setCoordinates2(new CoordinatesData(x2, y2, z2));
-            } catch (NumberFormatException e) {
-                if (coord2XComponent.getText().trim().isEmpty()
-                        && coord2YComponent.getText().trim().isEmpty()
-                        && coord2ZComponent.getText().trim().isEmpty()) {
-                    quest.setCoordinates2(null);
-                }
-            }
+        if (coord2XComponent != null) {
+            quest.setCoordinates2(parseCoordinates(coord2XComponent, coord2YComponent, coord2ZComponent));
+        }
+    }
+
+    private CoordinatesData parseCoordinates(TextFieldComponent xComp, TextFieldComponent yComp, TextFieldComponent zComp) {
+        if (xComp == null || yComp == null || zComp == null) return null;
+        String xText = xComp.getText().trim();
+        String yText = yComp.getText().trim();
+        String zText = zComp.getText().trim();
+        if (xText.isEmpty() && yText.isEmpty() && zText.isEmpty()) {
+            return null;
+        }
+        try {
+            return new CoordinatesData(
+                    Double.parseDouble(xText),
+                    Double.parseDouble(yText),
+                    Double.parseDouble(zText));
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 
