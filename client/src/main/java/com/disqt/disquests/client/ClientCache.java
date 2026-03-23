@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class ClientCache {
 
@@ -15,10 +16,10 @@ public class ClientCache {
     private static final CopyOnWriteArrayList<Quest> serverQuests = new CopyOnWriteArrayList<>();
     private static final ConcurrentHashMap<UUID, List<CollaborationRequestData>> pendingRequests = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<UUID, Integer> pendingCounts = new ConcurrentHashMap<>();
-    private static volatile long version = 0;
+    private static final AtomicLong version = new AtomicLong();
 
     /** Incremented on every mutation. UI can poll this to detect changes. */
-    public static long getVersion() { return version; }
+    public static long getVersion() { return version.get(); }
 
     public static List<Quest> getMyQuests() {
         return myQuests;
@@ -31,41 +32,41 @@ public class ClientCache {
     public static void setMyQuests(List<Quest> quests) {
         myQuests.clear();
         myQuests.addAll(quests);
-        version++;
+        version.incrementAndGet();
     }
 
     public static void setServerQuests(List<Quest> quests) {
         serverQuests.clear();
         serverQuests.addAll(quests);
-        version++;
+        version.incrementAndGet();
     }
 
     public static void addOrUpdateMyQuest(Quest quest) {
         myQuests.removeIf(q -> q.getId().equals(quest.getId()));
         myQuests.add(quest);
-        version++;
+        version.incrementAndGet();
     }
 
     public static void addOrUpdateServerQuest(Quest quest) {
         serverQuests.removeIf(q -> q.getId().equals(quest.getId()));
         serverQuests.add(quest);
-        version++;
+        version.incrementAndGet();
     }
 
     public static void removeQuestById(UUID id) {
         myQuests.removeIf(q -> q.getId().equals(id));
         serverQuests.removeIf(q -> q.getId().equals(id));
-        version++;
+        version.incrementAndGet();
     }
 
     public static void removeFromServerQuests(UUID id) {
         serverQuests.removeIf(q -> q.getId().equals(id));
-        version++;
+        version.incrementAndGet();
     }
 
     public static void removeFromMyQuests(UUID id) {
         myQuests.removeIf(q -> q.getId().equals(id));
-        version++;
+        version.incrementAndGet();
     }
 
     public static Quest getQuestById(UUID id) {
@@ -117,6 +118,6 @@ public class ClientCache {
         serverQuests.clear();
         pendingRequests.clear();
         pendingCounts.clear();
-        version++;
+        version.incrementAndGet();
     }
 }

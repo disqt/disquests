@@ -1,12 +1,12 @@
 package com.disqt.disquests.client;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ClientSession {
 
@@ -21,8 +21,8 @@ public class ClientSession {
     private static boolean onServer = false;
     private static String bluemapUrl = null;
     private static int pendingRequestCount = 0;
-    private static final List<UUID> pinnedQuestIds = new ArrayList<>();
-    private static final Set<UUID> requestedQuestIds = new HashSet<>();
+    private static final List<UUID> pinnedQuestIds = new CopyOnWriteArrayList<>();
+    private static final Set<UUID> requestedQuestIds = ConcurrentHashMap.newKeySet();
     private static UUID playerUuid = null;
     private static Map<String, String> bluemapMapNames = Map.of();
 

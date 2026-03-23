@@ -7,7 +7,6 @@ import com.disqt.disquests.client.markdown.RenderedLine;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.MutableText;
 import net.minecraft.text.OrderedText;
 
 import java.util.ArrayList;

@@ -9,7 +9,6 @@ import com.disqt.disquests.client.gui.helper.Theme;
 import com.disqt.disquests.client.hud.HudPinManager;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.common.model.CoordinatesData;
-import com.disqt.disquests.common.model.Visibility;
 import io.wispforest.owo.ui.base.BaseUIComponent;
 import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.Sizing;

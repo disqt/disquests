@@ -1,7 +1,6 @@
 package com.disqt.disquests.client.gui.screen;
 
 import com.disqt.disquests.client.gui.helper.DisquestsConfig;
-import com.disqt.disquests.client.gui.helper.Theme;
 import io.wispforest.owo.ui.base.BaseUIModelScreen;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.ParentUIComponent;
