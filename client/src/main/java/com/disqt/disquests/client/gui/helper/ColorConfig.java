@@ -1,18 +1,18 @@
 package com.disqt.disquests.client.gui.helper;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -21,7 +21,6 @@ import java.util.regex.Pattern;
 public class ColorConfig {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("Disquests");
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Pattern RGBA_PATTERN = Pattern.compile("rgba\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*([0-9.]+)\\s*\\)");
     private static final Pattern RGB_PATTERN = Pattern.compile("rgb\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*\\)");
     private static final Path CONFIG_PATH = FabricLoader.getInstance().getConfigDir().resolve("disquests/colors.json");
@@ -30,8 +29,8 @@ public class ColorConfig {
         try {
             File configFile = CONFIG_PATH.toFile();
             if (configFile.exists()) {
-                try (FileReader reader = new FileReader(configFile)) {
-                    Map<String, String> colorMap = GSON.fromJson(reader, new TypeToken<Map<String, String>>(){}.getType());
+                try (BufferedReader reader = Files.newBufferedReader(configFile.toPath(), StandardCharsets.UTF_8)) {
+                    Map<String, String> colorMap = DisquestsConfig.GSON.fromJson(reader, new TypeToken<Map<String, String>>(){}.getType());
                     if (colorMap != null) {
                         applyColors(colorMap);
                     }
@@ -71,8 +70,8 @@ public class ColorConfig {
         try {
             File configFile = CONFIG_PATH.toFile();
             configFile.getParentFile().mkdirs();
-            try (FileWriter writer = new FileWriter(configFile)) {
-                GSON.toJson(Colors.getColorsAsMap(), writer);
+            try (BufferedWriter writer = Files.newBufferedWriter(configFile.toPath(), StandardCharsets.UTF_8)) {
+                DisquestsConfig.GSON.toJson(Colors.getColorsAsMap(), writer);
             }
         } catch (IOException e) {
             LOGGER.error("Error saving default color config", e);

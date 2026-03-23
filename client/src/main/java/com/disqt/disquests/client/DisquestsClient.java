@@ -6,7 +6,6 @@ import com.disqt.disquests.client.gui.helper.DisquestsConfig;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.hud.HudPinRenderer;
 import com.disqt.disquests.client.network.ClientPacketHandler;
-import com.disqt.disquests.client.network.PacketSender;
 import com.disqt.disquests.client.network.RawPayload;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;

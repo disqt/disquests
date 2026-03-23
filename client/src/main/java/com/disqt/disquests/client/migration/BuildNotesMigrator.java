@@ -37,8 +37,9 @@ public class BuildNotesMigrator {
     private static final long MAX_FILE_SIZE = 64 * 1024; // 64KB
 
     private static void migrateFile(Path file) throws IOException {
-        if (Files.size(file) > MAX_FILE_SIZE) {
-            LOGGER.warn("Skipping oversized BuildNotes file: {} ({} bytes)", file.getFileName(), Files.size(file));
+        long fileSize = Files.size(file);
+        if (fileSize > MAX_FILE_SIZE) {
+            LOGGER.warn("Skipping oversized BuildNotes file: {} ({} bytes)", file.getFileName(), fileSize);
             return;
         }
         String content = Files.readString(file);
