@@ -52,13 +52,25 @@ UX-driven journey tests in `client/src/testmod/java/com/disqt/disquests/test/int
 ./gradlew :client:jacocoIntegrationTestReport                                 # generate HTML report
 ```
 
+**Quick iteration** -- when debugging a known failure, run the minimal subset:
+```bash
+./gradlew :client:runDuoTests                                                 # duo tests only (two-player)
+./gradlew :client:runSoloTests                                                # solo tests only
+./gradlew :client:runDuoTests -PtestFilter=TwoPlayerJourneys                  # specific test class
+```
+
+**CI status:** The `e2e-test.yml` workflow has never passed on CI (Paper server setup issue). E2E tests only run locally.
+
 Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with GLFW physical input via `TestInput`. All tests connect to a live Paper server -- no mocking.
 
-- **`UIActions`** -- click, type, undo/redo, waitForScreen, openMainScreen, etc.
+- **`UIActions`** -- click, type, undo/redo, waitForScreen, openMainScreen, findComponent, waitForQuestCondition, etc.
 - **`UIAssertions`** -- assertLabelText, assertButtonText, assertEntryCount, assertScreenIs, etc.
+- **`seconds(N)`** -- converts seconds to game ticks (20 ticks/sec). Use instead of `N * 20`.
+- **`CONNECT_TIMEOUT`** (30s) for server connection, **`TIMEOUT`** (10s) for UI operations.
 - **Trust hierarchy:** UI state > component state > debug logs > cache state
 - **Two-player journeys** use `PhaseSync.signal()`/`waitFor()` for coordination
 - **`AbortOnFailureExtension`** skips remaining steps if a prior step fails
+- **Verify testmod compilation** with `:client:compileTestmodJava`, not `:client:classes` (separate classpath)
 
 ## Networking Protocol
 
@@ -121,6 +133,10 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **XML comments cannot contain `--`** — causes `SAXParseException`. Use commas instead.
 - **Fire-and-forget C2S race** — `PacketSender.pinQuest()`, `respondCollaboration()` etc. have no server acknowledgment. Add `waitTicks(40)` before disconnect/re-sync if the server must process the packet first. UI code using optimistic cache updates (e.g. `ContributorScreen.respondToRequest` calls `removePendingRequest` locally) must be replicated in tests.
 - **`ClientCache.getQuestById` searches both lists** — returns quests from myQuests AND serverQuests. After leaving an OPEN quest, it's removed from myQuests but still in serverQuests. Use `getMyQuests().stream()` to check membership specifically.
+- **Logger names use `.` not `/`** — `LoggerFactory.getLogger("Disquests.MainScreen")` not `"Disquests/MainScreen"`. Log4j2 uses `.` for hierarchy; `/` creates flat names that don't inherit parent logger config (e.g. test log4j2-test.xml).
+- **owo-ui `doubled` flag is screen-level** — The `boolean doubled` in `onMouseDown(Click, boolean)` comes from vanilla Minecraft's `Screen` class, not per-component. Clicking two different components quickly registers as a double-click. Components that care must track their own state (see `QuestEntryComponent`).
+- **`ClientCache.clear()` doesn't bump version** — Only `setMyQuests`/`setServerQuests`/`addOrUpdate`/`remove` methods increment the version counter.
+- **`javax.annotation` not on testmod classpath** — Don't use `@Nullable` etc. in testmod code. JUnit is also unresolvable in IDE (cosmetic, compiles fine via Gradle).
 
 ## Deploy
 
