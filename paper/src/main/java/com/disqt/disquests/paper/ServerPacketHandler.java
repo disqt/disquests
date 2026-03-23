@@ -7,13 +7,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.messaging.PluginMessageListener;
 
 import java.util.*;
 
 public class ServerPacketHandler implements PluginMessageListener, Listener {
-    private static final String CHANNEL = "disquests:main";
     private static final int MAX_TITLE_LENGTH = 256;
     private static final int MAX_CONTENT_LENGTH = 65536;
     private static final int MAX_MAP_LENGTH = 256;
@@ -31,7 +29,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
 
     @Override
     public void onPluginMessageReceived(String channel, Player player, byte[] data) {
-        if (!CHANNEL.equals(channel)) return;
+        if (!DisquestsPlugin.CHANNEL.equals(channel)) return;
         try {
             ByteBufReader buf = new ByteBufReader(data);
             PacketType type = PacketType.fromId(buf.readByte());
@@ -66,11 +64,6 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
             if (!isModPlayer(player)) return;
             sendHandshake(player);
         }, 40L);
-    }
-
-    @EventHandler
-    public void onPlayerQuit(PlayerQuitEvent event) {
-        // No cleanup needed currently
     }
 
     // --- Packet Handlers ---
@@ -364,11 +357,11 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
     }
 
     private void sendPacket(Player player, byte[] data) {
-        player.sendPluginMessage(plugin, CHANNEL, data);
+        player.sendPluginMessage(plugin, DisquestsPlugin.CHANNEL, data);
     }
 
     private boolean isModPlayer(Player player) {
-        return player.getListeningPluginChannels().contains(CHANNEL);
+        return player.getListeningPluginChannels().contains(DisquestsPlugin.CHANNEL);
     }
 
     private List<Player> getModPlayers() {

@@ -462,11 +462,6 @@ public class MainScreen extends DisquestsBaseScreen {
         toast.render(context, this.textRenderer, this.width, this.height - 40);
     }
 
-    @Override
-    public boolean shouldPause() {
-        return false;
-    }
-
     // --- HELPERS ---
 
     private static int hsbToRgb(float hue, float saturation, float brightness) {

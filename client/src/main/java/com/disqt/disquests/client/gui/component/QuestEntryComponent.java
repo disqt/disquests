@@ -59,6 +59,9 @@ public class QuestEntryComponent extends BaseUIComponent {
     private final String cachedLocationString;
     private final int cachedLocationWidth;
 
+    // Cached "Last Modified: ..." string (fix 9)
+    private final String cachedLastModifiedText;
+
     // Cached truncated content (fix 5) — depends on width known at draw time
     private Text cachedContentText;
     private int cachedContentWidth = -1;
@@ -106,6 +109,7 @@ public class QuestEntryComponent extends BaseUIComponent {
                 Instant.ofEpochSecond(quest.getLastModified()), ZoneId.systemDefault()
         );
         this.formattedDateTime = dateTime.format(DATE_TIME_FORMATTER);
+        this.cachedLastModifiedText = "Last Modified: " + formattedDateTime;
 
         // Cache visibility text + width (fix 1)
         Text visText = null;
@@ -146,13 +150,15 @@ public class QuestEntryComponent extends BaseUIComponent {
                 quest.getVisibility(), ClientSession.isPinned(quest.getId()));
 
         // Debug: subscribe to owo-ui event streams for dispatch tracing
-        this.mouseDown().subscribe((click, doubled) -> {
-            LOGGER.debug("[EVENT mouseDown] quest={}, click=({}, {}), doubled={}", quest.getTitle(), click.x(), click.y(), doubled);
-            return false; // don't consume -- let onMouseDown handle it
-        });
-        this.mouseEnter().subscribe(() -> {
-            LOGGER.debug("[EVENT mouseEnter] quest={}", quest.getTitle());
-        });
+        if (LOGGER.isDebugEnabled()) {
+            this.mouseDown().subscribe((click, doubled) -> {
+                LOGGER.debug("[EVENT mouseDown] quest={}, click=({}, {}), doubled={}", quest.getTitle(), click.x(), click.y(), doubled);
+                return false;
+            });
+            this.mouseEnter().subscribe(() -> {
+                LOGGER.debug("[EVENT mouseEnter] quest={}", quest.getTitle());
+            });
+        }
     }
 
     // --- Fluent setters ---
@@ -300,7 +306,7 @@ public class QuestEntryComponent extends BaseUIComponent {
         }
 
         // --- Row 3: Last modified + location / requested ---
-        context.drawText(textRenderer, "Last Modified: " + formattedDateTime,
+        context.drawText(textRenderer, cachedLastModifiedText,
                 entryX + 4, entryY + 24, Colors.TEXT_MUTED, false);
 
         if (ClientSession.isRequested(quest.getId())) {

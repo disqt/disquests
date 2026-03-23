@@ -117,5 +117,6 @@ public class ClientCache {
         serverQuests.clear();
         pendingRequests.clear();
         pendingCounts.clear();
+        version++;
     }
 }

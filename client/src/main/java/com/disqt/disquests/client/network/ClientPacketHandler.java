@@ -20,12 +20,15 @@ import java.util.UUID;
 
 public class ClientPacketHandler {
 
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger("Disquests.ClientPacketHandler");
+
     public static void handleRawPayload(RawPayload payload, ClientPlayNetworking.Context context) {
         ByteBufReader r = new ByteBufReader(payload.data());
         PacketType type;
         try {
             type = PacketCodec.readType(r);
         } catch (Exception e) {
+            LOGGER.warn("Failed to read packet type", e);
             return;
         }
 
@@ -43,8 +46,7 @@ public class ClientPacketHandler {
                     default -> {}
                 }
             } catch (Exception e) {
-                org.slf4j.LoggerFactory.getLogger("Disquests")
-                    .warn("Failed to handle S2C packet {}", type, e);
+                LOGGER.warn("Failed to handle S2C packet {}", type, e);
             }
         });
     }

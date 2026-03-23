@@ -438,25 +438,21 @@ public class QuestScreen extends DisquestsBaseScreen {
         persistFieldValues();
         String origTitle = quest.getTitle() != null ? quest.getTitle() : "";
         String origContent = quest.getContent() != null ? quest.getContent() : "";
-        if (this.client != null) {
-            this.client.setScreen(new QuestScreen(this.parent, quest, true, isNewQuest, origTitle, origContent));
-        }
+        navigateToScreen(new QuestScreen(this.parent, quest, true, isNewQuest, origTitle, origContent));
     }
 
     private void cancelEdit() {
         if (isDirty()) {
-            if (this.client != null) {
-                this.client.setScreen(new ConfirmScreen(this,
-                        Text.literal("Discard unsaved changes?"),
-                        () -> {
-                            quest.setTitle(originalTitle);
-                            quest.setContent(originalContent);
-                            exitToViewMode();
-                        },
-                        () -> {
-                            if (this.client != null) this.client.setScreen(this);
-                        }));
-            }
+            navigateToScreen(new ConfirmScreen(this,
+                    Text.literal("Discard unsaved changes?"),
+                    () -> {
+                        quest.setTitle(originalTitle);
+                        quest.setContent(originalContent);
+                        exitToViewMode();
+                    },
+                    () -> {
+                        navigateToScreen(this);
+                    }));
         } else {
             exitToViewMode();
         }
@@ -464,11 +460,9 @@ public class QuestScreen extends DisquestsBaseScreen {
 
     private void exitToViewMode() {
         if (isNewQuest) {
-            if (this.client != null) this.client.setScreen(this.parent);
+            navigateToScreen(this.parent);
         } else {
-            if (this.client != null) {
-                this.client.setScreen(new QuestScreen(this.parent, quest));
-            }
+            navigateToScreen(new QuestScreen(this.parent, quest));
         }
     }
 
@@ -483,55 +477,49 @@ public class QuestScreen extends DisquestsBaseScreen {
             PacketSender.updateVisibility(quest.getId(), quest.getVisibility());
         }
 
-        if (this.client != null) {
-            this.client.setScreen(new QuestScreen(this.parent, quest));
-        }
+        navigateToScreen(new QuestScreen(this.parent, quest));
     }
 
     // ===================== VIEW MODE ACTIONS =====================
 
     private void confirmDelete() {
-        if (this.client != null) {
-            this.client.setScreen(new ConfirmScreen(this,
-                    Text.literal("Delete quest \"" + quest.getTitle() + "\"?"),
-                    () -> {
-                        ClientCache.removeQuestById(quest.getId());
-                        PacketSender.deleteQuest(quest.getId());
-                        if (this.client != null) this.client.setScreen(this.parent);
-                    },
-                    () -> {
-                        if (this.client != null) this.client.setScreen(this);
-                    }));
-        }
+        navigateToScreen(new ConfirmScreen(this,
+                Text.literal("Delete quest \"" + quest.getTitle() + "\"?"),
+                () -> {
+                    ClientCache.removeQuestById(quest.getId());
+                    PacketSender.deleteQuest(quest.getId());
+                    navigateToScreen(this.parent);
+                },
+                () -> {
+                    navigateToScreen(this);
+                }));
     }
 
     private void leaveQuest() {
-        if (this.client != null) {
-            this.client.setScreen(new ConfirmScreen(this,
-                    Text.literal("Leave this quest? You'll lose contributor access."),
-                    () -> {
-                        ClientCache.removeFromMyQuests(quest.getId());
-                        PacketSender.leaveQuest(quest.getId());
-                        ClientSession.setPendingToast("Left \"" + quest.getTitle() + "\"");
-                        if (this.client != null) this.client.setScreen(this.parent);
-                    },
-                    () -> {
-                        if (this.client != null) this.client.setScreen(this);
-                    }));
-        }
+        navigateToScreen(new ConfirmScreen(this,
+                Text.literal("Leave this quest? You'll lose contributor access."),
+                () -> {
+                    ClientCache.removeFromMyQuests(quest.getId());
+                    PacketSender.leaveQuest(quest.getId());
+                    ClientSession.setPendingToast("Left \"" + quest.getTitle() + "\"");
+                    navigateToScreen(this.parent);
+                },
+                () -> {
+                    navigateToScreen(this);
+                }));
     }
 
     private void joinQuest() {
         PacketSender.joinQuest(quest.getId());
         ClientSession.setPendingToast("Joined \"" + quest.getTitle() + "\"");
-        if (this.client != null) this.client.setScreen(this.parent);
+        navigateToScreen(this.parent);
     }
 
     private void requestAccess() {
         PacketSender.requestCollaboration(quest.getId());
         ClientSession.markRequested(quest.getId());
         ClientSession.setPendingToast("Request sent to " + quest.getOwnerName());
-        if (this.client != null) this.client.setScreen(this.parent);
+        navigateToScreen(this.parent);
     }
 
     // ===================== EDIT MODE ACTIONS =====================
@@ -606,16 +594,12 @@ public class QuestScreen extends DisquestsBaseScreen {
 
     private void openContributors() {
         persistFieldValues();
-        if (this.client != null) {
-            this.client.setScreen(new ContributorScreen(this, quest));
-        }
+        navigateToScreen(new ContributorScreen(this, quest));
     }
 
     private void rebuildEditMode() {
-        if (this.client != null) {
-            this.client.setScreen(new QuestScreen(this.parent, quest, true, isNewQuest,
-                    originalTitle, originalContent));
-        }
+        navigateToScreen(new QuestScreen(this.parent, quest, true, isNewQuest,
+                originalTitle, originalContent));
     }
 
     // ===================== HELPERS =====================
@@ -711,8 +695,4 @@ public class QuestScreen extends DisquestsBaseScreen {
         }
     }
 
-    @Override
-    public boolean shouldPause() {
-        return false;
-    }
 }

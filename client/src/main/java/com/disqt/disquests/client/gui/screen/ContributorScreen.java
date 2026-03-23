@@ -135,11 +135,6 @@ public class ContributorScreen extends DisquestsBaseScreen {
                 .onPress(b -> this.close());
     }
 
-    @Override
-    public boolean shouldPause() {
-        return false;
-    }
-
     // --- Actions ---
 
     private void respondToRequest(UUID questId, UUID requestId, boolean accept) {
@@ -168,30 +163,22 @@ public class ContributorScreen extends DisquestsBaseScreen {
         if (index < 0 || index >= quest.getContributors().size()) return;
         Contributor contrib = quest.getContributors().get(index);
 
-        if (this.client != null) {
-            this.client.setScreen(new ConfirmScreen(this,
-                    Text.literal("Remove " + contrib.getName() + " from contributors?"),
-                    () -> {
-                        PacketSender.updateContributors(quest.getId(), List.of(
-                                new PacketCodec.ContributorOpEntry(ContributorOp.REMOVE, contrib.getUuid(), contrib.getName(), false)
-                        ));
-                        quest.getContributors().remove(index);
-                        if (this.client != null) {
-                            this.client.setScreen(this);
-                        }
-                    },
-                    () -> {
-                        if (this.client != null) {
-                            this.client.setScreen(this);
-                        }
-                    }));
-        }
+        navigateToScreen(new ConfirmScreen(this,
+                Text.literal("Remove " + contrib.getName() + " from contributors?"),
+                () -> {
+                    PacketSender.updateContributors(quest.getId(), List.of(
+                            new PacketCodec.ContributorOpEntry(ContributorOp.REMOVE, contrib.getUuid(), contrib.getName(), false)
+                    ));
+                    quest.getContributors().remove(index);
+                    navigateToScreen(this);
+                },
+                () -> {
+                    navigateToScreen(this);
+                }));
     }
 
     private void rebuildUi() {
         // Re-open this screen to rebuild the component tree
-        if (this.client != null) {
-            this.client.setScreen(new ContributorScreen(this.parent, this.quest));
-        }
+        navigateToScreen(new ContributorScreen(this.parent, this.quest));
     }
 }

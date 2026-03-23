@@ -72,4 +72,15 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     public FlowLayout getRootComponent() {
         return this.uiAdapter != null ? this.uiAdapter.rootComponent : null;
     }
+
+    @Override
+    public boolean shouldPause() {
+        return false;
+    }
+
+    protected void navigateToScreen(Screen screen) {
+        if (this.client != null) {
+            this.client.setScreen(screen);
+        }
+    }
 }
