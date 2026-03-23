@@ -149,12 +149,9 @@ class DirtyDetectionJourney {
 
         and("player makes no changes and clicks Cancel");
             click(context, "btn-cancel");
-            context.waitTicks(4);
 
         then("no ConfirmScreen appears -- goes directly back to view mode");
-            boolean noConfirmScreen = context.computeOnClient(c ->
-                !(c.currentScreen instanceof ConfirmScreen));
-            assertTrue(noConfirmScreen, "ConfirmScreen should NOT appear when no changes were made");
+            context.waitFor(client -> !(client.currentScreen instanceof ConfirmScreen), TIMEOUT);
 
         and("QuestScreen shows in view mode");
             assertScreenIs(context, QuestScreen.class);

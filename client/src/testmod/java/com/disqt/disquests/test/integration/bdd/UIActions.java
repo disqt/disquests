@@ -108,12 +108,13 @@ public final class UIActions {
             if (c.currentScreen != null) c.setScreen(null);
         });
 
-        // Wait for server re-handshake + fresh sync
-        context.waitTicks(40);
+        // Request sync and wait for cache to update (version bumps when SYNC packets arrive)
+        // Request sync and wait for cache to update (SYNC packets bump version)
+        long versionBefore = context.computeOnClient(c -> ClientCache.getVersion());
         context.runOnClient(c -> {
             com.disqt.disquests.client.network.PacketSender.requestSync();
         });
-        context.waitTicks(20);
+        context.waitFor(client -> ClientCache.getVersion() != versionBefore, TIMEOUT);
     }
 
     // --- Connection ---
