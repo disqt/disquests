@@ -102,11 +102,8 @@ class TwoPlayerJourneys {
             PhaseSync.waitFor("collab-request-sent", context);
 
         and("PlayerA waits for pending request to arrive");
-            context.waitFor(client -> ClientCache.getPendingCount(
-                ClientCache.getMyQuests().stream()
-                    .filter(q -> "Collab Quest".equals(q.getTitle()))
-                    .findFirst().map(q -> q.getId()).orElse(null)) > 0,
-                TIMEOUT);
+            waitForQuestCondition(context, "Collab Quest", true,
+                q -> ClientCache.getPendingCount(q.getId()) > 0);
 
         and("PlayerA opens MainScreen and selects the quest");
             openMainScreen(context);
@@ -167,13 +164,8 @@ class TwoPlayerJourneys {
 
         then("PlayerB appears in the contributor list");
             // Wait for server to process accept and send back updated quest with contributor
-            context.waitFor(client ->
-                ClientCache.getMyQuests().stream()
-                    .filter(q -> "Collab Quest".equals(q.getTitle()))
-                    .findFirst()
-                    .map(q -> !q.getContributors().isEmpty())
-                    .orElse(false),
-                TIMEOUT);
+            waitForQuestCondition(context, "Collab Quest", true,
+                q -> !q.getContributors().isEmpty());
 
         and("PlayerA reopens ContributorScreen with updated data");
             // ContributorScreen doesn't auto-refresh, so reopen it via quest edit mode
@@ -273,13 +265,8 @@ class TwoPlayerJourneys {
 
         then("contributor list is empty");
             // Wait for server to process removal
-            context.waitFor(client ->
-                ClientCache.getMyQuests().stream()
-                    .filter(q -> "Collab Quest".equals(q.getTitle()))
-                    .findFirst()
-                    .map(q -> q.getContributors().isEmpty())
-                    .orElse(false),
-                TIMEOUT);
+            waitForQuestCondition(context, "Collab Quest", true,
+                q -> q.getContributors().isEmpty());
     }
 
     // =========================================================================

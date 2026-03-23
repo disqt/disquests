@@ -351,6 +351,22 @@ public final class UIActions {
     }
 
     /**
+     * Wait for a quest matching title to satisfy a condition in the cache.
+     * @param myQuests true = search myQuests, false = search serverQuests
+     */
+    public static void waitForQuestCondition(
+            ClientGameTestContext context, String title, boolean myQuests, java.util.function.Predicate<Quest> condition) {
+        context.waitFor(client -> {
+            var list = myQuests ? ClientCache.getMyQuests() : ClientCache.getServerQuests();
+            return list.stream()
+                .filter(q -> title.equals(q.getTitle()))
+                .findFirst()
+                .map(condition::test)
+                .orElse(false);
+        }, TIMEOUT);
+    }
+
+    /**
      * Wait for a quest to be removed from myQuests.
      */
     public static void waitForQuestRemoved(ClientGameTestContext context, UUID questId) {
