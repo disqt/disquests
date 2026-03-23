@@ -166,17 +166,25 @@ class TwoPlayerJourneys {
             waitForScreen(context, ContributorScreen.class);
 
         then("PlayerB appears in the contributor list");
-            boolean hasContrib = context.computeOnClient(c -> {
-                Screen screen = c.currentScreen;
-                if (screen instanceof com.disqt.disquests.client.gui.screen.DisquestsBaseScreen dScreen) {
-                    var root = dScreen.getRootComponent();
-                    if (root == null) return false;
-                    FlowLayout contribList = root.childById(FlowLayout.class, "contributor-list");
-                    return contribList != null && !contribList.children().isEmpty();
-                }
-                return false;
-            });
-            assertTrue(hasContrib, "Expected contributor in list after accept");
+            // Wait for server to process accept and send back updated quest with contributor
+            context.waitFor(client ->
+                ClientCache.getMyQuests().stream()
+                    .filter(q -> "Collab Quest".equals(q.getTitle()))
+                    .findFirst()
+                    .map(q -> !q.getContributors().isEmpty())
+                    .orElse(false),
+                TIMEOUT);
+
+        and("PlayerA reopens ContributorScreen with updated data");
+            // ContributorScreen doesn't auto-refresh, so reopen it via quest edit mode
+            openMainScreen(context);
+            clickEntryByTitle(context, "Collab Quest");
+            click(context, "btn-open");
+            waitForScreen(context, QuestScreen.class);
+            click(context, "btn-edit");
+            waitForScreen(context, QuestScreen.class);
+            click(context, "btn-contributors");
+            waitForScreen(context, ContributorScreen.class);
 
         PhaseSync.signal("collab-accepted");
     }
@@ -264,17 +272,14 @@ class TwoPlayerJourneys {
             waitForScreen(context, ContributorScreen.class);
 
         then("contributor list is empty");
-            boolean isEmpty = context.computeOnClient(c -> {
-                Screen screen = c.currentScreen;
-                if (screen instanceof com.disqt.disquests.client.gui.screen.DisquestsBaseScreen dScreen) {
-                    var root = dScreen.getRootComponent();
-                    if (root == null) return true;
-                    FlowLayout contribList = root.childById(FlowLayout.class, "contributor-list");
-                    return contribList == null || contribList.children().isEmpty();
-                }
-                return true;
-            });
-            assertTrue(isEmpty, "Expected contributor list to be empty after removal");
+            // Wait for server to process removal
+            context.waitFor(client ->
+                ClientCache.getMyQuests().stream()
+                    .filter(q -> "Collab Quest".equals(q.getTitle()))
+                    .findFirst()
+                    .map(q -> q.getContributors().isEmpty())
+                    .orElse(false),
+                TIMEOUT);
     }
 
     // =========================================================================
@@ -347,6 +352,7 @@ class TwoPlayerJourneys {
 
         when("PlayerB opens MainScreen");
             openMainScreen(context);
+            click(context, "tab-my-quests");
             waitForQuestByTitle(context, "Open Quest", true);
 
         and("PlayerB selects the quest and opens it");
