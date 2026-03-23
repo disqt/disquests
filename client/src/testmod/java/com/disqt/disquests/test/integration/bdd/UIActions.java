@@ -60,7 +60,6 @@ public final class UIActions {
     /**
      * Find a component by ID, returning null if not found.
      */
-    @javax.annotation.Nullable
     public static <T extends UIComponent> T findComponentOrNull(ClientGameTestContext context, Class<T> type, String id) {
         return context.computeOnClient(c -> {
             if (c.currentScreen instanceof DisquestsBaseScreen dScreen) {
