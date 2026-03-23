@@ -275,14 +275,14 @@ fun ensureServer(serverDir: File, logger: org.gradle.api.logging.Logger, pluginJ
         val startupDeadline = System.currentTimeMillis() + 120_000L
         while (System.currentTimeMillis() < startupDeadline) {
             try {
-                java.net.Socket("localhost", serverPort).close()
+                Socket("localhost", serverPort).close()
                 break
             } catch (e: Exception) {
                 Thread.sleep(1000)
             }
         }
         try {
-            java.net.Socket("localhost", serverPort).close()
+            Socket("localhost", serverPort).close()
         } catch (e: Exception) {
             throw RuntimeException("Paper server not accepting connections on port $serverPort after 120s")
         }
