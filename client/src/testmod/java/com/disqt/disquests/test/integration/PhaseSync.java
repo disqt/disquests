@@ -64,14 +64,13 @@ public class PhaseSync {
      */
     public static void waitFor(String phaseName, ClientGameTestContext context) {
         Path marker = SYNC_DIR.resolve(phaseName + ".done");
-        // Use longer timeout for phase sync (120s) since other client may be booting
         context.waitFor(client -> {
             String error = checkOtherClientError();
             if (error != null) {
                 throw new AssertionError("Other client failed while waiting for '" + phaseName + "': " + error);
             }
             return Files.exists(marker);
-        }, 120 * 20);
+        }, 15 * 20);
     }
 
     private static String checkOtherClientError() {

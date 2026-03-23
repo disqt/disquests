@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
  */
 public class DebugScreenEvents {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger("Disquests/ScreenEvents");
+    private static final Logger LOGGER = LoggerFactory.getLogger("Disquests.ScreenEvents");
 
     public static void register() {
         ScreenEvents.AFTER_INIT.register((client, screen, width, height) -> {

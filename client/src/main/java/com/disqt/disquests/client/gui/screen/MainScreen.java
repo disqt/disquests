@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
 
 public class MainScreen extends DisquestsBaseScreen {
 
-    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger("Disquests/MainScreen");
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger("Disquests.MainScreen");
 
     // Tabs
     private static final int TAB_MY_QUESTS = 0;
@@ -236,6 +236,8 @@ public class MainScreen extends DisquestsBaseScreen {
             return;
         }
 
+        UUID previousSelectedId = selectedEntry != null ? selectedEntry.getQuest().getId() : null;
+        LOGGER.debug("refreshListContents: previousSelectedId={}", previousSelectedId);
         questList.clearChildren();
         selectedEntry = null;
 
@@ -288,6 +290,10 @@ public class MainScreen extends DisquestsBaseScreen {
             entry.onDoubleClick(e -> openSelected());
             entry.onPinToggle(e -> refreshAfterPinToggle());
             questList.child(entry);
+            if (previousSelectedId != null && quest.getId().equals(previousSelectedId)) {
+                entry.selected(true);
+                selectedEntry = entry;
+            }
         }
         LOGGER.debug("refreshListContents: added {} entries to questList", questList.children().size());
 
@@ -382,6 +388,10 @@ public class MainScreen extends DisquestsBaseScreen {
 
     private void requestAccess() {
         Quest sel = getSelectedQuest();
+        LOGGER.debug("requestAccess: sel={}, visibility={}, btnActive={}",
+            sel != null ? sel.getTitle() : "null",
+            sel != null ? sel.getVisibility() : "n/a",
+            btnRequest.active());
         if (sel != null && sel.getVisibility() == Visibility.CLOSED) {
             PacketSender.requestCollaboration(sel.getId());
             ClientSession.markRequested(sel.getId());

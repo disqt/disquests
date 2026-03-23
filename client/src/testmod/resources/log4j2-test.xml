@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration>
+	<Loggers>
+		<Logger name="Disquests" level="debug" additivity="false">
+			<AppenderRef ref="SysOut" level="debug"/>
+			<AppenderRef ref="LatestFile" level="debug"/>
+			<AppenderRef ref="DebugFile" level="debug"/>
+		</Logger>
+	</Loggers>
+</Configuration>

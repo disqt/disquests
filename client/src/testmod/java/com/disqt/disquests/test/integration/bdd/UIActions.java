@@ -25,8 +25,9 @@ import java.util.UUID;
  * Never call screen methods directly -- always go through the real input pipeline.
  */
 public final class UIActions {
-    private static final Logger LOG = LoggerFactory.getLogger("Disquests/E2E");
-    public static final int TIMEOUT = 30 * 20; // 30 seconds in ticks
+    private static final Logger LOG = LoggerFactory.getLogger("Disquests.E2E");
+    public static final int CONNECT_TIMEOUT = 30 * 20; // 30 seconds in ticks
+    public static final int TIMEOUT = 10 * 20; // 10 seconds in ticks
 
     private UIActions() {}
 
@@ -74,9 +75,9 @@ public final class UIActions {
         });
 
         // Wait for player entity
-        context.waitFor(client -> client.player != null, TIMEOUT);
+        context.waitFor(client -> client.player != null, CONNECT_TIMEOUT);
         // Wait for Disquests handshake
-        context.waitFor(client -> ClientSession.isOnServer(), TIMEOUT);
+        context.waitFor(client -> ClientSession.isOnServer(), CONNECT_TIMEOUT);
         context.waitTicks(10);
     }
 

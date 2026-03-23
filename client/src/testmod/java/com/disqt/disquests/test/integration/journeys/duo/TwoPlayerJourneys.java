@@ -40,7 +40,7 @@ class TwoPlayerJourneys {
     @DisplayName("Collab: A creates CLOSED quest")
     void collab_a_creates_closed_quest(ClientGameTestContext context) {
         given("PlayerA is connected to the server");
-        context.waitFor(client -> ClientSession.isOnServer(), TIMEOUT);
+        context.waitFor(client -> ClientSession.isOnServer(), CONNECT_TIMEOUT);
 
         when("PlayerA opens MainScreen and creates a new quest");
             openMainScreen(context);
@@ -73,7 +73,7 @@ class TwoPlayerJourneys {
     @DisplayName("Collab: B finds quest on board and sends request")
     void collab_b_finds_and_requests(ClientGameTestContext context) {
         given("PlayerB is connected to the server");
-        context.waitFor(client -> ClientSession.isOnServer(), TIMEOUT);
+        context.waitFor(client -> ClientSession.isOnServer(), CONNECT_TIMEOUT);
 
         when("PlayerB waits for quest to be created");
             PhaseSync.waitFor("collab-quest-created", context);
@@ -119,7 +119,7 @@ class TwoPlayerJourneys {
             waitForScreen(context, QuestScreen.class);
 
         then("contributors button shows pending count");
-            assertButtonText(context, "btn-contributors", "pending");
+            assertButtonText(context, "btn-contributors", "+ 1");
 
         when("PlayerA clicks Contributors");
             click(context, "btn-contributors");
@@ -285,7 +285,7 @@ class TwoPlayerJourneys {
     @DisplayName("Open: A creates OPEN quest")
     void open_a_creates_open_quest(ClientGameTestContext context) {
         given("PlayerA is connected to the server");
-        context.waitFor(client -> ClientSession.isOnServer(), TIMEOUT);
+        context.waitFor(client -> ClientSession.isOnServer(), CONNECT_TIMEOUT);
 
         when("PlayerA opens MainScreen and creates a new quest");
             openMainScreen(context);
@@ -318,7 +318,7 @@ class TwoPlayerJourneys {
     @DisplayName("Open: B joins the OPEN quest")
     void open_b_joins_quest(ClientGameTestContext context) {
         given("PlayerB is connected to the server");
-        context.waitFor(client -> ClientSession.isOnServer(), TIMEOUT);
+        context.waitFor(client -> ClientSession.isOnServer(), CONNECT_TIMEOUT);
 
         when("PlayerB waits for quest to be created");
             PhaseSync.waitFor("open-quest-created", context);
