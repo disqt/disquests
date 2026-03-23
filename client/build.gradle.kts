@@ -269,16 +269,17 @@ fun ensureServer(serverDir: File, logger: org.gradle.api.logging.Logger, pluginJ
         // Drain server stdout
         Thread { serverProcess.inputStream.bufferedReader().lines().forEach { } }.apply { isDaemon = true; start() }
 
-        // Wait for server startup
-        logger.lifecycle("Waiting for Paper server...")
+        // Wait for server startup (CI runners can be slow)
+        val serverStartupTimeoutMs = 120_000L
+        logger.lifecycle("Waiting for Paper server (timeout: ${serverStartupTimeoutMs / 1000}s)...")
         val logFile = File(serverDir, "logs/latest.log")
-        val deadline = System.currentTimeMillis() + 120000
+        val deadline = System.currentTimeMillis() + serverStartupTimeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (logFile.exists() && logFile.readText().contains("Done (")) break
             Thread.sleep(1000)
         }
         if (!logFile.exists() || !logFile.readText().contains("Done (")) {
-            throw RuntimeException("Paper server failed to start within 120s")
+            throw RuntimeException("Paper server failed to start within ${serverStartupTimeoutMs / 1000}s")
         }
         logger.lifecycle("Paper server ready")
         return serverProcess
