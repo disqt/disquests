@@ -1,24 +1,67 @@
+# Gradle
 .gradle/
-build/
+**/build/
+!**/src/**/build/
 !gradle/wrapper/gradle-wrapper.jar
-.idea/
-*.iml
-.vscode/
-*.code-workspace
+!gradle/wrapper/gradle-wrapper.properties
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+replay_pid*
+*.hprof
+*.jfr
+
+# Fabric Loom / Minecraft dev server
 run/
 run-b/
-logs/
-.DS_Store
-Thumbs.db
 
-# CI artifacts
-.ci/
+# Extracted dependency artifacts (owo-lib, Fabric, Architectury)
+/META-INF/
+/assets/owo/
+/io/
+/net/
+/owo-json5
+/owo.accesswidener
+/owo.mixins.json
+/architectury.common.json
+/fabric.mod.json
+/assets/disquests/
 
-# Eclipse
+# IDE - IntelliJ
+.idea/
+*.iml
+
+# IDE - Eclipse
 .classpath
 .project
 .settings/
 bin/
+
+# IDE - VS Code
+.vscode/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Temp/backup
+*.tmp
+*.bak
+*.swp
+*~
+
+# CI artifacts
+.ci/
 
 # Brainstorming mockups
 .superpowers/
