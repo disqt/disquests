@@ -215,8 +215,10 @@ tasks.register<JacocoReport>("jacocoIntegrationTestReport") {
     reports {
         html.required.set(true)
         xml.required.set(true)
+        csv.required.set(true)
         html.outputLocation.set(layout.buildDirectory.dir("reports/jacoco/integrationTest/html"))
         xml.outputLocation.set(layout.buildDirectory.file("reports/jacoco/integrationTest/report.xml"))
+        csv.outputLocation.set(layout.buildDirectory.file("reports/jacoco/integrationTest/report.csv"))
     }
 }
 
