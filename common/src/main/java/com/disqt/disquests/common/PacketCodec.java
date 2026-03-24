@@ -274,7 +274,7 @@ public final class PacketCodec {
         buf.writeString(quest.title());
         buf.writeString(quest.content());
         buf.writeUUID(quest.ownerUuid());
-        buf.writeString(quest.ownerName());
+        buf.writeString(quest.ownerName() != null ? quest.ownerName() : "");
         buf.writeVarInt(quest.visibility().ordinal());
         buf.writeVarInt(quest.contributors().size());
         for (ContributorData contributor : quest.contributors()) {
