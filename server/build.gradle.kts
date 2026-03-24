@@ -1,5 +1,6 @@
 plugins {
     java
+    jacoco
     id("xyz.jpenilla.run-paper") version "3.0.2"
 }
 
@@ -21,6 +22,13 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    reports {
+        xml.required.set(true)
+    }
 }
 
 tasks.jar {

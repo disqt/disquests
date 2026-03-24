@@ -11,6 +11,10 @@ on:
     branches: [main]
   workflow_call:
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   e2e-test:
     runs-on: ubuntu-latest
@@ -43,13 +47,48 @@ jobs:
       - name: Build all JARs
         run: ./gradlew build
 
+      - name: Run unit tests
+        run: ./gradlew :common:test :server:test
+
       - name: Run integration tests
         run: |
           sudo apt-get install -y xvfb
           Xvfb :99 -ac -screen 0 854x480x24 &
           sleep 2
-          DISPLAY=:99 ./gradlew :client:runIntegrationTest
+          DISPLAY=:99 ./gradlew :client:runIntegrationTest -Pcoverage
         timeout-minutes: 10
+
+      - name: Generate coverage report
+        if: always()
+        run: ./gradlew :client:jacocoIntegrationTestReport
+
+      - name: Add coverage to PR
+        if: github.event_name == 'pull_request'
+        uses: madrapps/jacoco-report@v1.7.2
+        with:
+          paths: client/build/reports/jacoco/integrationTest/report.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          min-coverage-overall: 40
+          min-coverage-changed-files: 60
+          title: Test Coverage
+          update-comment: true
+
+      - name: Generate coverage badges
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: cicirello/jacoco-badge-generator@v2
+        with:
+          jacoco-csv-file: client/build/reports/jacoco/integrationTest/report.csv
+          badges-directory: .github/badges
+          generate-branches-badge: true
+          coverage-label: coverage
+
+      - name: Commit coverage badges
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/badges/
+          git diff --staged --quiet || git commit -m "ci: update coverage badges [skip ci]" && git push
 
       - name: Upload test artifacts
         if: always()
@@ -61,4 +100,5 @@ jobs:
             client/run-b/logs/
             server/run/logs/
             integration-sync/
+            client/build/reports/jacoco/integrationTest/
           retention-days: 14

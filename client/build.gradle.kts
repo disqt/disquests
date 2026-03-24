@@ -177,13 +177,37 @@ tasks.register<JacocoReport>("jacocoGameTestReport") {
 
 tasks.register<JacocoReport>("jacocoIntegrationTestReport") {
     group = "verification"
-    description = "Generate code coverage report from integration E2E tests"
-    dependsOn("compileJava")
+    description = "Generate combined coverage report from client + server E2E tests"
+    dependsOn("compileJava", ":server:compileJava", ":common:compileJava")
 
-    executionData(layout.buildDirectory.file("jacoco/gameTest.exec"))
-    sourceDirectories.from(files("src/main/java"))
+    // Merge all exec files: E2E client + E2E server + common unit tests + server unit tests
+    val execFiles = files(
+        layout.buildDirectory.file("jacoco/gameTest.exec").get().asFile,
+        file("../server/run/jacoco-server.exec"),
+        file("../common/build/jacoco/test.exec"),
+        file("../server/build/jacoco/test.exec")
+    ).filter { it.exists() }
+    executionData(execFiles)
+
+    // Use classdump dir for server classes (Paper transforms bytecode on load,
+    // so compiled classes don't match the exec data -- classdumpdir captures the actual runtime classes)
+    val serverClassDump = file("../server/run/jacoco-classdump")
+
+    sourceDirectories.from(
+        files("src/main/java"),
+        files("../server/src/main/java"),
+        files("../common/src/main/java")
+    )
     classDirectories.from(
         fileTree(layout.buildDirectory.dir("classes/java/main")) {
+            include("com/disqt/disquests/**")
+        },
+        if (serverClassDump.exists()) fileTree(serverClassDump) {
+            include("com/disqt/disquests/server/**")
+        } else fileTree("../server/build/classes/java/main") {
+            include("com/disqt/disquests/**")
+        },
+        fileTree("../common/build/classes/java/main") {
             include("com/disqt/disquests/**")
         }
     )
@@ -191,8 +215,10 @@ tasks.register<JacocoReport>("jacocoIntegrationTestReport") {
     reports {
         html.required.set(true)
         xml.required.set(true)
+        csv.required.set(true)
         html.outputLocation.set(layout.buildDirectory.dir("reports/jacoco/integrationTest/html"))
         xml.outputLocation.set(layout.buildDirectory.file("reports/jacoco/integrationTest/report.xml"))
+        csv.outputLocation.set(layout.buildDirectory.file("reports/jacoco/integrationTest/report.csv"))
     }
 }
 
@@ -293,7 +319,7 @@ fun bootstrapServerDir(serverDir: File, mcVersion: String, logger: org.gradle.ap
     logger.lifecycle("Server directory bootstrapped at ${serverDir.absolutePath}")
 }
 
-fun ensureServer(serverDir: File, logger: org.gradle.api.logging.Logger, pluginJar: File, mcVersion: String): Process? {
+fun ensureServer(serverDir: File, logger: org.gradle.api.logging.Logger, pluginJar: File, mcVersion: String, coverageAgentJar: File? = null): Process? {
     val serverRunning = try {
         Socket("localhost", 25565).use { true }
     } catch (_: Exception) { false }
@@ -314,10 +340,16 @@ fun ensureServer(serverDir: File, logger: org.gradle.api.logging.Logger, pluginJ
         if (!paperJar.exists()) {
             bootstrapServerDir(serverDir, mcVersion, logger)
         }
-        val serverProcess = ProcessBuilder(
-            "java", "-Xmx1G", "-Ddisquests.debug=true",
-            "-jar", paperJar.absolutePath, "--nogui"
-        ).directory(serverDir).redirectErrorStream(true).start()
+        val cmd = mutableListOf("java", "-Xmx1G", "-Ddisquests.debug=true")
+        if (coverageAgentJar != null) {
+            val execFile = File(serverDir, "jacoco-server.exec")
+            val classDumpDir = File(serverDir, "jacoco-classdump")
+            if (classDumpDir.exists()) classDumpDir.deleteRecursively()
+            cmd.add("-javaagent:${coverageAgentJar.absolutePath}=destfile=${execFile.absolutePath},includes=com.disqt.disquests.*,append=true,classdumpdir=${classDumpDir.absolutePath}")
+            logger.lifecycle("JaCoCo agent attached to server, writing to: $execFile")
+        }
+        cmd.addAll(listOf("-jar", paperJar.absolutePath, "--nogui"))
+        val serverProcess = ProcessBuilder(cmd).directory(serverDir).redirectErrorStream(true).start()
 
         // Capture server stdout for debugging
         val serverLog = File(serverDir, "logs/server-stdout.log")
@@ -388,7 +420,11 @@ fun stopServer(serverProcess: Process?) {
         try {
             serverProcess.outputStream.write("stop\n".toByteArray())
             serverProcess.outputStream.flush()
-            Thread.sleep(5000)
+            // Wait up to 30s for graceful shutdown (JaCoCo writes .exec via shutdown hook)
+            val deadline = System.currentTimeMillis() + 30_000
+            while (serverProcess.isAlive && System.currentTimeMillis() < deadline) {
+                Thread.sleep(1000)
+            }
         } catch (_: Exception) {}
         if (serverProcess.isAlive) serverProcess.destroyForcibly()
     }
@@ -424,7 +460,8 @@ tasks.register("runSoloTests") {
             // --- Step 2: Server ---
             if (!noStart) {
                 val pluginJar = file("../server/build/libs/server.jar")
-                serverProcess = ensureServer(serverDir, logger, pluginJar, minecraft_version)
+                val agentJar = if (coverage) jacocoRuntime.singleFile else null
+                serverProcess = ensureServer(serverDir, logger, pluginJar, minecraft_version, agentJar)
                 rconReset(logger)
             } else {
                 // -PnoStart: verify client A is ready
@@ -531,7 +568,8 @@ tasks.register("runDuoTests") {
             // --- Step 2: Server ---
             if (!noStart) {
                 val pluginJar = file("../server/build/libs/server.jar")
-                serverProcess = ensureServer(serverDir, logger, pluginJar, minecraft_version)
+                val agentJar = if (coverage) jacocoRuntime.singleFile else null
+                serverProcess = ensureServer(serverDir, logger, pluginJar, minecraft_version, agentJar)
                 rconReset(logger)
             } else {
                 // -PnoStart: verify both clients are ready

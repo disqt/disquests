@@ -491,6 +491,118 @@ class DataManagerTest {
     }
 
     @Test
+    void deleteCollaborationRequest() {
+        UUID questId = UUID.randomUUID();
+        dm.upsertPlayerName(OWNER, "Alice");
+        dm.upsertPlayerName(PLAYER2, "Bob");
+        dm.saveQuest(makeQuest(questId, OWNER, "Quest", Visibility.OPEN));
+
+        UUID requestId = dm.createCollaborationRequest(questId, PLAYER2);
+        assertNotNull(dm.getCollaborationRequest(requestId));
+
+        dm.deleteCollaborationRequest(requestId);
+        assertNull(dm.getCollaborationRequest(requestId));
+    }
+
+    @Test
+    void getPendingRequestCount() {
+        UUID questId1 = UUID.randomUUID();
+        UUID questId2 = UUID.randomUUID();
+        dm.upsertPlayerName(OWNER, "Alice");
+        dm.upsertPlayerName(PLAYER2, "Bob");
+        dm.upsertPlayerName(PLAYER3, "Carol");
+        dm.saveQuest(makeQuest(questId1, OWNER, "Q1", Visibility.CLOSED));
+        dm.saveQuest(makeQuest(questId2, OWNER, "Q2", Visibility.CLOSED));
+
+        assertEquals(0, dm.getPendingRequestCount(OWNER));
+
+        dm.createCollaborationRequest(questId1, PLAYER2);
+        dm.createCollaborationRequest(questId1, PLAYER3);
+        dm.createCollaborationRequest(questId2, PLAYER2);
+
+        assertEquals(3, dm.getPendingRequestCount(OWNER));
+    }
+
+    @Test
+    void deleteQuest_returnsFalseForNonexistent() {
+        boolean deleted = dm.deleteQuest(UUID.randomUUID());
+        assertFalse(deleted);
+    }
+
+    @Test
+    void getQuest_returnsNullForNonexistent() {
+        assertNull(dm.getQuest(UUID.randomUUID()));
+    }
+
+    @Test
+    void saveQuest_upserts() {
+        UUID id = UUID.randomUUID();
+        dm.upsertPlayerName(OWNER, "Alice");
+        dm.saveQuest(makeQuest(id, OWNER, "Original", Visibility.PRIVATE));
+
+        QuestData loaded = dm.getQuest(id);
+        assertNotNull(loaded);
+        assertEquals("Original", loaded.title());
+
+        QuestData updated = new QuestData(
+                id,
+                "Updated",
+                "new content",
+                OWNER,
+                null,
+                Visibility.OPEN,
+                List.of(),
+                2000L,
+                new CoordinatesData(5.0, 6.0, 7.0),
+                false,
+                null,
+                "nether"
+        );
+        dm.saveQuest(updated);
+
+        QuestData reloaded = dm.getQuest(id);
+        assertNotNull(reloaded);
+        assertEquals("Updated", reloaded.title());
+        assertEquals("new content", reloaded.content());
+        assertEquals(Visibility.OPEN, reloaded.visibility());
+        assertEquals(2000L, reloaded.lastModified());
+        assertNotNull(reloaded.coordinates());
+        assertEquals(5.0, reloaded.coordinates().x(), 1e-9);
+        assertEquals("nether", reloaded.map());
+    }
+
+    @Test
+    void getQuestsForPlayer_batchContributors() {
+        UUID questId1 = UUID.randomUUID();
+        UUID questId2 = UUID.randomUUID();
+        dm.upsertPlayerName(OWNER, "Alice");
+        dm.upsertPlayerName(PLAYER2, "Bob");
+        dm.upsertPlayerName(PLAYER3, "Carol");
+        dm.saveQuest(makeQuest(questId1, OWNER, "Q1", Visibility.OPEN));
+        dm.saveQuest(makeQuest(questId2, OWNER, "Q2", Visibility.OPEN));
+
+        dm.addContributor(questId1, PLAYER2, false);
+        dm.addContributor(questId2, PLAYER2, true);
+        dm.addContributor(questId2, PLAYER3, false);
+
+        List<QuestData> quests = dm.getQuestsForPlayer(OWNER);
+        assertEquals(2, quests.size());
+
+        QuestData q1 = quests.stream().filter(q -> q.id().equals(questId1)).findFirst().orElse(null);
+        QuestData q2 = quests.stream().filter(q -> q.id().equals(questId2)).findFirst().orElse(null);
+        assertNotNull(q1);
+        assertNotNull(q2);
+
+        assertEquals(1, q1.contributors().size());
+        assertEquals(PLAYER2, q1.contributors().get(0).uuid());
+        assertFalse(q1.contributors().get(0).canEdit());
+
+        assertEquals(2, q2.contributors().size());
+        List<UUID> q2Uuids = q2.contributors().stream().map(ContributorData::uuid).toList();
+        assertTrue(q2Uuids.containsAll(List.of(PLAYER2, PLAYER3)));
+    }
+
+    @Test
     void deleteQuest_cascadesPin() {
         UUID questId = UUID.randomUUID();
         dm.upsertPlayerName(OWNER, "Alice");
