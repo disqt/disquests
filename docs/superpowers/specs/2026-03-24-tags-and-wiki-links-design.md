@@ -25,6 +25,14 @@ predefined-tags:
 
 Custom tags are any string not in the predefined list. No structural difference -- both are stored as plain strings.
 
+**QuestData record change:** Adding `List<String> tags` changes the canonical constructor. All call sites that construct `QuestData` must be updated:
+
+- Server: `DataManager.mapQuestRow()`, `DataManager.withContributors()`, `DataManager.withContributorsAll()`, `ServerPacketHandler.handleSaveQuest()`
+- Common: `PacketCodec.readQuest()`, `PacketCodec.writeSaveQuest()` (gains `List<String> tags` parameter)
+- Client: `Quest.fromNetwork(QuestData)` (must extract and store tags), `PacketSender.saveQuest()` (gains `List<String> tags` parameter), `QuestScreen` save call sites
+- Tests: any test code constructing `QuestData`
+- Cleanup: `DataManager.resetDatabase()` must also clear the new `quest_tags` table
+
 ### SQLite Schema
 
 ```sql
@@ -36,15 +44,35 @@ quest_tags (
 )
 ```
 
+**Persistence in DataManager.saveQuest():** Within the same transaction as the quest upsert, delete all existing tags for the quest (`DELETE FROM quest_tags WHERE quest_id = ?`) then re-insert the new tag list. This is simpler and safer than diffing.
+
+**Loading:** Follow the existing contributor pattern. `mapQuestRow()` returns `QuestData` with empty tags list. A new `withTags()` method (or batch variant `withTagsBatch()`) enriches quests with tags from `quest_tags` via a single `SELECT quest_id, tag FROM quest_tags WHERE quest_id IN (...)` query. Called from the same places that call `withContributors()`/`withContributorsAll()`.
+
+### Tag Validation
+
+- Allowed characters: `[a-z0-9_-]` (lowercase alphanumeric, underscore, hyphen)
+- Server normalizes to lowercase on save
+- Duplicate tags in a single quest silently deduplicated
+- Empty strings rejected
+- Exceeding max 8 tags: server truncates to first 8, no error
+
 ### Packet Changes
 
-Append to `PacketCodec.writeQuest()` / `readQuest()` after existing fields:
+**No backward compatibility.** Disquests is a mod+plugin pair deployed together -- both client and server always update at the same time. Tags are written/read unconditionally (no `remaining() > 0` guards in `readQuest()`, which would be incorrect anyway since `readQuest()` is called in a loop inside `readQuestList()`).
+
+**S2C (writeQuest/readQuest):** Append after existing fields:
 ```
 VarInt tagCount
 String[] tags
 ```
 
-No new packet types. Tags are part of `SAVE_QUEST` like title and content.
+Always written, always read. Old client + new server (or vice versa) is an unsupported configuration.
+
+**C2S (writeSaveQuest/readSaveQuest):** Add `List<String> tags` to `SaveQuestPayload` record and `writeSaveQuest()` method signature. Append tag serialization after existing fields.
+
+**Predefined tag list:** Sent to clients via HANDSHAKE packet (append after existing fields; HANDSHAKE is a single packet so `remaining() > 0` guard is safe here for graceful handling of old servers during transition). Client stores in `ClientSession` and uses for the tag picker UI and fixed color assignments.
+
+No new packet types needed.
 
 ### Permissions
 
@@ -103,15 +131,37 @@ Players can reference other quests in markdown content using `[[Quest Name]]` sy
 | Quest found | No access | `[[uuid\|Private Quest]]` |
 | Quest not found | N/A | `[[\|Quest Title]]` (empty UUID = broken) |
 
-Title lookup is case-insensitive. When multiple quests share the same title, the server picks the oldest (by creation date).
+Title lookup is case-insensitive. When multiple quests share the same title, the server uses the quest UUID as a deterministic tiebreaker (lexicographic order).
+
+**Performance:** Resolution batches all `[[...]]` matches in a quest's content into a single SQL query (`SELECT id, title FROM quests WHERE LOWER(title) IN (...)`), then checks access per-match in memory. Max 16 wiki-links per quest content enforced server-side; excess links pass through unresolved.
 
 **On save** (SAVE_QUEST from client), the server reverse-resolves:
 - `[[uuid|Display Name]]` where sender has access: stored as `[[Current Title]]` (canonical form, picks up renames)
 - `[[uuid|Private Quest]]` where sender lacks access: stored as-is (sender cannot learn the real title through editing)
+- `[[uuid|...]]` where UUID no longer exists: stored as `[[Original Text]]` (preserves the text the user typed, link becomes broken)
+
+**Title character safety:** Quest titles containing `]]` are not linkable (the parser matches the first `]]` it finds). This is an acceptable edge case -- titles with `]]` are pathological.
+
+### Regex Patterns
+
+**Server-side content scanning** (raw `[[Quest Name]]` in stored content):
+```
+\[\[([^\]]+)\]\]
+```
+Captures the quest name between `[[` and the first `]]`.
+
+**Server-side resolved link scanning** (after sync resolution, `[[uuid|title]]`):
+```
+\[\[([^|\]]*)\|([^\]]*)\]\]
+```
+Group 1 = UUID (may be empty for broken links), Group 2 = display title.
+
+**Client-side pre-process** (before commonmark parsing, replaces `[[uuid|title]]` with `<dqlink>`):
+Same pattern as server-side resolved link scanning. Replacement: `<dqlink uuid="$1" title="$2"/>`
 
 ### Markdown Rendering
 
-**Pre-process approach:** Before passing content to commonmark-java, regex-replace `[[uuid|title]]` patterns with `<dqlink uuid="..." title="..."/>`. The commonmark parser passes these through as `HtmlInline` nodes. The renderer detects these and produces styled text.
+**Pre-process approach:** Before passing content to commonmark-java, regex-replace `[[uuid|title]]` patterns with `<dqlink uuid="..." title="..."/>`. The commonmark parser passes these through as `HtmlInline` nodes (raw HTML strings, not parsed DOM). A new handler in `MarkdownRenderer.appendInline()` must detect `HtmlInline` nodes, parse the uuid and title from the literal string (e.g., via regex on `HtmlInline.getLiteral()`), and produce the styled text.
 
 **Rendering styles:**
 - Valid link (UUID resolves in client cache): amber text (`#e8a86d`), dashed underline. Click opens the linked quest.
@@ -131,6 +181,8 @@ In the multiline text editor (edit mode):
 6. On select: insert full quest title + closing `]]`
 
 Autocomplete only shows quests from client cache (already filtered by access). For disambiguation when titles collide, show owner name next to title in the dropdown.
+
+**Implementation note:** The dropdown renders as a custom overlay drawn in `TextFieldComponent.draw()` (or a sibling component positioned absolutely). Cursor pixel position can be approximated from the text content and line/column index using `TextRenderer.getWidth()`. Arrow key interception happens in `onKeyPress()` before forwarding to the delegate when the dropdown is visible.
 
 ### Edge Cases
 
