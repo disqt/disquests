@@ -59,6 +59,6 @@ jobs:
           path: |
             client/run/logs/
             client/run-b/logs/
-            paper/run/logs/
+            server/run/logs/
             integration-sync/
           retention-days: 14

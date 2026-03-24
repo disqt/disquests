@@ -45,6 +45,8 @@ public final class UIActions {
      * Runs on the client thread. Throws AssertionError if screen or component not found.
      */
     public static <T extends UIComponent> T findComponent(ClientGameTestContext context, Class<T> type, String id) {
+        // Wait for a Disquests screen to be active (handles brief screen transitions on CI)
+        context.waitFor(client -> client.currentScreen instanceof DisquestsBaseScreen, TIMEOUT);
         return context.computeOnClient(c -> {
             if (c.currentScreen instanceof DisquestsBaseScreen dScreen) {
                 var root = dScreen.getRootComponent();

@@ -111,7 +111,7 @@ jobs:
         run: |
           VERSION="${{ steps.changelog.outputs.VERSION }}"
           cp client/build/libs/client.jar "disquests-client-${VERSION}.jar"
-          cp paper/build/libs/paper.jar "disquests-paper-${VERSION}.jar"
+          cp server/build/libs/server.jar "disquests-paper-${VERSION}.jar"
 
       - name: Create GitHub release
         env:
