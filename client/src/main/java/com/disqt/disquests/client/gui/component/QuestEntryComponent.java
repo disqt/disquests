@@ -5,10 +5,10 @@ import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.helper.DisquestsConfig;
+import com.disqt.disquests.client.gui.helper.TagColors;
 import com.disqt.disquests.client.gui.helper.Theme;
 import com.disqt.disquests.client.hud.HudPinManager;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
-import com.disqt.disquests.common.model.CoordinatesData;
 import io.wispforest.owo.ui.base.BaseUIComponent;
 import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.Sizing;
@@ -20,28 +20,22 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 
 public class QuestEntryComponent extends BaseUIComponent {
 
     public static final int ENTRY_HEIGHT = 38;
-    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm dd MM yyyy");
     private static final Identifier PIN_ICON = Identifier.of("disquests", "icon/pin");
     private static final Identifier PIN_ACTIVE_ICON = Identifier.of("disquests", "icon/pin_active");
 
     // Static constants cached once across all instances
     private static final Text HIDDEN_CONTENT_TEXT = Text.literal("Request access to view").formatted(Formatting.ITALIC);
-    private static final String REQUESTED_STR = "Requested";
 
 
     private final Quest quest;
     private final String firstLine;
-    private final String formattedDateTime;
     private final boolean isOwnedByPlayer;
     private final boolean isContributor;
     private final boolean hideContent;
@@ -53,13 +47,6 @@ public class QuestEntryComponent extends BaseUIComponent {
     // Cached owner text (fix 2)
     private final Text cachedOwnerText;
     private final int cachedOwnerWidth;
-
-    // Cached location string (fix 4)
-    private final String cachedLocationString;
-    private final int cachedLocationWidth;
-
-    // Cached "Last Modified: ..." string (fix 9)
-    private final String cachedLastModifiedText;
 
     // Cached truncated content (fix 5) — depends on width known at draw time
     private Text cachedContentText;
@@ -101,12 +88,6 @@ public class QuestEntryComponent extends BaseUIComponent {
             }
         }
 
-        LocalDateTime dateTime = LocalDateTime.ofInstant(
-                Instant.ofEpochSecond(quest.getLastModified()), ZoneId.systemDefault()
-        );
-        this.formattedDateTime = dateTime.format(DATE_TIME_FORMATTER);
-        this.cachedLastModifiedText = "Last Modified: " + formattedDateTime;
-
         // Cache visibility text + width (fix 1)
         Text visText = null;
         if (quest.getVisibility() != null) {
@@ -130,14 +111,6 @@ public class QuestEntryComponent extends BaseUIComponent {
         } else {
             this.cachedOwnerText = null;
             this.cachedOwnerWidth = 0;
-        }
-
-        // Cache location string + width (fix 4)
-        this.cachedLocationString = buildLocationString();
-        if (!cachedLocationString.isEmpty()) {
-            this.cachedLocationWidth = MinecraftClient.getInstance().textRenderer.getWidth(cachedLocationString);
-        } else {
-            this.cachedLocationWidth = 0;
         }
 
         // Debug: log construction state
@@ -301,19 +274,21 @@ public class QuestEntryComponent extends BaseUIComponent {
             context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, pinIcon, pinIconX, pinIconY, pinIconSize, pinIconSize);
         }
 
-        // --- Row 3: Last modified + location / requested ---
-        context.drawText(textRenderer, cachedLastModifiedText,
-                entryX + 4, entryY + 24, Colors.TEXT_MUTED, false);
-
-        if (ClientSession.isRequested(quest.getId())) {
-            // Width computed once via static constant (fix 7)
-            int requestedWidth = textRenderer.getWidth(REQUESTED_STR);
-            context.drawText(textRenderer, REQUESTED_STR,
-                    entryX + entryWidth - requestedWidth - 4, entryY + 24, 0xFFCCCC44, false);
+        // --- Row 3: Tags ---
+        List<String> tags = quest.getTags();
+        if (tags == null || tags.isEmpty()) {
+            context.drawText(textRenderer, Text.literal("no tags").formatted(Formatting.ITALIC),
+                    entryX + 4, entryY + 24, Colors.TEXT_MUTED, false);
         } else {
-            if (!cachedLocationString.isEmpty()) {
-                context.drawText(textRenderer, cachedLocationString,
-                        entryX + entryWidth - cachedLocationWidth - 4, entryY + 24, Colors.TEXT_MUTED, false);
+            int tagX = entryX + 4;
+            for (String tag : tags) {
+                int bg = TagColors.getBackground(tag);
+                int fg = TagColors.getForeground(tag);
+                int tagWidth = textRenderer.getWidth(tag) + 6; // 3px padding each side
+                if (tagX + tagWidth > entryX + entryWidth - 4) break; // don't overflow
+                context.fill(tagX, entryY + 24, tagX + tagWidth, entryY + 34, bg);
+                context.drawText(textRenderer, Text.literal(tag), tagX + 3, entryY + 25, fg, false);
+                tagX += tagWidth + 3; // 3px gap
             }
         }
     }
@@ -367,32 +342,4 @@ public class QuestEntryComponent extends BaseUIComponent {
         return true;
     }
 
-    // --- Helpers ---
-
-    private String buildLocationString() {
-        if (quest.isRegion()) {
-            String mapName = quest.getMap();
-            if (mapName != null && !mapName.isEmpty()) {
-                return mapName + " (Region)";
-            }
-            return "Region";
-        }
-
-        CoordinatesData coords = quest.getCoordinates();
-        if (coords == null) return "";
-
-        StringBuilder sb = new StringBuilder();
-        String mapName = quest.getMap();
-        if (mapName != null && !mapName.isEmpty()) {
-            sb.append(mapName);
-        }
-
-        String coordStr = "X:" + (int) coords.x() + " Z:" + (int) coords.z();
-        if (sb.length() > 0) {
-            sb.append(" \u2022 ");
-        }
-        sb.append(coordStr);
-
-        return sb.toString();
-    }
 }
