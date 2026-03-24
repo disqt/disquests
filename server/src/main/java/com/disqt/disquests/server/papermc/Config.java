@@ -4,11 +4,13 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class Config {
     private String bluemapUrl;
     private Map<String, String> bluemapMapNames;
+    private List<String> predefinedTags;
     private boolean debug;
 
     public Config(JavaPlugin plugin) {
@@ -27,6 +29,8 @@ public class Config {
                 bluemapMapNames.put(key, section.getString(key));
             }
         }
+        this.predefinedTags = cfg.getStringList("predefined-tags");
+        if (this.predefinedTags == null) this.predefinedTags = List.of();
         this.debug = cfg.getBoolean("debug", false);
         if (Boolean.getBoolean("disquests.debug")) {
             this.debug = true;
@@ -36,4 +40,5 @@ public class Config {
     public boolean isDebug() { return debug; }
     public String getBluemapUrl() { return bluemapUrl; }
     public Map<String, String> getBluemapMapNames() { return bluemapMapNames; }
+    public List<String> getPredefinedTags() { return predefinedTags; }
 }

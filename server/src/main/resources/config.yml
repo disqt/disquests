@@ -7,3 +7,12 @@ bluemap-map-names:
   overworld: "world_new"
   nether: "world_new_nether"
   the_end: "world_new_the_end"
+
+# Predefined tags shown to clients for quick selection.
+predefined-tags:
+  - overworld
+  - nether
+  - the_end
+  - building
+  - redstone
+  - farm

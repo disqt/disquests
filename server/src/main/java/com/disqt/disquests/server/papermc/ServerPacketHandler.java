@@ -87,6 +87,13 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
             plugin.getLogger().warning("Quest field too long from " + player.getName());
             return;
         }
+        List<String> tags = payload.tags().stream()
+                .map(String::toLowerCase)
+                .filter(t -> !t.isEmpty() && t.length() <= 32)
+                .filter(t -> t.matches("[a-z0-9_-]+"))
+                .distinct()
+                .limit(8)
+                .toList();
         UUID playerUuid = player.getUniqueId();
         QuestData existing = dataManager.getQuest(payload.questId());
 
@@ -97,7 +104,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
                 playerUuid, player.getName(), Visibility.PRIVATE,
                 List.of(), System.currentTimeMillis() / 1000,
                 payload.coords(), payload.isRegion(), payload.coords2(), payload.map(),
-                payload.tags()
+                tags
             );
             dataManager.saveQuest(newQuest);
             QuestData saved = dataManager.getQuest(payload.questId());
@@ -115,7 +122,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
                 existing.ownerUuid(), existing.ownerName(), existing.visibility(),
                 existing.contributors(), System.currentTimeMillis() / 1000,
                 payload.coords(), payload.isRegion(), payload.coords2(), payload.map(),
-                payload.tags()
+                tags
             );
             dataManager.saveQuest(updated);
             QuestData saved = dataManager.getQuest(payload.questId());
@@ -361,7 +368,8 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
         List<UUID> pinnedIds = dataManager.getPinnedQuestIds(player.getUniqueId());
         int pendingCount = dataManager.getPendingRequestCount(player.getUniqueId());
         sendPacket(player, PacketCodec.writeHandshake(
-            config.getBluemapUrl(), pendingCount, pinnedIds, player.getUniqueId(), config.getBluemapMapNames()));
+            config.getBluemapUrl(), pendingCount, pinnedIds,
+            player.getUniqueId(), config.getBluemapMapNames(), config.getPredefinedTags()));
     }
 
     private void sendPacket(Player player, byte[] data) {
