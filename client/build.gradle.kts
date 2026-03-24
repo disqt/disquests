@@ -180,10 +180,14 @@ tasks.register<JacocoReport>("jacocoIntegrationTestReport") {
     description = "Generate combined coverage report from client + server E2E tests"
     dependsOn("compileJava", ":server:compileJava", ":common:compileJava")
 
-    // Merge client and server exec files (skip missing -- server exec only exists with -Pcoverage)
-    val clientExec = layout.buildDirectory.file("jacoco/gameTest.exec").get().asFile
-    val serverExec = file("../server/run/jacoco-server.exec")
-    executionData(files(clientExec, serverExec).filter { it.exists() })
+    // Merge all exec files: E2E client + E2E server + common unit tests + server unit tests
+    val execFiles = files(
+        layout.buildDirectory.file("jacoco/gameTest.exec").get().asFile,
+        file("../server/run/jacoco-server.exec"),
+        file("../common/build/jacoco/test.exec"),
+        file("../server/build/jacoco/test.exec")
+    ).filter { it.exists() }
+    executionData(execFiles)
 
     // Use classdump dir for server classes (Paper transforms bytecode on load,
     // so compiled classes don't match the exec data -- classdumpdir captures the actual runtime classes)

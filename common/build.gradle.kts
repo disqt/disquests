@@ -1,5 +1,6 @@
 plugins {
     java
+    jacoco
 }
 
 dependencies {
@@ -9,4 +10,11 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    reports {
+        xml.required.set(true)
+    }
 }
