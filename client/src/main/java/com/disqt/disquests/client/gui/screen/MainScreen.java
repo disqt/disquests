@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+
 public class MainScreen extends DisquestsBaseScreen {
 
     private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger("Disquests.MainScreen");
@@ -128,7 +129,7 @@ public class MainScreen extends DisquestsBaseScreen {
         // --- Create search text box programmatically ---
         this.searchField = UIComponents.textBox(Sizing.fixed(200));
         this.searchField.text(this.searchTerm);
-        this.searchField.setPlaceholder(Text.literal("Search..."));
+        this.searchField.setPlaceholder(Text.literal("Search... (#tag to filter)"));
         this.searchField.onChanged().subscribe(this::onSearchTermChanged);
         this.searchField.id("search-box");
         this.searchRow.child(this.searchField);
@@ -207,10 +208,38 @@ public class MainScreen extends DisquestsBaseScreen {
 
     // --- SEARCH ---
 
+    private record SearchQuery(String textFilter, List<String> tagFilters) {}
+
+    private SearchQuery parseSearch(String raw) {
+        if (raw == null || raw.isEmpty()) return new SearchQuery("", List.of());
+        List<String> tagFilters = new ArrayList<>();
+        StringBuilder text = new StringBuilder();
+        for (String token : raw.trim().split("\\s+")) {
+            if (token.startsWith("#") && token.length() > 1) {
+                tagFilters.add(token.substring(1).toLowerCase());
+            } else {
+                if (text.length() > 0) text.append(" ");
+                text.append(token);
+            }
+        }
+        return new SearchQuery(text.toString(), tagFilters);
+    }
+
     private boolean matchesSearch(Quest q) {
         if (searchTerm.isEmpty()) return true;
-        return q.getTitle().toLowerCase().contains(searchTerm)
-                || (q.getContent() != null && q.getContent().toLowerCase().contains(searchTerm));
+        SearchQuery query = parseSearch(searchTerm);
+        if (!query.textFilter().isEmpty()) {
+            String tf = query.textFilter();
+            boolean textMatch = q.getTitle().toLowerCase().contains(tf)
+                    || (q.getContent() != null && q.getContent().toLowerCase().contains(tf));
+            if (!textMatch) return false;
+        }
+        if (!query.tagFilters().isEmpty()) {
+            boolean tagMatch = query.tagFilters().stream().allMatch(
+                    tagFilter -> q.getTags().stream().anyMatch(t -> t.equalsIgnoreCase(tagFilter)));
+            if (!tagMatch) return false;
+        }
+        return true;
     }
 
     private void onSearchTermChanged(String newTerm) {
