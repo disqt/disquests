@@ -22,9 +22,12 @@ public final class PacketCodec {
     private static final int MAX_OPS = 256;
     private static final int MAX_QUEST_LIST = 10000;
 
+    private static final java.util.concurrent.ConcurrentHashMap<Class<?>, Object[]> ENUM_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    @SuppressWarnings("unchecked")
     private static <T extends Enum<T>> T readEnum(ByteBufReader buf, Class<T> enumClass) {
         int ordinal = buf.readVarInt();
-        T[] values = enumClass.getEnumConstants();
+        T[] values = (T[]) ENUM_CACHE.computeIfAbsent(enumClass, Class::getEnumConstants);
         if (ordinal < 0 || ordinal >= values.length) {
             throw new IllegalArgumentException(
                     "Invalid " + enumClass.getSimpleName() + " ordinal: " + ordinal);
@@ -174,13 +177,7 @@ public final class PacketCodec {
     }
 
     public static byte[] writeSyncMyQuests(List<QuestData> quests) {
-        ByteBufWriter buf = new ByteBufWriter();
-        buf.writeByte(PacketType.SYNC_MY_QUESTS.getId());
-        buf.writeVarInt(quests.size());
-        for (QuestData quest : quests) {
-            writeQuest(buf, quest);
-        }
-        return buf.toByteArray();
+        return writeSyncMyQuests(quests, Map.of());
     }
 
     public static byte[] writeSyncMyQuests(List<QuestData> quests, Map<UUID, Integer> pendingCounts) {
@@ -190,10 +187,12 @@ public final class PacketCodec {
         for (QuestData quest : quests) {
             writeQuest(buf, quest);
         }
-        buf.writeVarInt(pendingCounts.size());
-        for (Map.Entry<UUID, Integer> entry : pendingCounts.entrySet()) {
-            buf.writeUUID(entry.getKey());
-            buf.writeVarInt(entry.getValue());
+        if (!pendingCounts.isEmpty()) {
+            buf.writeVarInt(pendingCounts.size());
+            for (Map.Entry<UUID, Integer> entry : pendingCounts.entrySet()) {
+                buf.writeUUID(entry.getKey());
+                buf.writeVarInt(entry.getValue());
+            }
         }
         return buf.toByteArray();
     }
@@ -391,13 +390,17 @@ public final class PacketCodec {
         return new HandshakePayload(bluemapUrl, pendingRequestCount, pinnedQuestIds, playerUuid, mapNames);
     }
 
-    public static List<QuestData> readSyncMyQuests(ByteBufReader buf) {
+    private static List<QuestData> readQuestList(ByteBufReader buf) {
         int count = readCount(buf, MAX_QUEST_LIST, "Quest");
         List<QuestData> quests = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             quests.add(readQuest(buf));
         }
         return quests;
+    }
+
+    public static List<QuestData> readSyncMyQuests(ByteBufReader buf) {
+        return readQuestList(buf);
     }
 
     public static Map<UUID, Integer> readPendingCounts(ByteBufReader r) {
@@ -411,12 +414,7 @@ public final class PacketCodec {
     }
 
     public static List<QuestData> readSyncServerQuests(ByteBufReader buf) {
-        int count = readCount(buf, MAX_QUEST_LIST, "Quest");
-        List<QuestData> quests = new ArrayList<>(count);
-        for (int i = 0; i < count; i++) {
-            quests.add(readQuest(buf));
-        }
-        return quests;
+        return readQuestList(buf);
     }
 
     public static QuestData readUpdateQuest(ByteBufReader buf) {

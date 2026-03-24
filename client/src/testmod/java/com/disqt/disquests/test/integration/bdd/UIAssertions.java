@@ -1,6 +1,5 @@
 package com.disqt.disquests.test.integration.bdd;
 
-import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.core.UIComponent;
@@ -24,17 +23,8 @@ public final class UIAssertions {
      */
     public static <T extends UIComponent> void assertComponent(
             ClientGameTestContext context, String componentId, Class<T> type, Predicate<T> predicate, String message) {
-        boolean result = context.computeOnClient(c -> {
-            Screen screen = c.currentScreen;
-            if (screen instanceof DisquestsBaseScreen dScreen) {
-                var root = dScreen.getRootComponent();
-                if (root == null) return false;
-                T component = root.childById(type, componentId);
-                if (component == null) return false;
-                return predicate.test(component);
-            }
-            return false;
-        });
+        T component = UIActions.findComponentOrNull(context, type, componentId);
+        boolean result = component != null && context.computeOnClient(c -> predicate.test(component));
         assertTrue(result, message);
     }
 
@@ -42,18 +32,8 @@ public final class UIAssertions {
      * Assert that a label component has the expected text.
      */
     public static void assertLabelText(ClientGameTestContext context, String componentId, String expected) {
-        String actual = context.computeOnClient(c -> {
-            Screen screen = c.currentScreen;
-            if (screen instanceof DisquestsBaseScreen dScreen) {
-                var root = dScreen.getRootComponent();
-                if (root == null) return null;
-                LabelComponent label = root.childById(LabelComponent.class, componentId);
-                if (label == null) return null;
-                return label.text().getString();
-            }
-            return null;
-        });
-        assertNotNull(actual, "Label '" + componentId + "' not found");
+        LabelComponent label = UIActions.findComponent(context, LabelComponent.class, componentId);
+        String actual = context.computeOnClient(c -> label.text().getString());
         assertEquals(expected, actual, "Label '" + componentId + "' text mismatch");
     }
 
@@ -61,18 +41,8 @@ public final class UIAssertions {
      * Assert that a button component has text containing the expected substring.
      */
     public static void assertButtonText(ClientGameTestContext context, String componentId, String expectedSubstring) {
-        String actual = context.computeOnClient(c -> {
-            Screen screen = c.currentScreen;
-            if (screen instanceof DisquestsBaseScreen dScreen) {
-                var root = dScreen.getRootComponent();
-                if (root == null) return null;
-                ButtonComponent btn = root.childById(ButtonComponent.class, componentId);
-                if (btn == null) return null;
-                return btn.getMessage().getString();
-            }
-            return null;
-        });
-        assertNotNull(actual, "Button '" + componentId + "' not found");
+        ButtonComponent btn = UIActions.findComponent(context, ButtonComponent.class, componentId);
+        String actual = context.computeOnClient(c -> btn.getMessage().getString());
         assertTrue(actual.contains(expectedSubstring),
             "Button '" + componentId + "' text '" + actual + "' does not contain '" + expectedSubstring + "'");
     }
@@ -81,32 +51,16 @@ public final class UIAssertions {
      * Assert a component exists (non-null).
      */
     public static void assertComponentExists(ClientGameTestContext context, String componentId) {
-        boolean exists = context.computeOnClient(c -> {
-            Screen screen = c.currentScreen;
-            if (screen instanceof DisquestsBaseScreen dScreen) {
-                var root = dScreen.getRootComponent();
-                if (root == null) return false;
-                return root.childById(UIComponent.class, componentId) != null;
-            }
-            return false;
-        });
-        assertTrue(exists, "Component '" + componentId + "' not found");
+        UIComponent comp = UIActions.findComponentOrNull(context, UIComponent.class, componentId);
+        assertTrue(comp != null, "Component '" + componentId + "' not found");
     }
 
     /**
      * Assert a component does NOT exist (was removed or hidden).
      */
     public static void assertComponentMissing(ClientGameTestContext context, String componentId) {
-        boolean exists = context.computeOnClient(c -> {
-            Screen screen = c.currentScreen;
-            if (screen instanceof DisquestsBaseScreen dScreen) {
-                var root = dScreen.getRootComponent();
-                if (root == null) return false;
-                return root.childById(UIComponent.class, componentId) != null;
-            }
-            return false;
-        });
-        assertFalse(exists, "Component '" + componentId + "' should not exist but was found");
+        UIComponent comp = UIActions.findComponentOrNull(context, UIComponent.class, componentId);
+        assertFalse(comp != null, "Component '" + componentId + "' should not exist but was found");
     }
 
     /**
@@ -121,17 +75,9 @@ public final class UIAssertions {
      * Assert the quest list has exactly N entries.
      */
     public static void assertEntryCount(ClientGameTestContext context, int expected) {
-        int actual = context.computeOnClient(c -> {
-            Screen screen = c.currentScreen;
-            if (screen instanceof DisquestsBaseScreen dScreen) {
-                var root = dScreen.getRootComponent();
-                if (root == null) return -1;
-                var questList = root.childById(
-                    io.wispforest.owo.ui.container.FlowLayout.class, "quest-list");
-                return questList != null ? questList.children().size() : -1;
-            }
-            return -1;
-        });
+        var questList = UIActions.findComponentOrNull(context,
+            io.wispforest.owo.ui.container.FlowLayout.class, "quest-list");
+        int actual = questList != null ? context.computeOnClient(c -> questList.children().size()) : -1;
         assertEquals(expected, actual, "Quest list entry count mismatch");
     }
 

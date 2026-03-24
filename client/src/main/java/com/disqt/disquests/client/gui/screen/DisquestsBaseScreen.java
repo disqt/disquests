@@ -1,7 +1,6 @@
 package com.disqt.disquests.client.gui.screen;
 
 import com.disqt.disquests.client.gui.helper.DisquestsConfig;
-import com.disqt.disquests.client.gui.helper.Theme;
 import io.wispforest.owo.ui.base.BaseUIModelScreen;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.ParentUIComponent;
@@ -71,5 +70,16 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
      */
     public FlowLayout getRootComponent() {
         return this.uiAdapter != null ? this.uiAdapter.rootComponent : null;
+    }
+
+    @Override
+    public boolean shouldPause() {
+        return false;
+    }
+
+    protected void navigateToScreen(Screen screen) {
+        if (this.client != null) {
+            this.client.setScreen(screen);
+        }
     }
 }

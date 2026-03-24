@@ -1,27 +1,35 @@
 package com.disqt.disquests.client;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ClientSession {
+
+    public enum Tab {
+        MY_QUESTS, SERVER_QUESTS
+    }
+
+    public enum QuestFilter {
+        ALL, OPEN, CLOSED
+    }
 
     private static boolean onServer = false;
     private static String bluemapUrl = null;
     private static int pendingRequestCount = 0;
-    private static final List<UUID> pinnedQuestIds = new ArrayList<>();
-    private static final Set<UUID> requestedQuestIds = new HashSet<>();
+    private static final List<UUID> pinnedQuestIds = new CopyOnWriteArrayList<>();
+    private static final Set<UUID> requestedQuestIds = ConcurrentHashMap.newKeySet();
     private static UUID playerUuid = null;
     private static Map<String, String> bluemapMapNames = Map.of();
 
     // UI state
-    private static int activeTab = 0; // 0=My Quests, 1=Server Quests
+    private static Tab activeTab = Tab.MY_QUESTS;
     private static String searchTerm = "";
-    private static int serverQuestsFilter = 0; // 0=All, 1=Open, 2=Closed
+    private static QuestFilter serverQuestsFilter = QuestFilter.ALL;
     private static String pendingToast = null;
 
     public static void joinServer(String bluemapUrl, int pendingCount, List<UUID> pinnedIds, UUID playerUuid) {
@@ -48,9 +56,9 @@ public class ClientSession {
         pendingToast = null;
         playerUuid = null;
         bluemapMapNames = Map.of();
-        activeTab = 0;
+        activeTab = Tab.MY_QUESTS;
         searchTerm = "";
-        serverQuestsFilter = 0;
+        serverQuestsFilter = QuestFilter.ALL;
     }
 
     public static boolean isOnServer() {
@@ -139,11 +147,11 @@ public class ClientSession {
         return uuid;
     }
 
-    public static int getActiveTab() {
+    public static Tab getActiveTab() {
         return activeTab;
     }
 
-    public static void setActiveTab(int tab) {
+    public static void setActiveTab(Tab tab) {
         activeTab = tab;
     }
 
@@ -155,11 +163,11 @@ public class ClientSession {
         searchTerm = term;
     }
 
-    public static int getServerQuestsFilter() {
+    public static QuestFilter getServerQuestsFilter() {
         return serverQuestsFilter;
     }
 
-    public static void setServerQuestsFilter(int filter) {
+    public static void setServerQuestsFilter(QuestFilter filter) {
         serverQuestsFilter = filter;
     }
 }

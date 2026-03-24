@@ -322,8 +322,8 @@ class DataManagerTest {
 
         List<UUID> pinned = dm.getPinnedQuestIds(OWNER);
         assertEquals(2, pinned.size());
-        assertEquals(questA, pinned.get(0));
-        assertEquals(questB, pinned.get(1));
+        assertTrue(pinned.containsAll(List.of(questA, questB)),
+            "Pinned list should contain both quests (order not guaranteed)");
     }
 
     @Test

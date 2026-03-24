@@ -92,12 +92,11 @@ class PinAndHudJourney {
         // "Second" (created last) is at index 0 due to lastModified sort
         when("player clicks the pin icon on Second (index 0)");
             clickPinIcon(context, 0);
-            context.waitTicks(4);
 
         then("Second quest is pinned");
-            boolean pinned = context.computeOnClient(c ->
-                secondQuestId != null && HudPinManager.isPinned(secondQuestId));
-            assertTrue(pinned, "Second quest should be pinned after clicking pin icon");
+            context.waitFor(client ->
+                secondQuestId != null && HudPinManager.isPinned(secondQuestId), TIMEOUT);
+
     }
 
     @Test @Order(3) @PlayerA
@@ -158,12 +157,11 @@ class PinAndHudJourney {
 
         when("player clicks the pin icon on the entry at index 0 (Second, the pinned one)");
             clickPinIcon(context, 0);
-            context.waitTicks(4);
 
         then("Second quest is no longer pinned");
-            boolean unpinned = context.computeOnClient(c ->
-                secondQuestId != null && !HudPinManager.isPinned(secondQuestId));
-            assertTrue(unpinned, "Second quest should be unpinned after clicking pin icon again");
+            context.waitFor(client ->
+                secondQuestId != null && !HudPinManager.isPinned(secondQuestId), TIMEOUT);
+
     }
 
     @Test @Order(6) @PlayerA

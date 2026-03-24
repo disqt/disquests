@@ -36,8 +36,4 @@ public class ConfirmScreen extends DisquestsBaseScreen {
                 .onPress(b -> onCancel.run());
     }
 
-    @Override
-    public boolean shouldPause() {
-        return false;
-    }
 }
