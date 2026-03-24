@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class DataManager {
 
@@ -243,6 +244,32 @@ public class DataManager {
             throw new RuntimeException("Failed to get server quests", e);
         }
         return withTagsAll(withContributorsAll(quests));
+    }
+
+    public synchronized Map<String, QuestData> findQuestsByTitlesIgnoreCase(List<String> titles) {
+        if (titles.isEmpty()) return Map.of();
+        Map<String, QuestData> result = new HashMap<>();
+        String placeholders = titles.stream().map(t -> "?").collect(Collectors.joining(","));
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "SELECT q.*, pn.name as owner_name FROM quests q " +
+                "LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid " +
+                "WHERE LOWER(q.title) IN (" + placeholders + ")")) {
+            for (int i = 0; i < titles.size(); i++) {
+                stmt.setString(i + 1, titles.get(i).toLowerCase());
+            }
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                QuestData quest = mapQuestRow(rs);
+                String lowerTitle = quest.title().toLowerCase();
+                if (!result.containsKey(lowerTitle)
+                        || quest.id().toString().compareTo(result.get(lowerTitle).id().toString()) < 0) {
+                    result.put(lowerTitle, quest);
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to find quests by titles", e);
+        }
+        return result;
     }
 
     public synchronized void updateVisibility(UUID questId, Visibility visibility) {
