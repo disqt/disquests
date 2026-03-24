@@ -67,7 +67,7 @@
             <flow-layout direction="horizontal" id="content-row">
                 <sizing>
                     <horizontal method="fill">85</horizontal>
-                    <vertical method="fill">45</vertical>
+                    <vertical method="fill">35</vertical>
                 </sizing>
                 <gap>4</gap>
                 <margins>
