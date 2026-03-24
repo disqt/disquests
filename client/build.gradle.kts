@@ -185,6 +185,10 @@ tasks.register<JacocoReport>("jacocoIntegrationTestReport") {
     val serverExec = file("../server/run/jacoco-server.exec")
     executionData(files(clientExec, serverExec).filter { it.exists() })
 
+    // Use classdump dir for server classes (Paper transforms bytecode on load,
+    // so compiled classes don't match the exec data -- classdumpdir captures the actual runtime classes)
+    val serverClassDump = file("../server/run/jacoco-classdump")
+
     sourceDirectories.from(
         files("src/main/java"),
         files("../server/src/main/java"),
@@ -194,7 +198,9 @@ tasks.register<JacocoReport>("jacocoIntegrationTestReport") {
         fileTree(layout.buildDirectory.dir("classes/java/main")) {
             include("com/disqt/disquests/**")
         },
-        fileTree("../server/build/classes/java/main") {
+        if (serverClassDump.exists()) fileTree(serverClassDump) {
+            include("com/disqt/disquests/server/**")
+        } else fileTree("../server/build/classes/java/main") {
             include("com/disqt/disquests/**")
         },
         fileTree("../common/build/classes/java/main") {
@@ -331,7 +337,9 @@ fun ensureServer(serverDir: File, logger: org.gradle.api.logging.Logger, pluginJ
         val cmd = mutableListOf("java", "-Xmx1G", "-Ddisquests.debug=true")
         if (coverageAgentJar != null) {
             val execFile = File(serverDir, "jacoco-server.exec")
-            cmd.add("-javaagent:${coverageAgentJar.absolutePath}=destfile=${execFile.absolutePath},includes=com.disqt.disquests.*,append=true")
+            val classDumpDir = File(serverDir, "jacoco-classdump")
+            if (classDumpDir.exists()) classDumpDir.deleteRecursively()
+            cmd.add("-javaagent:${coverageAgentJar.absolutePath}=destfile=${execFile.absolutePath},includes=com.disqt.disquests.*,append=true,classdumpdir=${classDumpDir.absolutePath}")
             logger.lifecycle("JaCoCo agent attached to server, writing to: $execFile")
         }
         cmd.addAll(listOf("-jar", paperJar.absolutePath, "--nogui"))
