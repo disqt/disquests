@@ -38,7 +38,8 @@ class PacketCodecTest {
                 coords,
                 isRegion,
                 coords2,
-                map
+                map,
+                List.of()
         );
     }
 
@@ -52,6 +53,8 @@ class PacketCodecTest {
         assertEquals(expected.lastModified(), actual.lastModified());
         assertEquals(expected.isRegion(), actual.isRegion());
         assertEquals(expected.map(), actual.map());
+
+        assertEquals(expected.tags(), actual.tags());
 
         assertEquals(expected.contributors().size(), actual.contributors().size());
         for (int i = 0; i < expected.contributors().size(); i++) {
@@ -166,7 +169,8 @@ class PacketCodecTest {
                 null,
                 false,
                 null,
-                null
+                null,
+                List.of()
         );
         ByteBufWriter writer = new ByteBufWriter();
         PacketCodec.writeQuest(writer, quest);
@@ -209,7 +213,7 @@ class PacketCodecTest {
         CoordinatesData coords = new CoordinatesData(50.0, 63.0, 100.0);
         byte[] packet = PacketCodec.writeSaveQuest(
                 questId, "Build a house", "Gather wood and build.",
-                coords, false, null, "dust2");
+                coords, false, null, "dust2", List.of());
 
         ByteBufReader reader = new ByteBufReader(packet);
 
@@ -573,7 +577,7 @@ class PacketCodecTest {
             UUID.randomUUID(), "owner",
             Visibility.CLOSED,
             List.of(new ContributorData(UUID.randomUUID(), "helper", true)),
-            1000L, null, false, null, null
+            1000L, null, false, null, null, List.of()
         );
         ByteBufWriter w = new ByteBufWriter();
         PacketCodec.writeQuest(w, quest);
@@ -590,7 +594,7 @@ class PacketCodecTest {
         UUID questId = UUID.randomUUID();
         byte[] packet = PacketCodec.writeSaveQuest(
             questId, "Quest: \u9F8D Dragon", "Description with unicode: \u00E9\u00E8\u00EA and CJK: \u4E16\u754C",
-            null, false, null, null);
+            null, false, null, null, List.of());
         ByteBufReader reader = new ByteBufReader(packet);
         PacketCodec.readType(reader);
         PacketCodec.SaveQuestPayload payload = PacketCodec.readSaveQuest(reader);
@@ -661,7 +665,7 @@ class PacketCodecTest {
     void testSyncMyQuestsWithPendingCounts() {
         UUID questId = UUID.randomUUID();
         QuestData quest = new QuestData(questId, "Test", "content", UUID.randomUUID(), "Owner",
-                Visibility.OPEN, List.of(), System.currentTimeMillis(), null, false, null, null);
+                Visibility.OPEN, List.of(), System.currentTimeMillis(), null, false, null, null, List.of());
         Map<UUID, Integer> pendingCounts = Map.of(questId, 3);
 
         byte[] packet = PacketCodec.writeSyncMyQuests(List.of(quest), pendingCounts);
@@ -692,6 +696,119 @@ class PacketCodecTest {
         assertEquals(req.questTitle(), readReqs.get(0).questTitle());
         assertEquals(req.requesterName(), readReqs.get(0).requesterName());
         assertEquals(req.timestamp(), readReqs.get(0).timestamp());
+        assertEquals(0, reader.remaining());
+    }
+
+    // ---- 30. testQuestTagsRoundTrip ----
+
+    @Test
+    void testQuestTagsRoundTrip() {
+        List<String> tags = List.of("combat", "exploration", "daily");
+        QuestData quest = new QuestData(
+                UUID.randomUUID(),
+                "Tagged Quest",
+                "A quest with tags.",
+                UUID.randomUUID(),
+                "ownerPlayer",
+                Visibility.OPEN,
+                List.of(),
+                System.currentTimeMillis(),
+                null,
+                false,
+                null,
+                null,
+                tags
+        );
+        ByteBufWriter writer = new ByteBufWriter();
+        PacketCodec.writeQuest(writer, quest);
+
+        ByteBufReader reader = new ByteBufReader(writer.toByteArray());
+        QuestData decoded = PacketCodec.readQuest(reader);
+
+        assertQuestsEqual(quest, decoded);
+        assertEquals(tags, decoded.tags());
+        assertEquals(0, reader.remaining());
+    }
+
+    @Test
+    void testQuestEmptyTagsRoundTrip() {
+        QuestData quest = new QuestData(
+                UUID.randomUUID(),
+                "No Tags Quest",
+                "A quest with no tags.",
+                UUID.randomUUID(),
+                "ownerPlayer",
+                Visibility.PRIVATE,
+                List.of(),
+                System.currentTimeMillis(),
+                null,
+                false,
+                null,
+                null,
+                List.of()
+        );
+        ByteBufWriter writer = new ByteBufWriter();
+        PacketCodec.writeQuest(writer, quest);
+
+        ByteBufReader reader = new ByteBufReader(writer.toByteArray());
+        QuestData decoded = PacketCodec.readQuest(reader);
+
+        assertQuestsEqual(quest, decoded);
+        assertTrue(decoded.tags().isEmpty());
+        assertEquals(0, reader.remaining());
+    }
+
+    // ---- 31. testSaveQuestTagsRoundTrip ----
+
+    @Test
+    void testSaveQuestTagsRoundTrip() {
+        UUID questId = UUID.randomUUID();
+        List<String> tags = List.of("pvp", "hardcore");
+        byte[] packet = PacketCodec.writeSaveQuest(
+                questId, "PvP Quest", "Fight to win.",
+                null, false, null, "mirage", tags);
+
+        ByteBufReader reader = new ByteBufReader(packet);
+        assertEquals(PacketType.SAVE_QUEST, PacketCodec.readType(reader));
+        PacketCodec.SaveQuestPayload payload = PacketCodec.readSaveQuest(reader);
+
+        assertEquals(questId, payload.questId());
+        assertEquals("PvP Quest", payload.title());
+        assertEquals(tags, payload.tags());
+        assertEquals(0, reader.remaining());
+    }
+
+    // ---- 32. testHandshakePredefinedTagsRoundTrip ----
+
+    @Test
+    void testHandshakePredefinedTagsRoundTrip() {
+        List<UUID> pinnedIds = List.of(UUID.randomUUID());
+        UUID playerUuid = UUID.randomUUID();
+        Map<String, String> mapNames = Map.of("overworld", "world_new");
+        List<String> predefinedTags = List.of("combat", "exploration", "crafting");
+
+        byte[] packet = PacketCodec.writeHandshake(
+                "https://bluemap.example.com", 1, pinnedIds, playerUuid, mapNames, predefinedTags);
+        ByteBufReader reader = new ByteBufReader(packet);
+
+        assertEquals(PacketType.HANDSHAKE, PacketCodec.readType(reader));
+        PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(reader);
+
+        assertEquals("https://bluemap.example.com", payload.bluemapUrl());
+        assertEquals(predefinedTags, payload.predefinedTags());
+        assertEquals(0, reader.remaining());
+    }
+
+    @Test
+    void testHandshakePredefinedTagsEmptyViaConvenienceOverload() {
+        UUID playerUuid = UUID.randomUUID();
+        byte[] packet = PacketCodec.writeHandshake(null, 0, List.of(), playerUuid);
+        ByteBufReader reader = new ByteBufReader(packet);
+
+        assertEquals(PacketType.HANDSHAKE, PacketCodec.readType(reader));
+        PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(reader);
+
+        assertTrue(payload.predefinedTags().isEmpty());
         assertEquals(0, reader.remaining());
     }
 }

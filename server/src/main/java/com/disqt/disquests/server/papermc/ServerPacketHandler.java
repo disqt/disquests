@@ -96,7 +96,8 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
                 payload.questId(), payload.title(), payload.content(),
                 playerUuid, player.getName(), Visibility.PRIVATE,
                 List.of(), System.currentTimeMillis() / 1000,
-                payload.coords(), payload.isRegion(), payload.coords2(), payload.map()
+                payload.coords(), payload.isRegion(), payload.coords2(), payload.map(),
+                payload.tags()
             );
             dataManager.saveQuest(newQuest);
             QuestData saved = dataManager.getQuest(payload.questId());
@@ -113,7 +114,8 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
                 existing.id(), payload.title(), payload.content(),
                 existing.ownerUuid(), existing.ownerName(), existing.visibility(),
                 existing.contributors(), System.currentTimeMillis() / 1000,
-                payload.coords(), payload.isRegion(), payload.coords2(), payload.map()
+                payload.coords(), payload.isRegion(), payload.coords2(), payload.map(),
+                payload.tags()
             );
             dataManager.saveQuest(updated);
             QuestData saved = dataManager.getQuest(payload.questId());

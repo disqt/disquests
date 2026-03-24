@@ -617,7 +617,8 @@ public class DataManager {
                 coords,
                 rs.getInt("is_region") != 0,
                 coords2,
-                rs.getString("map")
+                rs.getString("map"),
+                List.of()
         );
     }
 
@@ -635,7 +636,8 @@ public class DataManager {
                 quest.coordinates(),
                 quest.isRegion(),
                 quest.coordinates2(),
-                quest.map()
+                quest.map(),
+                quest.tags()
         );
     }
 
@@ -678,7 +680,8 @@ public class DataManager {
                 quest.id(), quest.title(), quest.content(),
                 quest.ownerUuid(), quest.ownerName(), quest.visibility(),
                 contributors, quest.lastModified(),
-                quest.coordinates(), quest.isRegion(), quest.coordinates2(), quest.map()
+                quest.coordinates(), quest.isRegion(), quest.coordinates2(), quest.map(),
+                quest.tags()
             ));
         }
         return result;

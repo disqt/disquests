@@ -166,7 +166,7 @@ public class QuestScreen extends DisquestsBaseScreen {
                 List<RenderedLine> rerendered = MarkdownRenderer.render(updated);
                 markdownWidget.setContent(rerendered);
                 PacketSender.saveQuest(quest.getId(), quest.getTitle(), updated,
-                        quest.getCoordinates(), quest.isRegion(), quest.getCoordinates2(), quest.getMap());
+                        quest.getCoordinates(), quest.isRegion(), quest.getCoordinates2(), quest.getMap(), quest.getTags());
                 ClientCache.addOrUpdateMyQuest(quest);
             });
         }
@@ -472,7 +472,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         persistFieldValues();
         ClientCache.addOrUpdateMyQuest(quest);
         PacketSender.saveQuest(quest.getId(), quest.getTitle(), quest.getContent(),
-                quest.getCoordinates(), quest.isRegion(), quest.getCoordinates2(), quest.getMap());
+                quest.getCoordinates(), quest.isRegion(), quest.getCoordinates2(), quest.getMap(), quest.getTags());
 
         UUID myUuid = ClientSession.getEffectivePlayerUuid();
         if (quest.getOwnerUuid().equals(myUuid)) {

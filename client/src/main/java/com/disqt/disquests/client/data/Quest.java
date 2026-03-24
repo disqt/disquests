@@ -22,6 +22,7 @@ public class Quest {
     private boolean isRegion;
     private CoordinatesData coordinates2;
     private String map;
+    private List<String> tags;
 
     public static Quest fromNetwork(QuestData data) {
         Quest quest = new Quest();
@@ -40,6 +41,7 @@ public class Quest {
         quest.isRegion = data.isRegion();
         quest.coordinates2 = data.coordinates2();
         quest.map = data.map();
+        quest.tags = new ArrayList<>(data.tags());
         return quest;
     }
 
@@ -137,6 +139,14 @@ public class Quest {
 
     public void setMap(String map) {
         this.map = map;
+    }
+
+    public List<String> getTags() {
+        return tags != null ? tags : List.of();
+    }
+
+    public void setTags(List<String> tags) {
+        this.tags = tags;
     }
 
     // --- Permission helpers ---
