@@ -639,10 +639,47 @@ public class DataManager {
         );
     }
 
+    private Map<UUID, List<ContributorData>> getContributorsBatch(List<UUID> questIds) {
+        if (questIds.isEmpty()) return Map.of();
+        Map<UUID, List<ContributorData>> result = new HashMap<>();
+        for (UUID id : questIds) {
+            result.put(id, new ArrayList<>());
+        }
+        String placeholders = String.join(",", questIds.stream().map(id -> "?").toList());
+        String sql = "SELECT c.quest_id, c.player_uuid, c.can_edit, pn.name FROM contributors c " +
+                     "LEFT JOIN player_names pn ON c.player_uuid = pn.uuid " +
+                     "WHERE c.quest_id IN (" + placeholders + ")";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            for (int i = 0; i < questIds.size(); i++) {
+                stmt.setString(i + 1, questIds.get(i).toString());
+            }
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                UUID questId = UUID.fromString(rs.getString("quest_id"));
+                result.computeIfAbsent(questId, k -> new ArrayList<>()).add(new ContributorData(
+                    UUID.fromString(rs.getString("player_uuid")),
+                    rs.getString("name"),
+                    rs.getInt("can_edit") != 0
+                ));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to batch-load contributors", e);
+        }
+        return result;
+    }
+
     private List<QuestData> withContributorsAll(List<QuestData> quests) {
+        List<UUID> questIds = quests.stream().map(QuestData::id).toList();
+        Map<UUID, List<ContributorData>> contributorMap = getContributorsBatch(questIds);
         List<QuestData> result = new ArrayList<>(quests.size());
         for (QuestData quest : quests) {
-            result.add(withContributors(quest));
+            List<ContributorData> contributors = contributorMap.getOrDefault(quest.id(), List.of());
+            result.add(new QuestData(
+                quest.id(), quest.title(), quest.content(),
+                quest.ownerUuid(), quest.ownerName(), quest.visibility(),
+                contributors, quest.lastModified(),
+                quest.coordinates(), quest.isRegion(), quest.coordinates2(), quest.map()
+            ));
         }
         return result;
     }

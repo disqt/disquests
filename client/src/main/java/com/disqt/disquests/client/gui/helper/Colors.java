@@ -43,6 +43,9 @@ public final class Colors {
     // --- Accent ---
     public static int AMBER = 0xFFFFAA33;
 
+    // --- Badge ---
+    public static int BADGE_RED = 0xFFCC3333;
+
     // --- Entry Highlights ---
     public static int ENTRY_HOVER = 0x22FFFFFF;
     public static int ENTRY_SELECTED = 0x44FFFFFF;

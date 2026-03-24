@@ -36,6 +36,10 @@ import java.util.stream.Collectors;
  */
 public class QuestScreen extends DisquestsBaseScreen {
 
+    private static final String MAP_OVERWORLD = "overworld";
+    private static final String MAP_NETHER = "the_nether";
+    private static final String MAP_END = "the_end";
+
     private final Quest quest;
     private final boolean editing;
     private final boolean isNewQuest;
@@ -117,12 +121,10 @@ public class QuestScreen extends DisquestsBaseScreen {
         if (coordsSection != null) applyThemePanel(coordsSection);
 
         UUID myUuid = ClientSession.getEffectivePlayerUuid();
-        this.isOwner = quest.getOwnerUuid().equals(myUuid);
-        this.canEdit = isOwner || quest.getContributors().stream()
-                .anyMatch(c -> c.getUuid().equals(myUuid) && c.canEdit());
-        this.isContributor = quest.getContributors().stream()
-                .anyMatch(c -> c.getUuid().equals(myUuid));
-        this.hideContent = quest.getVisibility() == Visibility.CLOSED && !isOwner && !isContributor;
+        this.isOwner = quest.isOwner(myUuid);
+        this.canEdit = quest.canEdit(myUuid);
+        this.isContributor = quest.isContributor(myUuid);
+        this.hideContent = quest.isContentHidden(myUuid);
 
         if (editing) {
             buildEditMode(root);
@@ -438,25 +440,21 @@ public class QuestScreen extends DisquestsBaseScreen {
         persistFieldValues();
         String origTitle = quest.getTitle() != null ? quest.getTitle() : "";
         String origContent = quest.getContent() != null ? quest.getContent() : "";
-        if (this.client != null) {
-            this.client.setScreen(new QuestScreen(this.parent, quest, true, isNewQuest, origTitle, origContent));
-        }
+        navigateToScreen(new QuestScreen(this.parent, quest, true, isNewQuest, origTitle, origContent));
     }
 
     private void cancelEdit() {
         if (isDirty()) {
-            if (this.client != null) {
-                this.client.setScreen(new ConfirmScreen(this,
-                        Text.literal("Discard unsaved changes?"),
-                        () -> {
-                            quest.setTitle(originalTitle);
-                            quest.setContent(originalContent);
-                            exitToViewMode();
-                        },
-                        () -> {
-                            if (this.client != null) this.client.setScreen(this);
-                        }));
-            }
+            navigateToScreen(new ConfirmScreen(this,
+                    Text.literal("Discard unsaved changes?"),
+                    () -> {
+                        quest.setTitle(originalTitle);
+                        quest.setContent(originalContent);
+                        exitToViewMode();
+                    },
+                    () -> {
+                        navigateToScreen(this);
+                    }));
         } else {
             exitToViewMode();
         }
@@ -464,11 +462,9 @@ public class QuestScreen extends DisquestsBaseScreen {
 
     private void exitToViewMode() {
         if (isNewQuest) {
-            if (this.client != null) this.client.setScreen(this.parent);
+            navigateToScreen(this.parent);
         } else {
-            if (this.client != null) {
-                this.client.setScreen(new QuestScreen(this.parent, quest));
-            }
+            navigateToScreen(new QuestScreen(this.parent, quest));
         }
     }
 
@@ -483,55 +479,49 @@ public class QuestScreen extends DisquestsBaseScreen {
             PacketSender.updateVisibility(quest.getId(), quest.getVisibility());
         }
 
-        if (this.client != null) {
-            this.client.setScreen(new QuestScreen(this.parent, quest));
-        }
+        navigateToScreen(new QuestScreen(this.parent, quest));
     }
 
     // ===================== VIEW MODE ACTIONS =====================
 
     private void confirmDelete() {
-        if (this.client != null) {
-            this.client.setScreen(new ConfirmScreen(this,
-                    Text.literal("Delete quest \"" + quest.getTitle() + "\"?"),
-                    () -> {
-                        ClientCache.removeQuestById(quest.getId());
-                        PacketSender.deleteQuest(quest.getId());
-                        if (this.client != null) this.client.setScreen(this.parent);
-                    },
-                    () -> {
-                        if (this.client != null) this.client.setScreen(this);
-                    }));
-        }
+        navigateToScreen(new ConfirmScreen(this,
+                Text.literal("Delete quest \"" + quest.getTitle() + "\"?"),
+                () -> {
+                    ClientCache.removeQuestById(quest.getId());
+                    PacketSender.deleteQuest(quest.getId());
+                    navigateToScreen(this.parent);
+                },
+                () -> {
+                    navigateToScreen(this);
+                }));
     }
 
     private void leaveQuest() {
-        if (this.client != null) {
-            this.client.setScreen(new ConfirmScreen(this,
-                    Text.literal("Leave this quest? You'll lose contributor access."),
-                    () -> {
-                        ClientCache.removeFromMyQuests(quest.getId());
-                        PacketSender.leaveQuest(quest.getId());
-                        ClientSession.setPendingToast("Left \"" + quest.getTitle() + "\"");
-                        if (this.client != null) this.client.setScreen(this.parent);
-                    },
-                    () -> {
-                        if (this.client != null) this.client.setScreen(this);
-                    }));
-        }
+        navigateToScreen(new ConfirmScreen(this,
+                Text.literal("Leave this quest? You'll lose contributor access."),
+                () -> {
+                    ClientCache.removeFromMyQuests(quest.getId());
+                    PacketSender.leaveQuest(quest.getId());
+                    ClientSession.setPendingToast("Left \"" + quest.getTitle() + "\"");
+                    navigateToScreen(this.parent);
+                },
+                () -> {
+                    navigateToScreen(this);
+                }));
     }
 
     private void joinQuest() {
         PacketSender.joinQuest(quest.getId());
         ClientSession.setPendingToast("Joined \"" + quest.getTitle() + "\"");
-        if (this.client != null) this.client.setScreen(this.parent);
+        navigateToScreen(this.parent);
     }
 
     private void requestAccess() {
         PacketSender.requestCollaboration(quest.getId());
         ClientSession.markRequested(quest.getId());
         ClientSession.setPendingToast("Request sent to " + quest.getOwnerName());
-        if (this.client != null) this.client.setScreen(this.parent);
+        navigateToScreen(this.parent);
     }
 
     // ===================== EDIT MODE ACTIONS =====================
@@ -580,13 +570,13 @@ public class QuestScreen extends DisquestsBaseScreen {
         persistFieldValues();
         String current = quest.getMap();
         if (current == null) {
-            quest.setMap("overworld");
+            quest.setMap(MAP_OVERWORLD);
         } else {
             quest.setMap(switch (current) {
-                case "overworld" -> "the_nether";
-                case "the_nether" -> "the_end";
-                case "the_end" -> null; // cycles back to "any"
-                default -> "overworld";
+                case MAP_OVERWORLD -> MAP_NETHER;
+                case MAP_NETHER -> MAP_END;
+                case MAP_END -> null; // cycles back to "any"
+                default -> MAP_OVERWORLD;
             });
         }
         rebuildEditMode();
@@ -606,16 +596,12 @@ public class QuestScreen extends DisquestsBaseScreen {
 
     private void openContributors() {
         persistFieldValues();
-        if (this.client != null) {
-            this.client.setScreen(new ContributorScreen(this, quest));
-        }
+        navigateToScreen(new ContributorScreen(this, quest));
     }
 
     private void rebuildEditMode() {
-        if (this.client != null) {
-            this.client.setScreen(new QuestScreen(this.parent, quest, true, isNewQuest,
-                    originalTitle, originalContent));
-        }
+        navigateToScreen(new QuestScreen(this.parent, quest, true, isNewQuest,
+                originalTitle, originalContent));
     }
 
     // ===================== HELPERS =====================
@@ -627,33 +613,29 @@ public class QuestScreen extends DisquestsBaseScreen {
         if (contentFieldComponent != null) {
             quest.setContent(contentFieldComponent.getText());
         }
-        if (coordXComponent != null && coordYComponent != null && coordZComponent != null) {
-            try {
-                double x = Double.parseDouble(coordXComponent.getText().trim());
-                double y = Double.parseDouble(coordYComponent.getText().trim());
-                double z = Double.parseDouble(coordZComponent.getText().trim());
-                quest.setCoordinates(new CoordinatesData(x, y, z));
-            } catch (NumberFormatException e) {
-                if (coordXComponent.getText().trim().isEmpty()
-                        && coordYComponent.getText().trim().isEmpty()
-                        && coordZComponent.getText().trim().isEmpty()) {
-                    quest.setCoordinates(null);
-                }
-            }
+        if (coordXComponent != null) {
+            quest.setCoordinates(parseCoordinates(coordXComponent, coordYComponent, coordZComponent));
         }
-        if (coord2XComponent != null && coord2YComponent != null && coord2ZComponent != null) {
-            try {
-                double x2 = Double.parseDouble(coord2XComponent.getText().trim());
-                double y2 = Double.parseDouble(coord2YComponent.getText().trim());
-                double z2 = Double.parseDouble(coord2ZComponent.getText().trim());
-                quest.setCoordinates2(new CoordinatesData(x2, y2, z2));
-            } catch (NumberFormatException e) {
-                if (coord2XComponent.getText().trim().isEmpty()
-                        && coord2YComponent.getText().trim().isEmpty()
-                        && coord2ZComponent.getText().trim().isEmpty()) {
-                    quest.setCoordinates2(null);
-                }
-            }
+        if (coord2XComponent != null) {
+            quest.setCoordinates2(parseCoordinates(coord2XComponent, coord2YComponent, coord2ZComponent));
+        }
+    }
+
+    private CoordinatesData parseCoordinates(TextFieldComponent xComp, TextFieldComponent yComp, TextFieldComponent zComp) {
+        if (xComp == null || yComp == null || zComp == null) return null;
+        String xText = xComp.getText().trim();
+        String yText = yComp.getText().trim();
+        String zText = zComp.getText().trim();
+        if (xText.isEmpty() && yText.isEmpty() && zText.isEmpty()) {
+            return null;
+        }
+        try {
+            return new CoordinatesData(
+                    Double.parseDouble(xText),
+                    Double.parseDouble(yText),
+                    Double.parseDouble(zText));
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 
@@ -711,8 +693,4 @@ public class QuestScreen extends DisquestsBaseScreen {
         }
     }
 
-    @Override
-    public boolean shouldPause() {
-        return false;
-    }
 }

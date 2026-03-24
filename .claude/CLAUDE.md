@@ -59,7 +59,7 @@ UX-driven journey tests in `client/src/testmod/java/com/disqt/disquests/test/int
 ./gradlew :client:runDuoTests -PtestFilter=TwoPlayerJourneys                  # specific test class
 ```
 
-**CI status:** The `e2e-test.yml` workflow has never passed on CI (Paper server setup issue). E2E tests only run locally.
+**CI status:** The `e2e-test.yml` workflow runs on every PR and push to main. `ensureServer()` auto-downloads paper.jar from the Paper API and bootstraps `paper/run/` (eula, server.properties) on first run.
 
 Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with GLFW physical input via `TestInput`. All tests connect to a live Paper server -- no mocking.
 
@@ -144,7 +144,6 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **`ClientCache.getQuestById` searches both lists** — returns quests from myQuests AND serverQuests. After leaving an OPEN quest, it's removed from myQuests but still in serverQuests. Use `getMyQuests().stream()` to check membership specifically.
 - **Logger names use `.` not `/`** — `LoggerFactory.getLogger("Disquests.MainScreen")` not `"Disquests/MainScreen"`. Log4j2 uses `.` for hierarchy; `/` creates flat names that don't inherit parent logger config (e.g. test log4j2-test.xml).
 - **owo-ui `doubled` flag is screen-level** — The `boolean doubled` in `onMouseDown(Click, boolean)` comes from vanilla Minecraft's `Screen` class, not per-component. Clicking two different components quickly registers as a double-click. Components that care must track their own state (see `QuestEntryComponent`).
-- **`ClientCache.clear()` doesn't bump version** — Only `setMyQuests`/`setServerQuests`/`addOrUpdate`/`remove` methods increment the version counter.
 - **`javax.annotation` not on testmod classpath** — Don't use `@Nullable` etc. in testmod code. JUnit is also unresolvable in IDE (cosmetic, compiles fine via Gradle).
 
 ## Deploy

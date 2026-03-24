@@ -94,8 +94,4 @@ public class ConfigScreen extends DisquestsBaseScreen {
                 });
     }
 
-    @Override
-    public boolean shouldPause() {
-        return false;
-    }
 }

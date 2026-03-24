@@ -29,10 +29,19 @@ public enum PacketType {
 
     public byte getId() { return id; }
 
-    public static PacketType fromId(byte id) {
+    private static final PacketType[] BY_ID;
+    static {
+        BY_ID = new PacketType[256];
         for (PacketType type : values()) {
-            if (type.id == id) return type;
+            BY_ID[type.id & 0xFF] = type;
         }
-        throw new IllegalArgumentException("Unknown packet type: 0x" + String.format("%02X", id));
+    }
+
+    public static PacketType fromId(byte id) {
+        PacketType type = BY_ID[id & 0xFF];
+        if (type == null) {
+            throw new IllegalArgumentException("Unknown packet type: 0x" + String.format("%02X", id));
+        }
+        return type;
     }
 }

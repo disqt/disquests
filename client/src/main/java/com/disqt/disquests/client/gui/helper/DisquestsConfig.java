@@ -14,7 +14,7 @@ public class DisquestsConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger("Disquests");
     private static final Path CONFIG_PATH = FabricLoader.getInstance().getConfigDir()
             .resolve("disquests").resolve("config.json");
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     public static final int MIN_PINNED_WIDTH = 100;
     public static final int MAX_PINNED_WIDTH = 400;

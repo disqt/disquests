@@ -1,6 +1,7 @@
 package com.disqt.disquests.client.mixin;
 
 import com.disqt.disquests.client.ClientSession;
+import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
@@ -54,7 +55,7 @@ public abstract class InventoryBadgeMixin extends Screen {
             int dotX = badgeX + BADGE_SIZE - dotSize / 2;
             int dotY = badgeY - dotSize / 2 + 2;
 
-            context.fill(dotX, dotY, dotX + dotSize, dotY + dotSize, 0xFFCC3333);
+            context.fill(dotX, dotY, dotX + dotSize, dotY + dotSize, Colors.BADGE_RED);
             int countTextX = dotX + (dotSize - countWidth) / 2;
             int countTextY = dotY + (dotSize - tr.fontHeight) / 2;
             context.drawText(tr, countStr, countTextX, countTextY, 0xFFFFFFFF, false);

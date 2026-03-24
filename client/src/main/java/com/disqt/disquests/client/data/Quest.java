@@ -138,4 +138,24 @@ public class Quest {
     public void setMap(String map) {
         this.map = map;
     }
+
+    // --- Permission helpers ---
+
+    public boolean isOwner(UUID playerUuid) {
+        return playerUuid != null && playerUuid.equals(ownerUuid);
+    }
+
+    public boolean isContributor(UUID playerUuid) {
+        return contributors != null && contributors.stream()
+                .anyMatch(c -> c.getUuid().equals(playerUuid));
+    }
+
+    public boolean canEdit(UUID playerUuid) {
+        return isOwner(playerUuid) || (contributors != null && contributors.stream()
+                .anyMatch(c -> c.getUuid().equals(playerUuid) && c.canEdit()));
+    }
+
+    public boolean isContentHidden(UUID playerUuid) {
+        return visibility == Visibility.CLOSED && !isOwner(playerUuid) && !isContributor(playerUuid);
+    }
 }
