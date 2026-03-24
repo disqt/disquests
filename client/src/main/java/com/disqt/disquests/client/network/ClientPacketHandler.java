@@ -64,7 +64,8 @@ public class ClientPacketHandler {
     private static void handleHandshake(ByteBufReader r) {
         PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(r);
         ClientSession.joinServer(payload.bluemapUrl(), payload.pendingRequestCount(),
-                payload.pinnedQuestIds(), payload.playerUuid(), payload.bluemapMapNames());
+                payload.pinnedQuestIds(), payload.playerUuid(), payload.bluemapMapNames(),
+                payload.predefinedTags());
         PacketSender.requestSync();
 
     }
