@@ -1,4 +1,4 @@
-package com.disqt.disquests.paper;
+package com.disqt.disquests.server.papermc;
 
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;

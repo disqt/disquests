@@ -7,4 +7,4 @@ pluginManagement {
 }
 
 rootProject.name = "disquests"
-include("common", "client", "paper")
+include("common", "client", "server")

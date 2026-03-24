@@ -13,16 +13,16 @@ Originally forked from [BuildNotes](https://github.com/Atif85/buildnotes-mod) (M
 ```
 common/   — shared PacketCodec, data models, no platform deps
 client/   — Fabric mod, networking via RawPayload, markdown rendering via commonmark-java
-paper/    — Paper plugin: SQLite storage, permissions, packet handler, commands
+server/   — Paper plugin: SQLite storage, permissions, packet handler, commands
 ```
 
-Both `client` and `paper` depend on `common`. The client registers a single `RawPayload` CustomPayload type that wraps raw bytes; the Paper plugin uses `Messenger.registerIncomingPluginChannel()`. Both sides use `PacketCodec` from common for serialization.
+Both `client` and `server` depend on `common`. The client registers a single `RawPayload` CustomPayload type that wraps raw bytes; the Paper plugin uses `Messenger.registerIncomingPluginChannel()`. Both sides use `PacketCodec` from common for serialization.
 
 **GUI migration state:** All screens migrated to owo-ui (XML layouts + `DisquestsBaseScreen`). MarkdownWidget ported to `BaseUIComponent`. MultiLineTextFieldWidget wrapped via `TextFieldComponent`.
 
 **All modules share the same package namespace**: `com.disqt.disquests.*`
 - Common: `com.disqt.disquests.common.*`
-- Paper: `com.disqt.disquests.paper.*`
+- Server: `com.disqt.disquests.server.papermc.*`
 - Client: `com.disqt.disquests.client.*`
 
 ## Build
@@ -33,8 +33,8 @@ All versions (MC, Fabric, Paper, Java) are in `gradle.properties` — that is th
 ./gradlew build              # build all
 ./gradlew :common:test       # run codec unit tests (JUnit 5)
 ./gradlew :client:build      # build Fabric mod jar
-./gradlew :paper:build       # build Paper plugin jar
-./gradlew :paper:runServer   # start Paper dev server (auto-downloads Paper, places plugin jar)
+./gradlew :server:build       # build Paper plugin jar
+./gradlew :server:runServer   # start Paper dev server (auto-downloads Paper, places plugin jar)
 ```
 
 `runServer` has a 4GB free RAM gate — it will refuse to start on low-memory machines (Pi, VPS). The check and threshold are in `build.gradle.kts` via `requireFreeRam`.
@@ -59,7 +59,7 @@ UX-driven journey tests in `client/src/testmod/java/com/disqt/disquests/test/int
 ./gradlew :client:runDuoTests -PtestFilter=TwoPlayerJourneys                  # specific test class
 ```
 
-**CI status:** The `e2e-test.yml` workflow runs on every PR and push to main. `ensureServer()` auto-downloads paper.jar from the Paper API and bootstraps `paper/run/` (eula, server.properties) on first run.
+**CI status:** The `e2e-test.yml` workflow runs on every PR and push to main. `ensureServer()` auto-downloads paper.jar from the Paper API and bootstraps `server/run/` (eula, server.properties) on first run.
 
 Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with GLFW physical input via `TestInput`. All tests connect to a live Paper server -- no mocking.
 
@@ -79,7 +79,7 @@ Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with GLFW physical inpu
 - **Loom property passing** — use `-P` (Gradle property) not `-D` (JVM system property) for subprocess invocation.
 - **Prism mods incompatible with `runClient`** — production jars use intermediary mappings, dev environment uses named mappings. Mixin crashes guaranteed.
 - **ModMenu incompatible with `runClient`** — ModMenu's TitleScreen mixin crashes in dev. Use F6 keybind to open ConfigScreen instead.
-- **`paper/run/server.properties` `max-players`** — must be >= 4 (two test clients + reconnect headroom)
+- **`server/run/server.properties` `max-players`** — must be >= 4 (two test clients + reconnect headroom)
 
 ## Networking Protocol
 
@@ -107,11 +107,11 @@ Channel: `disquests:main`. First byte = PacketType ID.
 | `client/src/main/java/com/disqt/disquests/client/gui/helper/Theme.java` | Theme enum (VANILLA, FLAT, INSET, FROSTED, ACCENT_LINE) with color palettes and surfaces |
 | `client/src/main/java/com/disqt/disquests/client/debug/DebugScreenEvents.java` | Fabric screen event hooks for debug logging |
 | `client/src/main/resources/assets/disquests/owo_ui/*.xml` | XML UI models for all screens (hot-reloadable) |
-| `paper/src/main/java/com/disqt/disquests/paper/DisquestsPlugin.java` | Plugin entry, channel registration |
-| `paper/src/main/java/com/disqt/disquests/paper/ServerPacketHandler.java` | Handles C2S, broadcasts S2C |
-| `paper/src/main/java/com/disqt/disquests/paper/DataManager.java` | SQLite persistence |
-| `paper/src/main/java/com/disqt/disquests/paper/PlayerNameTracker.java` | Tracks online player display names |
-| `paper/src/main/java/com/disqt/disquests/paper/Commands.java` | `/disquests reload` and `/disquests reset` (debug mode) |
+| `server/src/main/java/com/disqt/disquests/server/papermc/DisquestsPlugin.java` | Plugin entry, channel registration |
+| `server/src/main/java/com/disqt/disquests/server/papermc/ServerPacketHandler.java` | Handles C2S, broadcasts S2C |
+| `server/src/main/java/com/disqt/disquests/server/papermc/DataManager.java` | SQLite persistence |
+| `server/src/main/java/com/disqt/disquests/server/papermc/PlayerNameTracker.java` | Tracks online player display names |
+| `server/src/main/java/com/disqt/disquests/server/papermc/Commands.java` | `/disquests reload` and `/disquests reset` (debug mode) |
 | `client/src/testmod/.../integration/harness/` | JUnit 5 harness: HarnessCommon, TestContext, IntegrationTestExtension, RconClient |
 | `client/src/testmod/.../integration/journeys/` | Solo and duo journey test classes |
 
@@ -148,7 +148,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 
 ## Deploy
 
-- **Paper plugin**: `scp paper/build/libs/paper.jar minecraft:~/serverfiles/plugins/Disquests.jar` then `ssh minecraft "tmux -S /tmp/tmux-1000/pmcserver-bb664df1 send-keys -t pmcserver 'plugman reload Disquests' Enter"`
+- **Paper plugin**: `scp server/build/libs/server.jar minecraft:~/serverfiles/plugins/Disquests.jar` then `ssh minecraft "tmux -S /tmp/tmux-1000/pmcserver-bb664df1 send-keys -t pmcserver 'plugman reload Disquests' Enter"`
 - **Client mod**: `cp client/build/libs/client.jar "C:/Users/leole/AppData/Roaming/PrismLauncher/instances/1.21.11 v2.7/.minecraft/mods/disquests-client-0.2.5.jar"`
 - **owo-lib (Prism)**: Must be in Prism mods folder alongside client mod. Find in `~/.gradle/caches/modules-2/files-2.1/io.wispforest/owo-lib/`.
 

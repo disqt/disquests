@@ -1,4 +1,4 @@
-package com.disqt.disquests.paper;
+package com.disqt.disquests.server.papermc;
 
 import com.disqt.disquests.common.*;
 import com.disqt.disquests.common.model.*;
