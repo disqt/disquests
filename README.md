@@ -25,6 +25,7 @@ A Minecraft mod for creating, sharing, and collaborating on in-game quests. Fabr
 | Minecraft | 1.21.11 |
 | Fabric Loader | 0.18.2+ |
 | Fabric API | 0.139.5+ |
+| [owo-lib](https://modrinth.com/mod/owo-lib) | 0.13.0+ |
 | PaperMC | 1.21.11 |
 | Java | 21+ |
 
@@ -34,13 +35,14 @@ A Minecraft mod for creating, sharing, and collaborating on in-game quests. Fabr
 
 1. Install [Fabric Loader](https://fabricmc.net/use/) for Minecraft 1.21.11
 2. Install [Fabric API](https://modrinth.com/mod/fabric-api)
-3. Download the latest `disquests-*.jar` from [Releases](../../releases)
-4. Place it in your `.minecraft/mods/` directory
+3. Install [owo-lib](https://modrinth.com/mod/owo-lib) (UI framework dependency)
+4. Download the latest `disquests-client-*.jar` from [Releases](../../releases)
+5. Place it in your `.minecraft/mods/` directory
 
 ### Server admins
 
 1. Download the latest `disquests-paper-*.jar` from [Releases](../../releases)
-2. Place it in your server's `plugins/` directory
+2. Rename it to `Disquests.jar` and place it in your server's `plugins/` directory
 3. Restart the server
 
 The plugin creates a `plugins/Disquests/` directory with a `config.yml` and SQLite database on first run.
@@ -51,6 +53,7 @@ The plugin creates a `plugins/Disquests/` directory with a `config.yml` and SQLi
 |--------|-----------------|
 | Open quest list | **N** |
 | Toggle HUD pin | Unbound (set in Controls) |
+| Open config | **F6** |
 
 From the quest list you can create new quests, browse server quests, and manage collaboration requests. Each quest has a title, markdown content body, optional coordinates, and visibility settings.
 
@@ -72,33 +75,32 @@ cd disquests
 
 ./gradlew build                # build all modules
 ./gradlew :client:build        # client mod jar only
-./gradlew :paper:build         # server plugin jar only
+./gradlew :server:build        # server plugin jar only
 ./gradlew :common:test         # run unit tests
-./gradlew :paper:runServer     # start a dev Paper server
+./gradlew :server:runServer    # start a dev Paper server
 ```
 
 Build outputs:
-- Client mod: `client/build/libs/disquests-*.jar`
-- Paper plugin: `paper/build/libs/disquests-paper-*.jar`
+- Client mod: `client/build/libs/client.jar`
+- Paper plugin: `server/build/libs/server.jar`
 
 ### Project structure
 
 ```
 common/   — shared packet codec, data models (no platform dependencies)
 client/   — Fabric mod: UI, networking, HUD rendering, markdown
-paper/    — PaperMC plugin: SQLite storage, packet handler, commands
+server/   — PaperMC plugin: SQLite storage, packet handler, commands
 ```
 
 ### Running E2E tests
 
-The E2E tests run a real Minecraft client against a Paper server using Fabric's game test framework.
+The E2E tests launch real Minecraft clients against a Paper server. The test harness auto-starts the server.
 
 ```bash
-# 1. Start a Paper server with the plugin + RCON enabled
-./gradlew :paper:runServer
-
-# 2. In another terminal, run the game tests
-./gradlew runClientGameTest
+./gradlew :client:runIntegrationTest                                    # full suite
+./gradlew :client:runIntegrationTest -PtestFilter=QuestLifecycleJourney # single journey
+./gradlew :client:runSoloTests                                          # solo tests only
+./gradlew :client:runDuoTests                                           # two-player tests only
 ```
 
 See `.github/workflows/e2e-test.yml` for the full CI setup.

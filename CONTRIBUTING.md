@@ -18,16 +18,16 @@ Thanks for your interest in contributing to Disquests.
 ```
 common/   — shared packet codec and data models (no platform deps)
 client/   — Fabric client mod
-paper/    — PaperMC server plugin
+server/   — PaperMC server plugin
 ```
 
-Both `client` and `paper` depend on `common`. Changes to the networking protocol or data models usually touch all three modules.
+Both `client` and `server` depend on `common`. Changes to the networking protocol or data models usually touch all three modules.
 
 ## Development setup
 
 - **Java 21+** required
 - **Gradle** — the wrapper is included, use `./gradlew`
-- **Paper dev server** — `./gradlew :paper:runServer` starts a local Paper server with the plugin installed (requires 4GB+ free RAM)
+- **Paper dev server** — `./gradlew :server:runServer` starts a local Paper server with the plugin installed (requires 4GB+ free RAM)
 - **Versions** — all Minecraft, Fabric, and Paper versions are in `gradle.properties`
 
 ## Code style

@@ -149,7 +149,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 ## Deploy
 
 - **Paper plugin**: `scp server/build/libs/server.jar minecraft:~/serverfiles/plugins/Disquests.jar` then `ssh minecraft "tmux -S /tmp/tmux-1000/pmcserver-bb664df1 send-keys -t pmcserver 'plugman reload Disquests' Enter"`
-- **Client mod**: `cp client/build/libs/client.jar "C:/Users/leole/AppData/Roaming/PrismLauncher/instances/1.21.11 v2.7/.minecraft/mods/disquests-client-0.2.5.jar"`
+- **Client mod**: `cp client/build/libs/client.jar "C:/Users/leole/AppData/Roaming/PrismLauncher/instances/1.21.11 v2.7/.minecraft/mods/disquests-client-0.3.0.jar"`
 - **owo-lib (Prism)**: Must be in Prism mods folder alongside client mod. Find in `~/.gradle/caches/modules-2/files-2.1/io.wispforest/owo-lib/`.
 
 ## Release
@@ -157,8 +157,8 @@ Channel: `disquests:main`. First byte = PacketType ID.
 Tag-triggered via GitHub Actions (`.github/workflows/release.yml`). Pushes a `v*` tag, runs E2E tests, generates changelog from conventional commits, creates GitHub release with `disquests-client-{version}.jar` and `disquests-paper-{version}.jar`.
 
 ```bash
-git tag v0.2.4
-git push origin v0.2.4
+git tag v0.3.0
+git push origin v0.3.0
 ```
 
 ## References
