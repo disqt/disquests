@@ -6,6 +6,7 @@ import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.helper.TagColors;
 import com.disqt.disquests.client.gui.widget.MarkdownWidget;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
@@ -17,8 +18,10 @@ import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.ParentUIComponent;
 import io.wispforest.owo.ui.core.Sizing;
+import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -148,6 +151,23 @@ public class QuestScreen extends DisquestsBaseScreen {
         root.childById(LabelComponent.class, "owner-label")
                 .text(Text.literal(ownerInfo).withColor(Colors.TEXT_MUTED));
 
+        // Tag display
+        FlowLayout tagDisplay = root.childById(FlowLayout.class, "tag-display");
+        List<String> viewTags = quest.getTags();
+        if (viewTags.isEmpty()) {
+            LabelComponent noTagsLabel = UIComponents.label(
+                    Text.literal("no tags").withColor(Colors.TEXT_MUTED).styled(s -> s.withItalic(true)));
+            noTagsLabel.shadow(false);
+            tagDisplay.child(noTagsLabel);
+        } else {
+            for (String tag : viewTags) {
+                LabelComponent tagLabel = UIComponents.label(
+                        Text.literal(tag).withColor(TagColors.getForeground(tag)));
+                tagLabel.shadow(true);
+                tagDisplay.child(tagLabel);
+            }
+        }
+
         // Content area -- add MarkdownWidget
         String contentToRender = hideContent
                 ? "Request access to view this quest"
@@ -276,6 +296,11 @@ public class QuestScreen extends DisquestsBaseScreen {
         titleFieldComponent.sizing(Sizing.fill(90), Sizing.fixed(16));
         titleFieldComponent.id("title-field");
         titleRow.child(titleFieldComponent);
+
+        // Tag editor (only if player can edit)
+        if (canEdit) {
+            buildTagEditor(root);
+        }
 
         // Content editor
         FlowLayout editorPanel = root.childById(FlowLayout.class, "editor-panel");
@@ -416,6 +441,44 @@ public class QuestScreen extends DisquestsBaseScreen {
         mapBtn.sizing(Sizing.content(), Sizing.fixed(14));
         mapBtn.id("btn-map");
         mapRow.child(mapBtn);
+    }
+
+    private void buildTagEditor(FlowLayout root) {
+        FlowLayout tagEditor = root.childById(FlowLayout.class, "tag-editor");
+        if (tagEditor == null) return;
+
+        List<String> tags = quest.getTags();
+        for (int i = 0; i < tags.size(); i++) {
+            final String tag = tags.get(i);
+            final int idx = i;
+
+            // Tag label
+            LabelComponent tagLabel = UIComponents.label(
+                    Text.literal(tag).withColor(TagColors.getForeground(tag)));
+            tagLabel.shadow(true);
+            tagEditor.child(tagLabel);
+
+            // Remove "x" button
+            ButtonComponent removeBtn = UIComponents.button(Text.literal("x"), b -> {
+                persistFieldValues();
+                quest.getTags().remove(idx);
+                rebuildEditMode();
+            });
+            removeBtn.sizing(Sizing.fixed(12), Sizing.fixed(12));
+            tagEditor.child(removeBtn);
+        }
+
+        // "+ Tag" button (only if below max)
+        if (tags.size() < 8) {
+            ButtonComponent addTagBtn = UIComponents.button(Text.literal("+ Tag"), b -> {
+                persistFieldValues();
+                QuestScreen returnScreen = new QuestScreen(this.parent, quest, true, isNewQuest,
+                        originalTitle, originalContent);
+                navigateToScreen(new TagPickerScreen(returnScreen, quest, returnScreen));
+            });
+            addTagBtn.sizing(Sizing.content(), Sizing.fixed(12));
+            tagEditor.child(addTagBtn);
+        }
     }
 
     private TextFieldComponent createCoordField(String value, String placeholder) {

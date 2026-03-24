@@ -49,6 +49,19 @@
                 </children>
             </flow-layout>
 
+            <!-- Tag display row (populated programmatically) -->
+            <flow-layout direction="horizontal" id="tag-display">
+                <sizing>
+                    <horizontal method="fill">85</horizontal>
+                    <vertical method="content"/>
+                </sizing>
+                <gap>3</gap>
+                <margins>
+                    <bottom>4</bottom>
+                </margins>
+                <children/>
+            </flow-layout>
+
             <!-- Content scroll area (MarkdownWidget added programmatically) -->
             <scroll direction="vertical" id="content-scroll">
                 <flow-layout direction="vertical" id="content-area">

@@ -1,0 +1,85 @@
+<owo-ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/wisp-forest/owo-lib/1.21/owo-ui.xsd">
+
+    <components>
+    <flow-layout direction="vertical" id="root">
+        <sizing>
+            <horizontal method="fill">100</horizontal>
+            <vertical method="fill">100</vertical>
+        </sizing>
+        <surface>
+            <vanilla-translucent/>
+        </surface>
+        <horizontal-alignment>center</horizontal-alignment>
+        <vertical-alignment>center</vertical-alignment>
+
+        <children>
+
+            <!-- Picker panel -->
+            <flow-layout direction="vertical" id="panel">
+                <sizing>
+                    <horizontal method="fixed">180</horizontal>
+                    <vertical method="content"/>
+                </sizing>
+                <surface>
+                    <panel dark="true"/>
+                </surface>
+                <padding>
+                    <all>10</all>
+                </padding>
+                <horizontal-alignment>center</horizontal-alignment>
+                <gap>6</gap>
+
+                <children>
+
+                    <!-- Title -->
+                    <label id="screen-title">
+                        <text>Add Tag</text>
+                        <shadow>true</shadow>
+                        <sizing>
+                            <horizontal method="content"/>
+                            <vertical method="content"/>
+                        </sizing>
+                        <margins>
+                            <bottom>2</bottom>
+                        </margins>
+                    </label>
+
+                    <!-- Predefined tags list (buttons added programmatically) -->
+                    <flow-layout direction="vertical" id="predefined-list">
+                        <sizing>
+                            <horizontal method="fill">100</horizontal>
+                            <vertical method="content"/>
+                        </sizing>
+                        <gap>3</gap>
+                        <children/>
+                    </flow-layout>
+
+                    <!-- Custom tag row (text field + Add button added programmatically) -->
+                    <flow-layout direction="horizontal" id="custom-row">
+                        <sizing>
+                            <horizontal method="fill">100</horizontal>
+                            <vertical method="content"/>
+                        </sizing>
+                        <gap>4</gap>
+                        <vertical-alignment>center</vertical-alignment>
+                        <children/>
+                    </flow-layout>
+
+                    <!-- Cancel button -->
+                    <button id="btn-cancel">
+                        <text>Cancel</text>
+                        <sizing>
+                            <horizontal method="fixed">60</horizontal>
+                            <vertical method="fixed">16</vertical>
+                        </sizing>
+                    </button>
+
+                </children>
+            </flow-layout>
+
+        </children>
+    </flow-layout>
+    </components>
+
+</owo-ui>
