@@ -434,6 +434,91 @@ class DataManagerTest {
     }
 
     // -------------------------------------------------------------------------
+    // Tags
+    // -------------------------------------------------------------------------
+
+    @Test
+    void saveQuest_persistsTags() {
+        UUID id = UUID.randomUUID();
+        dm.upsertPlayerName(OWNER, "Alice");
+        QuestData quest = new QuestData(
+                id, "Tagged Quest", "content", OWNER, null,
+                Visibility.OPEN, List.of(), 1000L,
+                null, false, null, null,
+                List.of("build", "survival", "creative")
+        );
+        dm.saveQuest(quest);
+
+        QuestData loaded = dm.getQuest(id);
+        assertNotNull(loaded);
+        assertEquals(3, loaded.tags().size());
+        assertTrue(loaded.tags().containsAll(List.of("build", "survival", "creative")));
+    }
+
+    @Test
+    void saveQuest_replacesTags() {
+        UUID id = UUID.randomUUID();
+        dm.upsertPlayerName(OWNER, "Alice");
+        QuestData quest = new QuestData(
+                id, "Quest", "content", OWNER, null,
+                Visibility.OPEN, List.of(), 1000L,
+                null, false, null, null,
+                List.of("old-tag", "another-old")
+        );
+        dm.saveQuest(quest);
+
+        QuestData updated = new QuestData(
+                id, "Quest", "content", OWNER, null,
+                Visibility.OPEN, List.of(), 2000L,
+                null, false, null, null,
+                List.of("new-tag")
+        );
+        dm.saveQuest(updated);
+
+        QuestData loaded = dm.getQuest(id);
+        assertNotNull(loaded);
+        assertEquals(1, loaded.tags().size());
+        assertTrue(loaded.tags().contains("new-tag"));
+        assertFalse(loaded.tags().contains("old-tag"));
+        assertFalse(loaded.tags().contains("another-old"));
+    }
+
+    @Test
+    void saveQuest_emptyTags() {
+        UUID id = UUID.randomUUID();
+        dm.upsertPlayerName(OWNER, "Alice");
+        QuestData quest = new QuestData(
+                id, "Quest", "content", OWNER, null,
+                Visibility.OPEN, List.of(), 1000L,
+                null, false, null, null,
+                List.of()
+        );
+        dm.saveQuest(quest);
+
+        QuestData loaded = dm.getQuest(id);
+        assertNotNull(loaded);
+        assertTrue(loaded.tags().isEmpty());
+    }
+
+    @Test
+    void resetDatabase_clearsTags() {
+        UUID id = UUID.randomUUID();
+        dm.upsertPlayerName(OWNER, "Alice");
+        QuestData quest = new QuestData(
+                id, "Tagged Quest", "content", OWNER, null,
+                Visibility.OPEN, List.of(), 1000L,
+                null, false, null, null,
+                List.of("tag1", "tag2")
+        );
+        dm.saveQuest(quest);
+
+        dm.resetDatabase();
+
+        assertNull(dm.getQuest(id));
+        assertTrue(dm.getQuestsForPlayer(OWNER).isEmpty());
+    }
+
+    // -------------------------------------------------------------------------
     // Reset Database
     // -------------------------------------------------------------------------
 
