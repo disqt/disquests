@@ -399,7 +399,7 @@ fun stopServer(serverProcess: Process?) {
 tasks.register("runSoloTests") {
     group = "verification"
     description = "Run single-player E2E journey tests (one client only)"
-    dependsOn(":paper:jar", ":client:build")
+    dependsOn(":server:jar", ":client:build")
 
     doLast {
         val isWin = System.getProperty("os.name").lowercase().contains("win")
@@ -410,7 +410,7 @@ tasks.register("runSoloTests") {
         val soloPackage = "com.disqt.disquests.test.integration.journeys.solo"
 
         val syncDir = File(rootProject.projectDir, "integration-sync")
-        val serverDir = file("../paper/run")
+        val serverDir = file("../server/run")
         val processes = mutableListOf<Process>()
         var serverProcess: Process? = null
         var startedClients = false
@@ -423,7 +423,7 @@ tasks.register("runSoloTests") {
         try {
             // --- Step 2: Server ---
             if (!noStart) {
-                val pluginJar = file("../paper/build/libs/paper.jar")
+                val pluginJar = file("../server/build/libs/server.jar")
                 serverProcess = ensureServer(serverDir, logger, pluginJar, minecraft_version)
                 rconReset(logger)
             } else {
@@ -505,7 +505,7 @@ tasks.register("runSoloTests") {
 tasks.register("runDuoTests") {
     group = "verification"
     description = "Run two-player E2E journey tests (both clients)"
-    dependsOn(":paper:jar", ":client:build")
+    dependsOn(":server:jar", ":client:build")
 
     doLast {
         val isWin = System.getProperty("os.name").lowercase().contains("win")
@@ -517,7 +517,7 @@ tasks.register("runDuoTests") {
         val duoPackage = "com.disqt.disquests.test.integration.journeys.duo"
 
         val syncDir = File(rootProject.projectDir, "integration-sync")
-        val serverDir = file("../paper/run")
+        val serverDir = file("../server/run")
         val processes = mutableListOf<Process>()
         var serverProcess: Process? = null
         var startedClients = false
@@ -530,7 +530,7 @@ tasks.register("runDuoTests") {
         try {
             // --- Step 2: Server ---
             if (!noStart) {
-                val pluginJar = file("../paper/build/libs/paper.jar")
+                val pluginJar = file("../server/build/libs/server.jar")
                 serverProcess = ensureServer(serverDir, logger, pluginJar, minecraft_version)
                 rconReset(logger)
             } else {
@@ -652,7 +652,7 @@ tasks.register("runDuoTests") {
 tasks.register("runIntegrationTest") {
     group = "verification"
     description = "Run all integration E2E tests: solo first, then duo"
-    dependsOn(":paper:jar", ":client:build")
+    dependsOn(":server:jar", ":client:build")
 
     doLast {
         val isWin = System.getProperty("os.name").lowercase().contains("win")
