@@ -4,6 +4,7 @@ import com.disqt.disquests.client.BlueMapHelper;
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
+import com.disqt.disquests.client.gui.component.AutocompleteDropdown;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.helper.TagColors;
@@ -313,6 +314,21 @@ public class QuestScreen extends DisquestsBaseScreen {
         contentFieldComponent.id("content-field");
         editorPanel.child(contentFieldComponent);
 
+        // Attach autocomplete dropdown for wiki-link syntax ([[Quest Name]])
+        AutocompleteDropdown autocomplete = new AutocompleteDropdown();
+        autocomplete.setOnSelect(title -> {
+            // Replace the partial query after [[ with the full title + ]]
+            String current = contentFieldComponent.getText();
+            int openBracket = current.lastIndexOf("[[");
+            if (openBracket >= 0) {
+                String before = current.substring(0, openBracket + 2);
+                String replacement = before + title + "]]";
+                // Append any text after the cursor (approximated as end of text)
+                contentFieldComponent.getDelegate().setText(replacement);
+            }
+        });
+        contentFieldComponent.setAutocomplete(autocomplete);
+
         // Coords section
         buildCoordsSection(root);
 
@@ -367,6 +383,9 @@ public class QuestScreen extends DisquestsBaseScreen {
         if (fmtQuote != null) fmtQuote.text(Text.literal("> ").append(Text.literal("quote").styled(s -> s.withItalic(true).withColor(0xAAAAAA))));
         LabelComponent fmtLink = root.childById(LabelComponent.class, "fmt-link");
         if (fmtLink != null) fmtLink.text(Text.literal("[text](url): ").append(Text.literal("link").styled(s -> s.withUnderline(true).withColor(0x5555FF))));
+        LabelComponent fmtWikiLink = root.childById(LabelComponent.class, "fmt-wikilink");
+        if (fmtWikiLink != null) fmtWikiLink.text(Text.literal("[[Quest Name]]: ")
+                .append(Text.literal("quest link").styled(s -> s.withUnderline(true).withColor(0xe8a86d))));
     }
 
     private void buildCoordsSection(FlowLayout root) {

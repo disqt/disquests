@@ -137,6 +137,10 @@
                                 <text>[text](url)</text>
                                 <shadow>true</shadow>
                             </label>
+                            <label id="fmt-wikilink">
+                                <text>[[Quest Name]] = quest link</text>
+                                <shadow>true</shadow>
+                            </label>
                         </children>
                     </flow-layout>
                 </children>
