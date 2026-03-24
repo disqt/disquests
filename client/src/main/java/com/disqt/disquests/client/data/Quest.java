@@ -22,7 +22,7 @@ public class Quest {
     private boolean isRegion;
     private CoordinatesData coordinates2;
     private String map;
-    private List<String> tags;
+    private List<String> tags = new ArrayList<>();
 
     public static Quest fromNetwork(QuestData data) {
         Quest quest = new Quest();
