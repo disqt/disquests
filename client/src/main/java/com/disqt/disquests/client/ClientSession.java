@@ -25,6 +25,7 @@ public class ClientSession {
     private static final Set<UUID> requestedQuestIds = ConcurrentHashMap.newKeySet();
     private static UUID playerUuid = null;
     private static Map<String, String> bluemapMapNames = Map.of();
+    private static List<String> predefinedTags = List.of();
 
     // UI state
     private static Tab activeTab = Tab.MY_QUESTS;
@@ -33,11 +34,16 @@ public class ClientSession {
     private static String pendingToast = null;
 
     public static void joinServer(String bluemapUrl, int pendingCount, List<UUID> pinnedIds, UUID playerUuid) {
-        joinServer(bluemapUrl, pendingCount, pinnedIds, playerUuid, Map.of());
+        joinServer(bluemapUrl, pendingCount, pinnedIds, playerUuid, Map.of(), List.of());
     }
 
     public static void joinServer(String bluemapUrl, int pendingCount, List<UUID> pinnedIds, UUID playerUuid,
             Map<String, String> bluemapMapNames) {
+        joinServer(bluemapUrl, pendingCount, pinnedIds, playerUuid, bluemapMapNames, List.of());
+    }
+
+    public static void joinServer(String bluemapUrl, int pendingCount, List<UUID> pinnedIds, UUID playerUuid,
+            Map<String, String> bluemapMapNames, List<String> predefinedTags) {
         onServer = true;
         ClientSession.bluemapUrl = bluemapUrl;
         pendingRequestCount = pendingCount;
@@ -45,6 +51,7 @@ public class ClientSession {
         pinnedQuestIds.addAll(pinnedIds);
         ClientSession.playerUuid = playerUuid;
         ClientSession.bluemapMapNames = bluemapMapNames != null ? bluemapMapNames : Map.of();
+        ClientSession.predefinedTags = predefinedTags != null ? List.copyOf(predefinedTags) : List.of();
     }
 
     public static void leaveServer() {
@@ -56,6 +63,7 @@ public class ClientSession {
         pendingToast = null;
         playerUuid = null;
         bluemapMapNames = Map.of();
+        predefinedTags = List.of();
         activeTab = Tab.MY_QUESTS;
         searchTerm = "";
         serverQuestsFilter = QuestFilter.ALL;
@@ -82,6 +90,10 @@ public class ClientSession {
      */
     public static Map<String, String> getBluemapMapNames() {
         return bluemapMapNames;
+    }
+
+    public static List<String> getPredefinedTags() {
+        return predefinedTags;
     }
 
     public static int getPendingRequestCount() {

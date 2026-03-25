@@ -4,13 +4,16 @@ import com.disqt.disquests.client.BlueMapHelper;
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
+import com.disqt.disquests.client.gui.component.AutocompleteDropdown;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.helper.TagColors;
 import com.disqt.disquests.client.gui.widget.MarkdownWidget;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.client.markdown.RenderedLine;
 import com.disqt.disquests.client.network.PacketSender;
+import com.disqt.disquests.common.TagConstraints;
 import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.Visibility;
 import io.wispforest.owo.ui.component.ButtonComponent;
@@ -148,6 +151,23 @@ public class QuestScreen extends DisquestsBaseScreen {
         root.childById(LabelComponent.class, "owner-label")
                 .text(Text.literal(ownerInfo).withColor(Colors.TEXT_MUTED));
 
+        // Tag display
+        FlowLayout tagDisplay = root.childById(FlowLayout.class, "tag-display");
+        List<String> viewTags = quest.getTags();
+        if (viewTags.isEmpty()) {
+            LabelComponent noTagsLabel = UIComponents.label(
+                    Text.literal("no tags").withColor(Colors.TEXT_MUTED).styled(s -> s.withItalic(true)));
+            noTagsLabel.shadow(false);
+            tagDisplay.child(noTagsLabel);
+        } else {
+            for (String tag : viewTags) {
+                LabelComponent tagLabel = UIComponents.label(
+                        Text.literal(tag).withColor(TagColors.getForeground(tag)));
+                tagLabel.shadow(true);
+                tagDisplay.child(tagLabel);
+            }
+        }
+
         // Content area -- add MarkdownWidget
         String contentToRender = hideContent
                 ? "Request access to view this quest"
@@ -166,7 +186,7 @@ public class QuestScreen extends DisquestsBaseScreen {
                 List<RenderedLine> rerendered = MarkdownRenderer.render(updated);
                 markdownWidget.setContent(rerendered);
                 PacketSender.saveQuest(quest.getId(), quest.getTitle(), updated,
-                        quest.getCoordinates(), quest.isRegion(), quest.getCoordinates2(), quest.getMap());
+                        quest.getCoordinates(), quest.isRegion(), quest.getCoordinates2(), quest.getMap(), quest.getTags());
                 ClientCache.addOrUpdateMyQuest(quest);
             });
         }
@@ -277,6 +297,11 @@ public class QuestScreen extends DisquestsBaseScreen {
         titleFieldComponent.id("title-field");
         titleRow.child(titleFieldComponent);
 
+        // Tag editor (only if player can edit)
+        if (canEdit) {
+            buildTagEditor(root);
+        }
+
         // Content editor
         FlowLayout editorPanel = root.childById(FlowLayout.class, "editor-panel");
         MultiLineTextFieldWidget contentField = new MultiLineTextFieldWidget(
@@ -287,6 +312,21 @@ public class QuestScreen extends DisquestsBaseScreen {
         contentFieldComponent.sizing(Sizing.fill(100), Sizing.fill(100));
         contentFieldComponent.id("content-field");
         editorPanel.child(contentFieldComponent);
+
+        // Attach autocomplete dropdown for wiki-link syntax ([[Quest Name]])
+        AutocompleteDropdown autocomplete = new AutocompleteDropdown();
+        autocomplete.setOnSelect(title -> {
+            // Replace the partial query after [[ with the full title + ]]
+            String current = contentFieldComponent.getText();
+            int openBracket = current.lastIndexOf("[[");
+            if (openBracket >= 0) {
+                String before = current.substring(0, openBracket + 2);
+                String replacement = before + title + "]]";
+                // Append any text after the cursor (approximated as end of text)
+                contentFieldComponent.getDelegate().setText(replacement);
+            }
+        });
+        contentFieldComponent.setAutocomplete(autocomplete);
 
         // Coords section
         buildCoordsSection(root);
@@ -342,6 +382,9 @@ public class QuestScreen extends DisquestsBaseScreen {
         if (fmtQuote != null) fmtQuote.text(Text.literal("> ").append(Text.literal("quote").styled(s -> s.withItalic(true).withColor(0xAAAAAA))));
         LabelComponent fmtLink = root.childById(LabelComponent.class, "fmt-link");
         if (fmtLink != null) fmtLink.text(Text.literal("[text](url): ").append(Text.literal("link").styled(s -> s.withUnderline(true).withColor(0x5555FF))));
+        LabelComponent fmtWikiLink = root.childById(LabelComponent.class, "fmt-wikilink");
+        if (fmtWikiLink != null) fmtWikiLink.text(Text.literal("[[Quest Name]]: ")
+                .append(Text.literal("quest link").styled(s -> s.withUnderline(true).withColor(0xe8a86d))));
     }
 
     private void buildCoordsSection(FlowLayout root) {
@@ -418,6 +461,44 @@ public class QuestScreen extends DisquestsBaseScreen {
         mapRow.child(mapBtn);
     }
 
+    private void buildTagEditor(FlowLayout root) {
+        FlowLayout tagEditor = root.childById(FlowLayout.class, "tag-editor");
+        if (tagEditor == null) return;
+
+        List<String> tags = quest.getTags();
+        for (int i = 0; i < tags.size(); i++) {
+            final String tag = tags.get(i);
+            final int idx = i;
+
+            // Tag label
+            LabelComponent tagLabel = UIComponents.label(
+                    Text.literal(tag).withColor(TagColors.getForeground(tag)));
+            tagLabel.shadow(true);
+            tagEditor.child(tagLabel);
+
+            // Remove "x" button
+            ButtonComponent removeBtn = UIComponents.button(Text.literal("x"), b -> {
+                persistFieldValues();
+                quest.getTags().remove(idx);
+                rebuildEditMode();
+            });
+            removeBtn.sizing(Sizing.fixed(12), Sizing.fixed(12));
+            tagEditor.child(removeBtn);
+        }
+
+        // "+ Tag" button (only if below max)
+        if (tags.size() < TagConstraints.MAX_TAGS) {
+            ButtonComponent addTagBtn = UIComponents.button(Text.literal("+ Tag"), b -> {
+                persistFieldValues();
+                QuestScreen returnScreen = new QuestScreen(this.parent, quest, true, isNewQuest,
+                        originalTitle, originalContent);
+                navigateToScreen(new TagPickerScreen(returnScreen, quest, returnScreen));
+            });
+            addTagBtn.sizing(Sizing.content(), Sizing.fixed(12));
+            tagEditor.child(addTagBtn);
+        }
+    }
+
     private TextFieldComponent createCoordField(String value, String placeholder) {
         MultiLineTextFieldWidget field = new MultiLineTextFieldWidget(
                 client.textRenderer, 0, 0, 50, 14,
@@ -472,7 +553,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         persistFieldValues();
         ClientCache.addOrUpdateMyQuest(quest);
         PacketSender.saveQuest(quest.getId(), quest.getTitle(), quest.getContent(),
-                quest.getCoordinates(), quest.isRegion(), quest.getCoordinates2(), quest.getMap());
+                quest.getCoordinates(), quest.isRegion(), quest.getCoordinates2(), quest.getMap(), quest.getTags());
 
         UUID myUuid = ClientSession.getEffectivePlayerUuid();
         if (quest.getOwnerUuid().equals(myUuid)) {

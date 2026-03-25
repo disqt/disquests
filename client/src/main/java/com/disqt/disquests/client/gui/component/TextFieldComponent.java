@@ -26,6 +26,9 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
     private int offsetX;
     private int offsetY;
 
+    // Optional autocomplete dropdown
+    private AutocompleteDropdown dropdown;
+
     public TextFieldComponent(MultiLineTextFieldWidget delegate) {
         this.delegate = delegate;
         this.preferredWidth = delegate.width;
@@ -38,6 +41,10 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
 
     public String getText() {
         return delegate.getText();
+    }
+
+    public void setAutocomplete(AutocompleteDropdown dropdown) {
+        this.dropdown = dropdown;
     }
 
     @Override
@@ -63,6 +70,10 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
         context.getMatrices().translate(offsetX, offsetY);
         delegate.render((DrawContext) context, mouseX - offsetX, mouseY - offsetY, delta);
         context.getMatrices().popMatrix();
+        // Draw autocomplete dropdown on top, positioned relative to this component
+        if (dropdown != null) {
+            dropdown.draw(context, this.x(), this.y());
+        }
     }
 
     @Override
@@ -107,6 +118,12 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
 
     @Override
     public boolean onKeyPress(KeyInput keyInput) {
+        // Intercept navigation keys for autocomplete dropdown before forwarding to delegate
+        if (dropdown != null && dropdown.isVisible()) {
+            if (dropdown.onKeyDown(keyInput.key())) {
+                return true;
+            }
+        }
         delegate.setFocused(true);
         return delegate.keyPressed(keyInput);
     }
@@ -114,7 +131,40 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
     @Override
     public boolean onCharTyped(CharInput charInput) {
         delegate.setFocused(true);
-        return delegate.charTyped(charInput);
+        boolean result = delegate.charTyped(charInput);
+        updateAutocomplete();
+        return result;
+    }
+
+    /**
+     * After each character, checks if the cursor is inside a [[...]] context.
+     * If so, extracts the partial query and updates the dropdown.
+     * If not, hides the dropdown.
+     */
+    private void updateAutocomplete() {
+        if (dropdown == null) return;
+        String text = delegate.getText();
+        if (text == null || text.isEmpty()) {
+            dropdown.hide();
+            return;
+        }
+        // Use full text length as a proxy for cursor position (end of text after typing)
+        int cursorPos = text.length();
+        // Find the last [[ before cursor
+        int openBracket = text.lastIndexOf("[[", cursorPos - 1);
+        if (openBracket < 0) {
+            dropdown.hide();
+            return;
+        }
+        // Ensure there is no closing ]] between the [[ and cursor
+        String afterOpen = text.substring(openBracket + 2, cursorPos);
+        if (afterOpen.contains("]]")) {
+            dropdown.hide();
+            return;
+        }
+        // afterOpen is the partial query typed after [[
+        // Position dropdown at bottom-left of this component
+        dropdown.update(afterOpen, 0, this.height());
     }
 
     @Override

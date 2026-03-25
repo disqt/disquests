@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class DataManager {
 
@@ -95,6 +96,14 @@ public class DataManager {
                         name TEXT NOT NULL,
                         last_seen INTEGER NOT NULL
                     )""");
+
+            stmt.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS quest_tags (
+                        quest_id TEXT NOT NULL,
+                        tag TEXT NOT NULL,
+                        PRIMARY KEY (quest_id, tag),
+                        FOREIGN KEY (quest_id) REFERENCES quests(id) ON DELETE CASCADE
+                    )""");
         }
     }
 
@@ -150,6 +159,23 @@ public class DataManager {
             stmt.setString(13, quest.map());
             stmt.setLong(14, quest.lastModified());
             stmt.executeUpdate();
+
+            try (PreparedStatement delTags = connection.prepareStatement(
+                    "DELETE FROM quest_tags WHERE quest_id = ?")) {
+                delTags.setString(1, quest.id().toString());
+                delTags.executeUpdate();
+            }
+            if (!quest.tags().isEmpty()) {
+                try (PreparedStatement insTags = connection.prepareStatement(
+                        "INSERT OR IGNORE INTO quest_tags (quest_id, tag) VALUES (?, ?)")) {
+                    for (String tag : quest.tags()) {
+                        insTags.setString(1, quest.id().toString());
+                        insTags.setString(2, tag);
+                        insTags.addBatch();
+                    }
+                    insTags.executeBatch();
+                }
+            }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to save quest", e);
         }
@@ -171,7 +197,7 @@ public class DataManager {
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
                 QuestData quest = mapQuestRow(rs);
-                return withContributors(quest);
+                return withTags(withContributors(quest));
             }
             return null;
         } catch (SQLException e) {
@@ -196,7 +222,7 @@ public class DataManager {
         } catch (SQLException e) {
             throw new RuntimeException("Failed to get quests for player", e);
         }
-        return withContributorsAll(quests);
+        return withTagsAll(withContributorsAll(quests));
     }
 
     public synchronized List<QuestData> getServerQuests(UUID excludePlayerUuid) {
@@ -217,7 +243,33 @@ public class DataManager {
         } catch (SQLException e) {
             throw new RuntimeException("Failed to get server quests", e);
         }
-        return withContributorsAll(quests);
+        return withTagsAll(withContributorsAll(quests));
+    }
+
+    public synchronized Map<String, QuestData> findQuestsByTitlesIgnoreCase(List<String> titles) {
+        if (titles.isEmpty()) return Map.of();
+        Map<String, QuestData> result = new HashMap<>();
+        String placeholders = titles.stream().map(t -> "?").collect(Collectors.joining(","));
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "SELECT q.*, pn.name as owner_name FROM quests q " +
+                "LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid " +
+                "WHERE LOWER(q.title) IN (" + placeholders + ")")) {
+            for (int i = 0; i < titles.size(); i++) {
+                stmt.setString(i + 1, titles.get(i).toLowerCase());
+            }
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                QuestData quest = mapQuestRow(rs);
+                String lowerTitle = quest.title().toLowerCase();
+                if (!result.containsKey(lowerTitle)
+                        || quest.id().toString().compareTo(result.get(lowerTitle).id().toString()) < 0) {
+                    result.put(lowerTitle, quest);
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to find quests by titles", e);
+        }
+        return result;
     }
 
     public synchronized void updateVisibility(UUID questId, Visibility visibility) {
@@ -546,6 +598,7 @@ public class DataManager {
             stmt.executeUpdate("DELETE FROM pinned_quests");
             stmt.executeUpdate("DELETE FROM collaboration_requests");
             stmt.executeUpdate("DELETE FROM contributors");
+            stmt.executeUpdate("DELETE FROM quest_tags");
             stmt.executeUpdate("DELETE FROM quests");
             stmt.executeUpdate("DELETE FROM player_names");
         } catch (SQLException e) {
@@ -617,7 +670,8 @@ public class DataManager {
                 coords,
                 rs.getInt("is_region") != 0,
                 coords2,
-                rs.getString("map")
+                rs.getString("map"),
+                List.of()
         );
     }
 
@@ -635,7 +689,8 @@ public class DataManager {
                 quest.coordinates(),
                 quest.isRegion(),
                 quest.coordinates2(),
-                quest.map()
+                quest.map(),
+                quest.tags()
         );
     }
 
@@ -678,7 +733,82 @@ public class DataManager {
                 quest.id(), quest.title(), quest.content(),
                 quest.ownerUuid(), quest.ownerName(), quest.visibility(),
                 contributors, quest.lastModified(),
-                quest.coordinates(), quest.isRegion(), quest.coordinates2(), quest.map()
+                quest.coordinates(), quest.isRegion(), quest.coordinates2(), quest.map(),
+                quest.tags()
+            ));
+        }
+        return result;
+    }
+
+    private List<String> getTagsForQuest(UUID questId) {
+        List<String> tags = new ArrayList<>();
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "SELECT tag FROM quest_tags WHERE quest_id = ?")) {
+            stmt.setString(1, questId.toString());
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                tags.add(rs.getString("tag"));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to get tags for quest", e);
+        }
+        return tags;
+    }
+
+    private Map<UUID, List<String>> getTagsBatch(List<UUID> questIds) {
+        if (questIds.isEmpty()) return Map.of();
+        Map<UUID, List<String>> result = new HashMap<>();
+        for (UUID id : questIds) {
+            result.put(id, new ArrayList<>());
+        }
+        String placeholders = String.join(",", questIds.stream().map(id -> "?").toList());
+        String sql = "SELECT quest_id, tag FROM quest_tags WHERE quest_id IN (" + placeholders + ")";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            for (int i = 0; i < questIds.size(); i++) {
+                stmt.setString(i + 1, questIds.get(i).toString());
+            }
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                UUID questId = UUID.fromString(rs.getString("quest_id"));
+                result.computeIfAbsent(questId, k -> new ArrayList<>()).add(rs.getString("tag"));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to batch-load tags", e);
+        }
+        return result;
+    }
+
+    private QuestData withTags(QuestData quest) {
+        List<String> tags = getTagsForQuest(quest.id());
+        return new QuestData(
+                quest.id(),
+                quest.title(),
+                quest.content(),
+                quest.ownerUuid(),
+                quest.ownerName(),
+                quest.visibility(),
+                quest.contributors(),
+                quest.lastModified(),
+                quest.coordinates(),
+                quest.isRegion(),
+                quest.coordinates2(),
+                quest.map(),
+                tags
+        );
+    }
+
+    private List<QuestData> withTagsAll(List<QuestData> quests) {
+        List<UUID> questIds = quests.stream().map(QuestData::id).toList();
+        Map<UUID, List<String>> tagMap = getTagsBatch(questIds);
+        List<QuestData> result = new ArrayList<>(quests.size());
+        for (QuestData quest : quests) {
+            List<String> tags = tagMap.getOrDefault(quest.id(), List.of());
+            result.add(new QuestData(
+                quest.id(), quest.title(), quest.content(),
+                quest.ownerUuid(), quest.ownerName(), quest.visibility(),
+                quest.contributors(), quest.lastModified(),
+                quest.coordinates(), quest.isRegion(), quest.coordinates2(), quest.map(),
+                tags
             ));
         }
         return result;

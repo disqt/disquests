@@ -50,11 +50,24 @@
                 </children>
             </flow-layout>
 
+            <!-- Tag editor row (populated programmatically) -->
+            <flow-layout direction="horizontal" id="tag-editor">
+                <sizing>
+                    <horizontal method="fill">85</horizontal>
+                    <vertical method="content"/>
+                </sizing>
+                <gap>3</gap>
+                <margins>
+                    <bottom>4</bottom>
+                </margins>
+                <children/>
+            </flow-layout>
+
             <!-- Content area (editor + formatting help) -->
             <flow-layout direction="horizontal" id="content-row">
                 <sizing>
                     <horizontal method="fill">85</horizontal>
-                    <vertical method="fill">45</vertical>
+                    <vertical method="fill">35</vertical>
                 </sizing>
                 <gap>4</gap>
                 <margins>
@@ -122,6 +135,10 @@
                             </label>
                             <label id="fmt-link">
                                 <text>[text](url)</text>
+                                <shadow>true</shadow>
+                            </label>
+                            <label id="fmt-wikilink">
+                                <text>[[Quest Name]] = quest link</text>
                                 <shadow>true</shadow>
                             </label>
                         </children>

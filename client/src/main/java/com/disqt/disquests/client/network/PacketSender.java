@@ -15,8 +15,8 @@ public class PacketSender {
     }
 
     public static void saveQuest(UUID questId, String title, String content,
-            CoordinatesData coords, boolean isRegion, CoordinatesData coords2, String map) {
-        send(PacketCodec.writeSaveQuest(questId, title, content, coords, isRegion, coords2, map));
+            CoordinatesData coords, boolean isRegion, CoordinatesData coords2, String map, List<String> tags) {
+        send(PacketCodec.writeSaveQuest(questId, title, content, coords, isRegion, coords2, map, tags));
     }
 
     public static void deleteQuest(UUID questId) {

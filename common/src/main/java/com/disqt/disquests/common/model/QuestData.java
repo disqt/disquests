@@ -15,5 +15,6 @@ public record QuestData(
     CoordinatesData coordinates,
     boolean isRegion,
     CoordinatesData coordinates2,
-    String map
+    String map,
+    List<String> tags
 ) {}

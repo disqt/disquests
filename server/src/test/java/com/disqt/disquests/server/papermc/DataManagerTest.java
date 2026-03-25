@@ -51,7 +51,8 @@ class DataManagerTest {
                 new CoordinatesData(1.0, 2.0, 3.0),
                 false,
                 null,
-                "world"
+                "world",
+                List.of()
         );
     }
 
@@ -76,7 +77,8 @@ class DataManagerTest {
                 new CoordinatesData(10.5, 64.0, -32.25),
                 true,
                 new CoordinatesData(20.5, 65.0, -31.0),
-                "the_end"
+                "the_end",
+                List.of()
         );
         dm.saveQuest(quest);
 
@@ -118,7 +120,8 @@ class DataManagerTest {
                 null,
                 false,
                 null,
-                null
+                null,
+                List.of()
         );
         dm.saveQuest(quest);
 
@@ -396,7 +399,7 @@ class DataManagerTest {
         dm.upsertPlayerName(PLAYER2, "Player2");
 
         QuestData quest = new QuestData(questId, "Quest", "content", OWNER, null,
-                Visibility.OPEN, List.of(), System.currentTimeMillis(), null, false, null, null);
+                Visibility.OPEN, List.of(), System.currentTimeMillis(), null, false, null, null, List.of());
         dm.saveQuest(quest);
         dm.addContributor(questId, PLAYER2, false);
         dm.pinQuest(PLAYER2, questId);
@@ -419,15 +422,100 @@ class DataManagerTest {
         dm.upsertPlayerName(PLAYER2, "Player2");
         dm.upsertPlayerName(PLAYER3, "Player3");
         dm.saveQuest(new QuestData(questId1, "Q1", "", OWNER, null,
-                Visibility.CLOSED, List.of(), System.currentTimeMillis(), null, false, null, null));
+                Visibility.CLOSED, List.of(), System.currentTimeMillis(), null, false, null, null, List.of()));
         dm.saveQuest(new QuestData(questId2, "Q2", "", OWNER, null,
-                Visibility.CLOSED, List.of(), System.currentTimeMillis(), null, false, null, null));
+                Visibility.CLOSED, List.of(), System.currentTimeMillis(), null, false, null, null, List.of()));
         dm.createCollaborationRequest(questId1, PLAYER2);
         dm.createCollaborationRequest(questId1, PLAYER3);
         dm.createCollaborationRequest(questId2, PLAYER2);
         Map<UUID, Integer> counts = dm.getPendingCountByQuest(OWNER);
         assertEquals(2, counts.get(questId1));
         assertEquals(1, counts.get(questId2));
+    }
+
+    // -------------------------------------------------------------------------
+    // Tags
+    // -------------------------------------------------------------------------
+
+    @Test
+    void saveQuest_persistsTags() {
+        UUID id = UUID.randomUUID();
+        dm.upsertPlayerName(OWNER, "Alice");
+        QuestData quest = new QuestData(
+                id, "Tagged Quest", "content", OWNER, null,
+                Visibility.OPEN, List.of(), 1000L,
+                null, false, null, null,
+                List.of("build", "survival", "creative")
+        );
+        dm.saveQuest(quest);
+
+        QuestData loaded = dm.getQuest(id);
+        assertNotNull(loaded);
+        assertEquals(3, loaded.tags().size());
+        assertTrue(loaded.tags().containsAll(List.of("build", "survival", "creative")));
+    }
+
+    @Test
+    void saveQuest_replacesTags() {
+        UUID id = UUID.randomUUID();
+        dm.upsertPlayerName(OWNER, "Alice");
+        QuestData quest = new QuestData(
+                id, "Quest", "content", OWNER, null,
+                Visibility.OPEN, List.of(), 1000L,
+                null, false, null, null,
+                List.of("old-tag", "another-old")
+        );
+        dm.saveQuest(quest);
+
+        QuestData updated = new QuestData(
+                id, "Quest", "content", OWNER, null,
+                Visibility.OPEN, List.of(), 2000L,
+                null, false, null, null,
+                List.of("new-tag")
+        );
+        dm.saveQuest(updated);
+
+        QuestData loaded = dm.getQuest(id);
+        assertNotNull(loaded);
+        assertEquals(1, loaded.tags().size());
+        assertTrue(loaded.tags().contains("new-tag"));
+        assertFalse(loaded.tags().contains("old-tag"));
+        assertFalse(loaded.tags().contains("another-old"));
+    }
+
+    @Test
+    void saveQuest_emptyTags() {
+        UUID id = UUID.randomUUID();
+        dm.upsertPlayerName(OWNER, "Alice");
+        QuestData quest = new QuestData(
+                id, "Quest", "content", OWNER, null,
+                Visibility.OPEN, List.of(), 1000L,
+                null, false, null, null,
+                List.of()
+        );
+        dm.saveQuest(quest);
+
+        QuestData loaded = dm.getQuest(id);
+        assertNotNull(loaded);
+        assertTrue(loaded.tags().isEmpty());
+    }
+
+    @Test
+    void resetDatabase_clearsTags() {
+        UUID id = UUID.randomUUID();
+        dm.upsertPlayerName(OWNER, "Alice");
+        QuestData quest = new QuestData(
+                id, "Tagged Quest", "content", OWNER, null,
+                Visibility.OPEN, List.of(), 1000L,
+                null, false, null, null,
+                List.of("tag1", "tag2")
+        );
+        dm.saveQuest(quest);
+
+        dm.resetDatabase();
+
+        assertNull(dm.getQuest(id));
+        assertTrue(dm.getQuestsForPlayer(OWNER).isEmpty());
     }
 
     // -------------------------------------------------------------------------
@@ -556,7 +644,8 @@ class DataManagerTest {
                 new CoordinatesData(5.0, 6.0, 7.0),
                 false,
                 null,
-                "nether"
+                "nether",
+                List.of()
         );
         dm.saveQuest(updated);
 

@@ -47,7 +47,7 @@ public final class PacketCodec {
     // ---- Nested payload records ----
 
     public record SaveQuestPayload(UUID questId, String title, String content,
-            CoordinatesData coords, boolean isRegion, CoordinatesData coords2, String map) {}
+            CoordinatesData coords, boolean isRegion, CoordinatesData coords2, String map, List<String> tags) {}
 
     public record RespondCollaborationPayload(UUID requestId, boolean approved) {}
 
@@ -58,7 +58,7 @@ public final class PacketCodec {
 
     public record UpdateVisibilityPayload(UUID questId, Visibility visibility) {}
 
-    public record HandshakePayload(String bluemapUrl, int pendingRequestCount, List<UUID> pinnedQuestIds, UUID playerUuid, Map<String, String> bluemapMapNames) {}
+    public record HandshakePayload(String bluemapUrl, int pendingRequestCount, List<UUID> pinnedQuestIds, UUID playerUuid, Map<String, String> bluemapMapNames, List<String> predefinedTags) {}
 
     public record CollaborationRequestPayload(UUID requestId, UUID questId,
             String questTitle, String requesterName) {}
@@ -74,7 +74,7 @@ public final class PacketCodec {
     }
 
     public static byte[] writeSaveQuest(UUID questId, String title, String content,
-            CoordinatesData coords, boolean isRegion, CoordinatesData coords2, String map) {
+            CoordinatesData coords, boolean isRegion, CoordinatesData coords2, String map, List<String> tags) {
         ByteBufWriter buf = new ByteBufWriter();
         buf.writeByte(PacketType.SAVE_QUEST.getId());
         buf.writeUUID(questId);
@@ -84,6 +84,10 @@ public final class PacketCodec {
         buf.writeBoolean(isRegion);
         writeNullableCoords(buf, coords2);
         writeNullableString(buf, map);
+        buf.writeVarInt(tags.size());
+        for (String tag : tags) {
+            buf.writeString(tag);
+        }
         return buf.toByteArray();
     }
 
@@ -155,10 +159,14 @@ public final class PacketCodec {
     // ---- S2C encode ----
 
     public static byte[] writeHandshake(String bluemapUrl, int pendingRequestCount, List<UUID> pinnedQuestIds, UUID playerUuid) {
-        return writeHandshake(bluemapUrl, pendingRequestCount, pinnedQuestIds, playerUuid, Map.of());
+        return writeHandshake(bluemapUrl, pendingRequestCount, pinnedQuestIds, playerUuid, Map.of(), List.of());
     }
 
     public static byte[] writeHandshake(String bluemapUrl, int pendingRequestCount, List<UUID> pinnedQuestIds, UUID playerUuid, Map<String, String> mapNames) {
+        return writeHandshake(bluemapUrl, pendingRequestCount, pinnedQuestIds, playerUuid, mapNames, List.of());
+    }
+
+    public static byte[] writeHandshake(String bluemapUrl, int pendingRequestCount, List<UUID> pinnedQuestIds, UUID playerUuid, Map<String, String> mapNames, List<String> predefinedTags) {
         ByteBufWriter buf = new ByteBufWriter();
         buf.writeByte(PacketType.HANDSHAKE.getId());
         writeNullableString(buf, bluemapUrl);
@@ -172,6 +180,10 @@ public final class PacketCodec {
         for (Map.Entry<String, String> entry : mapNames.entrySet()) {
             buf.writeString(entry.getKey());
             buf.writeString(entry.getValue());
+        }
+        buf.writeVarInt(predefinedTags.size());
+        for (String tag : predefinedTags) {
+            buf.writeString(tag);
         }
         return buf.toByteArray();
     }
@@ -262,7 +274,7 @@ public final class PacketCodec {
         buf.writeString(quest.title());
         buf.writeString(quest.content());
         buf.writeUUID(quest.ownerUuid());
-        buf.writeString(quest.ownerName());
+        buf.writeString(quest.ownerName() != null ? quest.ownerName() : "");
         buf.writeVarInt(quest.visibility().ordinal());
         buf.writeVarInt(quest.contributors().size());
         for (ContributorData contributor : quest.contributors()) {
@@ -275,6 +287,10 @@ public final class PacketCodec {
         buf.writeBoolean(quest.isRegion());
         writeNullableCoords(buf, quest.coordinates2());
         writeNullableString(buf, quest.map());
+        buf.writeVarInt(quest.tags().size());
+        for (String tag : quest.tags()) {
+            buf.writeString(tag);
+        }
     }
 
     public static QuestData readQuest(ByteBufReader buf) {
@@ -297,8 +313,13 @@ public final class PacketCodec {
         boolean isRegion = buf.readBoolean();
         CoordinatesData coordinates2 = readNullableCoords(buf);
         String map = readNullableString(buf);
+        int tagCount = buf.readVarInt();
+        List<String> tags = new ArrayList<>(tagCount);
+        for (int i = 0; i < tagCount; i++) {
+            tags.add(buf.readString());
+        }
         return new QuestData(id, title, content, ownerUuid, ownerName, visibility,
-                contributors, lastModified, coordinates, isRegion, coordinates2, map);
+                contributors, lastModified, coordinates, isRegion, coordinates2, map, tags);
     }
 
     // ---- C2S decode ----
@@ -315,7 +336,12 @@ public final class PacketCodec {
         boolean isRegion = buf.readBoolean();
         CoordinatesData coords2 = readNullableCoords(buf);
         String map = readNullableString(buf);
-        return new SaveQuestPayload(questId, title, content, coords, isRegion, coords2, map);
+        int tagCount = buf.readVarInt();
+        List<String> tags = new ArrayList<>(tagCount);
+        for (int i = 0; i < tagCount; i++) {
+            tags.add(buf.readString());
+        }
+        return new SaveQuestPayload(questId, title, content, coords, isRegion, coords2, map, tags);
     }
 
     public static UUID readDeleteQuest(ByteBufReader buf) {
@@ -387,7 +413,17 @@ public final class PacketCodec {
         } else {
             mapNames = Map.of();
         }
-        return new HandshakePayload(bluemapUrl, pendingRequestCount, pinnedQuestIds, playerUuid, mapNames);
+        List<String> predefinedTags;
+        if (buf.remaining() > 0) {
+            int tagCount = buf.readVarInt();
+            predefinedTags = new ArrayList<>(tagCount);
+            for (int i = 0; i < tagCount; i++) {
+                predefinedTags.add(buf.readString());
+            }
+        } else {
+            predefinedTags = List.of();
+        }
+        return new HandshakePayload(bluemapUrl, pendingRequestCount, pinnedQuestIds, playerUuid, mapNames, predefinedTags);
     }
 
     private static List<QuestData> readQuestList(ByteBufReader buf) {

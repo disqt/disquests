@@ -1,6 +1,10 @@
 package com.disqt.disquests.client.gui.widget;
 
+import com.disqt.disquests.client.ClientCache;
+import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.screen.QuestScreen;
+import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.client.markdown.RenderedLine;
 import io.wispforest.owo.ui.base.BaseUIComponent;
 import io.wispforest.owo.ui.core.OwoUIGraphics;
@@ -14,6 +18,7 @@ import net.minecraft.text.Text;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * An owo-ui component that renders pre-parsed markdown as styled text lines.
@@ -23,10 +28,12 @@ public class MarkdownWidget extends BaseUIComponent {
 
     private static final int PADDING = 5;
     private static final int SCROLLBAR_THICKNESS = 6;
+    private static final String QUEST_INACCESSIBLE_MSG = "This quest is private or no longer exists";
 
     private final List<WrappedEntry> wrappedLines = new ArrayList<>();
     private final List<CheckboxHitbox> checkboxHitboxes = new ArrayList<>();
     private final List<LinkHitbox> linkHitboxes = new ArrayList<>();
+    private final List<WikiLinkHitbox> wikiLinkHitboxes = new ArrayList<>();
     private int totalContentHeight = 0;
     private double scrollOffset = 0;
     private CheckboxToggleListener checkboxToggleListener;
@@ -44,6 +51,7 @@ public class MarkdownWidget extends BaseUIComponent {
 
     private record CheckboxHitbox(int x, int y, int width, int height, int checkboxIndex, boolean checked) {}
     private record LinkHitbox(int x, int y, int width, int height, String url, Text displayText) {}
+    private record WikiLinkHitbox(int x, int y, int width, int height, String uuid) {}
 
     private static boolean hitTest(double mx, double my, int x, int y, int w, int h) {
         return mx >= x && mx < x + w && my >= y && my < y + h;
@@ -55,6 +63,20 @@ public class MarkdownWidget extends BaseUIComponent {
             ClickEvent clickEvent = style.getClickEvent();
             if (clickEvent instanceof ClickEvent.OpenUrl openUrl) {
                 result[0] = openUrl.uri().toString();
+                return false;
+            }
+            return true;
+        });
+        return result[0];
+    }
+
+    private static String findWikiLinkUuidInText(OrderedText text) {
+        String[] result = {null};
+        text.accept((index, style, codepoint) -> {
+            ClickEvent clickEvent = style.getClickEvent();
+            if (clickEvent instanceof ClickEvent.RunCommand runCmd
+                    && runCmd.command().startsWith(MarkdownRenderer.WIKI_LINK_COMMAND_PREFIX)) {
+                result[0] = runCmd.command().substring(MarkdownRenderer.WIKI_LINK_COMMAND_PREFIX.length());
                 return false;
             }
             return true;
@@ -151,6 +173,7 @@ public class MarkdownWidget extends BaseUIComponent {
 
         checkboxHitboxes.clear();
         linkHitboxes.clear();
+        wikiLinkHitboxes.clear();
         int contentX = compX + PADDING;
         int contentY = compY + PADDING;
         int drawY = contentY - (int) scrollOffset;
@@ -182,6 +205,12 @@ public class MarkdownWidget extends BaseUIComponent {
                 if (url != null) {
                     int textWidth = textRenderer.getWidth(entry.text());
                     linkHitboxes.add(new LinkHitbox(drawX, drawY, textWidth, textRenderer.fontHeight, url, Text.literal(url)));
+                }
+
+                String wikiUuid = findWikiLinkUuidInText(entry.text());
+                if (wikiUuid != null) {
+                    int textWidth = textRenderer.getWidth(entry.text());
+                    wikiLinkHitboxes.add(new WikiLinkHitbox(drawX, drawY, textWidth, textRenderer.fontHeight, wikiUuid));
                 }
             }
 
@@ -261,6 +290,27 @@ public class MarkdownWidget extends BaseUIComponent {
                 try {
                     net.minecraft.util.Util.getOperatingSystem().open(java.net.URI.create(lh.url()));
                 } catch (Exception ignored) {}
+                return true;
+            }
+        }
+        for (WikiLinkHitbox wh : wikiLinkHitboxes) {
+            if (hitTest(mx, my, wh.x(), wh.y(), wh.width(), wh.height())) {
+                if (MarkdownRenderer.WIKI_LINK_BROKEN.equals(wh.uuid())) {
+                    ClientSession.setPendingToast(QUEST_INACCESSIBLE_MSG);
+                    return true;
+                }
+                try {
+                    UUID questId = UUID.fromString(wh.uuid());
+                    var quest = ClientCache.getQuestById(questId);
+                    if (quest != null) {
+                        MinecraftClient.getInstance().setScreen(
+                                new QuestScreen(MinecraftClient.getInstance().currentScreen, quest));
+                    } else {
+                        ClientSession.setPendingToast(QUEST_INACCESSIBLE_MSG);
+                    }
+                } catch (IllegalArgumentException e) {
+                    ClientSession.setPendingToast(QUEST_INACCESSIBLE_MSG);
+                }
                 return true;
             }
         }

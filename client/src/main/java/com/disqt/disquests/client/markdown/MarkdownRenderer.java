@@ -15,13 +15,30 @@ import org.commonmark.parser.Parser;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MarkdownRenderer {
+    public static final String WIKI_LINK_COMMAND_PREFIX = "/disquests:wikilink:";
+    public static final String WIKI_LINK_BROKEN = "broken";
+
     private static final Parser PARSER = Parser.builder()
             .extensions(List.of(
                     StrikethroughExtension.create(),
                     TaskListItemsExtension.create()
             )).build();
+
+    private static final Pattern WIKI_LINK_PATTERN = Pattern.compile("\\[\\[([^|\\]]*)\\|([^\\]]*)\\]\\]");
+    private static final Pattern DQLINK_ATTR_PATTERN = Pattern.compile("uuid=\"([^\"]*)\"\\s+title=\"([^\"]*)\"");
+
+    private static String preprocessWikiLinks(String content) {
+        return WIKI_LINK_PATTERN.matcher(content).replaceAll(m -> {
+            String uuid = m.group(1);
+            String title = m.group(2);
+            title = title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+            return "<dqlink uuid=\"" + uuid + "\" title=\"" + title + "\"/>";
+        });
+    }
 
     public static List<RenderedLine> render(String markdown) {
         if (markdown == null || markdown.isEmpty()) {
@@ -37,7 +54,7 @@ public class MarkdownRenderer {
             processed.append(rawLines[i].stripLeading());
         }
 
-        Node document = PARSER.parse(processed.toString());
+        Node document = PARSER.parse(preprocessWikiLinks(processed.toString()));
         List<RenderedLine> lines = new ArrayList<>();
         renderChildren(document, lines, 0, Style.EMPTY);
         return lines;
@@ -225,6 +242,24 @@ public class MarkdownRenderer {
                 // Invalid URI, skip click event
             }
             target.append(inner);
+        } else if (node instanceof org.commonmark.node.HtmlInline htmlInline) {
+            String literal = htmlInline.getLiteral();
+            Matcher m = DQLINK_ATTR_PATTERN.matcher(literal);
+            if (m.find()) {
+                String uuid = m.group(1);
+                String title = m.group(2).replace("&amp;", "&").replace("&lt;", "<")
+                        .replace("&gt;", ">").replace("&quot;", "\"");
+                boolean isValid = !uuid.isEmpty();
+                int color = isValid ? 0xe8a86d : 0xe86d6d; // amber or red
+                Style wikiStyle = style.withColor(color).withUnderline(true);
+                if (!isValid) wikiStyle = wikiStyle.withStrikethrough(true);
+                // Use RunCommand as a marker for MarkdownWidget click handling
+                String command = isValid
+                        ? WIKI_LINK_COMMAND_PREFIX + uuid
+                        : WIKI_LINK_COMMAND_PREFIX + WIKI_LINK_BROKEN;
+                wikiStyle = wikiStyle.withClickEvent(new ClickEvent.RunCommand(command));
+                target.append(Text.literal(title).setStyle(wikiStyle));
+            }
         } else if (node instanceof SoftLineBreak) {
             target.append(Text.literal(" "));
         } else if (node instanceof HardLineBreak) {
