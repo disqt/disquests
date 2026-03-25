@@ -2,7 +2,6 @@ package com.disqt.disquests.test.integration.journeys.duo;
 
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
-import com.disqt.disquests.client.gui.screen.ConfirmScreen;
 import com.disqt.disquests.client.gui.screen.ContributorScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
@@ -256,11 +255,11 @@ class TwoPlayerJourneys {
             context.getInput().pressMouse(org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT);
             context.waitTicks(2);
 
-        then("ConfirmScreen appears");
-            waitForScreen(context, ConfirmScreen.class);
+        then("confirm overlay appears");
+            waitForOverlay(context, "confirm-overlay");
 
         when("PlayerA confirms removal");
-            click(context, "btn-yes");
+            click(context, "btn-confirm-yes");
             waitForScreen(context, ContributorScreen.class);
 
         then("contributor list is empty");
@@ -353,11 +352,11 @@ class TwoPlayerJourneys {
         when("PlayerB clicks Leave");
             click(context, "btn-leave");
 
-        then("ConfirmScreen appears");
-            waitForScreen(context, ConfirmScreen.class);
+        then("confirm overlay appears");
+            waitForOverlay(context, "confirm-overlay");
 
         when("PlayerB confirms leave");
-            click(context, "btn-yes");
+            click(context, "btn-confirm-yes");
 
         then("quest is removed from PlayerB's My Quests");
             waitForScreen(context, MainScreen.class);

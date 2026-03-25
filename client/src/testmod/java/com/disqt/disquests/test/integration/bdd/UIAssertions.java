@@ -1,5 +1,6 @@
 package com.disqt.disquests.test.integration.bdd;
 
+import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.core.UIComponent;
@@ -79,6 +80,32 @@ public final class UIAssertions {
             io.wispforest.owo.ui.container.FlowLayout.class, "quest-list");
         int actual = questList != null ? context.computeOnClient(c -> questList.children().size()) : -1;
         assertEquals(expected, actual, "Quest list entry count mismatch");
+    }
+
+    /**
+     * Assert that a confirm overlay is currently visible on the Disquests screen.
+     */
+    public static void assertOverlayVisible(ClientGameTestContext context, String overlayId) {
+        boolean visible = context.computeOnClient(client -> {
+            if (client.currentScreen instanceof DisquestsBaseScreen screen) {
+                return screen.getRootComponent().childById(UIComponent.class, overlayId) != null;
+            }
+            return false;
+        });
+        assertTrue(visible, "Expected overlay '" + overlayId + "' to be visible");
+    }
+
+    /**
+     * Assert that no confirm overlay is present on the current screen.
+     */
+    public static void assertNoOverlay(ClientGameTestContext context, String overlayId) {
+        boolean absent = context.computeOnClient(client -> {
+            if (client.currentScreen instanceof DisquestsBaseScreen screen) {
+                return screen.getRootComponent().childById(UIComponent.class, overlayId) == null;
+            }
+            return true;
+        });
+        assertTrue(absent, "Expected no overlay '" + overlayId + "'");
     }
 
     /**

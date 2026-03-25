@@ -394,6 +394,18 @@ public final class UIActions {
     }
 
     /**
+     * Wait for a confirm overlay to appear on the current Disquests screen.
+     */
+    public static void waitForOverlay(ClientGameTestContext context, String overlayId) {
+        context.waitFor(client -> {
+            if (client.currentScreen instanceof DisquestsBaseScreen screen) {
+                return screen.getRootComponent().childById(io.wispforest.owo.ui.core.UIComponent.class, overlayId) != null;
+            }
+            return false;
+        }, TIMEOUT);
+    }
+
+    /**
      * Offline-mode UUID generation (matches Paper's offline UUID format).
      */
     public static UUID offlineUuid(String playerName) {

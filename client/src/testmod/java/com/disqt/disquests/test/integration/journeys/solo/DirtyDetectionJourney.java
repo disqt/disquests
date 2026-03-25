@@ -1,6 +1,5 @@
 package com.disqt.disquests.test.integration.journeys.solo;
 
-import com.disqt.disquests.client.gui.screen.ConfirmScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
@@ -46,7 +45,7 @@ class DirtyDetectionJourney {
     }
 
     @Test @Order(2) @PlayerA
-    @DisplayName("Edit mode: change title to 'Modified', click Cancel -> ConfirmScreen appears")
+    @DisplayName("Edit mode: change title to 'Modified', click Cancel -> confirm overlay appears")
     void editAndCancelShowsConfirm(ClientGameTestContext context) {
         given("quest 'Original' is open in view mode");
 
@@ -60,19 +59,19 @@ class DirtyDetectionJourney {
         and("player clicks Cancel");
             click(context, "btn-cancel");
 
-        then("ConfirmScreen appears asking to discard changes");
-            waitForScreen(context, ConfirmScreen.class);
-            assertScreenIs(context, ConfirmScreen.class);
+        then("confirm overlay appears asking to discard changes");
+            waitForOverlay(context, "confirm-overlay");
+            assertOverlayVisible(context, "confirm-overlay");
     }
 
     @Test @Order(3) @PlayerA
-    @DisplayName("Click No on ConfirmScreen -> returns to edit with title still 'Modified'")
+    @DisplayName("Click No on confirm overlay -> returns to edit with title still 'Modified'")
     void clickNoReturnsToEdit(ClientGameTestContext context) {
-        given("ConfirmScreen is showing");
-            assertScreenIs(context, ConfirmScreen.class);
+        given("confirm overlay is showing");
+            assertOverlayVisible(context, "confirm-overlay");
 
         when("player clicks No (don't discard)");
-            click(context, "btn-no");
+            click(context, "btn-confirm-no");
 
         then("returns to QuestScreen in edit mode");
             waitForScreen(context, QuestScreen.class);
@@ -100,7 +99,7 @@ class DirtyDetectionJourney {
     }
 
     @Test @Order(4) @PlayerA
-    @DisplayName("Click Cancel again -> ConfirmScreen appears again")
+    @DisplayName("Click Cancel again -> confirm overlay appears again")
     void cancelAgainShowsConfirmAgain(ClientGameTestContext context) {
         given("player is back in edit mode with title 'Modified'");
             boolean isEditing = context.computeOnClient(c ->
@@ -110,19 +109,19 @@ class DirtyDetectionJourney {
         when("player clicks Cancel again");
             click(context, "btn-cancel");
 
-        then("ConfirmScreen appears again");
-            waitForScreen(context, ConfirmScreen.class);
-            assertScreenIs(context, ConfirmScreen.class);
+        then("confirm overlay appears again");
+            waitForOverlay(context, "confirm-overlay");
+            assertOverlayVisible(context, "confirm-overlay");
     }
 
     @Test @Order(5) @PlayerA
-    @DisplayName("Click Yes on ConfirmScreen -> view mode shows original title 'Original'")
+    @DisplayName("Click Yes on confirm overlay -> view mode shows original title 'Original'")
     void clickYesDiscardsChanges(ClientGameTestContext context) {
-        given("ConfirmScreen is showing");
-            assertScreenIs(context, ConfirmScreen.class);
+        given("confirm overlay is showing");
+            assertOverlayVisible(context, "confirm-overlay");
 
         when("player clicks Yes (discard)");
-            click(context, "btn-yes");
+            click(context, "btn-confirm-yes");
 
         then("returns to QuestScreen in view mode");
             waitForScreen(context, QuestScreen.class);
@@ -135,7 +134,7 @@ class DirtyDetectionJourney {
     }
 
     @Test @Order(6) @PlayerA
-    @DisplayName("Edit with no changes, Cancel goes straight to view mode (no ConfirmScreen)")
+    @DisplayName("Edit with no changes, Cancel goes straight to view mode (no confirm overlay)")
     void noChangesNoConfirmDialog(ClientGameTestContext context) {
         given("quest 'Original' is shown in view mode");
             assertScreenIs(context, QuestScreen.class);
@@ -150,8 +149,8 @@ class DirtyDetectionJourney {
         and("player makes no changes and clicks Cancel");
             click(context, "btn-cancel");
 
-        then("no ConfirmScreen appears -- goes directly back to view mode");
-            context.waitFor(client -> !(client.currentScreen instanceof ConfirmScreen), TIMEOUT);
+        then("no confirm overlay appears -- goes directly back to view mode");
+            assertNoOverlay(context, "confirm-overlay");
 
         and("QuestScreen shows in view mode");
             assertScreenIs(context, QuestScreen.class);

@@ -1,7 +1,6 @@
 package com.disqt.disquests.test.integration.journeys.solo;
 
 import com.disqt.disquests.client.ClientCache;
-import com.disqt.disquests.client.gui.screen.ConfirmScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
@@ -115,10 +114,10 @@ class QuestLifecycleJourney {
     void deleteQuest(ClientGameTestContext context) {
         when("player clicks Delete");
             click(context, "btn-delete");
-        then("ConfirmScreen appears");
-            waitForScreen(context, ConfirmScreen.class);
+        then("confirm overlay appears");
+            waitForOverlay(context, "confirm-overlay");
         when("player clicks Yes");
-            click(context, "btn-yes");
+            click(context, "btn-confirm-yes");
         then("MainScreen shows empty list");
             waitForScreen(context, MainScreen.class);
             openMainScreen(context);
