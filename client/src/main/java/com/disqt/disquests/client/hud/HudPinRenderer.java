@@ -17,11 +17,14 @@ public class HudPinRenderer {
 
     private static final int PADDING = 6;
     private static final int MAX_LINES = 12;
-    private static final int MARGIN = 4;
+    private static final int DEFAULT_MARGIN = 4;
     private static final int GAP = 4;
     private static final int BG_COLOR = 0x80000000;
     private static final int TITLE_COLOR = 0xFFFFFFFF;
     private static final int CONTENT_COLOR = 0xFFBBBBBB;
+
+    /** Sentinel value meaning "use default position" (top-right corner). */
+    private static final int DEFAULT_POSITION = -1;
 
     private static int getMaxWidth() { return DisquestsClient.CONFIG.pinnedWidth(); }
 
@@ -36,6 +39,32 @@ public class HudPinRenderer {
 
     public static void toggleVisibility() {
         visible = !visible;
+    }
+
+    /**
+     * Returns the X origin for pin rendering.
+     * If pinnedX is -1 (default), pins are placed at the top-right corner.
+     * Otherwise, the configured value is used directly.
+     */
+    private static int resolveX(int screenWidth) {
+        int configX = DisquestsClient.CONFIG.pinnedX();
+        if (configX == DEFAULT_POSITION) {
+            return screenWidth - getMaxWidth() - DEFAULT_MARGIN;
+        }
+        return configX;
+    }
+
+    /**
+     * Returns the Y origin for pin rendering.
+     * If pinnedY is -1 (default), pins start at the top margin.
+     * Otherwise, the configured value is used directly.
+     */
+    private static int resolveY() {
+        int configY = DisquestsClient.CONFIG.pinnedY();
+        if (configY == DEFAULT_POSITION) {
+            return DEFAULT_MARGIN;
+        }
+        return configY;
     }
 
     public static void render(DrawContext context) {
@@ -65,12 +94,17 @@ public class HudPinRenderer {
             lastWidth = currentWidth;
         }
 
+        // Resolve position from config
+        int screenWidth = client.getWindow().getScaledWidth();
+        int originX = resolveX(screenWidth);
+        int originY = resolveY();
+
         // Render from cache
         TextRenderer tr = client.textRenderer;
         int lineHeight = tr.fontHeight + 1;
-        int y = MARGIN;
+        int y = originY;
         for (CachedPin pin : cachedPins) {
-            y = renderCachedPin(context, tr, pin, y, lineHeight);
+            y = renderCachedPin(context, tr, pin, originX, y, lineHeight);
             y += GAP;
         }
     }
@@ -103,29 +137,29 @@ public class HudPinRenderer {
         cachedPins = pins;
     }
 
-    private static int renderCachedPin(DrawContext context, TextRenderer tr, CachedPin pin, int y, int lineHeight) {
+    private static int renderCachedPin(DrawContext context, TextRenderer tr, CachedPin pin, int originX, int y, int lineHeight) {
         int totalLines = pin.titleLines.size() + pin.contentLines.size() + (pin.truncated ? 1 : 0);
         int boxWidth = getMaxWidth();
         int boxHeight = PADDING * 2 + totalLines * lineHeight;
 
         // Background
-        context.fill(MARGIN, y, MARGIN + boxWidth, y + boxHeight, BG_COLOR);
+        context.fill(originX, y, originX + boxWidth, y + boxHeight, BG_COLOR);
 
         // Title (white)
         int textY = y + PADDING;
         for (String line : pin.titleLines) {
-            context.drawText(tr, line, MARGIN + PADDING, textY, TITLE_COLOR, true);
+            context.drawText(tr, line, originX + PADDING, textY, TITLE_COLOR, true);
             textY += lineHeight;
         }
 
         // Content (formatted)
         for (OrderedText line : pin.contentLines) {
-            context.drawText(tr, line, MARGIN + PADDING, textY, CONTENT_COLOR, true);
+            context.drawText(tr, line, originX + PADDING, textY, CONTENT_COLOR, true);
             textY += lineHeight;
         }
 
         if (pin.truncated) {
-            context.drawText(tr, "...", MARGIN + PADDING, textY, CONTENT_COLOR, true);
+            context.drawText(tr, "...", originX + PADDING, textY, CONTENT_COLOR, true);
         }
 
         return y + boxHeight;
