@@ -5,10 +5,11 @@ import com.disqt.disquests.client.data.Quest;
 import io.wispforest.owo.ui.core.OwoUIGraphics;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
+import org.lwjgl.glfw.GLFW;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 public class AutocompleteDropdown {
 
@@ -30,10 +31,7 @@ public class AutocompleteDropdown {
             return;
         }
         String lowerQuery = query.toLowerCase();
-        List<Quest> allQuests = new ArrayList<>();
-        allQuests.addAll(ClientCache.getMyQuests());
-        allQuests.addAll(ClientCache.getServerQuests());
-        results = allQuests.stream()
+        results = Stream.concat(ClientCache.getMyQuests().stream(), ClientCache.getServerQuests().stream())
                 .filter(q -> q.getTitle().toLowerCase().startsWith(lowerQuery))
                 .limit(MAX_RESULTS)
                 .toList();
@@ -54,16 +52,16 @@ public class AutocompleteDropdown {
 
     public boolean onKeyDown(int keyCode) {
         if (!visible) return false;
-        if (keyCode == 264) { // DOWN
+        if (keyCode == GLFW.GLFW_KEY_DOWN) {
             selectedIndex = Math.min(selectedIndex + 1, results.size() - 1);
             return true;
-        } else if (keyCode == 265) { // UP
+        } else if (keyCode == GLFW.GLFW_KEY_UP) {
             selectedIndex = Math.max(selectedIndex - 1, 0);
             return true;
-        } else if (keyCode == 257 || keyCode == 335) { // ENTER or KP_ENTER
+        } else if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
             selectCurrent();
             return true;
-        } else if (keyCode == 256) { // ESCAPE
+        } else if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
             hide();
             return true;
         }

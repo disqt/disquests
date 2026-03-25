@@ -225,9 +225,7 @@ public class MainScreen extends DisquestsBaseScreen {
         return new SearchQuery(text.toString(), tagFilters);
     }
 
-    private boolean matchesSearch(Quest q) {
-        if (searchTerm.isEmpty()) return true;
-        SearchQuery query = parseSearch(searchTerm);
+    private boolean matchesSearch(Quest q, SearchQuery query) {
         if (!query.textFilter().isEmpty()) {
             String tf = query.textFilter();
             boolean textMatch = q.getTitle().toLowerCase().contains(tf)
@@ -263,13 +261,15 @@ public class MainScreen extends DisquestsBaseScreen {
 
         List<Quest> quests;
 
+        SearchQuery query = parseSearch(searchTerm);
+
         if (currentTab == ClientSession.Tab.MY_QUESTS) {
             quests = new ArrayList<>(ClientCache.getMyQuests());
 
             // Filter by search term
             if (!searchTerm.isEmpty()) {
                 quests = quests.stream()
-                        .filter(this::matchesSearch)
+                        .filter(q -> matchesSearch(q, query))
                         .collect(Collectors.toList());
             }
 
@@ -294,7 +294,7 @@ public class MainScreen extends DisquestsBaseScreen {
             // Filter by search term
             if (!searchTerm.isEmpty()) {
                 quests = quests.stream()
-                        .filter(this::matchesSearch)
+                        .filter(q -> matchesSearch(q, query))
                         .collect(Collectors.toList());
             }
 

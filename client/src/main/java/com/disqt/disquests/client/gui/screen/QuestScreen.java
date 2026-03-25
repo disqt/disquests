@@ -13,16 +13,15 @@ import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.client.markdown.RenderedLine;
 import com.disqt.disquests.client.network.PacketSender;
+import com.disqt.disquests.common.TagConstraints;
 import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.Visibility;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
-import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.ParentUIComponent;
 import io.wispforest.owo.ui.core.Sizing;
-import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -488,7 +487,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         }
 
         // "+ Tag" button (only if below max)
-        if (tags.size() < 8) {
+        if (tags.size() < TagConstraints.MAX_TAGS) {
             ButtonComponent addTagBtn = UIComponents.button(Text.literal("+ Tag"), b -> {
                 persistFieldValues();
                 QuestScreen returnScreen = new QuestScreen(this.parent, quest, true, isNewQuest,

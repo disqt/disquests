@@ -19,6 +19,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class MarkdownRenderer {
+    public static final String WIKI_LINK_COMMAND_PREFIX = "/disquests:wikilink:";
+    public static final String WIKI_LINK_BROKEN = "broken";
+
     private static final Parser PARSER = Parser.builder()
             .extensions(List.of(
                     StrikethroughExtension.create(),
@@ -26,6 +29,7 @@ public class MarkdownRenderer {
             )).build();
 
     private static final Pattern WIKI_LINK_PATTERN = Pattern.compile("\\[\\[([^|\\]]*)\\|([^\\]]*)\\]\\]");
+    private static final Pattern DQLINK_ATTR_PATTERN = Pattern.compile("uuid=\"([^\"]*)\"\\s+title=\"([^\"]*)\"");
 
     private static String preprocessWikiLinks(String content) {
         return WIKI_LINK_PATTERN.matcher(content).replaceAll(m -> {
@@ -240,7 +244,7 @@ public class MarkdownRenderer {
             target.append(inner);
         } else if (node instanceof org.commonmark.node.HtmlInline htmlInline) {
             String literal = htmlInline.getLiteral();
-            Matcher m = Pattern.compile("uuid=\"([^\"]*)\"\\s+title=\"([^\"]*)\"").matcher(literal);
+            Matcher m = DQLINK_ATTR_PATTERN.matcher(literal);
             if (m.find()) {
                 String uuid = m.group(1);
                 String title = m.group(2).replace("&amp;", "&").replace("&lt;", "<")
@@ -250,7 +254,9 @@ public class MarkdownRenderer {
                 Style wikiStyle = style.withColor(color).withUnderline(true);
                 if (!isValid) wikiStyle = wikiStyle.withStrikethrough(true);
                 // Use RunCommand as a marker for MarkdownWidget click handling
-                String command = isValid ? "/disquests:wikilink:" + uuid : "/disquests:wikilink:broken";
+                String command = isValid
+                        ? WIKI_LINK_COMMAND_PREFIX + uuid
+                        : WIKI_LINK_COMMAND_PREFIX + WIKI_LINK_BROKEN;
                 wikiStyle = wikiStyle.withClickEvent(new ClickEvent.RunCommand(command));
                 target.append(Text.literal(title).setStyle(wikiStyle));
             }

@@ -6,14 +6,12 @@ import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.helper.TagColors;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
+import com.disqt.disquests.common.TagConstraints;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
-import io.wispforest.owo.ui.container.UIContainers;
-import io.wispforest.owo.ui.core.HorizontalAlignment;
 import io.wispforest.owo.ui.core.Sizing;
-import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -23,13 +21,7 @@ import java.util.List;
 
 public class TagPickerScreen extends DisquestsBaseScreen {
 
-    private static final int MAX_TAGS = 8;
-    private static final int MAX_TAG_LENGTH = 32;
-    private static final java.util.regex.Pattern TAG_PATTERN =
-            java.util.regex.Pattern.compile("[a-z0-9_-]+");
-
     private final Quest quest;
-    // Return screen -- QuestScreen in edit mode
     private final Screen returnScreen;
 
     private TextFieldComponent customTagField;
@@ -60,10 +52,9 @@ public class TagPickerScreen extends DisquestsBaseScreen {
         } else {
             for (String tag : predefined) {
                 if (existing.contains(tag)) continue; // already on quest
-                final String t = tag;
                 ButtonComponent btn = UIComponents.button(
                         Text.literal(tag).withColor(TagColors.getForeground(tag)),
-                        b -> addTag(t));
+                        b -> addTagAndReturn(tag));
                 btn.sizing(Sizing.fill(100), Sizing.fixed(16));
                 predefinedList.child(btn);
             }
@@ -88,9 +79,9 @@ public class TagPickerScreen extends DisquestsBaseScreen {
                 .onPress(b -> navigateToScreen(returnScreen));
     }
 
-    private void addTag(String tag) {
+    private void addTagAndReturn(String tag) {
         List<String> tags = quest.getTags();
-        if (!tags.contains(tag) && tags.size() < MAX_TAGS) {
+        if (!tags.contains(tag) && tags.size() < TagConstraints.MAX_TAGS) {
             tags.add(tag);
         }
         navigateToScreen(returnScreen);
@@ -100,18 +91,13 @@ public class TagPickerScreen extends DisquestsBaseScreen {
         if (customTagField == null) return;
         String raw = customTagField.getText().trim().toLowerCase();
         if (raw.isEmpty()) return;
-        if (raw.length() > MAX_TAG_LENGTH) {
-            raw = raw.substring(0, MAX_TAG_LENGTH);
+        if (raw.length() > TagConstraints.MAX_TAG_LENGTH) {
+            raw = raw.substring(0, TagConstraints.MAX_TAG_LENGTH);
         }
-        if (!TAG_PATTERN.matcher(raw).matches()) {
+        if (!TagConstraints.TAG_PATTERN.matcher(raw).matches()) {
             // Quietly ignore invalid input -- field stays for user to fix
             return;
         }
-        final String tag = raw;
-        List<String> tags = quest.getTags();
-        if (!tags.contains(tag) && tags.size() < MAX_TAGS) {
-            tags.add(tag);
-        }
-        navigateToScreen(returnScreen);
+        addTagAndReturn(raw);
     }
 }

@@ -34,9 +34,6 @@ public class WikiLinkResolver {
     /** Matches raw {@code [[text]]} where text contains no {@code |} or {@code ]}. */
     private static final Pattern RAW_PATTERN = Pattern.compile("\\[\\[([^\\]|]+)\\]\\]");
 
-    /** Matches resolved {@code [[uuid|title]]} — group 1 = UUID string, group 2 = display title. */
-    private static final Pattern RESOLVED_PATTERN = Pattern.compile("\\[\\[([^|\\]]*)]\\[([^\\]]*)\\]\\]|\\[\\[([^|\\]]*)]|\\[\\[([^|\\]]*\\|[^\\]]*)\\]\\]");
-
     /**
      * Matches the {@code [[uuid|title]]} form specifically.
      * Group 1 = UUID (may be empty string for broken links), group 2 = display title.

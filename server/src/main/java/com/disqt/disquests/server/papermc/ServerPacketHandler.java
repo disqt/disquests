@@ -1,6 +1,7 @@
 package com.disqt.disquests.server.papermc;
 
 import com.disqt.disquests.common.*;
+import com.disqt.disquests.common.TagConstraints;
 import com.disqt.disquests.common.model.*;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -96,10 +97,10 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
         }
         List<String> tags = payload.tags().stream()
                 .map(String::toLowerCase)
-                .filter(t -> !t.isEmpty() && t.length() <= 32)
-                .filter(t -> t.matches("[a-z0-9_-]+"))
+                .filter(t -> !t.isEmpty() && t.length() <= TagConstraints.MAX_TAG_LENGTH)
+                .filter(t -> TagConstraints.TAG_PATTERN.matcher(t).matches())
                 .distinct()
-                .limit(8)
+                .limit(TagConstraints.MAX_TAGS)
                 .toList();
         UUID playerUuid = player.getUniqueId();
         String content = wikiLinkResolver.reverseResolve(payload.content(), playerUuid);

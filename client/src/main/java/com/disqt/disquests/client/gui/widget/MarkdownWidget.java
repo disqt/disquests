@@ -4,6 +4,7 @@ import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
+import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.client.markdown.RenderedLine;
 import io.wispforest.owo.ui.base.BaseUIComponent;
 import io.wispforest.owo.ui.core.OwoUIGraphics;
@@ -27,6 +28,7 @@ public class MarkdownWidget extends BaseUIComponent {
 
     private static final int PADDING = 5;
     private static final int SCROLLBAR_THICKNESS = 6;
+    private static final String QUEST_INACCESSIBLE_MSG = "This quest is private or no longer exists";
 
     private final List<WrappedEntry> wrappedLines = new ArrayList<>();
     private final List<CheckboxHitbox> checkboxHitboxes = new ArrayList<>();
@@ -73,8 +75,8 @@ public class MarkdownWidget extends BaseUIComponent {
         text.accept((index, style, codepoint) -> {
             ClickEvent clickEvent = style.getClickEvent();
             if (clickEvent instanceof ClickEvent.RunCommand runCmd
-                    && runCmd.command().startsWith("/disquests:wikilink:")) {
-                result[0] = runCmd.command().substring("/disquests:wikilink:".length());
+                    && runCmd.command().startsWith(MarkdownRenderer.WIKI_LINK_COMMAND_PREFIX)) {
+                result[0] = runCmd.command().substring(MarkdownRenderer.WIKI_LINK_COMMAND_PREFIX.length());
                 return false;
             }
             return true;
@@ -293,8 +295,8 @@ public class MarkdownWidget extends BaseUIComponent {
         }
         for (WikiLinkHitbox wh : wikiLinkHitboxes) {
             if (hitTest(mx, my, wh.x(), wh.y(), wh.width(), wh.height())) {
-                if ("broken".equals(wh.uuid())) {
-                    ClientSession.setPendingToast("This quest is private or no longer exists");
+                if (MarkdownRenderer.WIKI_LINK_BROKEN.equals(wh.uuid())) {
+                    ClientSession.setPendingToast(QUEST_INACCESSIBLE_MSG);
                     return true;
                 }
                 try {
@@ -304,10 +306,10 @@ public class MarkdownWidget extends BaseUIComponent {
                         MinecraftClient.getInstance().setScreen(
                                 new QuestScreen(MinecraftClient.getInstance().currentScreen, quest));
                     } else {
-                        ClientSession.setPendingToast("This quest is private or no longer exists");
+                        ClientSession.setPendingToast(QUEST_INACCESSIBLE_MSG);
                     }
                 } catch (IllegalArgumentException e) {
-                    ClientSession.setPendingToast("This quest is private or no longer exists");
+                    ClientSession.setPendingToast(QUEST_INACCESSIBLE_MSG);
                 }
                 return true;
             }
