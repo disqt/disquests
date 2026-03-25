@@ -63,24 +63,12 @@
             </flow-layout>
 
             <!-- Content scroll area (MarkdownWidget added programmatically) -->
-            <scroll direction="vertical" id="content-scroll">
-                <flow-layout direction="vertical" id="content-area">
-                    <sizing>
-                        <horizontal method="fill">100</horizontal>
-                        <vertical method="content"/>
-                    </sizing>
-                </flow-layout>
-                <sizing>
-                    <horizontal method="fill">85</horizontal>
-                    <vertical method="fill">65</vertical>
-                </sizing>
-                <surface>
-                    <panel dark="true"/>
-                </surface>
-                <padding>
-                    <all>4</all>
-                </padding>
-            </scroll>
+            <template name="scrollable-list@disquests:templates">
+                <scroll-id>content-scroll</scroll-id>
+                <list-id>content-area</list-id>
+                <width>85</width>
+                <height>65</height>
+            </template>
 
             <!-- Metadata row (coords, map, BlueMap button, hidden when no coords) -->
             <flow-layout direction="horizontal" id="metadata-row">

@@ -1,0 +1,70 @@
+<owo-ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/wisp-forest/owo-lib/1.21/owo-ui.xsd">
+
+    <!-- No root component, templates only -->
+    <templates>
+
+        <!-- Scrollable list: vertical scroll container with dark panel, inner flow layout.
+             Parameters: scroll-id, list-id, width (fill %), height (fill %) -->
+        <template name="scrollable-list">
+            <scroll direction="vertical" id="{{scroll-id}}">
+                <!-- Child MUST be first element for WrappingParentUIComponent -->
+                <flow-layout direction="vertical" id="{{list-id}}">
+                    <sizing>
+                        <horizontal method="fill">100</horizontal>
+                        <vertical method="content"/>
+                    </sizing>
+                    <gap>2</gap>
+                </flow-layout>
+                <sizing>
+                    <horizontal method="fill">{{width}}</horizontal>
+                    <vertical method="fill">{{height}}</vertical>
+                </sizing>
+                <surface>
+                    <panel dark="true"/>
+                </surface>
+                <padding>
+                    <all>4</all>
+                </padding>
+            </scroll>
+        </template>
+
+        <!-- Button row: horizontal flow with content sizing, gap 4, and top/bottom margins.
+             Parameters: row-id -->
+        <template name="button-row">
+            <flow-layout direction="horizontal" id="{{row-id}}">
+                <sizing>
+                    <horizontal method="content"/>
+                    <vertical method="content"/>
+                </sizing>
+                <gap>4</gap>
+                <margins>
+                    <top>4</top>
+                    <bottom>4</bottom>
+                </margins>
+                <children/>
+            </flow-layout>
+        </template>
+
+        <!-- Dark panel: vertical flow with dark panel surface, padding, and gap.
+             Parameters: panel-id, width (fill %), padding-val, gap-val -->
+        <template name="dark-panel">
+            <flow-layout direction="vertical" id="{{panel-id}}">
+                <sizing>
+                    <horizontal method="fill">{{width}}</horizontal>
+                    <vertical method="content"/>
+                </sizing>
+                <surface>
+                    <panel dark="true"/>
+                </surface>
+                <padding>
+                    <all>{{padding-val}}</all>
+                </padding>
+                <gap>{{gap-val}}</gap>
+                <children/>
+            </flow-layout>
+        </template>
+
+    </templates>
+
+</owo-ui>
