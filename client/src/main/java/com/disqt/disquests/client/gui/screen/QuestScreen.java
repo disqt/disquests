@@ -19,9 +19,13 @@ import com.disqt.disquests.common.model.Visibility;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
+import io.wispforest.owo.ui.container.CollapsibleContainer;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.container.UIContainers;
+import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.ParentUIComponent;
 import io.wispforest.owo.ui.core.Sizing;
+import io.wispforest.owo.ui.core.UIComponent;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -151,9 +155,20 @@ public class QuestScreen extends DisquestsBaseScreen {
         root.childById(LabelComponent.class, "owner-label")
                 .text(Text.literal(ownerInfo).withColor(Colors.TEXT_MUTED));
 
-        // Tag display
-        FlowLayout tagDisplay = root.childById(FlowLayout.class, "tag-display");
+        // Tag display -- wrapped in collapsible
         List<String> viewTags = quest.getTags();
+        int tagCount = viewTags.size();
+        boolean tagsExpanded = tagCount <= 5;
+        CollapsibleContainer tagsCollapse = UIContainers.collapsible(
+                Sizing.fill(85), Sizing.content(),
+                Text.literal("Tags (" + tagCount + ")"),
+                tagsExpanded);
+        tagsCollapse.id("tags-collapse");
+        tagsCollapse.margins(Insets.bottom(4));
+
+        FlowLayout tagDisplay = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+        tagDisplay.id("tag-display");
+        tagDisplay.gap(3);
         if (viewTags.isEmpty()) {
             LabelComponent noTagsLabel = UIComponents.label(
                     Text.literal("no tags").withColor(Colors.TEXT_MUTED).styled(s -> s.withItalic(true)));
@@ -166,6 +181,18 @@ public class QuestScreen extends DisquestsBaseScreen {
                 tagLabel.shadow(true);
                 tagDisplay.child(tagLabel);
             }
+        }
+        tagsCollapse.child(tagDisplay);
+
+        // Replace the XML tag-display placeholder with the collapsible
+        UIComponent tagSlot = root.childById(UIComponent.class, "tag-display-slot");
+        if (tagSlot != null) {
+            int tagSlotIndex = root.children().indexOf(tagSlot);
+            root.removeChild(tagSlot);
+            root.child(tagSlotIndex, tagsCollapse);
+        } else {
+            // Fallback: append after header-row (index 1)
+            root.child(1, tagsCollapse);
         }
 
         // Content area -- add MarkdownWidget
@@ -222,16 +249,46 @@ public class QuestScreen extends DisquestsBaseScreen {
             metadataRow.sizing(Sizing.fixed(0), Sizing.fixed(0));
         }
 
-        // Contributors row
-        FlowLayout contributorsRow = root.childById(FlowLayout.class, "contributors-row");
-        if (!quest.getContributors().isEmpty()) {
-            String contribText = "Contributors: " + quest.getContributors().stream()
+        // Contributors row -- wrapped in collapsible
+        int contribCount = quest.getContributors().size();
+        boolean contribExpanded = contribCount <= 3;
+        CollapsibleContainer contributorsCollapse = UIContainers.collapsible(
+                Sizing.fill(85), Sizing.content(),
+                Text.literal("Contributors (" + contribCount + ")"),
+                contribExpanded && contribCount > 0);
+        contributorsCollapse.id("contributors-collapse");
+        contributorsCollapse.margins(Insets.top(2));
+
+        if (contribCount > 0) {
+            String contribNames = quest.getContributors().stream()
                     .map(c -> c.getName())
                     .collect(Collectors.joining(", "));
-            root.childById(LabelComponent.class, "contributors-label")
-                    .text(Text.literal(contribText).withColor(Colors.TEXT_MUTED));
+            LabelComponent contribLabel = UIComponents.label(
+                    Text.literal(contribNames).withColor(Colors.TEXT_MUTED));
+            contribLabel.id("contributors-label");
+            contribLabel.shadow(true);
+            FlowLayout contributorsRow = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+            contributorsRow.id("contributors-row");
+            contributorsRow.padding(Insets.left(4));
+            contributorsRow.child(contribLabel);
+            contributorsCollapse.child(contributorsRow);
+        }
+
+        // Replace the XML contributors-row placeholder with the collapsible
+        UIComponent contribSlot = root.childById(UIComponent.class, "contributors-row-slot");
+        if (contribSlot != null) {
+            int contribSlotIndex = root.children().indexOf(contribSlot);
+            root.removeChild(contribSlot);
+            root.child(contribSlotIndex, contributorsCollapse);
         } else {
-            contributorsRow.sizing(Sizing.fixed(0), Sizing.fixed(0));
+            // Fallback: find the metadata-row and insert after it
+            UIComponent metaRow = root.childById(UIComponent.class, "metadata-row");
+            if (metaRow != null) {
+                int metaIndex = root.children().indexOf(metaRow);
+                root.child(metaIndex + 1, contributorsCollapse);
+            } else {
+                root.child(contributorsCollapse);
+            }
         }
 
         // Buttons

@@ -49,16 +49,12 @@
                 </children>
             </flow-layout>
 
-            <!-- Tag display row (populated programmatically) -->
-            <flow-layout direction="horizontal" id="tag-display">
+            <!-- Tags collapsible slot (replaced programmatically with CollapsibleContainer) -->
+            <flow-layout direction="horizontal" id="tag-display-slot">
                 <sizing>
-                    <horizontal method="fill">85</horizontal>
-                    <vertical method="content"/>
+                    <horizontal method="fixed">0</horizontal>
+                    <vertical method="fixed">0</vertical>
                 </sizing>
-                <gap>3</gap>
-                <margins>
-                    <bottom>4</bottom>
-                </margins>
                 <children/>
             </flow-layout>
 
@@ -99,24 +95,13 @@
                 </children>
             </flow-layout>
 
-            <!-- Contributors row (hidden when empty) -->
-            <flow-layout direction="horizontal" id="contributors-row">
+            <!-- Contributors collapsible slot (replaced programmatically with CollapsibleContainer) -->
+            <flow-layout direction="horizontal" id="contributors-row-slot">
                 <sizing>
-                    <horizontal method="fill">85</horizontal>
-                    <vertical method="content"/>
+                    <horizontal method="fixed">0</horizontal>
+                    <vertical method="fixed">0</vertical>
                 </sizing>
-                <padding>
-                    <left>4</left>
-                </padding>
-                <margins>
-                    <top>2</top>
-                </margins>
-                <children>
-                    <label id="contributors-label">
-                        <text></text>
-                        <shadow>true</shadow>
-                    </label>
-                </children>
+                <children/>
             </flow-layout>
 
             <!-- Button row -->
