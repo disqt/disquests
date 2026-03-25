@@ -4,7 +4,7 @@ import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.helper.Colors;
-import com.disqt.disquests.client.gui.helper.DisquestsConfig;
+import com.disqt.disquests.client.DisquestsClient;
 import com.disqt.disquests.client.gui.helper.TagColors;
 import com.disqt.disquests.client.gui.helper.Theme;
 import com.disqt.disquests.client.hud.HudPinManager;
@@ -200,7 +200,7 @@ public class QuestEntryComponent extends BaseUIComponent {
         }
 
         // Inset bevel for selected entries
-        if (selected && DisquestsConfig.getTheme() == Theme.INSET) {
+        if (selected && DisquestsClient.CONFIG.theme() == Theme.INSET) {
             context.fill(entryX, entryY, entryX + entryWidth, entryY + 1, 0xFF0A0A0A);
             context.fill(entryX, entryY, entryX + 1, entryY + ENTRY_HEIGHT, 0xFF0A0A0A);
             context.fill(entryX, entryY + ENTRY_HEIGHT - 1, entryX + entryWidth, entryY + ENTRY_HEIGHT, 0xFF2A2A2A);

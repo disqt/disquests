@@ -21,6 +21,7 @@
     "option.pinnedX": "固定 X 位置",
     "option.pinnedY": "固定 Y 位置",
     "category.hud": "HUD",
+    "section.hud": "HUD",
     "category.colors": "颜色",
   },
 }

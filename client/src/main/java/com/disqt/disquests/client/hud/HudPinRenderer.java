@@ -1,7 +1,7 @@
 package com.disqt.disquests.client.hud;
 
+import com.disqt.disquests.client.DisquestsClient;
 import com.disqt.disquests.client.data.Quest;
-import com.disqt.disquests.client.gui.helper.DisquestsConfig;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.client.markdown.RenderedLine;
 import net.minecraft.client.MinecraftClient;
@@ -23,7 +23,7 @@ public class HudPinRenderer {
     private static final int TITLE_COLOR = 0xFFFFFFFF;
     private static final int CONTENT_COLOR = 0xFFBBBBBB;
 
-    private static int getMaxWidth() { return DisquestsConfig.getPinnedWidth(); }
+    private static int getMaxWidth() { return DisquestsClient.CONFIG.pinnedWidth(); }
 
     // --- Cache ---
     private record CachedPin(Quest quest, List<String> titleLines, List<OrderedText> contentLines, boolean truncated) {}

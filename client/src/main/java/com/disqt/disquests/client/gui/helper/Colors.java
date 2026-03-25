@@ -5,6 +5,11 @@ import java.lang.reflect.Modifier;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * Mutable color constants used by all Disquests UI components.
+ * Values are set by {@link Theme#applyColors()} on startup and
+ * whenever the user changes the theme via owo-config.
+ */
 public final class Colors {
 
     // --- Panel ---
@@ -56,9 +61,8 @@ public final class Colors {
 
     private Colors() {}
 
-    public static void reload() {
-        DisquestsConfig.getTheme().applyColors();
-        ColorConfig.loadColors();
+    public static void applyTheme(Theme theme) {
+        theme.applyColors();
     }
 
     public static Map<String, String> getColorsAsMap() {

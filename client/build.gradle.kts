@@ -48,6 +48,7 @@ dependencies {
     // owo-lib UI framework
     val owo_version: String by project
     modImplementation("io.wispforest:owo-lib:$owo_version")
+    annotationProcessor("io.wispforest:owo-lib:$owo_version")
     include("io.wispforest:owo-sentinel:$owo_version")
 
     // Markdown rendering

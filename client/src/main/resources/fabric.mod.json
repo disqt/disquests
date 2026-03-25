@@ -21,9 +21,6 @@
     "entrypoints": {
         "client": [
             "com.disqt.disquests.client.DisquestsClient"
-        ],
-        "modmenu": [
-            "com.disqt.disquests.client.compat.ModMenuIntegration"
         ]
     },
     "mixins": [

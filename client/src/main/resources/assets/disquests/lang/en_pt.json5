@@ -21,6 +21,7 @@
     "option.pinnedX": "Pin X Position",
     "option.pinnedY": "Pin Y Position",
     "category.hud": "HUD",
+    "section.hud": "HUD",
     "category.colors": "Colors",
   },
 }

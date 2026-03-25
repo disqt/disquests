@@ -1,6 +1,6 @@
 package com.disqt.disquests.client.gui.screen;
 
-import com.disqt.disquests.client.gui.helper.DisquestsConfig;
+import com.disqt.disquests.client.DisquestsClient;
 import io.wispforest.owo.ui.base.BaseUIModelScreen;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.ParentUIComponent;
@@ -57,11 +57,11 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     }
 
     protected void applyThemeRoot(FlowLayout root) {
-        root.surface(DisquestsConfig.getTheme().rootSurface());
+        root.surface(DisquestsClient.CONFIG.theme().rootSurface());
     }
 
     protected void applyThemePanel(ParentUIComponent component) {
-        component.surface(DisquestsConfig.getTheme().panelSurface());
+        component.surface(DisquestsClient.CONFIG.theme().panelSurface());
     }
 
     /**

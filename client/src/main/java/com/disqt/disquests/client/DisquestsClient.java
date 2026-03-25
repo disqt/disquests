@@ -1,12 +1,13 @@
 package com.disqt.disquests.client;
 
 import com.disqt.disquests.client.debug.DebugScreenEvents;
-import com.disqt.disquests.client.gui.helper.ColorConfig;
-import com.disqt.disquests.client.gui.helper.DisquestsConfig;
+import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.helper.DisquestsConfigWrapper;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.hud.HudPinRenderer;
 import com.disqt.disquests.client.network.ClientPacketHandler;
 import com.disqt.disquests.client.network.RawPayload;
+import io.wispforest.owo.config.ui.ConfigScreen;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -17,11 +18,12 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 
 @Environment(EnvType.CLIENT)
 public class DisquestsClient implements ClientModInitializer {
+    public static final DisquestsConfigWrapper CONFIG = DisquestsConfigWrapper.createAndLoad();
+
     @Override
     public void onInitializeClient() {
-        DisquestsConfig.load();
-        DisquestsConfig.getTheme().applyColors();
-        ColorConfig.loadColors();
+        CONFIG.subscribeToTheme(Colors::applyTheme);
+        Colors.applyTheme(CONFIG.theme());
         KeyBinds.register();
         DebugScreenEvents.register();
 
@@ -40,7 +42,7 @@ public class DisquestsClient implements ClientModInitializer {
             }
             while (KeyBinds.openConfigKey.wasPressed()) {
                 if (client.currentScreen == null) {
-                    client.setScreen(new com.disqt.disquests.client.gui.screen.ConfigScreen(null));
+                    client.setScreen(ConfigScreen.create(CONFIG, null));
                 }
             }
         });
