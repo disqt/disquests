@@ -163,18 +163,15 @@ public class ContributorScreen extends DisquestsBaseScreen {
         if (index < 0 || index >= quest.getContributors().size()) return;
         Contributor contrib = quest.getContributors().get(index);
 
-        navigateToScreen(new ConfirmScreen(this,
+        showConfirmOverlay(
                 Text.literal("Remove " + contrib.getName() + " from contributors?"),
                 () -> {
                     PacketSender.updateContributors(quest.getId(), List.of(
                             new PacketCodec.ContributorOpEntry(ContributorOp.REMOVE, contrib.getUuid(), contrib.getName(), false)
                     ));
                     quest.getContributors().remove(index);
-                    navigateToScreen(this);
-                },
-                () -> {
-                    navigateToScreen(this);
-                }));
+                    rebuildUi();
+                });
     }
 
     private void rebuildUi() {

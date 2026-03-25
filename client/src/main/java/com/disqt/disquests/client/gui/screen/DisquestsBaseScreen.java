@@ -2,12 +2,18 @@ package com.disqt.disquests.client.gui.screen;
 
 import com.disqt.disquests.client.DisquestsClient;
 import io.wispforest.owo.ui.base.BaseUIModelScreen;
+import io.wispforest.owo.ui.component.ButtonComponent;
+import io.wispforest.owo.ui.component.LabelComponent;
+import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
-import io.wispforest.owo.ui.core.ParentUIComponent;
+import io.wispforest.owo.ui.container.OverlayContainer;
+import io.wispforest.owo.ui.container.UIContainers;
+import io.wispforest.owo.ui.core.*;
 import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.input.CharInput;
 import net.minecraft.client.input.KeyInput;
+import net.minecraft.text.Text;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> {
@@ -80,6 +86,72 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     protected void navigateToScreen(Screen screen) {
         if (this.client != null) {
             this.client.setScreen(screen);
+        }
+    }
+
+    // ===================== CONFIRM OVERLAY =====================
+
+    protected void showConfirmOverlay(Text message, Runnable onConfirm) {
+        showConfirmOverlay(message, onConfirm, () -> {});
+    }
+
+    protected void showConfirmOverlay(Text message, Runnable onConfirm, Runnable onCancel) {
+        if (this.uiAdapter == null) return;
+
+        // Dismiss any existing overlay first
+        dismissOverlay();
+
+        // Message label
+        LabelComponent messageLabel = UIComponents.label(message);
+        messageLabel.shadow(true);
+        messageLabel.maxWidth(250);
+        messageLabel.horizontalTextAlignment(HorizontalAlignment.CENTER);
+
+        // Yes button
+        ButtonComponent yesBtn = UIComponents.button(Text.literal("Yes"), b -> {
+            dismissOverlay();
+            onConfirm.run();
+        });
+        yesBtn.id("btn-confirm-yes");
+        yesBtn.sizing(Sizing.fixed(60), Sizing.fixed(20));
+
+        // No button
+        ButtonComponent noBtn = UIComponents.button(Text.literal("No"), b -> {
+            dismissOverlay();
+            onCancel.run();
+        });
+        noBtn.id("btn-confirm-no");
+        noBtn.sizing(Sizing.fixed(60), Sizing.fixed(20));
+
+        // Button row
+        FlowLayout buttonRow = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+        buttonRow.gap(8);
+        buttonRow.child(yesBtn);
+        buttonRow.child(noBtn);
+        buttonRow.horizontalAlignment(HorizontalAlignment.CENTER);
+
+        // Panel
+        FlowLayout panel = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
+        panel.gap(12);
+        panel.padding(Insets.of(16));
+        panel.surface(Surface.DARK_PANEL);
+        panel.horizontalAlignment(HorizontalAlignment.CENTER);
+        panel.child(messageLabel);
+        panel.child(buttonRow);
+
+        // Overlay
+        OverlayContainer<FlowLayout> overlay = UIContainers.overlay(panel);
+        overlay.id("confirm-overlay");
+        overlay.closeOnClick(false);
+
+        this.uiAdapter.rootComponent.child(overlay);
+    }
+
+    protected void dismissOverlay() {
+        if (this.uiAdapter == null) return;
+        var existing = this.uiAdapter.rootComponent.childById(OverlayContainer.class, "confirm-overlay");
+        if (existing != null) {
+            existing.remove();
         }
     }
 }

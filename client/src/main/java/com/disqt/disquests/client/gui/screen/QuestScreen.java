@@ -526,16 +526,13 @@ public class QuestScreen extends DisquestsBaseScreen {
 
     private void cancelEdit() {
         if (isDirty()) {
-            navigateToScreen(new ConfirmScreen(this,
+            showConfirmOverlay(
                     Text.literal("Discard unsaved changes?"),
                     () -> {
                         quest.setTitle(originalTitle);
                         quest.setContent(originalContent);
                         exitToViewMode();
-                    },
-                    () -> {
-                        navigateToScreen(this);
-                    }));
+                    });
         } else {
             exitToViewMode();
         }
@@ -566,30 +563,24 @@ public class QuestScreen extends DisquestsBaseScreen {
     // ===================== VIEW MODE ACTIONS =====================
 
     private void confirmDelete() {
-        navigateToScreen(new ConfirmScreen(this,
+        showConfirmOverlay(
                 Text.literal("Delete quest \"" + quest.getTitle() + "\"?"),
                 () -> {
                     ClientCache.removeQuestById(quest.getId());
                     PacketSender.deleteQuest(quest.getId());
                     navigateToScreen(this.parent);
-                },
-                () -> {
-                    navigateToScreen(this);
-                }));
+                });
     }
 
     private void leaveQuest() {
-        navigateToScreen(new ConfirmScreen(this,
+        showConfirmOverlay(
                 Text.literal("Leave this quest? You'll lose contributor access."),
                 () -> {
                     ClientCache.removeFromMyQuests(quest.getId());
                     PacketSender.leaveQuest(quest.getId());
                     ClientSession.setPendingToast("Left \"" + quest.getTitle() + "\"");
                     navigateToScreen(this.parent);
-                },
-                () -> {
-                    navigateToScreen(this);
-                }));
+                });
     }
 
     private void joinQuest() {
