@@ -1,5 +1,6 @@
 package com.disqt.disquests.test.integration.journeys.solo;
 
+import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
@@ -60,18 +61,18 @@ class DirtyDetectionJourney {
             click(context, "btn-cancel");
 
         then("confirm overlay appears asking to discard changes");
-            waitForOverlay(context, "confirm-overlay");
-            assertOverlayVisible(context, "confirm-overlay");
+            waitForComponent(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
+            assertComponentExists(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
     }
 
     @Test @Order(3) @PlayerA
     @DisplayName("Click No on confirm overlay -> returns to edit with title still 'Modified'")
     void clickNoReturnsToEdit(ClientGameTestContext context) {
         given("confirm overlay is showing");
-            assertOverlayVisible(context, "confirm-overlay");
+            assertComponentExists(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
 
         when("player clicks No (don't discard)");
-            click(context, "btn-confirm-no");
+            click(context, DisquestsBaseScreen.CONFIRM_NO_ID);
 
         then("returns to QuestScreen in edit mode");
             waitForScreen(context, QuestScreen.class);
@@ -110,18 +111,18 @@ class DirtyDetectionJourney {
             click(context, "btn-cancel");
 
         then("confirm overlay appears again");
-            waitForOverlay(context, "confirm-overlay");
-            assertOverlayVisible(context, "confirm-overlay");
+            waitForComponent(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
+            assertComponentExists(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
     }
 
     @Test @Order(5) @PlayerA
     @DisplayName("Click Yes on confirm overlay -> view mode shows original title 'Original'")
     void clickYesDiscardsChanges(ClientGameTestContext context) {
         given("confirm overlay is showing");
-            assertOverlayVisible(context, "confirm-overlay");
+            assertComponentExists(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
 
         when("player clicks Yes (discard)");
-            click(context, "btn-confirm-yes");
+            click(context, DisquestsBaseScreen.CONFIRM_YES_ID);
 
         then("returns to QuestScreen in view mode");
             waitForScreen(context, QuestScreen.class);
@@ -150,7 +151,7 @@ class DirtyDetectionJourney {
             click(context, "btn-cancel");
 
         then("no confirm overlay appears -- goes directly back to view mode");
-            assertNoOverlay(context, "confirm-overlay");
+            assertComponentMissing(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
 
         and("QuestScreen shows in view mode");
             assertScreenIs(context, QuestScreen.class);

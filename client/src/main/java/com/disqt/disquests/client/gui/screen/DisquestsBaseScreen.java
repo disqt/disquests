@@ -18,6 +18,10 @@ import org.jetbrains.annotations.Nullable;
 
 public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> {
 
+    public static final String CONFIRM_OVERLAY_ID = "confirm-overlay";
+    public static final String CONFIRM_YES_ID = "btn-confirm-yes";
+    public static final String CONFIRM_NO_ID = "btn-confirm-no";
+
     @Nullable
     protected final Screen parent;
 
@@ -98,39 +102,33 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     protected void showConfirmOverlay(Text message, Runnable onConfirm, Runnable onCancel) {
         if (this.uiAdapter == null) return;
 
-        // Dismiss any existing overlay first
         dismissOverlay();
 
-        // Message label
         LabelComponent messageLabel = UIComponents.label(message);
         messageLabel.shadow(true);
         messageLabel.maxWidth(250);
         messageLabel.horizontalTextAlignment(HorizontalAlignment.CENTER);
 
-        // Yes button
         ButtonComponent yesBtn = UIComponents.button(Text.literal("Yes"), b -> {
             dismissOverlay();
             onConfirm.run();
         });
-        yesBtn.id("btn-confirm-yes");
+        yesBtn.id(CONFIRM_YES_ID);
         yesBtn.sizing(Sizing.fixed(60), Sizing.fixed(20));
 
-        // No button
         ButtonComponent noBtn = UIComponents.button(Text.literal("No"), b -> {
             dismissOverlay();
             onCancel.run();
         });
-        noBtn.id("btn-confirm-no");
+        noBtn.id(CONFIRM_NO_ID);
         noBtn.sizing(Sizing.fixed(60), Sizing.fixed(20));
 
-        // Button row
         FlowLayout buttonRow = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
         buttonRow.gap(8);
         buttonRow.child(yesBtn);
         buttonRow.child(noBtn);
         buttonRow.horizontalAlignment(HorizontalAlignment.CENTER);
 
-        // Panel
         FlowLayout panel = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
         panel.gap(12);
         panel.padding(Insets.of(16));
@@ -139,17 +137,20 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
         panel.child(messageLabel);
         panel.child(buttonRow);
 
-        // Overlay
         OverlayContainer<FlowLayout> overlay = UIContainers.overlay(panel);
-        overlay.id("confirm-overlay");
+        overlay.id(CONFIRM_OVERLAY_ID);
         overlay.closeOnClick(false);
 
         this.uiAdapter.rootComponent.child(overlay);
     }
 
     protected void dismissOverlay() {
+        dismissOverlay(CONFIRM_OVERLAY_ID);
+    }
+
+    protected void dismissOverlay(String overlayId) {
         if (this.uiAdapter == null) return;
-        var existing = this.uiAdapter.rootComponent.childById(OverlayContainer.class, "confirm-overlay");
+        var existing = this.uiAdapter.rootComponent.childById(OverlayContainer.class, overlayId);
         if (existing != null) {
             existing.remove();
         }

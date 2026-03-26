@@ -3,6 +3,7 @@ package com.disqt.disquests.test.integration.journeys.duo;
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.gui.screen.ContributorScreen;
+import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.test.integration.PhaseSync;
@@ -256,10 +257,10 @@ class TwoPlayerJourneys {
             context.waitTicks(2);
 
         then("confirm overlay appears");
-            waitForOverlay(context, "confirm-overlay");
+            waitForComponent(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
 
         when("PlayerA confirms removal");
-            click(context, "btn-confirm-yes");
+            click(context, DisquestsBaseScreen.CONFIRM_YES_ID);
             waitForScreen(context, ContributorScreen.class);
 
         then("contributor list is empty");
@@ -353,10 +354,10 @@ class TwoPlayerJourneys {
             click(context, "btn-leave");
 
         then("confirm overlay appears");
-            waitForOverlay(context, "confirm-overlay");
+            waitForComponent(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
 
         when("PlayerB confirms leave");
-            click(context, "btn-confirm-yes");
+            click(context, DisquestsBaseScreen.CONFIRM_YES_ID);
 
         then("quest is removed from PlayerB's My Quests");
             waitForScreen(context, MainScreen.class);

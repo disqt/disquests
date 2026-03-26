@@ -394,18 +394,6 @@ public final class UIActions {
     }
 
     /**
-     * Wait for a confirm overlay to appear on the current Disquests screen.
-     */
-    public static void waitForOverlay(ClientGameTestContext context, String overlayId) {
-        context.waitFor(client -> {
-            if (client.currentScreen instanceof DisquestsBaseScreen screen) {
-                return screen.getRootComponent().childById(io.wispforest.owo.ui.core.UIComponent.class, overlayId) != null;
-            }
-            return false;
-        }, TIMEOUT);
-    }
-
-    /**
      * Wait for a component to appear on the current Disquests screen.
      * Useful when programmatic components are added after the screen class is set.
      */

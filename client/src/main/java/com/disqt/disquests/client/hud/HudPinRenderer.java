@@ -46,10 +46,10 @@ public class HudPinRenderer {
      * If pinnedX is -1 (default), pins are placed at the top-right corner.
      * Otherwise, the configured value is used directly.
      */
-    private static int resolveX(int screenWidth) {
+    private static int resolveX(int screenWidth, int maxWidth) {
         int configX = DisquestsClient.CONFIG.pinnedX();
         if (configX == DEFAULT_POSITION) {
-            return screenWidth - getMaxWidth() - DEFAULT_MARGIN;
+            return screenWidth - maxWidth - DEFAULT_MARGIN;
         }
         return configX;
     }
@@ -96,7 +96,7 @@ public class HudPinRenderer {
 
         // Resolve position from config
         int screenWidth = client.getWindow().getScaledWidth();
-        int originX = resolveX(screenWidth);
+        int originX = resolveX(screenWidth, currentWidth);
         int originY = resolveY();
 
         // Render from cache
@@ -104,7 +104,7 @@ public class HudPinRenderer {
         int lineHeight = tr.fontHeight + 1;
         int y = originY;
         for (CachedPin pin : cachedPins) {
-            y = renderCachedPin(context, tr, pin, originX, y, lineHeight);
+            y = renderCachedPin(context, tr, pin, originX, y, lineHeight, currentWidth);
             y += GAP;
         }
     }
@@ -137,9 +137,8 @@ public class HudPinRenderer {
         cachedPins = pins;
     }
 
-    private static int renderCachedPin(DrawContext context, TextRenderer tr, CachedPin pin, int originX, int y, int lineHeight) {
+    private static int renderCachedPin(DrawContext context, TextRenderer tr, CachedPin pin, int originX, int y, int lineHeight, int boxWidth) {
         int totalLines = pin.titleLines.size() + pin.contentLines.size() + (pin.truncated ? 1 : 0);
-        int boxWidth = getMaxWidth();
         int boxHeight = PADDING * 2 + totalLines * lineHeight;
 
         // Background

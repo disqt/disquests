@@ -1,6 +1,7 @@
 package com.disqt.disquests.test.integration.journeys.solo;
 
 import com.disqt.disquests.client.ClientCache;
+import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
@@ -115,9 +116,9 @@ class QuestLifecycleJourney {
         when("player clicks Delete");
             click(context, "btn-delete");
         then("confirm overlay appears");
-            waitForOverlay(context, "confirm-overlay");
+            waitForComponent(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
         when("player clicks Yes");
-            click(context, "btn-confirm-yes");
+            click(context, DisquestsBaseScreen.CONFIRM_YES_ID);
         then("MainScreen shows empty list");
             waitForScreen(context, MainScreen.class);
             openMainScreen(context);

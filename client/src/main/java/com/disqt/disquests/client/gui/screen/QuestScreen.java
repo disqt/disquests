@@ -184,16 +184,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         }
         tagsCollapse.child(tagDisplay);
 
-        // Replace the XML tag-display placeholder with the collapsible
-        UIComponent tagSlot = root.childById(UIComponent.class, "tag-display-slot");
-        if (tagSlot != null) {
-            int tagSlotIndex = root.children().indexOf(tagSlot);
-            root.removeChild(tagSlot);
-            root.child(tagSlotIndex, tagsCollapse);
-        } else {
-            // Fallback: append after header-row (index 1)
-            root.child(1, tagsCollapse);
-        }
+        replaceSlot(root, "tag-display-slot", tagsCollapse);
 
         // Content area -- add MarkdownWidget
         String contentToRender = hideContent
@@ -274,22 +265,7 @@ public class QuestScreen extends DisquestsBaseScreen {
             contributorsCollapse.child(contributorsRow);
         }
 
-        // Replace the XML contributors-row placeholder with the collapsible
-        UIComponent contribSlot = root.childById(UIComponent.class, "contributors-row-slot");
-        if (contribSlot != null) {
-            int contribSlotIndex = root.children().indexOf(contribSlot);
-            root.removeChild(contribSlot);
-            root.child(contribSlotIndex, contributorsCollapse);
-        } else {
-            // Fallback: find the metadata-row and insert after it
-            UIComponent metaRow = root.childById(UIComponent.class, "metadata-row");
-            if (metaRow != null) {
-                int metaIndex = root.children().indexOf(metaRow);
-                root.child(metaIndex + 1, contributorsCollapse);
-            } else {
-                root.child(contributorsCollapse);
-            }
-        }
+        replaceSlot(root, "contributors-row-slot", contributorsCollapse);
 
         // Buttons
         FlowLayout buttonRow = root.childById(FlowLayout.class, "button-row");
@@ -734,6 +710,18 @@ public class QuestScreen extends DisquestsBaseScreen {
     }
 
     // ===================== HELPERS =====================
+
+    private void replaceSlot(FlowLayout parent, String slotId, UIComponent replacement) {
+        UIComponent slot = parent.childById(UIComponent.class, slotId);
+        if (slot != null) {
+            int idx = parent.children().indexOf(slot);
+            parent.removeChild(slot);
+            if (idx >= 0) parent.child(idx, replacement);
+            else parent.child(replacement);
+        } else {
+            parent.child(replacement);
+        }
+    }
 
     private void persistFieldValues() {
         if (titleFieldComponent != null) {
