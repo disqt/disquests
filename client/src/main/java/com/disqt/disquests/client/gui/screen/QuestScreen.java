@@ -381,7 +381,7 @@ public class QuestScreen extends DisquestsBaseScreen {
             }));
             visBtn.onPress(b -> cycleVisibility());
 
-            int contribCount = quest.getContributors() != null ? quest.getContributors().size() : 0;
+            int contribCount = quest.getContributors().size();
             int pendingReqCount = ClientCache.getPendingCount(quest.getId());
             Text contribText;
             if (pendingReqCount > 0) {

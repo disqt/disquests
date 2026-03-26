@@ -34,6 +34,8 @@ public class HudPinRenderer {
     private static List<UUID> lastPinnedIds = List.of();
     private static long lastContentHash = 0;
     private static int lastWidth = 0;
+    private static int lastX = DEFAULT_POSITION;
+    private static int lastY = DEFAULT_POSITION;
     private static List<CachedPin> cachedPins = List.of();
     private static boolean visible = true;
 
@@ -43,11 +45,10 @@ public class HudPinRenderer {
 
     /**
      * Returns the X origin for pin rendering.
-     * If pinnedX is -1 (default), pins are placed at the top-right corner.
+     * If configX is -1 (default), pins are placed at the top-right corner.
      * Otherwise, the configured value is used directly.
      */
-    private static int resolveX(int screenWidth, int maxWidth) {
-        int configX = DisquestsClient.CONFIG.pinnedX();
+    private static int resolveX(int screenWidth, int maxWidth, int configX) {
         if (configX == DEFAULT_POSITION) {
             return screenWidth - maxWidth - DEFAULT_MARGIN;
         }
@@ -56,11 +57,10 @@ public class HudPinRenderer {
 
     /**
      * Returns the Y origin for pin rendering.
-     * If pinnedY is -1 (default), pins start at the top margin.
+     * If configY is -1 (default), pins start at the top margin.
      * Otherwise, the configured value is used directly.
      */
-    private static int resolveY() {
-        int configY = DisquestsClient.CONFIG.pinnedY();
+    private static int resolveY(int configY) {
         if (configY == DEFAULT_POSITION) {
             return DEFAULT_MARGIN;
         }
@@ -74,6 +74,8 @@ public class HudPinRenderer {
             lastPinnedIds = List.of();
             lastContentHash = 0;
             lastWidth = 0;
+            lastX = DEFAULT_POSITION;
+            lastY = DEFAULT_POSITION;
             cachedPins = List.of();
             return;
         }
@@ -94,10 +96,14 @@ public class HudPinRenderer {
             lastWidth = currentWidth;
         }
 
+        // Read config positions once per frame
+        lastX = DisquestsClient.CONFIG.pinnedX();
+        lastY = DisquestsClient.CONFIG.pinnedY();
+
         // Resolve position from config
         int screenWidth = client.getWindow().getScaledWidth();
-        int originX = resolveX(screenWidth, currentWidth);
-        int originY = resolveY();
+        int originX = resolveX(screenWidth, currentWidth, lastX);
+        int originY = resolveY(lastY);
 
         // Render from cache
         TextRenderer tr = client.textRenderer;

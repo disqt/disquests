@@ -1,8 +1,8 @@
 package com.disqt.disquests.client;
 
 import com.disqt.disquests.client.debug.DebugScreenEvents;
-import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.helper.DisquestsConfigWrapper;
+import com.disqt.disquests.client.gui.helper.Theme;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.hud.HudPinRenderer;
 import com.disqt.disquests.client.network.ClientPacketHandler;
@@ -22,8 +22,8 @@ public class DisquestsClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        CONFIG.subscribeToTheme(Colors::applyTheme);
-        Colors.applyTheme(CONFIG.theme());
+        CONFIG.subscribeToTheme(Theme::applyColors);
+        CONFIG.theme().applyColors();
         KeyBinds.register();
         DebugScreenEvents.register();
 

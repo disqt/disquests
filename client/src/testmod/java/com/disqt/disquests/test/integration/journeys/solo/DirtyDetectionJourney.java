@@ -62,7 +62,6 @@ class DirtyDetectionJourney {
 
         then("confirm overlay appears asking to discard changes");
             waitForComponent(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
-            assertComponentExists(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
     }
 
     @Test @Order(3) @PlayerA
@@ -112,7 +111,6 @@ class DirtyDetectionJourney {
 
         then("confirm overlay appears again");
             waitForComponent(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
-            assertComponentExists(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
     }
 
     @Test @Order(5) @PlayerA

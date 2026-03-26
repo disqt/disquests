@@ -13,6 +13,8 @@ import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.container.ScrollContainer;
+import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.ParentUIComponent;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.VerticalAlignment;
@@ -54,7 +56,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
                 final UUID requestId = req.id();
                 final UUID questId = req.questId();
 
-                FlowLayout row = io.wispforest.owo.ui.container.UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+                FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
                 row.verticalAlignment(VerticalAlignment.CENTER);
                 row.gap(4);
 
@@ -64,7 +66,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
                 row.child(nameLabel);
 
                 // Spacer to push buttons right
-                FlowLayout spacer = io.wispforest.owo.ui.container.UIContainers.horizontalFlow(Sizing.fill(20), Sizing.fixed(1));
+                FlowLayout spacer = UIContainers.horizontalFlow(Sizing.fill(20), Sizing.fixed(1));
                 row.child(spacer);
 
                 ButtonComponent acceptBtn = UIComponents.button(
@@ -89,7 +91,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
 
         if (contributors.isEmpty() && pendingRequests.isEmpty()) {
             // Show empty label, hide contributor scroll
-            root.removeChild(root.childById(io.wispforest.owo.ui.container.ScrollContainer.class, "contributor-scroll"));
+            root.removeChild(root.childById(ScrollContainer.class, "contributor-scroll"));
         } else {
             // Hide empty label
             root.removeChild(emptyLabel);
@@ -98,7 +100,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
                 Contributor contrib = contributors.get(i);
                 final int idx = i;
 
-                FlowLayout row = io.wispforest.owo.ui.container.UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+                FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
                 row.verticalAlignment(VerticalAlignment.CENTER);
                 row.gap(4);
 
@@ -108,7 +110,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
                 row.child(nameLabel);
 
                 // Spacer
-                FlowLayout spacer = io.wispforest.owo.ui.container.UIContainers.horizontalFlow(Sizing.fill(20), Sizing.fixed(1));
+                FlowLayout spacer = UIContainers.horizontalFlow(Sizing.fill(20), Sizing.fixed(1));
                 row.child(spacer);
 
                 // Permission toggle
