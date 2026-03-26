@@ -71,6 +71,7 @@ class CoordinatesJourney {
             click(context, "btn-edit");
             waitForScreen(context, QuestScreen.class);
         and("player toggles Region on");
+            waitForComponent(context, "btn-region");
             click(context, "btn-region");
             // Region toggle rebuilds screen
             waitForScreen(context, QuestScreen.class);
