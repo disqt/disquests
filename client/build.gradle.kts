@@ -315,6 +315,7 @@ fun bootstrapServerDir(serverDir: File, mcVersion: String, logger: org.gradle.ap
         |server-port=25565
         |level-type=flat
         |spawn-protection=0
+        |difficulty=peaceful
         |""".trimMargin()
     )
     logger.lifecycle("Server directory bootstrapped at ${serverDir.absolutePath}")
@@ -392,6 +393,14 @@ fun rconReset(logger: org.gradle.api.logging.Logger) {
         Thread.sleep(1000)
     } catch (e: Exception) {
         logger.warn("RCON reset failed: ${e.message}")
+    }
+}
+
+fun ensureClientOptions(runDir: File) {
+    val optionsFile = File(runDir, "options.txt")
+    if (!optionsFile.exists()) {
+        runDir.mkdirs()
+        optionsFile.writeText("overrideWidth:1920\noverrideHeight:1080\nguiScale:2\n")
     }
 }
 
@@ -480,6 +489,7 @@ tasks.register("runSoloTests") {
 
             // --- Step 3: Launch PlayerA only ---
             if (!noStart) {
+                ensureClientOptions(file("run"))
                 val clientAReady = File(syncDir, "client-a-ready.done").exists()
 
                 if (!clientAReady) {
@@ -594,7 +604,8 @@ tasks.register("runDuoTests") {
                 val clientBReady = File(syncDir, "client-b-ready.done").exists()
 
                 if (!clientAReady || !clientBReady) {
-                    file("run-b").mkdirs()
+                    ensureClientOptions(file("run"))
+                    ensureClientOptions(file("run-b"))
 
                     val procA = launchClient(
                         gradlew, isWin, rootProject.projectDir,
