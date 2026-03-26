@@ -133,9 +133,18 @@ public final class UIActions {
         });
 
         // Wait for player entity
+        LOG.info("connectAndWait: waiting for player entity...");
         context.waitFor(client -> client.player != null, CONNECT_TIMEOUT);
+        LOG.info("connectAndWait: player entity present, waiting for Disquests handshake (ClientSession.isOnServer)...");
         // Wait for Disquests handshake
-        context.waitFor(client -> ClientSession.isOnServer(), CONNECT_TIMEOUT);
+        context.waitFor(client -> {
+            boolean onServer = ClientSession.isOnServer();
+            if (!onServer) {
+                LOG.debug("connectAndWait: isOnServer=false, still waiting...");
+            }
+            return onServer;
+        }, CONNECT_TIMEOUT);
+        LOG.info("connectAndWait: handshake received, connected!");
         context.waitTicks(10);
     }
 

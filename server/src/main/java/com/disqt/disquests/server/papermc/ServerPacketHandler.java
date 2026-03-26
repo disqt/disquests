@@ -61,18 +61,29 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        plugin.getLogger().info("PlayerJoin: " + player.getName() + ", channels: " + player.getListeningPluginChannels());
         // Retry handshake every 20 ticks until the client registers the channel (up to 10 seconds).
         // The Fabric client registers disquests:main during onInitializeClient, but on slow
         // environments (CI with Xvfb) the registration message can take several seconds to arrive.
         final int[] attempts = {0};
         Bukkit.getScheduler().runTaskTimer(plugin, task -> {
-            if (!player.isOnline() || attempts[0]++ >= 10) {
+            attempts[0]++;
+            if (!player.isOnline()) {
+                plugin.getLogger().info("Handshake retry: " + player.getName() + " went offline (attempt " + attempts[0] + ")");
+                task.cancel();
+                return;
+            }
+            if (attempts[0] > 10) {
+                plugin.getLogger().warning("Handshake retry: " + player.getName() + " channel not registered after 10 attempts, channels: " + player.getListeningPluginChannels());
                 task.cancel();
                 return;
             }
             if (isModPlayer(player)) {
+                plugin.getLogger().info("Handshake sent to " + player.getName() + " on attempt " + attempts[0]);
                 sendHandshake(player);
                 task.cancel();
+            } else {
+                plugin.getLogger().info("Handshake retry " + attempts[0] + " for " + player.getName() + ": channel not yet registered, channels: " + player.getListeningPluginChannels());
             }
         }, 40L, 20L);
     }
