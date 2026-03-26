@@ -52,7 +52,7 @@ class TwoPlayerJourneys {
 
         and("PlayerA cycles visibility to CLOSED (PRIVATE -> CLOSED)");
             click(context, "btn-visibility");
-            assertButtonText(context, "btn-visibility", "CLOSED");
+            assertButtonText(context, "btn-visibility", "Closed");
 
         and("PlayerA saves the quest");
             click(context, "btn-save");
@@ -290,7 +290,7 @@ class TwoPlayerJourneys {
         and("PlayerA cycles visibility twice to reach OPEN");
             click(context, "btn-visibility");
             click(context, "btn-visibility");
-            assertButtonText(context, "btn-visibility", "OPEN");
+            assertButtonText(context, "btn-visibility", "Open");
 
         and("PlayerA saves the quest");
             click(context, "btn-save");
