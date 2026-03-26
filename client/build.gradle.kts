@@ -400,7 +400,7 @@ fun ensureClientOptions(runDir: File) {
     val optionsFile = File(runDir, "options.txt")
     if (!optionsFile.exists()) {
         runDir.mkdirs()
-        optionsFile.writeText("overrideWidth:1920\noverrideHeight:1080\nguiScale:2\n")
+        optionsFile.writeText("guiScale:1\n")
     }
 }
 
@@ -519,7 +519,7 @@ tasks.register("runSoloTests") {
 
             // --- Step 5: Wait for results (Player A only) ---
             val resultA = File(syncDir, "results-a.txt")
-            val resultsDeadline = System.currentTimeMillis() + 420000 // 7 minutes (CI is slower than local)
+            val resultsDeadline = System.currentTimeMillis() + 300000 // 5 minutes
             while (System.currentTimeMillis() < resultsDeadline) {
                 if (resultA.exists()) break
                 if (startedClients && processes.all { !it.isAlive }) break
@@ -661,7 +661,7 @@ tasks.register("runDuoTests") {
             // --- Step 5: Wait for results (both players) ---
             val resultA = File(syncDir, "results-a.txt")
             val resultB = File(syncDir, "results-b.txt")
-            val resultsDeadline = System.currentTimeMillis() + 420000 // 7 minutes (CI is slower than local)
+            val resultsDeadline = System.currentTimeMillis() + 300000 // 5 minutes
             while (System.currentTimeMillis() < resultsDeadline) {
                 if (resultA.exists() && resultB.exists()) break
                 if (!harness && startedClients && processes.all { !it.isAlive }) break
