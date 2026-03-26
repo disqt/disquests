@@ -109,14 +109,14 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
         messageLabel.maxWidth(250);
         messageLabel.horizontalTextAlignment(HorizontalAlignment.CENTER);
 
-        ButtonComponent yesBtn = UIComponents.button(Text.literal("Yes"), b -> {
+        ButtonComponent yesBtn = UIComponents.button(Text.translatable("gui.disquests.btn.yes"), b -> {
             dismissOverlay();
             onConfirm.run();
         });
         yesBtn.id(CONFIRM_YES_ID);
         yesBtn.sizing(Sizing.fixed(60), Sizing.fixed(20));
 
-        ButtonComponent noBtn = UIComponents.button(Text.literal("No"), b -> {
+        ButtonComponent noBtn = UIComponents.button(Text.translatable("gui.disquests.btn.no"), b -> {
             dismissOverlay();
             onCancel.run();
         });

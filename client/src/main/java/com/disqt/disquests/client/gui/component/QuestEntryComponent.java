@@ -31,7 +31,7 @@ public class QuestEntryComponent extends BaseUIComponent {
     private static final Identifier PIN_ACTIVE_ICON = Identifier.of("disquests", "icon/pin_active");
 
     // Static constants cached once across all instances
-    private static final Text HIDDEN_CONTENT_TEXT = Text.literal("Request access to view").formatted(Formatting.ITALIC);
+    private static final Text HIDDEN_CONTENT_TEXT = Text.translatable("gui.disquests.label.request_access").formatted(Formatting.ITALIC);
 
 
     private final Quest quest;
@@ -92,9 +92,9 @@ public class QuestEntryComponent extends BaseUIComponent {
         Text visText = null;
         if (quest.getVisibility() != null) {
             visText = switch (quest.getVisibility()) {
-                case PRIVATE -> Text.literal("Private").formatted(Formatting.LIGHT_PURPLE);
-                case CLOSED  -> Text.literal("Closed").formatted(Formatting.YELLOW);
-                case OPEN    -> Text.literal("Open").formatted(Formatting.GREEN);
+                case PRIVATE -> Text.translatable("gui.disquests.visibility.private").formatted(Formatting.LIGHT_PURPLE);
+                case CLOSED  -> Text.translatable("gui.disquests.visibility.closed").formatted(Formatting.YELLOW);
+                case OPEN    -> Text.translatable("gui.disquests.visibility.open").formatted(Formatting.GREEN);
             };
         }
         this.cachedVisibilityText = visText;
@@ -277,7 +277,7 @@ public class QuestEntryComponent extends BaseUIComponent {
         // --- Row 3: Tags ---
         List<String> tags = quest.getTags();
         if (tags == null || tags.isEmpty()) {
-            context.drawText(textRenderer, Text.literal("no tags").formatted(Formatting.ITALIC),
+            context.drawText(textRenderer, Text.translatable("gui.disquests.label.no_tags").formatted(Formatting.ITALIC),
                     entryX + 4, entryY + 24, Colors.TEXT_MUTED, false);
         } else {
             int tagX = entryX + 4;

@@ -46,7 +46,7 @@ public class TagPickerScreen extends DisquestsBaseScreen {
 
         if (predefined.isEmpty()) {
             LabelComponent none = UIComponents.label(
-                    Text.literal("No predefined tags").withColor(Colors.TEXT_MUTED));
+                    Text.translatable("gui.disquests.label.no_predefined_tags").withColor(Colors.TEXT_MUTED));
             none.shadow(true);
             predefinedList.child(none);
         } else {
@@ -64,13 +64,13 @@ public class TagPickerScreen extends DisquestsBaseScreen {
         FlowLayout customRow = root.childById(FlowLayout.class, "custom-row");
         MultiLineTextFieldWidget textField = new MultiLineTextFieldWidget(
                 client.textRenderer, 0, 0, 120, 14,
-                "", "custom-tag...", 1, false);
+                "", Text.translatable("gui.disquests.placeholder.custom_tag").getString(), 1, false);
         customTagField = new TextFieldComponent(textField);
         customTagField.sizing(Sizing.fill(70), Sizing.fixed(14));
         customTagField.id("custom-tag-field");
         customRow.child(customTagField);
 
-        ButtonComponent addBtn = UIComponents.button(Text.literal("Add"), b -> addCustomTag());
+        ButtonComponent addBtn = UIComponents.button(Text.translatable("gui.disquests.btn.add"), b -> addCustomTag());
         addBtn.sizing(Sizing.fixed(40), Sizing.fixed(14));
         customRow.child(addBtn);
 

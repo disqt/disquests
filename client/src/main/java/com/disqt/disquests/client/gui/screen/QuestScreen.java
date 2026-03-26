@@ -161,7 +161,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         boolean tagsExpanded = tagCount <= 5;
         CollapsibleContainer tagsCollapse = UIContainers.collapsible(
                 Sizing.fill(85), Sizing.content(),
-                Text.literal("Tags (" + tagCount + ")"),
+                Text.translatable("gui.disquests.section.tags", tagCount),
                 tagsExpanded);
         tagsCollapse.id("tags-collapse");
         tagsCollapse.margins(Insets.bottom(4));
@@ -171,7 +171,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         tagDisplay.gap(3);
         if (viewTags.isEmpty()) {
             LabelComponent noTagsLabel = UIComponents.label(
-                    Text.literal("no tags").withColor(Colors.TEXT_MUTED).styled(s -> s.withItalic(true)));
+                    Text.translatable("gui.disquests.label.no_tags").withColor(Colors.TEXT_MUTED).styled(s -> s.withItalic(true)));
             noTagsLabel.shadow(false);
             tagDisplay.child(noTagsLabel);
         } else {
@@ -228,7 +228,7 @@ public class QuestScreen extends DisquestsBaseScreen {
             String bluemapUrl = BlueMapHelper.buildUrl(quest);
             if (bluemapUrl != null) {
                 final String url = bluemapUrl;
-                ButtonComponent bmBtn = UIComponents.button(Text.literal("View on BlueMap"), b -> {
+                ButtonComponent bmBtn = UIComponents.button(Text.translatable("gui.disquests.btn.view_bluemap"), b -> {
                     try {
                         net.minecraft.util.Util.getOperatingSystem().open(URI.create(url));
                     } catch (Exception ignored) {}
@@ -245,7 +245,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         boolean contribExpanded = contribCount <= 3;
         CollapsibleContainer contributorsCollapse = UIContainers.collapsible(
                 Sizing.fill(85), Sizing.content(),
-                Text.literal("Contributors (" + contribCount + ")"),
+                Text.translatable("gui.disquests.section.contributors", contribCount),
                 contribExpanded && contribCount > 0);
         contributorsCollapse.id("contributors-collapse");
         contributorsCollapse.margins(Insets.top(2));
@@ -284,7 +284,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         if (canJoinOrRequest && quest.getVisibility() == Visibility.CLOSED) {
             if (ClientSession.isRequested(quest.getId())) {
                 requestBtn.active = false;
-                requestBtn.setMessage(Text.literal("Requested"));
+                requestBtn.setMessage(Text.translatable("gui.disquests.btn.requested"));
             } else {
                 requestBtn.onPress(b -> requestAccess());
             }
@@ -324,7 +324,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         FlowLayout titleRow = root.childById(FlowLayout.class, "title-row");
         MultiLineTextFieldWidget titleField = new MultiLineTextFieldWidget(
                 client.textRenderer, 0, 0, 300, 16,
-                quest.getTitle(), "Quest title...", 1, false);
+                quest.getTitle(), Text.translatable("gui.disquests.placeholder.title").getString(), 1, false);
         titleFieldComponent = new TextFieldComponent(titleField);
         titleFieldComponent.sizing(Sizing.fill(90), Sizing.fixed(16));
         titleFieldComponent.id("title-field");
@@ -340,7 +340,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         MultiLineTextFieldWidget contentField = new MultiLineTextFieldWidget(
                 client.textRenderer, 0, 0, 400, 200,
                 quest.getContent() != null ? quest.getContent() : "",
-                "Quest content...", Integer.MAX_VALUE, true, true);
+                Text.translatable("gui.disquests.placeholder.content").getString(), Integer.MAX_VALUE, true, true);
         contentFieldComponent = new TextFieldComponent(contentField);
         contentFieldComponent.sizing(Sizing.fill(100), Sizing.fill(100));
         contentFieldComponent.id("content-field");
@@ -367,13 +367,17 @@ public class QuestScreen extends DisquestsBaseScreen {
         // Settings row (owner only)
         FlowLayout settingsRow = root.childById(FlowLayout.class, "settings-row");
         if (isOwner) {
-            String visText = "Visibility: " + quest.getVisibility().name();
             ButtonComponent visBtn = root.childById(ButtonComponent.class, "btn-visibility");
-            visBtn.setMessage(Text.literal(visText));
-            visBtn.tooltip(Text.literal(switch (quest.getVisibility()) {
-                case PRIVATE -> "Only you can see this quest";
-                case CLOSED -> "Visible on Quest Board, others must request access";
-                case OPEN -> "Anyone can join and view this quest";
+            visBtn.setMessage(Text.literal("Visibility: ")
+                    .append(Text.translatable(switch (quest.getVisibility()) {
+                        case PRIVATE -> "gui.disquests.visibility.private";
+                        case CLOSED -> "gui.disquests.visibility.closed";
+                        case OPEN -> "gui.disquests.visibility.open";
+                    })));
+            visBtn.tooltip(Text.translatable(switch (quest.getVisibility()) {
+                case PRIVATE -> "gui.disquests.tooltip.private";
+                case CLOSED -> "gui.disquests.tooltip.closed";
+                case OPEN -> "gui.disquests.tooltip.open";
             }));
             visBtn.onPress(b -> cycleVisibility());
 
@@ -381,11 +385,11 @@ public class QuestScreen extends DisquestsBaseScreen {
             int pendingReqCount = ClientCache.getPendingCount(quest.getId());
             Text contribText;
             if (pendingReqCount > 0) {
-                contribText = Text.literal("Contributors (" + contribCount + " ")
-                        .append(Text.literal("+ " + pendingReqCount).withColor(Colors.AMBER))
-                        .append(Text.literal(")"));
+                contribText = Text.translatable("gui.disquests.section.contributors", contribCount)
+                        .append(Text.literal(" "))
+                        .append(Text.literal("+ " + pendingReqCount).withColor(Colors.AMBER));
             } else {
-                contribText = Text.literal("Contributors (" + contribCount + ")");
+                contribText = Text.translatable("gui.disquests.section.contributors", contribCount);
             }
             ButtonComponent contribBtn = root.childById(ButtonComponent.class, "btn-contributors");
             contribBtn.setMessage(contribText);
@@ -441,20 +445,22 @@ public class QuestScreen extends DisquestsBaseScreen {
         coordsRow.child(coordZComponent);
 
         // Set Pos button
-        ButtonComponent setPosBtn = UIComponents.button(Text.literal("Set Pos"), b -> setPlayerPosition());
+        ButtonComponent setPosBtn = UIComponents.button(Text.translatable("gui.disquests.btn.set_pos"), b -> setPlayerPosition());
         setPosBtn.sizing(Sizing.fixed(50), Sizing.fixed(14));
         setPosBtn.id("btn-set-pos");
         coordsRow.child(setPosBtn);
 
         // Region toggle
-        String regionText = regionEnabled ? "[x] Region" : "[ ] Region";
-        ButtonComponent regionBtn = UIComponents.button(Text.literal(regionText), b -> toggleRegion());
+        Text regionText = regionEnabled
+                ? Text.translatable("gui.disquests.btn.region_on")
+                : Text.translatable("gui.disquests.btn.region_off");
+        ButtonComponent regionBtn = UIComponents.button(regionText, b -> toggleRegion());
         regionBtn.sizing(Sizing.content(), Sizing.fixed(14));
         regionBtn.id("btn-region");
         coordsRow.child(regionBtn);
 
         // Clear button
-        ButtonComponent clearBtn = UIComponents.button(Text.literal("Clear"), b -> clearCoords());
+        ButtonComponent clearBtn = UIComponents.button(Text.translatable("gui.disquests.btn.clear"), b -> clearCoords());
         clearBtn.sizing(Sizing.fixed(50), Sizing.fixed(14));
         clearBtn.id("btn-clear");
         coordsRow.child(clearBtn);
@@ -478,7 +484,7 @@ public class QuestScreen extends DisquestsBaseScreen {
             corner2Row.child(labelFor("Z:"));
             corner2Row.child(coord2ZComponent);
 
-            ButtonComponent setPos2Btn = UIComponents.button(Text.literal("Set Pos"), b -> setCorner2Position());
+            ButtonComponent setPos2Btn = UIComponents.button(Text.translatable("gui.disquests.btn.set_pos"), b -> setCorner2Position());
             setPos2Btn.sizing(Sizing.fixed(50), Sizing.fixed(14));
             corner2Row.child(setPos2Btn);
         } else {
@@ -521,7 +527,7 @@ public class QuestScreen extends DisquestsBaseScreen {
 
         // "+ Tag" button (only if below max)
         if (tags.size() < TagConstraints.MAX_TAGS) {
-            ButtonComponent addTagBtn = UIComponents.button(Text.literal("+ Tag"), b -> {
+            ButtonComponent addTagBtn = UIComponents.button(Text.translatable("gui.disquests.btn.add_tag"), b -> {
                 persistFieldValues();
                 QuestScreen returnScreen = new QuestScreen(this.parent, quest, true, isNewQuest,
                         originalTitle, originalContent);
@@ -560,7 +566,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     private void cancelEdit() {
         if (isDirty()) {
             showConfirmOverlay(
-                    Text.literal("Discard unsaved changes?"),
+                    Text.translatable("gui.disquests.confirm.discard"),
                     () -> {
                         quest.setTitle(originalTitle);
                         quest.setContent(originalContent);
@@ -597,7 +603,7 @@ public class QuestScreen extends DisquestsBaseScreen {
 
     private void confirmDelete() {
         showConfirmOverlay(
-                Text.literal("Delete quest \"" + quest.getTitle() + "\"?"),
+                Text.translatable("gui.disquests.confirm.delete", quest.getTitle()),
                 () -> {
                     ClientCache.removeQuestById(quest.getId());
                     PacketSender.deleteQuest(quest.getId());
@@ -607,7 +613,7 @@ public class QuestScreen extends DisquestsBaseScreen {
 
     private void leaveQuest() {
         showConfirmOverlay(
-                Text.literal("Leave this quest? You'll lose contributor access."),
+                Text.translatable("gui.disquests.confirm.leave"),
                 () -> {
                     ClientCache.removeFromMyQuests(quest.getId());
                     PacketSender.leaveQuest(quest.getId());

@@ -68,13 +68,13 @@ public class ContributorScreen extends DisquestsBaseScreen {
                 row.child(spacer);
 
                 ButtonComponent acceptBtn = UIComponents.button(
-                        Text.literal("Accept").withColor(0xFF55CC55),
+                        Text.translatable("gui.disquests.btn.accept").withColor(0xFF55CC55),
                         b -> respondToRequest(questId, requestId, true));
                 acceptBtn.sizing(Sizing.fixed(60), Sizing.fixed(14));
                 row.child(acceptBtn);
 
                 ButtonComponent denyBtn = UIComponents.button(
-                        Text.literal("Deny").withColor(0xFFCC5555),
+                        Text.translatable("gui.disquests.btn.deny").withColor(0xFFCC5555),
                         b -> respondToRequest(questId, requestId, false));
                 denyBtn.sizing(Sizing.fixed(60), Sizing.fixed(14));
                 row.child(denyBtn);
@@ -112,16 +112,18 @@ public class ContributorScreen extends DisquestsBaseScreen {
                 row.child(spacer);
 
                 // Permission toggle
-                String permText = contrib.canEdit() ? "Can Edit" : "View Only";
+                Text permText = contrib.canEdit()
+                        ? Text.translatable("gui.disquests.contributor.can_edit")
+                        : Text.translatable("gui.disquests.contributor.view_only");
                 ButtonComponent permBtn = UIComponents.button(
-                        Text.literal(permText),
+                        permText,
                         b -> togglePermission(idx));
                 permBtn.sizing(Sizing.fixed(60), Sizing.fixed(14));
                 row.child(permBtn);
 
                 // Remove button
                 ButtonComponent removeBtn = UIComponents.button(
-                        Text.literal("Remove"),
+                        Text.translatable("gui.disquests.btn.remove"),
                         b -> removeContributor(idx));
                 removeBtn.sizing(Sizing.fixed(60), Sizing.fixed(14));
                 row.child(removeBtn);
