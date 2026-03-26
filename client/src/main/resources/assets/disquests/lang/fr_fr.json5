@@ -1,0 +1,27 @@
+{
+  // Raccourcis clavier
+  "key.category.disquests.main": "Disquests",
+  "key.disquests.{}": {
+    "opengui": "Ouvrir Disquests",
+    "togglepin": "Afficher/masquer les quêtes épinglées",
+    "openconfig": "Ouvrir la configuration",
+  },
+
+  // Interface
+  "gui.disquests.main_title": [
+    "Dis",
+    { "text": "quests", "color": "#FFB300" }
+  ],
+
+  // owo-config
+  "text.config.disquests-config.{}": {
+    "title": "Configuration Disquests",
+    "option.pinnedWidth": "Largeur des quêtes épinglées",
+    "option.theme": "Thème",
+    "option.pinnedX": "Position X des quêtes épinglées",
+    "option.pinnedY": "Position Y des quêtes épinglées",
+    "category.hud": "HUD",
+    "section.hud": "HUD",
+    "category.colors": "Couleurs",
+  },
+}
