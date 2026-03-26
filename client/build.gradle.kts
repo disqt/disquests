@@ -519,7 +519,7 @@ tasks.register("runSoloTests") {
 
             // --- Step 5: Wait for results (Player A only) ---
             val resultA = File(syncDir, "results-a.txt")
-            val resultsDeadline = System.currentTimeMillis() + 180000
+            val resultsDeadline = System.currentTimeMillis() + 420000 // 7 minutes (CI is slower than local)
             while (System.currentTimeMillis() < resultsDeadline) {
                 if (resultA.exists()) break
                 if (startedClients && processes.all { !it.isAlive }) break
@@ -661,7 +661,7 @@ tasks.register("runDuoTests") {
             // --- Step 5: Wait for results (both players) ---
             val resultA = File(syncDir, "results-a.txt")
             val resultB = File(syncDir, "results-b.txt")
-            val resultsDeadline = System.currentTimeMillis() + 180000
+            val resultsDeadline = System.currentTimeMillis() + 420000 // 7 minutes (CI is slower than local)
             while (System.currentTimeMillis() < resultsDeadline) {
                 if (resultA.exists() && resultB.exists()) break
                 if (!harness && startedClients && processes.all { !it.isAlive }) break
