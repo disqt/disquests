@@ -1,6 +1,7 @@
 plugins {
     java
     id("com.diffplug.spotless") version "7.0.3" apply false
+    id("com.fizzpod.lefthook") version "0.4.0"
 }
 
 fun requireFreeRam(taskName: String, requiredMb: Long = 4096L) {
@@ -20,6 +21,20 @@ fun requireFreeRam(taskName: String, requiredMb: Long = 4096L) {
 }
 
 extra["requireFreeRam"] = ::requireFreeRam
+
+lefthook {
+    config.set(mapOf(
+        "pre-commit" to mapOf(
+            "commands" to mapOf(
+                "java-format" to mapOf(
+                    "glob" to "*.java",
+                    "run" to "./gradlew spotlessApply -PspotlessIdeHook={staged_files}",
+                    "stage_fixed" to true
+                )
+            )
+        )
+    ))
+}
 
 subprojects {
     // Client uses Fabric Loom which manages its own Java config
