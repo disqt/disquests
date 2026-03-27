@@ -48,6 +48,7 @@ dependencies {
     // owo-lib UI framework
     val owo_version: String by project
     modImplementation("io.wispforest:owo-lib:$owo_version")
+    annotationProcessor("io.wispforest:owo-lib:$owo_version")
     include("io.wispforest:owo-sentinel:$owo_version")
 
     // Markdown rendering
@@ -314,6 +315,7 @@ fun bootstrapServerDir(serverDir: File, mcVersion: String, logger: org.gradle.ap
         |server-port=25565
         |level-type=flat
         |spawn-protection=0
+        |difficulty=peaceful
         |""".trimMargin()
     )
     logger.lifecycle("Server directory bootstrapped at ${serverDir.absolutePath}")
@@ -391,6 +393,14 @@ fun rconReset(logger: org.gradle.api.logging.Logger) {
         Thread.sleep(1000)
     } catch (e: Exception) {
         logger.warn("RCON reset failed: ${e.message}")
+    }
+}
+
+fun ensureClientOptions(runDir: File) {
+    val optionsFile = File(runDir, "options.txt")
+    if (!optionsFile.exists()) {
+        runDir.mkdirs()
+        optionsFile.writeText("guiScale:1\n")
     }
 }
 
@@ -479,6 +489,7 @@ tasks.register("runSoloTests") {
 
             // --- Step 3: Launch PlayerA only ---
             if (!noStart) {
+                ensureClientOptions(file("run"))
                 val clientAReady = File(syncDir, "client-a-ready.done").exists()
 
                 if (!clientAReady) {
@@ -508,7 +519,7 @@ tasks.register("runSoloTests") {
 
             // --- Step 5: Wait for results (Player A only) ---
             val resultA = File(syncDir, "results-a.txt")
-            val resultsDeadline = System.currentTimeMillis() + 180000
+            val resultsDeadline = System.currentTimeMillis() + 300000 // 5 minutes
             while (System.currentTimeMillis() < resultsDeadline) {
                 if (resultA.exists()) break
                 if (startedClients && processes.all { !it.isAlive }) break
@@ -593,7 +604,8 @@ tasks.register("runDuoTests") {
                 val clientBReady = File(syncDir, "client-b-ready.done").exists()
 
                 if (!clientAReady || !clientBReady) {
-                    file("run-b").mkdirs()
+                    ensureClientOptions(file("run"))
+                    ensureClientOptions(file("run-b"))
 
                     val procA = launchClient(
                         gradlew, isWin, rootProject.projectDir,
@@ -649,7 +661,7 @@ tasks.register("runDuoTests") {
             // --- Step 5: Wait for results (both players) ---
             val resultA = File(syncDir, "results-a.txt")
             val resultB = File(syncDir, "results-b.txt")
-            val resultsDeadline = System.currentTimeMillis() + 180000
+            val resultsDeadline = System.currentTimeMillis() + 300000 // 5 minutes
             while (System.currentTimeMillis() < resultsDeadline) {
                 if (resultA.exists() && resultB.exists()) break
                 if (!harness && startedClients && processes.all { !it.isAlive }) break

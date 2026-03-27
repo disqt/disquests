@@ -394,6 +394,19 @@ public final class UIActions {
     }
 
     /**
+     * Wait for a component to appear on the current Disquests screen.
+     * Useful when programmatic components are added after the screen class is set.
+     */
+    public static void waitForComponent(ClientGameTestContext context, String componentId) {
+        context.waitFor(client -> {
+            if (client.currentScreen instanceof DisquestsBaseScreen screen) {
+                return screen.getRootComponent().childById(io.wispforest.owo.ui.core.UIComponent.class, componentId) != null;
+            }
+            return false;
+        }, TIMEOUT);
+    }
+
+    /**
      * Offline-mode UUID generation (matches Paper's offline UUID format).
      */
     public static UUID offlineUuid(String playerName) {

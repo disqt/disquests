@@ -2,8 +2,8 @@ package com.disqt.disquests.test.integration.journeys.duo;
 
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
-import com.disqt.disquests.client.gui.screen.ConfirmScreen;
 import com.disqt.disquests.client.gui.screen.ContributorScreen;
+import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.test.integration.PhaseSync;
@@ -52,7 +52,7 @@ class TwoPlayerJourneys {
 
         and("PlayerA cycles visibility to CLOSED (PRIVATE -> CLOSED)");
             click(context, "btn-visibility");
-            assertButtonText(context, "btn-visibility", "CLOSED");
+            assertButtonText(context, "btn-visibility", "Closed");
 
         and("PlayerA saves the quest");
             click(context, "btn-save");
@@ -256,11 +256,11 @@ class TwoPlayerJourneys {
             context.getInput().pressMouse(org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT);
             context.waitTicks(2);
 
-        then("ConfirmScreen appears");
-            waitForScreen(context, ConfirmScreen.class);
+        then("confirm overlay appears");
+            waitForComponent(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
 
         when("PlayerA confirms removal");
-            click(context, "btn-yes");
+            click(context, DisquestsBaseScreen.CONFIRM_YES_ID);
             waitForScreen(context, ContributorScreen.class);
 
         then("contributor list is empty");
@@ -290,7 +290,7 @@ class TwoPlayerJourneys {
         and("PlayerA cycles visibility twice to reach OPEN");
             click(context, "btn-visibility");
             click(context, "btn-visibility");
-            assertButtonText(context, "btn-visibility", "OPEN");
+            assertButtonText(context, "btn-visibility", "Open");
 
         and("PlayerA saves the quest");
             click(context, "btn-save");
@@ -353,11 +353,11 @@ class TwoPlayerJourneys {
         when("PlayerB clicks Leave");
             click(context, "btn-leave");
 
-        then("ConfirmScreen appears");
-            waitForScreen(context, ConfirmScreen.class);
+        then("confirm overlay appears");
+            waitForComponent(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
 
         when("PlayerB confirms leave");
-            click(context, "btn-yes");
+            click(context, DisquestsBaseScreen.CONFIRM_YES_ID);
 
         then("quest is removed from PlayerB's My Quests");
             waitForScreen(context, MainScreen.class);

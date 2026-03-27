@@ -1,16 +1,26 @@
 package com.disqt.disquests.client.gui.screen;
 
-import com.disqt.disquests.client.gui.helper.DisquestsConfig;
+import com.disqt.disquests.client.DisquestsClient;
 import io.wispforest.owo.ui.base.BaseUIModelScreen;
+import io.wispforest.owo.ui.component.ButtonComponent;
+import io.wispforest.owo.ui.component.LabelComponent;
+import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
-import io.wispforest.owo.ui.core.ParentUIComponent;
+import io.wispforest.owo.ui.container.OverlayContainer;
+import io.wispforest.owo.ui.container.UIContainers;
+import io.wispforest.owo.ui.core.*;
 import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.input.CharInput;
 import net.minecraft.client.input.KeyInput;
+import net.minecraft.text.Text;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> {
+
+    public static final String CONFIRM_OVERLAY_ID = "confirm-overlay";
+    public static final String CONFIRM_YES_ID = "btn-confirm-yes";
+    public static final String CONFIRM_NO_ID = "btn-confirm-no";
 
     @Nullable
     protected final Screen parent;
@@ -57,11 +67,11 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     }
 
     protected void applyThemeRoot(FlowLayout root) {
-        root.surface(DisquestsConfig.getTheme().rootSurface());
+        root.surface(DisquestsClient.CONFIG.theme().rootSurface());
     }
 
     protected void applyThemePanel(ParentUIComponent component) {
-        component.surface(DisquestsConfig.getTheme().panelSurface());
+        component.surface(DisquestsClient.CONFIG.theme().panelSurface());
     }
 
     /**
@@ -80,6 +90,69 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     protected void navigateToScreen(Screen screen) {
         if (this.client != null) {
             this.client.setScreen(screen);
+        }
+    }
+
+    // ===================== CONFIRM OVERLAY =====================
+
+    protected void showConfirmOverlay(Text message, Runnable onConfirm) {
+        showConfirmOverlay(message, onConfirm, () -> {});
+    }
+
+    protected void showConfirmOverlay(Text message, Runnable onConfirm, Runnable onCancel) {
+        if (this.uiAdapter == null) return;
+
+        dismissOverlay();
+
+        LabelComponent messageLabel = UIComponents.label(message);
+        messageLabel.shadow(true);
+        messageLabel.maxWidth(250);
+        messageLabel.horizontalTextAlignment(HorizontalAlignment.CENTER);
+
+        ButtonComponent yesBtn = UIComponents.button(Text.translatable("gui.disquests.btn.yes"), b -> {
+            dismissOverlay();
+            onConfirm.run();
+        });
+        yesBtn.id(CONFIRM_YES_ID);
+        yesBtn.sizing(Sizing.fixed(60), Sizing.fixed(20));
+
+        ButtonComponent noBtn = UIComponents.button(Text.translatable("gui.disquests.btn.no"), b -> {
+            dismissOverlay();
+            onCancel.run();
+        });
+        noBtn.id(CONFIRM_NO_ID);
+        noBtn.sizing(Sizing.fixed(60), Sizing.fixed(20));
+
+        FlowLayout buttonRow = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+        buttonRow.gap(8);
+        buttonRow.child(yesBtn);
+        buttonRow.child(noBtn);
+        buttonRow.horizontalAlignment(HorizontalAlignment.CENTER);
+
+        FlowLayout panel = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
+        panel.gap(12);
+        panel.padding(Insets.of(16));
+        panel.surface(Surface.DARK_PANEL);
+        panel.horizontalAlignment(HorizontalAlignment.CENTER);
+        panel.child(messageLabel);
+        panel.child(buttonRow);
+
+        OverlayContainer<FlowLayout> overlay = UIContainers.overlay(panel);
+        overlay.id(CONFIRM_OVERLAY_ID);
+        overlay.closeOnClick(false);
+
+        this.uiAdapter.rootComponent.child(overlay);
+    }
+
+    protected void dismissOverlay() {
+        dismissOverlay(CONFIRM_OVERLAY_ID);
+    }
+
+    protected void dismissOverlay(String overlayId) {
+        if (this.uiAdapter == null) return;
+        var existing = this.uiAdapter.rootComponent.childById(OverlayContainer.class, overlayId);
+        if (existing != null) {
+            existing.remove();
         }
     }
 }

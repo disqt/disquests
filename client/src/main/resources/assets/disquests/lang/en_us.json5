@@ -1,0 +1,100 @@
+{
+  // Keybinds
+  "key.category.disquests.main": "Disquests",
+  "key.disquests.{}": {
+    "opengui": "Open Disquests",
+    "togglepin": "Toggle HUD Pin",
+    "openconfig": "Open Config",
+  },
+
+  // GUI
+  "gui.disquests.main_title": [
+    "Dis",
+    { "text": "quests", "color": "#FFB300" }
+  ],
+
+  // Buttons
+  "gui.disquests.btn.{}": {
+    "yes": "Yes",
+    "no": "No",
+    "accept": "Accept",
+    "deny": "Deny",
+    "remove": "Remove",
+    "set_pos": "Set Pos",
+    "clear": "Clear",
+    "view_bluemap": "View on BlueMap",
+    "requested": "Requested",
+    "add_tag": "+ Tag",
+    "add": "Add",
+    "region_off": "[ ] Region",
+    "region_on": "[x] Region",
+  },
+
+  // Contributor permissions
+  "gui.disquests.contributor.{}": {
+    "can_edit": "Can Edit",
+    "view_only": "View Only",
+  },
+
+  // Placeholders
+  "gui.disquests.placeholder.{}": {
+    "search": "Search... (#tag to filter)",
+    "title": "Quest title...",
+    "content": "Quest content...",
+    "custom_tag": "custom-tag...",
+  },
+
+  // Visibility badges
+  "gui.disquests.visibility.{}": {
+    "private": "Private",
+    "closed": "Closed",
+    "open": "Open",
+  },
+
+  // Visibility tooltips
+  "gui.disquests.tooltip.{}": {
+    "private": "Only you can see this quest",
+    "closed": "Visible on Quest Board, others must request access",
+    "open": "Anyone can join and view this quest",
+  },
+
+  // Filter tooltips
+  "gui.disquests.filter.{}": {
+    "all": "Show all visible quests",
+    "open": "Quests anyone can join",
+    "closed": "Quests that require access request",
+  },
+
+  // Labels
+  "gui.disquests.label.{}": {
+    "no_tags": "no tags",
+    "no_predefined_tags": "No predefined tags",
+    "request_access": "Request access to view",
+  },
+
+  // Confirm dialogs
+  "gui.disquests.confirm.{}": {
+    "discard": "Discard unsaved changes?",
+    "leave": "Leave this quest? You'll lose contributor access.",
+    "delete": "Delete quest \"%s\"?",
+    "remove_contributor": "Remove %s from contributors?",
+  },
+
+  // Collapsible sections
+  "gui.disquests.section.{}": {
+    "tags": "Tags (%d)",
+    "contributors": "Contributors (%d)",
+  },
+
+  // owo-config
+  "text.config.disquests-config.{}": {
+    "title": "Disquests Config",
+    "option.pinnedWidth": "Pinned Width",
+    "option.theme": "Theme",
+    "option.pinnedX": "Pin X Position",
+    "option.pinnedY": "Pin Y Position",
+    "category.hud": "HUD",
+    "section.hud": "HUD",
+    "category.colors": "Colors",
+  },
+}

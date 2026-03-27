@@ -1,10 +1,11 @@
 package com.disqt.disquests.client.gui.helper;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
+/**
+ * Mutable color constants used by all Disquests UI components.
+ * Values are set by {@link Theme#applyColors()} on startup and
+ * whenever the user changes the theme via owo-config.
+ */
 public final class Colors {
 
     // --- Panel ---
@@ -56,29 +57,4 @@ public final class Colors {
 
     private Colors() {}
 
-    public static void reload() {
-        DisquestsConfig.getTheme().applyColors();
-        ColorConfig.loadColors();
-    }
-
-    public static Map<String, String> getColorsAsMap() {
-        Map<String, String> colorMap = new LinkedHashMap<>();
-        for (Field field : Colors.class.getDeclaredFields()) {
-            if (Modifier.isPublic(field.getModifiers()) && Modifier.isStatic(field.getModifiers()) && field.getType() == int.class) {
-                try {
-                    int colorValue = (Integer) field.get(null);
-                    int a = (colorValue >> 24) & 0xFF;
-                    int r = (colorValue >> 16) & 0xFF;
-                    int g = (colorValue >> 8) & 0xFF;
-                    int b = colorValue & 0xFF;
-                    float alpha = a / 255.0f;
-
-                    colorMap.put(field.getName(), String.format("rgba(%d, %d, %d, %.3f)", r, g, b, alpha));
-                } catch (IllegalAccessException e) {
-                    // ignore
-                }
-            }
-        }
-        return colorMap;
-    }
 }

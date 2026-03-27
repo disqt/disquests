@@ -113,9 +113,9 @@ public class MainScreen extends DisquestsBaseScreen {
         this.filterOpen.onPress(btn -> selectServerFilter(ClientSession.QuestFilter.OPEN));
         this.filterClosed.onPress(btn -> selectServerFilter(ClientSession.QuestFilter.CLOSED));
 
-        this.filterAll.tooltip(Text.literal("Show all visible quests"));
-        this.filterOpen.tooltip(Text.literal("Quests anyone can join"));
-        this.filterClosed.tooltip(Text.literal("Quests that require access request"));
+        this.filterAll.tooltip(Text.translatable("gui.disquests.filter.all"));
+        this.filterOpen.tooltip(Text.translatable("gui.disquests.filter.open"));
+        this.filterClosed.tooltip(Text.translatable("gui.disquests.filter.closed"));
 
         // --- Wire action button handlers ---
         this.btnNewQuest.onPress(btn -> createNewQuest());
@@ -129,7 +129,7 @@ public class MainScreen extends DisquestsBaseScreen {
         // --- Create search text box programmatically ---
         this.searchField = UIComponents.textBox(Sizing.fixed(200));
         this.searchField.text(this.searchTerm);
-        this.searchField.setPlaceholder(Text.literal("Search... (#tag to filter)"));
+        this.searchField.setPlaceholder(Text.translatable("gui.disquests.placeholder.search"));
         this.searchField.onChanged().subscribe(this::onSearchTermChanged);
         this.searchField.id("search-box");
         this.searchRow.child(this.searchField);
@@ -402,7 +402,7 @@ public class MainScreen extends DisquestsBaseScreen {
     }
 
     private void markRequestButtonAsRequested() {
-        btnRequest.setMessage(Text.literal("Requested"));
+        btnRequest.setMessage(Text.translatable("gui.disquests.btn.requested"));
         btnRequest.active(false);
     }
 

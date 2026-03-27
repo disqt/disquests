@@ -1,0 +1,100 @@
+{
+  // Raccourcis clavier
+  "key.category.disquests.main": "Disquests",
+  "key.disquests.{}": {
+    "opengui": "Ouvrir Disquests",
+    "togglepin": "Afficher/masquer les quêtes épinglées",
+    "openconfig": "Ouvrir la configuration",
+  },
+
+  // Interface
+  "gui.disquests.main_title": [
+    "Dis",
+    { "text": "quests", "color": "#FFB300" }
+  ],
+
+  // Boutons
+  "gui.disquests.btn.{}": {
+    "yes": "Oui",
+    "no": "Non",
+    "accept": "Accepter",
+    "deny": "Refuser",
+    "remove": "Retirer",
+    "set_pos": "Position",
+    "clear": "Effacer",
+    "view_bluemap": "Voir sur BlueMap",
+    "requested": "Demandé",
+    "add_tag": "+ Tag",
+    "add": "Ajouter",
+    "region_off": "[ ] Région",
+    "region_on": "[x] Région",
+  },
+
+  // Permissions des contributeurs
+  "gui.disquests.contributor.{}": {
+    "can_edit": "Peut éditer",
+    "view_only": "Lecture seule",
+  },
+
+  // Textes indicatifs
+  "gui.disquests.placeholder.{}": {
+    "search": "Rechercher... (#tag pour filtrer)",
+    "title": "Titre de la quête...",
+    "content": "Contenu de la quête...",
+    "custom_tag": "tag-personnalisé...",
+  },
+
+  // Badges de visibilité
+  "gui.disquests.visibility.{}": {
+    "private": "Privée",
+    "closed": "Fermée",
+    "open": "Ouverte",
+  },
+
+  // Infobulles de visibilité
+  "gui.disquests.tooltip.{}": {
+    "private": "Toi seul peux voir cette quête",
+    "closed": "Visible sur le tableau des quêtes, les autres doivent demander l'accès",
+    "open": "N'importe qui peut rejoindre et voir cette quête",
+  },
+
+  // Infobulles des filtres
+  "gui.disquests.filter.{}": {
+    "all": "Afficher toutes les quêtes visibles",
+    "open": "Quêtes ouvertes à tous",
+    "closed": "Quêtes nécessitant une demande d'accès",
+  },
+
+  // Libellés
+  "gui.disquests.label.{}": {
+    "no_tags": "aucun tag",
+    "no_predefined_tags": "Aucun tag prédéfini",
+    "request_access": "Demander l'accès pour voir",
+  },
+
+  // Dialogues de confirmation
+  "gui.disquests.confirm.{}": {
+    "discard": "Abandonner les modifications non enregistrées ?",
+    "leave": "Quitter cette quête ? Tu perdras l'accès contributeur.",
+    "delete": "Supprimer la quête \"%s\" ?",
+    "remove_contributor": "Retirer %s des contributeurs ?",
+  },
+
+  // Sections repliables
+  "gui.disquests.section.{}": {
+    "tags": "Tags (%d)",
+    "contributors": "Contributeurs (%d)",
+  },
+
+  // owo-config
+  "text.config.disquests-config.{}": {
+    "title": "Configuration Disquests",
+    "option.pinnedWidth": "Largeur des quêtes épinglées",
+    "option.theme": "Thème",
+    "option.pinnedX": "Position X des quêtes épinglées",
+    "option.pinnedY": "Position Y des quêtes épinglées",
+    "category.hud": "HUD",
+    "section.hud": "HUD",
+    "category.colors": "Couleurs",
+  },
+}

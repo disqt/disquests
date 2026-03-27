@@ -13,6 +13,8 @@ import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.container.ScrollContainer;
+import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.ParentUIComponent;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.VerticalAlignment;
@@ -54,7 +56,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
                 final UUID requestId = req.id();
                 final UUID questId = req.questId();
 
-                FlowLayout row = io.wispforest.owo.ui.container.UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+                FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
                 row.verticalAlignment(VerticalAlignment.CENTER);
                 row.gap(4);
 
@@ -64,17 +66,17 @@ public class ContributorScreen extends DisquestsBaseScreen {
                 row.child(nameLabel);
 
                 // Spacer to push buttons right
-                FlowLayout spacer = io.wispforest.owo.ui.container.UIContainers.horizontalFlow(Sizing.fill(20), Sizing.fixed(1));
+                FlowLayout spacer = UIContainers.horizontalFlow(Sizing.fill(20), Sizing.fixed(1));
                 row.child(spacer);
 
                 ButtonComponent acceptBtn = UIComponents.button(
-                        Text.literal("Accept").withColor(0xFF55CC55),
+                        Text.translatable("gui.disquests.btn.accept").withColor(0xFF55CC55),
                         b -> respondToRequest(questId, requestId, true));
                 acceptBtn.sizing(Sizing.fixed(60), Sizing.fixed(14));
                 row.child(acceptBtn);
 
                 ButtonComponent denyBtn = UIComponents.button(
-                        Text.literal("Deny").withColor(0xFFCC5555),
+                        Text.translatable("gui.disquests.btn.deny").withColor(0xFFCC5555),
                         b -> respondToRequest(questId, requestId, false));
                 denyBtn.sizing(Sizing.fixed(60), Sizing.fixed(14));
                 row.child(denyBtn);
@@ -89,7 +91,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
 
         if (contributors.isEmpty() && pendingRequests.isEmpty()) {
             // Show empty label, hide contributor scroll
-            root.removeChild(root.childById(io.wispforest.owo.ui.container.ScrollContainer.class, "contributor-scroll"));
+            root.removeChild(root.childById(ScrollContainer.class, "contributor-scroll"));
         } else {
             // Hide empty label
             root.removeChild(emptyLabel);
@@ -98,7 +100,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
                 Contributor contrib = contributors.get(i);
                 final int idx = i;
 
-                FlowLayout row = io.wispforest.owo.ui.container.UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+                FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
                 row.verticalAlignment(VerticalAlignment.CENTER);
                 row.gap(4);
 
@@ -108,20 +110,22 @@ public class ContributorScreen extends DisquestsBaseScreen {
                 row.child(nameLabel);
 
                 // Spacer
-                FlowLayout spacer = io.wispforest.owo.ui.container.UIContainers.horizontalFlow(Sizing.fill(20), Sizing.fixed(1));
+                FlowLayout spacer = UIContainers.horizontalFlow(Sizing.fill(20), Sizing.fixed(1));
                 row.child(spacer);
 
                 // Permission toggle
-                String permText = contrib.canEdit() ? "Can Edit" : "View Only";
+                Text permText = contrib.canEdit()
+                        ? Text.translatable("gui.disquests.contributor.can_edit")
+                        : Text.translatable("gui.disquests.contributor.view_only");
                 ButtonComponent permBtn = UIComponents.button(
-                        Text.literal(permText),
+                        permText,
                         b -> togglePermission(idx));
                 permBtn.sizing(Sizing.fixed(60), Sizing.fixed(14));
                 row.child(permBtn);
 
                 // Remove button
                 ButtonComponent removeBtn = UIComponents.button(
-                        Text.literal("Remove"),
+                        Text.translatable("gui.disquests.btn.remove"),
                         b -> removeContributor(idx));
                 removeBtn.sizing(Sizing.fixed(60), Sizing.fixed(14));
                 row.child(removeBtn);
@@ -163,18 +167,15 @@ public class ContributorScreen extends DisquestsBaseScreen {
         if (index < 0 || index >= quest.getContributors().size()) return;
         Contributor contrib = quest.getContributors().get(index);
 
-        navigateToScreen(new ConfirmScreen(this,
-                Text.literal("Remove " + contrib.getName() + " from contributors?"),
+        showConfirmOverlay(
+                Text.translatable("gui.disquests.confirm.remove_contributor", contrib.getName()),
                 () -> {
                     PacketSender.updateContributors(quest.getId(), List.of(
                             new PacketCodec.ContributorOpEntry(ContributorOp.REMOVE, contrib.getUuid(), contrib.getName(), false)
                     ));
                     quest.getContributors().remove(index);
-                    navigateToScreen(this);
-                },
-                () -> {
-                    navigateToScreen(this);
-                }));
+                    rebuildUi();
+                });
     }
 
     private void rebuildUi() {

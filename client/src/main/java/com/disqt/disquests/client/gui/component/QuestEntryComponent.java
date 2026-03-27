@@ -4,7 +4,7 @@ import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.helper.Colors;
-import com.disqt.disquests.client.gui.helper.DisquestsConfig;
+import com.disqt.disquests.client.DisquestsClient;
 import com.disqt.disquests.client.gui.helper.TagColors;
 import com.disqt.disquests.client.gui.helper.Theme;
 import com.disqt.disquests.client.hud.HudPinManager;
@@ -31,7 +31,8 @@ public class QuestEntryComponent extends BaseUIComponent {
     private static final Identifier PIN_ACTIVE_ICON = Identifier.of("disquests", "icon/pin_active");
 
     // Static constants cached once across all instances
-    private static final Text HIDDEN_CONTENT_TEXT = Text.literal("Request access to view").formatted(Formatting.ITALIC);
+    private static final Text HIDDEN_CONTENT_TEXT = Text.translatable("gui.disquests.label.request_access").formatted(Formatting.ITALIC);
+    private static final Text EMPTY_TAGS_TEXT = Text.translatable("gui.disquests.label.no_tags").formatted(Formatting.ITALIC);
 
 
     private final Quest quest;
@@ -60,6 +61,9 @@ public class QuestEntryComponent extends BaseUIComponent {
     private int lastPendingCount = -1;
     private Text cachedPendingText;
     private int cachedPendingWidth;
+
+    // Cached theme (fix: avoid CONFIG.theme() call per-entry per-frame)
+    private final Theme theme;
 
     private boolean selected = false;
 
@@ -92,9 +96,9 @@ public class QuestEntryComponent extends BaseUIComponent {
         Text visText = null;
         if (quest.getVisibility() != null) {
             visText = switch (quest.getVisibility()) {
-                case PRIVATE -> Text.literal("Private").formatted(Formatting.LIGHT_PURPLE);
-                case CLOSED  -> Text.literal("Closed").formatted(Formatting.YELLOW);
-                case OPEN    -> Text.literal("Open").formatted(Formatting.GREEN);
+                case PRIVATE -> Text.translatable("gui.disquests.visibility.private").formatted(Formatting.LIGHT_PURPLE);
+                case CLOSED  -> Text.translatable("gui.disquests.visibility.closed").formatted(Formatting.YELLOW);
+                case OPEN    -> Text.translatable("gui.disquests.visibility.open").formatted(Formatting.GREEN);
             };
         }
         this.cachedVisibilityText = visText;
@@ -103,6 +107,8 @@ public class QuestEntryComponent extends BaseUIComponent {
         } else {
             this.cachedVisibilityWidth = 0;
         }
+
+        this.theme = DisquestsClient.CONFIG.theme();
 
         // Cache owner text + width (fix 2)
         if (!isOwnedByPlayer && quest.getOwnerName() != null) {
@@ -200,7 +206,7 @@ public class QuestEntryComponent extends BaseUIComponent {
         }
 
         // Inset bevel for selected entries
-        if (selected && DisquestsConfig.getTheme() == Theme.INSET) {
+        if (selected && theme == Theme.INSET) {
             context.fill(entryX, entryY, entryX + entryWidth, entryY + 1, 0xFF0A0A0A);
             context.fill(entryX, entryY, entryX + 1, entryY + ENTRY_HEIGHT, 0xFF0A0A0A);
             context.fill(entryX, entryY + ENTRY_HEIGHT - 1, entryX + entryWidth, entryY + ENTRY_HEIGHT, 0xFF2A2A2A);
@@ -277,7 +283,7 @@ public class QuestEntryComponent extends BaseUIComponent {
         // --- Row 3: Tags ---
         List<String> tags = quest.getTags();
         if (tags == null || tags.isEmpty()) {
-            context.drawText(textRenderer, Text.literal("no tags").formatted(Formatting.ITALIC),
+            context.drawText(textRenderer, EMPTY_TAGS_TEXT,
                     entryX + 4, entryY + 24, Colors.TEXT_MUTED, false);
         } else {
             int tagX = entryX + 4;

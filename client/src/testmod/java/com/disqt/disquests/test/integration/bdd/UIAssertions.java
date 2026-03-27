@@ -52,7 +52,7 @@ public final class UIAssertions {
      */
     public static void assertComponentExists(ClientGameTestContext context, String componentId) {
         UIComponent comp = UIActions.findComponentOrNull(context, UIComponent.class, componentId);
-        assertTrue(comp != null, "Component '" + componentId + "' not found");
+        assertNotNull(comp, "Component '" + componentId + "' not found");
     }
 
     /**
@@ -60,7 +60,7 @@ public final class UIAssertions {
      */
     public static void assertComponentMissing(ClientGameTestContext context, String componentId) {
         UIComponent comp = UIActions.findComponentOrNull(context, UIComponent.class, componentId);
-        assertFalse(comp != null, "Component '" + componentId + "' should not exist but was found");
+        assertNull(comp, "Component '" + componentId + "' should not exist but was found");
     }
 
     /**

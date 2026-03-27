@@ -46,7 +46,10 @@ public class HarnessCommon {
             PhaseSync.signal("player-" + role + "-done");
             try {
                 context.waitFor(client -> Files.exists(PhaseSync.getSyncDir().resolve("player-" + otherRole + "-done.done")), seconds(15));
-            } catch (Exception ignored) {}
+            } catch (Throwable ignored) {
+                // waitFor throws AssertionError (extends Error, not Exception) on timeout.
+                // In solo tests, Player B never runs, so this always times out -- that's fine.
+            }
             System.exit(result.startsWith("PASS") ? 0 : 1);
         }
     }

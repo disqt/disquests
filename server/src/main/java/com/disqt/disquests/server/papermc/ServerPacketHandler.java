@@ -61,12 +61,20 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        // Delay handshake 40 ticks to allow Fabric channel registration
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (!player.isOnline()) return;
-            if (!isModPlayer(player)) return;
-            sendHandshake(player);
-        }, 40L);
+        // Retry handshake every 20 ticks until the client registers the channel (up to 10 seconds).
+        // Channel registration can be delayed on slow environments (CI with Xvfb).
+        final int[] attempts = {0};
+        Bukkit.getScheduler().runTaskTimer(plugin, task -> {
+            attempts[0]++;
+            if (!player.isOnline() || attempts[0] > 10) {
+                task.cancel();
+                return;
+            }
+            if (isModPlayer(player)) {
+                sendHandshake(player);
+                task.cancel();
+            }
+        }, 40L, 20L);
     }
 
     // --- Packet Handlers ---
