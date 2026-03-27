@@ -70,3 +70,4 @@ logs/
 .claude/.lsp.json
 .claude/worktrees/
 integration-sync/
+client/.factorypath

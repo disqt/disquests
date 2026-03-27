@@ -168,7 +168,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
         Contributor contrib = quest.getContributors().get(index);
 
         showConfirmOverlay(
-                Text.literal("Remove " + contrib.getName() + " from contributors?"),
+                Text.translatable("gui.disquests.confirm.remove_contributor", contrib.getName()),
                 () -> {
                     PacketSender.updateContributors(quest.getId(), List.of(
                             new PacketCodec.ContributorOpEntry(ContributorOp.REMOVE, contrib.getUuid(), contrib.getName(), false)

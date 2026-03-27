@@ -34,8 +34,6 @@ public class HudPinRenderer {
     private static List<UUID> lastPinnedIds = List.of();
     private static long lastContentHash = 0;
     private static int lastWidth = 0;
-    private static int lastX = DEFAULT_POSITION;
-    private static int lastY = DEFAULT_POSITION;
     private static List<CachedPin> cachedPins = List.of();
     private static boolean visible = true;
 
@@ -74,8 +72,6 @@ public class HudPinRenderer {
             lastPinnedIds = List.of();
             lastContentHash = 0;
             lastWidth = 0;
-            lastX = DEFAULT_POSITION;
-            lastY = DEFAULT_POSITION;
             cachedPins = List.of();
             return;
         }
@@ -96,14 +92,12 @@ public class HudPinRenderer {
             lastWidth = currentWidth;
         }
 
-        // Read config positions once per frame
-        lastX = DisquestsClient.CONFIG.pinnedX();
-        lastY = DisquestsClient.CONFIG.pinnedY();
-
         // Resolve position from config
         int screenWidth = client.getWindow().getScaledWidth();
-        int originX = resolveX(screenWidth, currentWidth, lastX);
-        int originY = resolveY(lastY);
+        int configX = DisquestsClient.CONFIG.pinnedX();
+        int configY = DisquestsClient.CONFIG.pinnedY();
+        int originX = resolveX(screenWidth, currentWidth, configX);
+        int originY = resolveY(configY);
 
         // Render from cache
         TextRenderer tr = client.textRenderer;

@@ -77,6 +77,7 @@
     "discard": "Abandonner les modifications non enregistrées ?",
     "leave": "Quitter cette quête ? Tu perdras l'accès contributeur.",
     "delete": "Supprimer la quête \"%s\" ?",
+    "remove_contributor": "Retirer %s des contributeurs ?",
   },
 
   // Sections repliables

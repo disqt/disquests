@@ -77,6 +77,7 @@
     "discard": "Discard unsaved changes?",
     "leave": "Leave this quest? You'll lose contributor access.",
     "delete": "Delete quest \"%s\"?",
+    "remove_contributor": "Remove %s from contributors?",
   },
 
   // Collapsible sections
