@@ -80,6 +80,9 @@ Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with GLFW physical inpu
 - **Prism mods incompatible with `runClient`** — production jars use intermediary mappings, dev environment uses named mappings. Mixin crashes guaranteed.
 - **ModMenu incompatible with `runClient`** — ModMenu's TitleScreen mixin crashes in dev. Use F6 keybind to open ConfigScreen instead.
 - **`server/run/server.properties` `max-players`** — must be >= 4 (two test clients + reconnect headroom)
+- **CI Xvfb** — `854x480x24` with `guiScale:1` via `ensureClientOptions()`. Do NOT increase Xvfb resolution -- 1920x1080 causes 4x software-rendering overhead, making tests 2x slower.
+- **`catch(Throwable)` not `catch(Exception)` for `waitFor`** — Fabric's `waitFor` throws `AssertionError` (extends `Error`). `catch(Exception)` won't catch it.
+- **Server handshake retry** — `ServerPacketHandler.onPlayerJoin` retries every 20 ticks (up to 10 attempts) because client channel registration can be delayed on slow CI.
 
 ## Networking Protocol
 
@@ -99,7 +102,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 | `client/src/main/java/com/disqt/disquests/client/DisquestsClient.java` | Fabric mod entrypoint, keybinds, channel registration |
 | `client/src/main/java/com/disqt/disquests/client/ClientSession.java` | Tracks connection state, dispatches S2C packets |
 | `client/src/main/java/com/disqt/disquests/client/ClientCache.java` | Client-side quest cache |
-| `client/src/main/java/com/disqt/disquests/client/gui/screen/` | All screens use owo-ui: MainScreen, QuestScreen (view/edit), ContributorScreen, ConfirmScreen, ConfigScreen |
+| `client/src/main/java/com/disqt/disquests/client/gui/screen/` | All screens use owo-ui: MainScreen, QuestScreen (view/edit), ContributorScreen, TagPickerScreen. Config uses owo-config auto-generated screen. Confirm dialogs use overlay on DisquestsBaseScreen. |
 | `client/src/main/java/com/disqt/disquests/client/gui/screen/DisquestsBaseScreen.java` | Shared owo-ui base screen with parent navigation |
 | `client/src/main/java/com/disqt/disquests/client/gui/component/QuestEntryComponent.java` | Custom owo-ui component for quest list entries |
 | `client/src/main/java/com/disqt/disquests/client/gui/component/TextFieldComponent.java` | BaseUIComponent wrapper for MultiLineTextFieldWidget |
@@ -119,7 +122,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 
 - **commonmark-java** (`org.commonmark:commonmark:0.27.1` + ext-gfm-strikethrough + ext-task-list-items): Markdown rendering in the client. Bundled via Loom `include`.
 - **sqlite-jdbc** (`org.xerial:sqlite-jdbc:3.51.2.0`): Paper-side SQLite. `compileOnly` (bundled in Paper env).
-- **owo-lib** (`io.wispforest:owo-lib:0.13.0+1.21.11`): UI framework for client screens. Runtime dependency (users install separately). owo-sentinel bundled as jar-in-jar for graceful fallback.
+- **owo-lib** (`io.wispforest:owo-lib:0.13.0+1.21.11`): UI framework + config (`@Config` annotations) + lang extensions (JSON5, nested lang, rich translations) for client. Fabric-only -- cannot be used in `common/` or `server/` modules. Runtime dependency (users install separately). owo-sentinel bundled as jar-in-jar for graceful fallback. Config uses `annotationProcessor` to generate `DisquestsConfigWrapper`.
 
 ## Gotchas
 
@@ -129,6 +132,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **MC 1.21.11 `Click` record** — `Click(double x, double y, MouseInput buttonInfo)` where `MouseInput(int button, int modifiers)`. Not `(double, double, int)`.
 - **Contributor is immutable** — `canEdit` is final. To update, replace with `new Contributor(new ContributorData(...))`.
 - **QuestScreen auto-close** — `tick()` closes the screen if the quest is not in `ClientCache`. E2E tests must add quests to cache before opening screens.
+- **owo-config wrapper IDE errors** — `DisquestsConfigWrapper cannot be resolved` cascades false errors across all files that reference `CONFIG`. IDE-only (annotation processor output not indexed). Gradle compiles fine. Don't chase these.
 - **owo-ui v0.13.0 renames** — `BaseComponent` -> `BaseUIComponent`, `Components` -> `UIComponents`, `Containers` -> `UIContainers`, `OwoUIDrawContext` -> `OwoUIGraphics`. XML tags unchanged.
 - **owo-ui `onMouseDown` coordinates are relative** — `Click.x()`/`Click.y()` are already relative to the component. Do NOT subtract `this.x()`/`this.y()`.
 - **owo-ui XML scroll container** — child element must be FIRST (before `<sizing>`, `<surface>`, `<padding>`). `WrappingParentUIComponent.parseProperties` takes first element child.
