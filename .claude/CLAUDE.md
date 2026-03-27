@@ -37,6 +37,7 @@ All versions (MC, Fabric, Paper, Java) are in `gradle.properties` — that is th
 ./gradlew :server:runServer   # start Paper dev server (auto-downloads Paper, places plugin jar)
 ./gradlew spotlessApply      # auto-format all Java (Google Java Format, 2-space indent)
 ./gradlew spotlessCheck      # verify formatting (runs in CI before build)
+./gradlew lefthookInstall    # install pre-commit hook (auto-formats staged .java files)
 ```
 
 `runServer` has a 4GB free RAM gate — it will refuse to start on low-memory machines (Pi, VPS). The check and threshold are in `build.gradle.kts` via `requireFreeRam`.

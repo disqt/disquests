@@ -18,8 +18,12 @@ A Minecraft mod for creating, sharing, and collaborating on in-game quests. Fabr
 - **Visibility** — private (only you), closed (visible to all, editable by contributors), or open (editable by all)
 - **HUD pin** — pin a quest to your screen for quick reference while playing
 - **Coordinates** — attach a location (point or region) to any quest, with BlueMap link support
+- **Tags** — organize quests with tags, filter by tag in the quest list (`#tag`)
+- **Wiki-links** — link between quests with `[[Quest Name]]` syntax
+- **Themes** — 5 built-in themes (Vanilla, Flat, Inset, Frosted, Accent Line)
 - **Server-side storage** — all quests stored in SQLite on the server, synced to clients automatically
 - **Markdown** — quest content supports bold, italic, strikethrough, lists, task lists, and more
+- **Localization** — English and French translations
 
 ## Requirements
 
@@ -81,6 +85,8 @@ cd disquests
 ./gradlew :server:build        # server plugin jar only
 ./gradlew :common:test         # run unit tests
 ./gradlew :server:runServer    # start a dev Paper server
+./gradlew spotlessApply        # auto-format all Java (Google Java Format)
+./gradlew lefthookInstall      # install pre-commit hook (formats staged files)
 ```
 
 Build outputs:
@@ -106,7 +112,7 @@ The E2E tests launch real Minecraft clients against a Paper server. The test har
 ./gradlew :client:runDuoTests                                           # two-player tests only
 ```
 
-See `.github/workflows/e2e-test.yml` for the full CI setup.
+See `.github/workflows/e2e-test.yml` for the full CI setup (parallel lint, build, and E2E jobs).
 
 ## Attribution
 
