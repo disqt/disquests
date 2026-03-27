@@ -35,6 +35,8 @@ All versions (MC, Fabric, Paper, Java) are in `gradle.properties` — that is th
 ./gradlew :client:build      # build Fabric mod jar
 ./gradlew :server:build       # build Paper plugin jar
 ./gradlew :server:runServer   # start Paper dev server (auto-downloads Paper, places plugin jar)
+./gradlew spotlessApply      # auto-format all Java (Google Java Format, 2-space indent)
+./gradlew spotlessCheck      # verify formatting (runs in CI before build)
 ```
 
 `runServer` has a 4GB free RAM gate — it will refuse to start on low-memory machines (Pi, VPS). The check and threshold are in `build.gradle.kts` via `requireFreeRam`.
@@ -123,10 +125,12 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **commonmark-java** (`org.commonmark:commonmark:0.27.1` + ext-gfm-strikethrough + ext-task-list-items): Markdown rendering in the client. Bundled via Loom `include`.
 - **sqlite-jdbc** (`org.xerial:sqlite-jdbc:3.51.2.0`): Paper-side SQLite. `compileOnly` (bundled in Paper env).
 - **owo-lib** (`io.wispforest:owo-lib:0.13.0+1.21.11`): UI framework + config (`@Config` annotations) + lang extensions (JSON5, nested lang, rich translations) for client. Fabric-only -- cannot be used in `common/` or `server/` modules. Runtime dependency (users install separately). owo-sentinel bundled as jar-in-jar for graceful fallback. Config uses `annotationProcessor` to generate `DisquestsConfigWrapper`.
+- **Lang files** — JSON5 with owo nested lang syntax in `client/src/main/resources/assets/disquests/lang/`. `en_us.json5` (English) and `fr_fr.json5` (French). French uses informal "tu", requires all accents (é, è, ê, ç, à), gaming terms stay English.
 
 ## Gotchas
 
 - **Gradle Kotlin DSL shadows `java` package** — `java.lang.management.*` won't resolve in `.gradle.kts` because `java` is a Gradle DSL accessor. Use `Class.forName("java.lang.management.ManagementFactory")` instead.
+- **Never push to main** — always create a branch and PR. Even config/infra changes go through PRs.
 - **PR target** — origin is `disqt/disquests`. No upstream remote.
 - **MC 1.21.11 ClickEvent API** — sealed classes, not enum. Use `new ClickEvent.OpenUrl(URI)` and `instanceof ClickEvent.OpenUrl openUrl` for pattern matching.
 - **MC 1.21.11 `Click` record** — `Click(double x, double y, MouseInput buttonInfo)` where `MouseInput(int button, int modifiers)`. Not `(double, double, int)`.
