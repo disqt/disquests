@@ -44,6 +44,9 @@ jobs:
           key: loom-${{ hashFiles('gradle.properties') }}
           restore-keys: loom-
 
+      - name: Check formatting
+        run: ./gradlew spotlessCheck
+
       - name: Build all JARs
         run: ./gradlew build
 

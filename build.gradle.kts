@@ -1,5 +1,6 @@
 plugins {
     java
+    id("com.diffplug.spotless") version "7.0.3" apply false
 }
 
 fun requireFreeRam(taskName: String, requiredMb: Long = 4096L) {
@@ -28,6 +29,14 @@ subprojects {
         java {
             sourceCompatibility = JavaVersion.VERSION_21
             targetCompatibility = JavaVersion.VERSION_21
+        }
+    }
+
+    apply(plugin = "com.diffplug.spotless")
+    configure<com.diffplug.gradle.spotless.SpotlessExtension> {
+        java {
+            googleJavaFormat()
+            targetExclude("build/**")
         }
     }
 
