@@ -81,7 +81,7 @@ Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with GLFW physical inpu
 - **`-PtestFilter` not `-Ptest`** — Gradle reserves `-Ptest` for its built-in test task.
 - **Loom property passing** — use `-P` (Gradle property) not `-D` (JVM system property) for subprocess invocation.
 - **Prism mods incompatible with `runClient`** — production jars use intermediary mappings, dev environment uses named mappings. Mixin crashes guaranteed.
-- **ModMenu incompatible with `runClient`** — ModMenu's TitleScreen mixin crashes in dev. Use F6 keybind to open ConfigScreen instead.
+- **ModMenu incompatible with `runClient`** — ModMenu's TitleScreen mixin crashes in dev. Use F6 keybind to open config screen instead.
 - **`server/run/server.properties` `max-players`** — must be >= 4 (two test clients + reconnect headroom)
 - **CI Xvfb** — `854x480x24` with `guiScale:1` via `ensureClientOptions()`. Do NOT increase Xvfb resolution -- 1920x1080 causes 4x software-rendering overhead, making tests 2x slower.
 - **`catch(Throwable)` not `catch(Exception)` for `waitFor`** — Fabric's `waitFor` throws `AssertionError` (extends `Error`). `catch(Exception)` won't catch it.
@@ -111,6 +111,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 | `client/src/main/java/com/disqt/disquests/client/gui/component/TextFieldComponent.java` | BaseUIComponent wrapper for MultiLineTextFieldWidget |
 | `client/src/main/java/com/disqt/disquests/client/gui/helper/Colors.java` | Color constants (AMBER, TEXT_PRIMARY, etc.) |
 | `client/src/main/java/com/disqt/disquests/client/gui/helper/Theme.java` | Theme enum (VANILLA, FLAT, INSET, FROSTED, ACCENT_LINE) with color palettes and surfaces |
+| `client/src/main/java/com/disqt/disquests/client/gui/helper/DisquestsConfigModel.java` | owo-config annotated model (theme, pinnedWidth, pin position) |
 | `client/src/main/java/com/disqt/disquests/client/debug/DebugScreenEvents.java` | Fabric screen event hooks for debug logging |
 | `client/src/main/resources/assets/disquests/owo_ui/*.xml` | XML UI models for all screens (hot-reloadable) |
 | `server/src/main/java/com/disqt/disquests/server/papermc/DisquestsPlugin.java` | Plugin entry, channel registration |
