@@ -1,5 +1,9 @@
 package com.disqt.disquests.test.integration.journeys.solo;
 
+import static com.disqt.disquests.test.integration.bdd.BDD.*;
+import static com.disqt.disquests.test.integration.bdd.UIActions.*;
+import static com.disqt.disquests.test.integration.bdd.UIAssertions.*;
+
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
@@ -11,70 +15,77 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 
-import static com.disqt.disquests.test.integration.bdd.BDD.*;
-import static com.disqt.disquests.test.integration.bdd.UIActions.*;
-import static com.disqt.disquests.test.integration.bdd.UIAssertions.*;
-
 @IntegrationTest
 @DisplayName("Quest Content Journey")
 class QuestContentJourney {
 
-    @BeforeAll
-    static void resetServer() throws Exception {
-        resetServerAndSync();
-        AbortOnFailureExtension.clearFailures();
-    }
+  @BeforeAll
+  static void resetServer() throws Exception {
+    resetServerAndSync();
+    AbortOnFailureExtension.clearFailures();
+  }
 
-    @Test @Order(1) @PlayerA
-    @DisplayName("Create quest with markdown content")
-    void createWithMarkdown(ClientGameTestContext context) {
-        given("player is on MainScreen");
-            openMainScreen(context);
-        when("player creates a new quest");
-            click(context, "btn-new-quest");
-            waitForScreen(context, QuestScreen.class);
-        and("types a title");
-            type(context, "title-field", "Markdown Test");
-        and("types markdown content with headings, bold, task list, and blockquote");
-            type(context, "content-field", "# Heading\n**bold** and *italic*\n- [ ] task one\n- [x] task two\n> a quote");
-        and("clicks Save");
-            click(context, "btn-save");
-        then("view mode shows the quest");
-            waitForScreen(context, QuestScreen.class);
-            assertLabelText(context, "title-label", "Markdown Test");
-    }
+  @Test
+  @Order(1)
+  @PlayerA
+  @DisplayName("Create quest with markdown content")
+  void createWithMarkdown(ClientGameTestContext context) {
+    given("player is on MainScreen");
+    openMainScreen(context);
+    when("player creates a new quest");
+    click(context, "btn-new-quest");
+    waitForScreen(context, QuestScreen.class);
+    and("types a title");
+    type(context, "title-field", "Markdown Test");
+    and("types markdown content with headings, bold, task list, and blockquote");
+    type(
+        context,
+        "content-field",
+        "# Heading\n**bold** and *italic*\n- [ ] task one\n- [x] task two\n> a quote");
+    and("clicks Save");
+    click(context, "btn-save");
+    then("view mode shows the quest");
+    waitForScreen(context, QuestScreen.class);
+    assertLabelText(context, "title-label", "Markdown Test");
+  }
 
-    @Test @Order(2) @PlayerA
-    @DisplayName("Verify markdown renders in view mode")
-    void verifyMarkdownRenders(ClientGameTestContext context) {
-        then("content area contains rendered markdown");
-            // MarkdownWidget is a child of content-area; its presence confirms rendering occurred
-            assertComponentExists(context, "content-area");
-    }
+  @Test
+  @Order(2)
+  @PlayerA
+  @DisplayName("Verify markdown renders in view mode")
+  void verifyMarkdownRenders(ClientGameTestContext context) {
+    then("content area contains rendered markdown");
+    // MarkdownWidget is a child of content-area; its presence confirms rendering occurred
+    assertComponentExists(context, "content-area");
+  }
 
-    @Test @Order(3) @PlayerA
-    @DisplayName("Formatting panel visible in edit mode")
-    void formattingPanel(ClientGameTestContext context) {
-        when("player clicks Edit");
-            click(context, "btn-edit");
-            waitForScreen(context, QuestScreen.class);
-        then("formatting panel is present");
-            assertComponentExists(context, "formatting-panel");
-    }
+  @Test
+  @Order(3)
+  @PlayerA
+  @DisplayName("Formatting panel visible in edit mode")
+  void formattingPanel(ClientGameTestContext context) {
+    when("player clicks Edit");
+    click(context, "btn-edit");
+    waitForScreen(context, QuestScreen.class);
+    then("formatting panel is present");
+    assertComponentExists(context, "formatting-panel");
+  }
 
-    @Test @Order(4) @PlayerA
-    @DisplayName("Save and return to MainScreen")
-    void cleanup(ClientGameTestContext context) {
-        when("player clicks Cancel to return to view mode");
-            click(context, "btn-cancel");
-        then("view mode is shown again");
-            waitForScreen(context, QuestScreen.class);
-        when("player closes the quest");
-            click(context, "btn-close");
-        then("MainScreen is shown with one quest");
-            waitForScreen(context, MainScreen.class);
-            // Reopen fresh MainScreen to pick up new quest (parent screen is stale)
-            openMainScreen(context);
-            waitForEntryCount(context, 1);
-    }
+  @Test
+  @Order(4)
+  @PlayerA
+  @DisplayName("Save and return to MainScreen")
+  void cleanup(ClientGameTestContext context) {
+    when("player clicks Cancel to return to view mode");
+    click(context, "btn-cancel");
+    then("view mode is shown again");
+    waitForScreen(context, QuestScreen.class);
+    when("player closes the quest");
+    click(context, "btn-close");
+    then("MainScreen is shown with one quest");
+    waitForScreen(context, MainScreen.class);
+    // Reopen fresh MainScreen to pick up new quest (parent screen is stale)
+    openMainScreen(context);
+    waitForEntryCount(context, 1);
+  }
 }

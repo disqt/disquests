@@ -18,141 +18,145 @@ import org.jetbrains.annotations.Nullable;
 
 public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> {
 
-    public static final String CONFIRM_OVERLAY_ID = "confirm-overlay";
-    public static final String CONFIRM_YES_ID = "btn-confirm-yes";
-    public static final String CONFIRM_NO_ID = "btn-confirm-no";
+  public static final String CONFIRM_OVERLAY_ID = "confirm-overlay";
+  public static final String CONFIRM_YES_ID = "btn-confirm-yes";
+  public static final String CONFIRM_NO_ID = "btn-confirm-no";
 
-    @Nullable
-    protected final Screen parent;
+  @Nullable protected final Screen parent;
 
-    protected DisquestsBaseScreen(DataSource source, @Nullable Screen parent) {
-        super(FlowLayout.class, source);
-        this.parent = parent;
+  protected DisquestsBaseScreen(DataSource source, @Nullable Screen parent) {
+    super(FlowLayout.class, source);
+    this.parent = parent;
+  }
+
+  @Override
+  public void close() {
+    if (this.client != null) {
+      this.client.setScreen(parent);
     }
+  }
 
-    @Override
-    public void close() {
-        if (this.client != null) {
-            this.client.setScreen(parent);
+  @Override
+  public boolean keyPressed(KeyInput keyInput) {
+    // BaseOwoScreen skips GreedyInputUIComponent routing when Ctrl is held,
+    // which prevents Ctrl+A, Ctrl+Z, Ctrl+Y etc from reaching text fields.
+    // Route ALL key events to the focused greedy component first.
+    if (this.uiAdapter != null) {
+      var focused = this.uiAdapter.rootComponent.focusHandler().focused();
+      if (focused instanceof GreedyInputUIComponent inputComponent) {
+        if (inputComponent.onKeyPress(keyInput)) {
+          return true;
         }
+      }
     }
+    return super.keyPressed(keyInput);
+  }
 
-    @Override
-    public boolean keyPressed(KeyInput keyInput) {
-        // BaseOwoScreen skips GreedyInputUIComponent routing when Ctrl is held,
-        // which prevents Ctrl+A, Ctrl+Z, Ctrl+Y etc from reaching text fields.
-        // Route ALL key events to the focused greedy component first.
-        if (this.uiAdapter != null) {
-            var focused = this.uiAdapter.rootComponent.focusHandler().focused();
-            if (focused instanceof GreedyInputUIComponent inputComponent) {
-                if (inputComponent.onKeyPress(keyInput)) {
-                    return true;
-                }
-            }
+  @Override
+  public boolean charTyped(CharInput charInput) {
+    if (this.uiAdapter != null) {
+      var focused = this.uiAdapter.rootComponent.focusHandler().focused();
+      if (focused instanceof GreedyInputUIComponent inputComponent) {
+        if (inputComponent.onCharTyped(charInput)) {
+          return true;
         }
-        return super.keyPressed(keyInput);
+      }
     }
+    return super.charTyped(charInput);
+  }
 
-    @Override
-    public boolean charTyped(CharInput charInput) {
-        if (this.uiAdapter != null) {
-            var focused = this.uiAdapter.rootComponent.focusHandler().focused();
-            if (focused instanceof GreedyInputUIComponent inputComponent) {
-                if (inputComponent.onCharTyped(charInput)) {
-                    return true;
-                }
-            }
-        }
-        return super.charTyped(charInput);
+  protected void applyThemeRoot(FlowLayout root) {
+    root.surface(DisquestsClient.CONFIG.theme().rootSurface());
+  }
+
+  protected void applyThemePanel(ParentUIComponent component) {
+    component.surface(DisquestsClient.CONFIG.theme().panelSurface());
+  }
+
+  /**
+   * Exposes the root component for test access. Only valid after the screen has been initialized.
+   */
+  public FlowLayout getRootComponent() {
+    return this.uiAdapter != null ? this.uiAdapter.rootComponent : null;
+  }
+
+  @Override
+  public boolean shouldPause() {
+    return false;
+  }
+
+  protected void navigateToScreen(Screen screen) {
+    if (this.client != null) {
+      this.client.setScreen(screen);
     }
+  }
 
-    protected void applyThemeRoot(FlowLayout root) {
-        root.surface(DisquestsClient.CONFIG.theme().rootSurface());
+  // ===================== CONFIRM OVERLAY =====================
+
+  protected void showConfirmOverlay(Text message, Runnable onConfirm) {
+    showConfirmOverlay(message, onConfirm, () -> {});
+  }
+
+  protected void showConfirmOverlay(Text message, Runnable onConfirm, Runnable onCancel) {
+    if (this.uiAdapter == null) return;
+
+    dismissOverlay();
+
+    LabelComponent messageLabel = UIComponents.label(message);
+    messageLabel.shadow(true);
+    messageLabel.maxWidth(250);
+    messageLabel.horizontalTextAlignment(HorizontalAlignment.CENTER);
+
+    ButtonComponent yesBtn =
+        UIComponents.button(
+            Text.translatable("gui.disquests.btn.yes"),
+            b -> {
+              dismissOverlay();
+              onConfirm.run();
+            });
+    yesBtn.id(CONFIRM_YES_ID);
+    yesBtn.sizing(Sizing.fixed(60), Sizing.fixed(20));
+
+    ButtonComponent noBtn =
+        UIComponents.button(
+            Text.translatable("gui.disquests.btn.no"),
+            b -> {
+              dismissOverlay();
+              onCancel.run();
+            });
+    noBtn.id(CONFIRM_NO_ID);
+    noBtn.sizing(Sizing.fixed(60), Sizing.fixed(20));
+
+    FlowLayout buttonRow = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+    buttonRow.gap(8);
+    buttonRow.child(yesBtn);
+    buttonRow.child(noBtn);
+    buttonRow.horizontalAlignment(HorizontalAlignment.CENTER);
+
+    FlowLayout panel = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
+    panel.gap(12);
+    panel.padding(Insets.of(16));
+    panel.surface(Surface.DARK_PANEL);
+    panel.horizontalAlignment(HorizontalAlignment.CENTER);
+    panel.child(messageLabel);
+    panel.child(buttonRow);
+
+    OverlayContainer<FlowLayout> overlay = UIContainers.overlay(panel);
+    overlay.id(CONFIRM_OVERLAY_ID);
+    overlay.closeOnClick(false);
+
+    this.uiAdapter.rootComponent.child(overlay);
+  }
+
+  protected void dismissOverlay() {
+    dismissOverlay(CONFIRM_OVERLAY_ID);
+  }
+
+  protected void dismissOverlay(String overlayId) {
+    if (this.uiAdapter == null) return;
+    var existing = this.uiAdapter.rootComponent.childById(OverlayContainer.class, overlayId);
+    if (existing != null) {
+      existing.remove();
     }
-
-    protected void applyThemePanel(ParentUIComponent component) {
-        component.surface(DisquestsClient.CONFIG.theme().panelSurface());
-    }
-
-    /**
-     * Exposes the root component for test access.
-     * Only valid after the screen has been initialized.
-     */
-    public FlowLayout getRootComponent() {
-        return this.uiAdapter != null ? this.uiAdapter.rootComponent : null;
-    }
-
-    @Override
-    public boolean shouldPause() {
-        return false;
-    }
-
-    protected void navigateToScreen(Screen screen) {
-        if (this.client != null) {
-            this.client.setScreen(screen);
-        }
-    }
-
-    // ===================== CONFIRM OVERLAY =====================
-
-    protected void showConfirmOverlay(Text message, Runnable onConfirm) {
-        showConfirmOverlay(message, onConfirm, () -> {});
-    }
-
-    protected void showConfirmOverlay(Text message, Runnable onConfirm, Runnable onCancel) {
-        if (this.uiAdapter == null) return;
-
-        dismissOverlay();
-
-        LabelComponent messageLabel = UIComponents.label(message);
-        messageLabel.shadow(true);
-        messageLabel.maxWidth(250);
-        messageLabel.horizontalTextAlignment(HorizontalAlignment.CENTER);
-
-        ButtonComponent yesBtn = UIComponents.button(Text.translatable("gui.disquests.btn.yes"), b -> {
-            dismissOverlay();
-            onConfirm.run();
-        });
-        yesBtn.id(CONFIRM_YES_ID);
-        yesBtn.sizing(Sizing.fixed(60), Sizing.fixed(20));
-
-        ButtonComponent noBtn = UIComponents.button(Text.translatable("gui.disquests.btn.no"), b -> {
-            dismissOverlay();
-            onCancel.run();
-        });
-        noBtn.id(CONFIRM_NO_ID);
-        noBtn.sizing(Sizing.fixed(60), Sizing.fixed(20));
-
-        FlowLayout buttonRow = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
-        buttonRow.gap(8);
-        buttonRow.child(yesBtn);
-        buttonRow.child(noBtn);
-        buttonRow.horizontalAlignment(HorizontalAlignment.CENTER);
-
-        FlowLayout panel = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
-        panel.gap(12);
-        panel.padding(Insets.of(16));
-        panel.surface(Surface.DARK_PANEL);
-        panel.horizontalAlignment(HorizontalAlignment.CENTER);
-        panel.child(messageLabel);
-        panel.child(buttonRow);
-
-        OverlayContainer<FlowLayout> overlay = UIContainers.overlay(panel);
-        overlay.id(CONFIRM_OVERLAY_ID);
-        overlay.closeOnClick(false);
-
-        this.uiAdapter.rootComponent.child(overlay);
-    }
-
-    protected void dismissOverlay() {
-        dismissOverlay(CONFIRM_OVERLAY_ID);
-    }
-
-    protected void dismissOverlay(String overlayId) {
-        if (this.uiAdapter == null) return;
-        var existing = this.uiAdapter.rootComponent.childById(OverlayContainer.class, overlayId);
-        if (existing != null) {
-            existing.remove();
-        }
-    }
+  }
 }

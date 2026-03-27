@@ -1,60 +1,57 @@
 package com.disqt.disquests.client.gui.helper;
 
-
 /**
- * Mutable color constants used by all Disquests UI components.
- * Values are set by {@link Theme#applyColors()} on startup and
- * whenever the user changes the theme via owo-config.
+ * Mutable color constants used by all Disquests UI components. Values are set by {@link
+ * Theme#applyColors()} on startup and whenever the user changes the theme via owo-config.
  */
 public final class Colors {
 
-    // --- Panel ---
-    public static int PANEL_BACKGROUND = 0x77000000;
+  // --- Panel ---
+  public static int PANEL_BACKGROUND = 0x77000000;
 
-    // --- Text ---
-    public static int TEXT_PRIMARY = 0xFFFFFFFF;
-    public static int TEXT_MUTED = 0xFFCCCCCC;
-    public static int TEXT_DISABLED = 0xFF888888;
+  // --- Text ---
+  public static int TEXT_PRIMARY = 0xFFFFFFFF;
+  public static int TEXT_MUTED = 0xFFCCCCCC;
+  public static int TEXT_DISABLED = 0xFF888888;
 
-    // --- Selection ---
-    public static int SELECTION_BACKGROUND = 0x8855AADD;
+  // --- Selection ---
+  public static int SELECTION_BACKGROUND = 0x8855AADD;
 
-    // --- Caret ---
-    public static int CARET_PRIMARY = 0xFFFFFFFF;
+  // --- Caret ---
+  public static int CARET_PRIMARY = 0xFFFFFFFF;
 
-    // --- Buttons ---
-    public static int BUTTON_DISABLED = 0x44000000;
-    public static int BUTTON_HOVER = 0xAA000000;
+  // --- Buttons ---
+  public static int BUTTON_DISABLED = 0x44000000;
+  public static int BUTTON_HOVER = 0xAA000000;
 
-    // --- Tabs ---
-    public static int TAB_INACTIVE = 0x44000000;
+  // --- Tabs ---
+  public static int TAB_INACTIVE = 0x44000000;
 
-    // --- Scrollbar ---
-    public static int SCROLLBAR_THUMB_INACTIVE = 0x88FFFFFF;
-    public static int SCROLLBAR_THUMB_ACTIVE = 0xFFFFFFFF;
+  // --- Scrollbar ---
+  public static int SCROLLBAR_THUMB_INACTIVE = 0x88FFFFFF;
+  public static int SCROLLBAR_THUMB_ACTIVE = 0xFFFFFFFF;
 
-    // --- Background ---
-    public static int GRADIENT_START = 0xFF101010;
-    public static int GRADIENT_END = 0xFF101010;
+  // --- Background ---
+  public static int GRADIENT_START = 0xFF101010;
+  public static int GRADIENT_END = 0xFF101010;
 
-    // --- Fade Gradient ---
-    public static int FADE_GRADIENT_TOP = 0x60000000;
-    public static int FADE_GRADIENT_BOTTOM = 0x00000000;
+  // --- Fade Gradient ---
+  public static int FADE_GRADIENT_TOP = 0x60000000;
+  public static int FADE_GRADIENT_BOTTOM = 0x00000000;
 
-    // --- Accent ---
-    public static int AMBER = 0xFFFFAA33;
+  // --- Accent ---
+  public static int AMBER = 0xFFFFAA33;
 
-    // --- Badge ---
-    public static int BADGE_RED = 0xFFCC3333;
+  // --- Badge ---
+  public static int BADGE_RED = 0xFFCC3333;
 
-    // --- Entry Highlights ---
-    public static int ENTRY_HOVER = 0x22FFFFFF;
-    public static int ENTRY_SELECTED = 0x44FFFFFF;
+  // --- Entry Highlights ---
+  public static int ENTRY_HOVER = 0x22FFFFFF;
+  public static int ENTRY_SELECTED = 0x44FFFFFF;
 
-    // --- Accent Line ---
-    public static int ACCENT_LINE_ACTIVE = 0x00000000;
-    public static int ACCENT_LINE_INACTIVE = 0x00000000;
+  // --- Accent Line ---
+  public static int ACCENT_LINE_ACTIVE = 0x00000000;
+  public static int ACCENT_LINE_INACTIVE = 0x00000000;
 
-    private Colors() {}
-
+  private Colors() {}
 }

@@ -1,44 +1,54 @@
 package com.disqt.disquests.server.papermc;
 
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.plugin.java.JavaPlugin;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.plugin.java.JavaPlugin;
 
 public class Config {
-    private String bluemapUrl;
-    private Map<String, String> bluemapMapNames;
-    private List<String> predefinedTags;
-    private boolean debug;
+  private String bluemapUrl;
+  private Map<String, String> bluemapMapNames;
+  private List<String> predefinedTags;
+  private boolean debug;
 
-    public Config(JavaPlugin plugin) {
-        plugin.saveDefaultConfig();
-        reload(plugin);
+  public Config(JavaPlugin plugin) {
+    plugin.saveDefaultConfig();
+    reload(plugin);
+  }
+
+  public void reload(JavaPlugin plugin) {
+    plugin.reloadConfig();
+    FileConfiguration cfg = plugin.getConfig();
+    this.bluemapUrl = cfg.getString("bluemap-url", "");
+    this.bluemapMapNames = new HashMap<>();
+    if (cfg.isConfigurationSection("bluemap-map-names")) {
+      var section = cfg.getConfigurationSection("bluemap-map-names");
+      for (String key : section.getKeys(false)) {
+        bluemapMapNames.put(key, section.getString(key));
+      }
     }
-
-    public void reload(JavaPlugin plugin) {
-        plugin.reloadConfig();
-        FileConfiguration cfg = plugin.getConfig();
-        this.bluemapUrl = cfg.getString("bluemap-url", "");
-        this.bluemapMapNames = new HashMap<>();
-        if (cfg.isConfigurationSection("bluemap-map-names")) {
-            var section = cfg.getConfigurationSection("bluemap-map-names");
-            for (String key : section.getKeys(false)) {
-                bluemapMapNames.put(key, section.getString(key));
-            }
-        }
-        this.predefinedTags = cfg.getStringList("predefined-tags");
-        if (this.predefinedTags == null) this.predefinedTags = List.of();
-        this.debug = cfg.getBoolean("debug", false);
-        if (Boolean.getBoolean("disquests.debug")) {
-            this.debug = true;
-        }
+    this.predefinedTags = cfg.getStringList("predefined-tags");
+    if (this.predefinedTags == null) this.predefinedTags = List.of();
+    this.debug = cfg.getBoolean("debug", false);
+    if (Boolean.getBoolean("disquests.debug")) {
+      this.debug = true;
     }
+  }
 
-    public boolean isDebug() { return debug; }
-    public String getBluemapUrl() { return bluemapUrl; }
-    public Map<String, String> getBluemapMapNames() { return bluemapMapNames; }
-    public List<String> getPredefinedTags() { return predefinedTags; }
+  public boolean isDebug() {
+    return debug;
+  }
+
+  public String getBluemapUrl() {
+    return bluemapUrl;
+  }
+
+  public Map<String, String> getBluemapMapNames() {
+    return bluemapMapNames;
+  }
+
+  public List<String> getPredefinedTags() {
+    return predefinedTags;
+  }
 }

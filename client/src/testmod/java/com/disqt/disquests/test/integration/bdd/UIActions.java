@@ -8,417 +8,448 @@ import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.test.integration.harness.RconClient;
 import com.disqt.disquests.test.integration.harness.TestContext;
 import io.wispforest.owo.ui.core.UIComponent;
+import java.util.UUID;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
-import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.TitleScreen;
+import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
 import net.minecraft.client.network.ServerAddress;
 import net.minecraft.client.network.ServerInfo;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.UUID;
-
 /**
- * UI interaction helpers using GLFW physical input (TestInput).
- * Never call screen methods directly -- always go through the real input pipeline.
+ * UI interaction helpers using GLFW physical input (TestInput). Never call screen methods directly
+ * -- always go through the real input pipeline.
  */
 public final class UIActions {
-    private static final Logger LOG = LoggerFactory.getLogger("Disquests.E2E");
+  private static final Logger LOG = LoggerFactory.getLogger("Disquests.E2E");
 
-    /** Convert seconds to game ticks (20 ticks/second). */
-    public static int seconds(int s) { return s * 20; }
+  /** Convert seconds to game ticks (20 ticks/second). */
+  public static int seconds(int s) {
+    return s * 20;
+  }
 
-    public static final int CONNECT_TIMEOUT = seconds(30);
-    public static final int TIMEOUT = seconds(10);
+  public static final int CONNECT_TIMEOUT = seconds(30);
+  public static final int TIMEOUT = seconds(10);
 
-    private static final double PIN_ICON_CLICK_X = 10.0;  // offset from right edge
-    private static final double PIN_ICON_CLICK_Y = 19.0;  // offset from entry top
+  private static final double PIN_ICON_CLICK_X = 10.0; // offset from right edge
+  private static final double PIN_ICON_CLICK_Y = 19.0; // offset from entry top
 
-    private UIActions() {}
+  private UIActions() {}
 
-    // --- Component lookup helpers ---
+  // --- Component lookup helpers ---
 
-    /**
-     * Find a component by ID on the current Disquests screen.
-     * Runs on the client thread. Throws AssertionError if screen or component not found.
-     */
-    public static <T extends UIComponent> T findComponent(ClientGameTestContext context, Class<T> type, String id) {
-        // Wait for a Disquests screen to be active (handles brief screen transitions on CI)
-        context.waitFor(client -> client.currentScreen instanceof DisquestsBaseScreen, TIMEOUT);
-        return context.computeOnClient(c -> {
-            if (c.currentScreen instanceof DisquestsBaseScreen dScreen) {
-                var root = dScreen.getRootComponent();
-                if (root == null) throw new AssertionError("Screen root not initialized");
-                T component = root.childById(type, id);
-                if (component == null) throw new AssertionError("Component not found: " + id);
-                return component;
-            }
-            throw new AssertionError("Current screen is not a Disquests screen");
+  /**
+   * Find a component by ID on the current Disquests screen. Runs on the client thread. Throws
+   * AssertionError if screen or component not found.
+   */
+  public static <T extends UIComponent> T findComponent(
+      ClientGameTestContext context, Class<T> type, String id) {
+    // Wait for a Disquests screen to be active (handles brief screen transitions on CI)
+    context.waitFor(client -> client.currentScreen instanceof DisquestsBaseScreen, TIMEOUT);
+    return context.computeOnClient(
+        c -> {
+          if (c.currentScreen instanceof DisquestsBaseScreen dScreen) {
+            var root = dScreen.getRootComponent();
+            if (root == null) throw new AssertionError("Screen root not initialized");
+            T component = root.childById(type, id);
+            if (component == null) throw new AssertionError("Component not found: " + id);
+            return component;
+          }
+          throw new AssertionError("Current screen is not a Disquests screen");
         });
-    }
+  }
 
-    /**
-     * Find a component by ID, returning null if not found.
-     */
-    public static <T extends UIComponent> T findComponentOrNull(ClientGameTestContext context, Class<T> type, String id) {
-        return context.computeOnClient(c -> {
-            if (c.currentScreen instanceof DisquestsBaseScreen dScreen) {
-                var root = dScreen.getRootComponent();
-                if (root == null) return null;
-                return root.childById(type, id);
-            }
-            return null;
+  /** Find a component by ID, returning null if not found. */
+  public static <T extends UIComponent> T findComponentOrNull(
+      ClientGameTestContext context, Class<T> type, String id) {
+    return context.computeOnClient(
+        c -> {
+          if (c.currentScreen instanceof DisquestsBaseScreen dScreen) {
+            var root = dScreen.getRootComponent();
+            if (root == null) return null;
+            return root.childById(type, id);
+          }
+          return null;
         });
-    }
+  }
 
-    /**
-     * Get the center coordinates of a component (screen-space, pre-scale).
-     */
-    public static double[] componentCenter(ClientGameTestContext context, UIComponent component) {
-        return context.computeOnClient(c ->
-            new double[]{component.x() + component.width() / 2.0, component.y() + component.height() / 2.0});
-    }
+  /** Get the center coordinates of a component (screen-space, pre-scale). */
+  public static double[] componentCenter(ClientGameTestContext context, UIComponent component) {
+    return context.computeOnClient(
+        c ->
+            new double[] {
+              component.x() + component.width() / 2.0, component.y() + component.height() / 2.0
+            });
+  }
 
-    /**
-     * Get the window scale factor.
-     */
-    public static double scaleFactor(ClientGameTestContext context) {
-        return context.computeOnClient(c -> (double) c.getWindow().getScaleFactor());
-    }
+  /** Get the window scale factor. */
+  public static double scaleFactor(ClientGameTestContext context) {
+    return context.computeOnClient(c -> (double) c.getWindow().getScaleFactor());
+  }
 
-    // --- Server reset ---
+  // --- Server reset ---
 
-    /**
-     * Sends RCON "disquests reset" to wipe the server DB, then clears client cache
-     * and requests a fresh sync. Waits for the sync to complete.
-     * Call this from @BeforeAll in solo journey classes.
-     */
-    public static void resetServerAndSync() throws Exception {
-        // RCON reset: wipes DB, triggers re-handshake
-        var rcon = new RconClient("localhost",
-            Integer.parseInt(System.getProperty("disquests.test.rcon.port", "25575")));
-        rcon.login(System.getProperty("disquests.test.rcon.password", "testpassword"));
-        rcon.command("disquests reset");
-        rcon.close();
+  /**
+   * Sends RCON "disquests reset" to wipe the server DB, then clears client cache and requests a
+   * fresh sync. Waits for the sync to complete. Call this from @BeforeAll in solo journey classes.
+   */
+  public static void resetServerAndSync() throws Exception {
+    // RCON reset: wipes DB, triggers re-handshake
+    var rcon =
+        new RconClient(
+            "localhost", Integer.parseInt(System.getProperty("disquests.test.rcon.port", "25575")));
+    rcon.login(System.getProperty("disquests.test.rcon.password", "testpassword"));
+    rcon.command("disquests reset");
+    rcon.close();
 
-        // Clear client cache and close screens
-        ClientGameTestContext context = TestContext.get();
-        context.runOnClient(c -> {
-            ClientCache.clear();
-            if (c.currentScreen != null) c.setScreen(null);
-        });
-
-        // Request sync and wait for cache to update (version bumps when SYNC packets arrive)
-        // Request sync and wait for cache to update (SYNC packets bump version)
-        long versionBefore = context.computeOnClient(c -> ClientCache.getVersion());
-        context.runOnClient(c -> {
-            com.disqt.disquests.client.network.PacketSender.requestSync();
-        });
-        context.waitFor(client -> ClientCache.getVersion() != versionBefore, TIMEOUT);
-    }
-
-    // --- Connection ---
-
-    public static void connectAndWait(ClientGameTestContext context) {
-        String host = System.getProperty("disquests.test.server.host", "localhost");
-        int port = Integer.getInteger("disquests.test.server.port", 25565);
-        String address = host + ":" + port;
-
-        context.runOnClient(client -> {
-            ServerAddress serverAddress = ServerAddress.parse(address);
-            ServerInfo serverInfo = new ServerInfo("Test", address, ServerInfo.ServerType.OTHER);
-            ConnectScreen.connect(client.currentScreen, client, serverAddress, serverInfo, false, null);
+    // Clear client cache and close screens
+    ClientGameTestContext context = TestContext.get();
+    context.runOnClient(
+        c -> {
+          ClientCache.clear();
+          if (c.currentScreen != null) c.setScreen(null);
         });
 
-        // Wait for player entity
-        context.waitFor(client -> client.player != null, CONNECT_TIMEOUT);
-        // Wait for Disquests handshake
-        context.waitFor(client -> ClientSession.isOnServer(), CONNECT_TIMEOUT);
-        context.waitTicks(10);
-    }
-
-    public static void disconnect(ClientGameTestContext context) {
-        context.runOnClient(client -> client.disconnect(new TitleScreen(), false));
-        context.waitForScreen(TitleScreen.class);
-    }
-
-    // --- Screen navigation ---
-
-    public static void openMainScreen(ClientGameTestContext context) {
-        context.runOnClient(client -> client.setScreen(new MainScreen(null)));
-        context.waitForScreen(MainScreen.class);
-        context.waitTicks(2);
-    }
-
-    public static <T extends Screen> void waitForScreen(ClientGameTestContext context, Class<T> screenClass) {
-        context.waitFor(client -> screenClass.isInstance(client.currentScreen), TIMEOUT);
-        context.waitTicks(2);
-    }
-
-    // --- Component interaction ---
-
-    /**
-     * Click a component by its XML/programmatic ID.
-     * Uses GLFW physical input: setCursorPos + pressMouse.
-     */
-    public static void click(ClientGameTestContext context, String componentId) {
-        var component = findComponent(context, UIComponent.class, componentId);
-        double[] pos = componentCenter(context, component);
-        double scale = scaleFactor(context);
-        context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-        context.waitTicks(2);
-    }
-
-    /**
-     * Click a QuestEntryComponent by index in the quest list.
-     * Entries are children of the "quest-list" FlowLayout.
-     */
-    public static void clickEntry(ClientGameTestContext context, int index) {
-        var questList = findComponent(context, io.wispforest.owo.ui.container.FlowLayout.class, "quest-list");
-        double[] pos = context.computeOnClient(c -> {
-            var children = questList.children();
-            if (index >= children.size()) throw new AssertionError("Entry index " + index + " out of bounds, size=" + children.size());
-            var entry = children.get(index);
-            return new double[]{entry.x() + entry.width() / 2.0, entry.y() + entry.height() / 2.0};
+    // Request sync and wait for cache to update (version bumps when SYNC packets arrive)
+    // Request sync and wait for cache to update (SYNC packets bump version)
+    long versionBefore = context.computeOnClient(c -> ClientCache.getVersion());
+    context.runOnClient(
+        c -> {
+          com.disqt.disquests.client.network.PacketSender.requestSync();
         });
-        double scale = scaleFactor(context);
-        context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-        context.waitTicks(2);
-    }
+    context.waitFor(client -> ClientCache.getVersion() != versionBefore, TIMEOUT);
+  }
 
-    /**
-     * Click a QuestEntryComponent by matching quest title.
-     * Searches all children of "quest-list" for a QuestEntryComponent with the given title.
-     */
-    public static void clickEntryByTitle(ClientGameTestContext context, String title) {
-        var questList = findComponent(context, io.wispforest.owo.ui.container.FlowLayout.class, "quest-list");
-        double[] pos = context.computeOnClient(c -> {
-            for (var child : questList.children()) {
-                if (child instanceof com.disqt.disquests.client.gui.component.QuestEntryComponent entry) {
-                    if (title.equals(entry.getQuest().getTitle())) {
-                        return new double[]{entry.x() + entry.width() / 2.0, entry.y() + entry.height() / 2.0};
-                    }
+  // --- Connection ---
+
+  public static void connectAndWait(ClientGameTestContext context) {
+    String host = System.getProperty("disquests.test.server.host", "localhost");
+    int port = Integer.getInteger("disquests.test.server.port", 25565);
+    String address = host + ":" + port;
+
+    context.runOnClient(
+        client -> {
+          ServerAddress serverAddress = ServerAddress.parse(address);
+          ServerInfo serverInfo = new ServerInfo("Test", address, ServerInfo.ServerType.OTHER);
+          ConnectScreen.connect(
+              client.currentScreen, client, serverAddress, serverInfo, false, null);
+        });
+
+    // Wait for player entity
+    context.waitFor(client -> client.player != null, CONNECT_TIMEOUT);
+    // Wait for Disquests handshake
+    context.waitFor(client -> ClientSession.isOnServer(), CONNECT_TIMEOUT);
+    context.waitTicks(10);
+  }
+
+  public static void disconnect(ClientGameTestContext context) {
+    context.runOnClient(client -> client.disconnect(new TitleScreen(), false));
+    context.waitForScreen(TitleScreen.class);
+  }
+
+  // --- Screen navigation ---
+
+  public static void openMainScreen(ClientGameTestContext context) {
+    context.runOnClient(client -> client.setScreen(new MainScreen(null)));
+    context.waitForScreen(MainScreen.class);
+    context.waitTicks(2);
+  }
+
+  public static <T extends Screen> void waitForScreen(
+      ClientGameTestContext context, Class<T> screenClass) {
+    context.waitFor(client -> screenClass.isInstance(client.currentScreen), TIMEOUT);
+    context.waitTicks(2);
+  }
+
+  // --- Component interaction ---
+
+  /**
+   * Click a component by its XML/programmatic ID. Uses GLFW physical input: setCursorPos +
+   * pressMouse.
+   */
+  public static void click(ClientGameTestContext context, String componentId) {
+    var component = findComponent(context, UIComponent.class, componentId);
+    double[] pos = componentCenter(context, component);
+    double scale = scaleFactor(context);
+    context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
+    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.waitTicks(2);
+  }
+
+  /**
+   * Click a QuestEntryComponent by index in the quest list. Entries are children of the
+   * "quest-list" FlowLayout.
+   */
+  public static void clickEntry(ClientGameTestContext context, int index) {
+    var questList =
+        findComponent(context, io.wispforest.owo.ui.container.FlowLayout.class, "quest-list");
+    double[] pos =
+        context.computeOnClient(
+            c -> {
+              var children = questList.children();
+              if (index >= children.size())
+                throw new AssertionError(
+                    "Entry index " + index + " out of bounds, size=" + children.size());
+              var entry = children.get(index);
+              return new double[] {
+                entry.x() + entry.width() / 2.0, entry.y() + entry.height() / 2.0
+              };
+            });
+    double scale = scaleFactor(context);
+    context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
+    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.waitTicks(2);
+  }
+
+  /**
+   * Click a QuestEntryComponent by matching quest title. Searches all children of "quest-list" for
+   * a QuestEntryComponent with the given title.
+   */
+  public static void clickEntryByTitle(ClientGameTestContext context, String title) {
+    var questList =
+        findComponent(context, io.wispforest.owo.ui.container.FlowLayout.class, "quest-list");
+    double[] pos =
+        context.computeOnClient(
+            c -> {
+              for (var child : questList.children()) {
+                if (child
+                    instanceof com.disqt.disquests.client.gui.component.QuestEntryComponent entry) {
+                  if (title.equals(entry.getQuest().getTitle())) {
+                    return new double[] {
+                      entry.x() + entry.width() / 2.0, entry.y() + entry.height() / 2.0
+                    };
+                  }
                 }
+              }
+              throw new AssertionError("No entry with title '" + title + "' found in quest list");
+            });
+    double scale = scaleFactor(context);
+    context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
+    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.waitTicks(2);
+  }
+
+  /** Double-click a QuestEntryComponent by index. */
+  public static void doubleClickEntry(ClientGameTestContext context, int index) {
+    clickEntry(context, index);
+    context.waitTicks(1);
+    clickEntry(context, index);
+  }
+
+  /**
+   * Click the pin icon on a QuestEntryComponent by index. Pin icon is in the rightmost 20px of the
+   * entry, vertically centered.
+   */
+  public static void clickPinIcon(ClientGameTestContext context, int index) {
+    var questList =
+        findComponent(context, io.wispforest.owo.ui.container.FlowLayout.class, "quest-list");
+    double[] pos =
+        context.computeOnClient(
+            c -> {
+              var entry = questList.children().get(index);
+              return new double[] {
+                entry.x() + entry.width() - PIN_ICON_CLICK_X, entry.y() + PIN_ICON_CLICK_Y
+              };
+            });
+    double scale = scaleFactor(context);
+    context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
+    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.waitTicks(2);
+  }
+
+  /**
+   * Type text into a focused text field. Must click the field first to focus it. Clears existing
+   * text by directly manipulating the widget, then types the new text via GLFW character input.
+   * Handles both TextFieldComponent (our custom multi-line) and TextBoxComponent (owo-ui
+   * single-line).
+   */
+  public static void type(ClientGameTestContext context, String componentId, String text) {
+    click(context, componentId);
+    context.waitTicks(1); // focus desync workaround for GreedyInputUIComponent
+    // Clear existing text by directly manipulating the widget.
+    // GLFW Ctrl+A routing can be unreliable through owo-ui layers,
+    // so we clear via runOnClient for robustness.
+    context.runOnClient(
+        c -> {
+          if (c.currentScreen instanceof DisquestsBaseScreen dScreen) {
+            var root = dScreen.getRootComponent();
+            if (root != null) {
+              // Find component by ID as generic UIComponent, then check type
+              var component = root.childById(UIComponent.class, componentId);
+              if (component
+                  instanceof
+                  com.disqt.disquests.client.gui.component.TextFieldComponent textField) {
+                textField.getDelegate().setText("");
+                textField.getDelegate().setFocused(true);
+              } else if (component
+                  instanceof io.wispforest.owo.ui.component.TextBoxComponent textBox) {
+                textBox.text("");
+              }
             }
-            throw new AssertionError("No entry with title '" + title + "' found in quest list");
+          }
         });
-        double scale = scaleFactor(context);
-        context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-        context.waitTicks(2);
-    }
+    context.waitTicks(1);
+    // Re-click to ensure owo-ui focus is restored after setText (which clears focused)
+    click(context, componentId);
+    context.waitTicks(1);
+    // Type new text
+    context.getInput().typeChars(text);
+    context.waitTicks(2);
+  }
 
-    /**
-     * Double-click a QuestEntryComponent by index.
-     */
-    public static void doubleClickEntry(ClientGameTestContext context, int index) {
-        clickEntry(context, index);
-        context.waitTicks(1);
-        clickEntry(context, index);
-    }
+  /** Append text to a text field without clearing existing content. */
+  public static void appendText(ClientGameTestContext context, String componentId, String text) {
+    click(context, componentId);
+    context.waitTicks(1);
+    // Move to end (Ctrl+End)
+    context.getInput().holdControl();
+    context.getInput().pressKey(GLFW.GLFW_KEY_END);
+    context.getInput().releaseControl();
+    context.getInput().typeChars(text);
+    context.waitTicks(2);
+  }
 
-    /**
-     * Click the pin icon on a QuestEntryComponent by index.
-     * Pin icon is in the rightmost 20px of the entry, vertically centered.
-     */
-    public static void clickPinIcon(ClientGameTestContext context, int index) {
-        var questList = findComponent(context, io.wispforest.owo.ui.container.FlowLayout.class, "quest-list");
-        double[] pos = context.computeOnClient(c -> {
-            var entry = questList.children().get(index);
-            return new double[]{entry.x() + entry.width() - PIN_ICON_CLICK_X, entry.y() + PIN_ICON_CLICK_Y};
+  /** Press Ctrl+Z (undo) on the currently focused field. */
+  public static void undo(ClientGameTestContext context) {
+    context.getInput().holdControl();
+    context.getInput().pressKey(GLFW.GLFW_KEY_Z);
+    context.getInput().releaseControl();
+    context.waitTicks(2);
+  }
+
+  /**
+   * Press Ctrl+Z repeatedly to undo N actions. Each typeChars character creates a separate undo
+   * action, so use this to undo an entire typed string.
+   */
+  public static void undoN(ClientGameTestContext context, int count) {
+    for (int i = 0; i < count; i++) {
+      context.getInput().holdControl();
+      context.getInput().pressKey(GLFW.GLFW_KEY_Z);
+      context.getInput().releaseControl();
+    }
+    context.waitTicks(2);
+  }
+
+  /** Press Ctrl+Y (redo) on the currently focused field. */
+  public static void redo(ClientGameTestContext context) {
+    context.getInput().holdControl();
+    context.getInput().pressKey(GLFW.GLFW_KEY_Y);
+    context.getInput().releaseControl();
+    context.waitTicks(2);
+  }
+
+  /** Press Ctrl+Y repeatedly to redo N actions. */
+  public static void redoN(ClientGameTestContext context, int count) {
+    for (int i = 0; i < count; i++) {
+      context.getInput().holdControl();
+      context.getInput().pressKey(GLFW.GLFW_KEY_Y);
+      context.getInput().releaseControl();
+    }
+    context.waitTicks(2);
+  }
+
+  // --- Quest helpers ---
+
+  /**
+   * Wait for a quest to appear in cache by title.
+   *
+   * @param myQuests true = search myQuests, false = search serverQuests
+   */
+  public static Quest waitForQuestByTitle(
+      ClientGameTestContext context, String title, boolean myQuests) {
+    context.waitFor(
+        client -> {
+          var list = myQuests ? ClientCache.getMyQuests() : ClientCache.getServerQuests();
+          return list.stream().anyMatch(q -> title.equals(q.getTitle()));
+        },
+        TIMEOUT);
+    return context.computeOnClient(
+        c -> {
+          var list = myQuests ? ClientCache.getMyQuests() : ClientCache.getServerQuests();
+          return list.stream().filter(q -> title.equals(q.getTitle())).findFirst().orElse(null);
         });
-        double scale = scaleFactor(context);
-        context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-        context.waitTicks(2);
-    }
+  }
 
-    /**
-     * Type text into a focused text field.
-     * Must click the field first to focus it.
-     * Clears existing text by directly manipulating the widget,
-     * then types the new text via GLFW character input.
-     * Handles both TextFieldComponent (our custom multi-line) and
-     * TextBoxComponent (owo-ui single-line).
-     */
-    public static void type(ClientGameTestContext context, String componentId, String text) {
-        click(context, componentId);
-        context.waitTicks(1); // focus desync workaround for GreedyInputUIComponent
-        // Clear existing text by directly manipulating the widget.
-        // GLFW Ctrl+A routing can be unreliable through owo-ui layers,
-        // so we clear via runOnClient for robustness.
-        context.runOnClient(c -> {
-            if (c.currentScreen instanceof DisquestsBaseScreen dScreen) {
-                var root = dScreen.getRootComponent();
-                if (root != null) {
-                    // Find component by ID as generic UIComponent, then check type
-                    var component = root.childById(UIComponent.class, componentId);
-                    if (component instanceof com.disqt.disquests.client.gui.component.TextFieldComponent textField) {
-                        textField.getDelegate().setText("");
-                        textField.getDelegate().setFocused(true);
-                    } else if (component instanceof io.wispforest.owo.ui.component.TextBoxComponent textBox) {
-                        textBox.text("");
-                    }
-                }
-            }
-        });
-        context.waitTicks(1);
-        // Re-click to ensure owo-ui focus is restored after setText (which clears focused)
-        click(context, componentId);
-        context.waitTicks(1);
-        // Type new text
-        context.getInput().typeChars(text);
-        context.waitTicks(2);
-    }
+  /**
+   * Wait for a quest matching title to satisfy a condition in the cache.
+   *
+   * @param myQuests true = search myQuests, false = search serverQuests
+   */
+  public static void waitForQuestCondition(
+      ClientGameTestContext context,
+      String title,
+      boolean myQuests,
+      java.util.function.Predicate<Quest> condition) {
+    context.waitFor(
+        client -> {
+          var list = myQuests ? ClientCache.getMyQuests() : ClientCache.getServerQuests();
+          return list.stream()
+              .filter(q -> title.equals(q.getTitle()))
+              .findFirst()
+              .map(condition::test)
+              .orElse(false);
+        },
+        TIMEOUT);
+  }
 
-    /**
-     * Append text to a text field without clearing existing content.
-     */
-    public static void appendText(ClientGameTestContext context, String componentId, String text) {
-        click(context, componentId);
-        context.waitTicks(1);
-        // Move to end (Ctrl+End)
-        context.getInput().holdControl();
-        context.getInput().pressKey(GLFW.GLFW_KEY_END);
-        context.getInput().releaseControl();
-        context.getInput().typeChars(text);
-        context.waitTicks(2);
-    }
+  /** Wait for a quest to be removed from myQuests. */
+  public static void waitForQuestRemoved(ClientGameTestContext context, UUID questId) {
+    context.waitFor(
+        client -> ClientCache.getMyQuests().stream().noneMatch(q -> q.getId().equals(questId)),
+        TIMEOUT);
+  }
 
-    /**
-     * Press Ctrl+Z (undo) on the currently focused field.
-     */
-    public static void undo(ClientGameTestContext context) {
-        context.getInput().holdControl();
-        context.getInput().pressKey(GLFW.GLFW_KEY_Z);
-        context.getInput().releaseControl();
-        context.waitTicks(2);
-    }
+  /** Wait for quest list in MainScreen to have exactly N entries. */
+  public static void waitForEntryCount(ClientGameTestContext context, int count) {
+    context.waitFor(
+        client -> {
+          Screen screen = client.currentScreen;
+          if (screen instanceof DisquestsBaseScreen dScreen) {
+            var root = dScreen.getRootComponent();
+            var questList =
+                root != null
+                    ? root.childById(io.wispforest.owo.ui.container.FlowLayout.class, "quest-list")
+                    : null;
+            return questList != null && questList.children().size() == count;
+          }
+          return false;
+        },
+        TIMEOUT);
+  }
 
-    /**
-     * Press Ctrl+Z repeatedly to undo N actions.
-     * Each typeChars character creates a separate undo action,
-     * so use this to undo an entire typed string.
-     */
-    public static void undoN(ClientGameTestContext context, int count) {
-        for (int i = 0; i < count; i++) {
-            context.getInput().holdControl();
-            context.getInput().pressKey(GLFW.GLFW_KEY_Z);
-            context.getInput().releaseControl();
-        }
-        context.waitTicks(2);
-    }
+  /**
+   * Wait for a component to appear on the current Disquests screen. Useful when programmatic
+   * components are added after the screen class is set.
+   */
+  public static void waitForComponent(ClientGameTestContext context, String componentId) {
+    context.waitFor(
+        client -> {
+          if (client.currentScreen instanceof DisquestsBaseScreen screen) {
+            return screen
+                    .getRootComponent()
+                    .childById(io.wispforest.owo.ui.core.UIComponent.class, componentId)
+                != null;
+          }
+          return false;
+        },
+        TIMEOUT);
+  }
 
-    /**
-     * Press Ctrl+Y (redo) on the currently focused field.
-     */
-    public static void redo(ClientGameTestContext context) {
-        context.getInput().holdControl();
-        context.getInput().pressKey(GLFW.GLFW_KEY_Y);
-        context.getInput().releaseControl();
-        context.waitTicks(2);
-    }
+  /** Offline-mode UUID generation (matches Paper's offline UUID format). */
+  public static UUID offlineUuid(String playerName) {
+    return UUID.nameUUIDFromBytes(
+        ("OfflinePlayer:" + playerName).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+  }
 
-    /**
-     * Press Ctrl+Y repeatedly to redo N actions.
-     */
-    public static void redoN(ClientGameTestContext context, int count) {
-        for (int i = 0; i < count; i++) {
-            context.getInput().holdControl();
-            context.getInput().pressKey(GLFW.GLFW_KEY_Y);
-            context.getInput().releaseControl();
-        }
-        context.waitTicks(2);
-    }
-
-    // --- Quest helpers ---
-
-    /**
-     * Wait for a quest to appear in cache by title.
-     * @param myQuests true = search myQuests, false = search serverQuests
-     */
-    public static Quest waitForQuestByTitle(ClientGameTestContext context, String title, boolean myQuests) {
-        context.waitFor(client -> {
-            var list = myQuests ? ClientCache.getMyQuests() : ClientCache.getServerQuests();
-            return list.stream().anyMatch(q -> title.equals(q.getTitle()));
-        }, TIMEOUT);
-        return context.computeOnClient(c -> {
-            var list = myQuests ? ClientCache.getMyQuests() : ClientCache.getServerQuests();
-            return list.stream().filter(q -> title.equals(q.getTitle())).findFirst().orElse(null);
-        });
-    }
-
-    /**
-     * Wait for a quest matching title to satisfy a condition in the cache.
-     * @param myQuests true = search myQuests, false = search serverQuests
-     */
-    public static void waitForQuestCondition(
-            ClientGameTestContext context, String title, boolean myQuests, java.util.function.Predicate<Quest> condition) {
-        context.waitFor(client -> {
-            var list = myQuests ? ClientCache.getMyQuests() : ClientCache.getServerQuests();
-            return list.stream()
-                .filter(q -> title.equals(q.getTitle()))
-                .findFirst()
-                .map(condition::test)
-                .orElse(false);
-        }, TIMEOUT);
-    }
-
-    /**
-     * Wait for a quest to be removed from myQuests.
-     */
-    public static void waitForQuestRemoved(ClientGameTestContext context, UUID questId) {
-        context.waitFor(client ->
-            ClientCache.getMyQuests().stream().noneMatch(q -> q.getId().equals(questId)),
-            TIMEOUT
-        );
-    }
-
-    /**
-     * Wait for quest list in MainScreen to have exactly N entries.
-     */
-    public static void waitForEntryCount(ClientGameTestContext context, int count) {
-        context.waitFor(client -> {
-            Screen screen = client.currentScreen;
-            if (screen instanceof DisquestsBaseScreen dScreen) {
-                var root = dScreen.getRootComponent();
-                var questList = root != null ? root.childById(io.wispforest.owo.ui.container.FlowLayout.class, "quest-list") : null;
-                return questList != null && questList.children().size() == count;
-            }
-            return false;
-        }, TIMEOUT);
-    }
-
-    /**
-     * Wait for a component to appear on the current Disquests screen.
-     * Useful when programmatic components are added after the screen class is set.
-     */
-    public static void waitForComponent(ClientGameTestContext context, String componentId) {
-        context.waitFor(client -> {
-            if (client.currentScreen instanceof DisquestsBaseScreen screen) {
-                return screen.getRootComponent().childById(io.wispforest.owo.ui.core.UIComponent.class, componentId) != null;
-            }
-            return false;
-        }, TIMEOUT);
-    }
-
-    /**
-     * Offline-mode UUID generation (matches Paper's offline UUID format).
-     */
-    public static UUID offlineUuid(String playerName) {
-        return UUID.nameUUIDFromBytes(("OfflinePlayer:" + playerName).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-    }
-
-    /**
-     * Check if this test journey should be skipped based on -Ddisquests.test.journey filter.
-     * Used by HarnessPlayerA/B to decide whether to run.
-     */
-    public static boolean shouldSkip(String journeyName) {
-        String filter = System.getProperty("disquests.test.journey");
-        return filter != null && !filter.isEmpty() && !filter.equals(journeyName);
-    }
+  /**
+   * Check if this test journey should be skipped based on -Ddisquests.test.journey filter. Used by
+   * HarnessPlayerA/B to decide whether to run.
+   */
+  public static boolean shouldSkip(String journeyName) {
+    String filter = System.getProperty("disquests.test.journey");
+    return filter != null && !filter.isEmpty() && !filter.equals(journeyName);
+  }
 }

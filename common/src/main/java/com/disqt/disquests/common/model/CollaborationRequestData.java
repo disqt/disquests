@@ -8,5 +8,4 @@ public record CollaborationRequestData(
     String questTitle,
     UUID requesterUuid,
     String requesterName,
-    long timestamp
-) {}
+    long timestamp) {}

@@ -6,7 +6,6 @@ import com.disqt.disquests.common.model.ContributorOp;
 import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.common.model.Visibility;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -15,549 +14,597 @@ import java.util.UUID;
 
 public final class PacketCodec {
 
-    private PacketCodec() {
+  private PacketCodec() {}
+
+  private static final int MAX_CONTRIBUTORS = 256;
+  private static final int MAX_OPS = 256;
+  private static final int MAX_QUEST_LIST = 10000;
+
+  private static final java.util.concurrent.ConcurrentHashMap<Class<?>, Object[]> ENUM_CACHE =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
+  @SuppressWarnings("unchecked")
+  private static <T extends Enum<T>> T readEnum(ByteBufReader buf, Class<T> enumClass) {
+    int ordinal = buf.readVarInt();
+    T[] values = (T[]) ENUM_CACHE.computeIfAbsent(enumClass, Class::getEnumConstants);
+    if (ordinal < 0 || ordinal >= values.length) {
+      throw new IllegalArgumentException(
+          "Invalid " + enumClass.getSimpleName() + " ordinal: " + ordinal);
     }
+    return values[ordinal];
+  }
 
-    private static final int MAX_CONTRIBUTORS = 256;
-    private static final int MAX_OPS = 256;
-    private static final int MAX_QUEST_LIST = 10000;
-
-    private static final java.util.concurrent.ConcurrentHashMap<Class<?>, Object[]> ENUM_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
-
-    @SuppressWarnings("unchecked")
-    private static <T extends Enum<T>> T readEnum(ByteBufReader buf, Class<T> enumClass) {
-        int ordinal = buf.readVarInt();
-        T[] values = (T[]) ENUM_CACHE.computeIfAbsent(enumClass, Class::getEnumConstants);
-        if (ordinal < 0 || ordinal >= values.length) {
-            throw new IllegalArgumentException(
-                    "Invalid " + enumClass.getSimpleName() + " ordinal: " + ordinal);
-        }
-        return values[ordinal];
+  private static int readCount(ByteBufReader buf, int max, String label) {
+    int count = buf.readVarInt();
+    if (count < 0 || count > max) {
+      throw new IllegalArgumentException(
+          label + " count " + count + " outside bounds [0, " + max + "]");
     }
+    return count;
+  }
 
-    private static int readCount(ByteBufReader buf, int max, String label) {
-        int count = buf.readVarInt();
-        if (count < 0 || count > max) {
-            throw new IllegalArgumentException(
-                    label + " count " + count + " outside bounds [0, " + max + "]");
-        }
-        return count;
+  // ---- Nested payload records ----
+
+  public record SaveQuestPayload(
+      UUID questId,
+      String title,
+      String content,
+      CoordinatesData coords,
+      boolean isRegion,
+      CoordinatesData coords2,
+      String map,
+      List<String> tags) {}
+
+  public record RespondCollaborationPayload(UUID requestId, boolean approved) {}
+
+  public record ContributorOpEntry(
+      ContributorOp action, UUID playerUuid, String playerName, boolean canEdit) {}
+
+  public record UpdateContributorsPayload(UUID questId, List<ContributorOpEntry> ops) {}
+
+  public record UpdateVisibilityPayload(UUID questId, Visibility visibility) {}
+
+  public record HandshakePayload(
+      String bluemapUrl,
+      int pendingRequestCount,
+      List<UUID> pinnedQuestIds,
+      UUID playerUuid,
+      Map<String, String> bluemapMapNames,
+      List<String> predefinedTags) {}
+
+  public record CollaborationRequestPayload(
+      UUID requestId, UUID questId, String questTitle, String requesterName) {}
+
+  public record CollaborationResponsePayload(UUID questId, boolean approved, QuestData quest) {}
+
+  // ---- C2S encode ----
+
+  public static byte[] writeRequestSync() {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.REQUEST_SYNC.getId());
+    return buf.toByteArray();
+  }
+
+  public static byte[] writeSaveQuest(
+      UUID questId,
+      String title,
+      String content,
+      CoordinatesData coords,
+      boolean isRegion,
+      CoordinatesData coords2,
+      String map,
+      List<String> tags) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.SAVE_QUEST.getId());
+    buf.writeUUID(questId);
+    buf.writeString(title);
+    buf.writeString(content);
+    writeNullableCoords(buf, coords);
+    buf.writeBoolean(isRegion);
+    writeNullableCoords(buf, coords2);
+    writeNullableString(buf, map);
+    buf.writeVarInt(tags.size());
+    for (String tag : tags) {
+      buf.writeString(tag);
     }
+    return buf.toByteArray();
+  }
 
-    // ---- Nested payload records ----
+  public static byte[] writeDeleteQuest(UUID questId) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.DELETE_QUEST.getId());
+    buf.writeUUID(questId);
+    return buf.toByteArray();
+  }
 
-    public record SaveQuestPayload(UUID questId, String title, String content,
-            CoordinatesData coords, boolean isRegion, CoordinatesData coords2, String map, List<String> tags) {}
+  public static byte[] writeJoinQuest(UUID questId) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.JOIN_QUEST.getId());
+    buf.writeUUID(questId);
+    return buf.toByteArray();
+  }
 
-    public record RespondCollaborationPayload(UUID requestId, boolean approved) {}
+  public static byte[] writeRequestCollaboration(UUID questId) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.REQUEST_COLLABORATION.getId());
+    buf.writeUUID(questId);
+    return buf.toByteArray();
+  }
 
-    public record ContributorOpEntry(ContributorOp action, UUID playerUuid,
-            String playerName, boolean canEdit) {}
+  public static byte[] writeRespondCollaboration(UUID requestId, boolean approved) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.RESPOND_COLLABORATION.getId());
+    buf.writeUUID(requestId);
+    buf.writeBoolean(approved);
+    return buf.toByteArray();
+  }
 
-    public record UpdateContributorsPayload(UUID questId, List<ContributorOpEntry> ops) {}
-
-    public record UpdateVisibilityPayload(UUID questId, Visibility visibility) {}
-
-    public record HandshakePayload(String bluemapUrl, int pendingRequestCount, List<UUID> pinnedQuestIds, UUID playerUuid, Map<String, String> bluemapMapNames, List<String> predefinedTags) {}
-
-    public record CollaborationRequestPayload(UUID requestId, UUID questId,
-            String questTitle, String requesterName) {}
-
-    public record CollaborationResponsePayload(UUID questId, boolean approved, QuestData quest) {}
-
-    // ---- C2S encode ----
-
-    public static byte[] writeRequestSync() {
-        ByteBufWriter buf = new ByteBufWriter();
-        buf.writeByte(PacketType.REQUEST_SYNC.getId());
-        return buf.toByteArray();
+  public static byte[] writeUpdateContributors(UUID questId, List<ContributorOpEntry> ops) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.UPDATE_CONTRIBUTORS.getId());
+    buf.writeUUID(questId);
+    buf.writeVarInt(ops.size());
+    for (ContributorOpEntry op : ops) {
+      buf.writeVarInt(op.action().ordinal());
+      writeNullableUUID(buf, op.playerUuid());
+      writeNullableString(buf, op.playerName());
+      buf.writeBoolean(op.canEdit());
     }
+    return buf.toByteArray();
+  }
 
-    public static byte[] writeSaveQuest(UUID questId, String title, String content,
-            CoordinatesData coords, boolean isRegion, CoordinatesData coords2, String map, List<String> tags) {
-        ByteBufWriter buf = new ByteBufWriter();
-        buf.writeByte(PacketType.SAVE_QUEST.getId());
-        buf.writeUUID(questId);
-        buf.writeString(title);
-        buf.writeString(content);
-        writeNullableCoords(buf, coords);
-        buf.writeBoolean(isRegion);
-        writeNullableCoords(buf, coords2);
-        writeNullableString(buf, map);
-        buf.writeVarInt(tags.size());
-        for (String tag : tags) {
-            buf.writeString(tag);
-        }
-        return buf.toByteArray();
+  public static byte[] writeUpdateVisibility(UUID questId, Visibility visibility) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.UPDATE_VISIBILITY.getId());
+    buf.writeUUID(questId);
+    buf.writeVarInt(visibility.ordinal());
+    return buf.toByteArray();
+  }
+
+  public static byte[] writePinQuest(UUID questId) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.PIN_QUEST.getId());
+    writeNullableUUID(buf, questId);
+    return buf.toByteArray();
+  }
+
+  public static byte[] writeLeaveQuest(UUID questId) {
+    ByteBufWriter w = new ByteBufWriter();
+    w.writeByte(PacketType.LEAVE_QUEST.getId());
+    w.writeUUID(questId);
+    return w.toByteArray();
+  }
+
+  // ---- S2C encode ----
+
+  public static byte[] writeHandshake(
+      String bluemapUrl, int pendingRequestCount, List<UUID> pinnedQuestIds, UUID playerUuid) {
+    return writeHandshake(
+        bluemapUrl, pendingRequestCount, pinnedQuestIds, playerUuid, Map.of(), List.of());
+  }
+
+  public static byte[] writeHandshake(
+      String bluemapUrl,
+      int pendingRequestCount,
+      List<UUID> pinnedQuestIds,
+      UUID playerUuid,
+      Map<String, String> mapNames) {
+    return writeHandshake(
+        bluemapUrl, pendingRequestCount, pinnedQuestIds, playerUuid, mapNames, List.of());
+  }
+
+  public static byte[] writeHandshake(
+      String bluemapUrl,
+      int pendingRequestCount,
+      List<UUID> pinnedQuestIds,
+      UUID playerUuid,
+      Map<String, String> mapNames,
+      List<String> predefinedTags) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.HANDSHAKE.getId());
+    writeNullableString(buf, bluemapUrl);
+    buf.writeVarInt(pendingRequestCount);
+    buf.writeVarInt(pinnedQuestIds.size());
+    for (UUID id : pinnedQuestIds) {
+      buf.writeUUID(id);
     }
-
-    public static byte[] writeDeleteQuest(UUID questId) {
-        ByteBufWriter buf = new ByteBufWriter();
-        buf.writeByte(PacketType.DELETE_QUEST.getId());
-        buf.writeUUID(questId);
-        return buf.toByteArray();
+    buf.writeUUID(playerUuid);
+    buf.writeVarInt(mapNames.size());
+    for (Map.Entry<String, String> entry : mapNames.entrySet()) {
+      buf.writeString(entry.getKey());
+      buf.writeString(entry.getValue());
     }
-
-    public static byte[] writeJoinQuest(UUID questId) {
-        ByteBufWriter buf = new ByteBufWriter();
-        buf.writeByte(PacketType.JOIN_QUEST.getId());
-        buf.writeUUID(questId);
-        return buf.toByteArray();
+    buf.writeVarInt(predefinedTags.size());
+    for (String tag : predefinedTags) {
+      buf.writeString(tag);
     }
+    return buf.toByteArray();
+  }
 
-    public static byte[] writeRequestCollaboration(UUID questId) {
-        ByteBufWriter buf = new ByteBufWriter();
-        buf.writeByte(PacketType.REQUEST_COLLABORATION.getId());
-        buf.writeUUID(questId);
-        return buf.toByteArray();
+  public static byte[] writeSyncMyQuests(List<QuestData> quests) {
+    return writeSyncMyQuests(quests, Map.of());
+  }
+
+  public static byte[] writeSyncMyQuests(List<QuestData> quests, Map<UUID, Integer> pendingCounts) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.SYNC_MY_QUESTS.getId());
+    buf.writeVarInt(quests.size());
+    for (QuestData quest : quests) {
+      writeQuest(buf, quest);
     }
-
-    public static byte[] writeRespondCollaboration(UUID requestId, boolean approved) {
-        ByteBufWriter buf = new ByteBufWriter();
-        buf.writeByte(PacketType.RESPOND_COLLABORATION.getId());
-        buf.writeUUID(requestId);
-        buf.writeBoolean(approved);
-        return buf.toByteArray();
+    if (!pendingCounts.isEmpty()) {
+      buf.writeVarInt(pendingCounts.size());
+      for (Map.Entry<UUID, Integer> entry : pendingCounts.entrySet()) {
+        buf.writeUUID(entry.getKey());
+        buf.writeVarInt(entry.getValue());
+      }
     }
+    return buf.toByteArray();
+  }
 
-    public static byte[] writeUpdateContributors(UUID questId, List<ContributorOpEntry> ops) {
-        ByteBufWriter buf = new ByteBufWriter();
-        buf.writeByte(PacketType.UPDATE_CONTRIBUTORS.getId());
-        buf.writeUUID(questId);
-        buf.writeVarInt(ops.size());
-        for (ContributorOpEntry op : ops) {
-            buf.writeVarInt(op.action().ordinal());
-            writeNullableUUID(buf, op.playerUuid());
-            writeNullableString(buf, op.playerName());
-            buf.writeBoolean(op.canEdit());
-        }
-        return buf.toByteArray();
+  public static byte[] writeSyncServerQuests(List<QuestData> quests) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.SYNC_SERVER_QUESTS.getId());
+    buf.writeVarInt(quests.size());
+    for (QuestData quest : quests) {
+      writeQuest(buf, quest);
     }
+    return buf.toByteArray();
+  }
 
-    public static byte[] writeUpdateVisibility(UUID questId, Visibility visibility) {
-        ByteBufWriter buf = new ByteBufWriter();
-        buf.writeByte(PacketType.UPDATE_VISIBILITY.getId());
-        buf.writeUUID(questId);
-        buf.writeVarInt(visibility.ordinal());
-        return buf.toByteArray();
+  public static byte[] writeUpdateQuest(QuestData quest) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.UPDATE_QUEST.getId());
+    writeQuest(buf, quest);
+    return buf.toByteArray();
+  }
+
+  public static byte[] writeDeleteQuestS2C(UUID questId) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.DELETE_QUEST_S2C.getId());
+    buf.writeUUID(questId);
+    return buf.toByteArray();
+  }
+
+  public static byte[] writeCollaborationRequest(
+      UUID requestId, UUID questId, String questTitle, String requesterName) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.COLLABORATION_REQUEST.getId());
+    buf.writeUUID(requestId);
+    buf.writeUUID(questId);
+    buf.writeString(questTitle);
+    buf.writeString(requesterName);
+    return buf.toByteArray();
+  }
+
+  public static byte[] writeCollaborationResponse(UUID questId, boolean approved, QuestData quest) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.COLLABORATION_RESPONSE.getId());
+    buf.writeUUID(questId);
+    buf.writeBoolean(approved);
+    writeNullableQuest(buf, quest);
+    return buf.toByteArray();
+  }
+
+  public static byte[] writeSyncPendingRequests(List<CollaborationRequestData> requests) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.SYNC_PENDING_REQUESTS.getId());
+    buf.writeVarInt(requests.size());
+    for (CollaborationRequestData req : requests) {
+      buf.writeUUID(req.id());
+      buf.writeUUID(req.questId());
+      buf.writeString(req.questTitle());
+      writeNullableString(buf, req.requesterName());
+      buf.writeLong(req.timestamp());
     }
+    return buf.toByteArray();
+  }
 
-    public static byte[] writePinQuest(UUID questId) {
-        ByteBufWriter buf = new ByteBufWriter();
-        buf.writeByte(PacketType.PIN_QUEST.getId());
-        writeNullableUUID(buf, questId);
-        return buf.toByteArray();
+  // ---- Shared quest serialization ----
+
+  public static void writeQuest(ByteBufWriter buf, QuestData quest) {
+    buf.writeUUID(quest.id());
+    buf.writeString(quest.title());
+    buf.writeString(quest.content());
+    buf.writeUUID(quest.ownerUuid());
+    buf.writeString(quest.ownerName() != null ? quest.ownerName() : "");
+    buf.writeVarInt(quest.visibility().ordinal());
+    buf.writeVarInt(quest.contributors().size());
+    for (ContributorData contributor : quest.contributors()) {
+      buf.writeUUID(contributor.uuid());
+      buf.writeString(contributor.name());
+      buf.writeBoolean(contributor.canEdit());
     }
-
-    public static byte[] writeLeaveQuest(UUID questId) {
-        ByteBufWriter w = new ByteBufWriter();
-        w.writeByte(PacketType.LEAVE_QUEST.getId());
-        w.writeUUID(questId);
-        return w.toByteArray();
+    buf.writeLong(quest.lastModified());
+    writeNullableCoords(buf, quest.coordinates());
+    buf.writeBoolean(quest.isRegion());
+    writeNullableCoords(buf, quest.coordinates2());
+    writeNullableString(buf, quest.map());
+    buf.writeVarInt(quest.tags().size());
+    for (String tag : quest.tags()) {
+      buf.writeString(tag);
     }
+  }
 
-    // ---- S2C encode ----
-
-    public static byte[] writeHandshake(String bluemapUrl, int pendingRequestCount, List<UUID> pinnedQuestIds, UUID playerUuid) {
-        return writeHandshake(bluemapUrl, pendingRequestCount, pinnedQuestIds, playerUuid, Map.of(), List.of());
+  public static QuestData readQuest(ByteBufReader buf) {
+    UUID id = buf.readUUID();
+    String title = buf.readString();
+    String content = buf.readString();
+    UUID ownerUuid = buf.readUUID();
+    String ownerName = buf.readString();
+    Visibility visibility = readEnum(buf, Visibility.class);
+    int contributorCount = readCount(buf, MAX_CONTRIBUTORS, "Contributor");
+    List<ContributorData> contributors = new ArrayList<>(contributorCount);
+    for (int i = 0; i < contributorCount; i++) {
+      UUID uuid = buf.readUUID();
+      String name = buf.readString();
+      boolean canEdit = buf.readBoolean();
+      contributors.add(new ContributorData(uuid, name, canEdit));
     }
-
-    public static byte[] writeHandshake(String bluemapUrl, int pendingRequestCount, List<UUID> pinnedQuestIds, UUID playerUuid, Map<String, String> mapNames) {
-        return writeHandshake(bluemapUrl, pendingRequestCount, pinnedQuestIds, playerUuid, mapNames, List.of());
+    long lastModified = buf.readLong();
+    CoordinatesData coordinates = readNullableCoords(buf);
+    boolean isRegion = buf.readBoolean();
+    CoordinatesData coordinates2 = readNullableCoords(buf);
+    String map = readNullableString(buf);
+    int tagCount = buf.readVarInt();
+    List<String> tags = new ArrayList<>(tagCount);
+    for (int i = 0; i < tagCount; i++) {
+      tags.add(buf.readString());
     }
+    return new QuestData(
+        id,
+        title,
+        content,
+        ownerUuid,
+        ownerName,
+        visibility,
+        contributors,
+        lastModified,
+        coordinates,
+        isRegion,
+        coordinates2,
+        map,
+        tags);
+  }
 
-    public static byte[] writeHandshake(String bluemapUrl, int pendingRequestCount, List<UUID> pinnedQuestIds, UUID playerUuid, Map<String, String> mapNames, List<String> predefinedTags) {
-        ByteBufWriter buf = new ByteBufWriter();
-        buf.writeByte(PacketType.HANDSHAKE.getId());
-        writeNullableString(buf, bluemapUrl);
-        buf.writeVarInt(pendingRequestCount);
-        buf.writeVarInt(pinnedQuestIds.size());
-        for (UUID id : pinnedQuestIds) {
-            buf.writeUUID(id);
-        }
-        buf.writeUUID(playerUuid);
-        buf.writeVarInt(mapNames.size());
-        for (Map.Entry<String, String> entry : mapNames.entrySet()) {
-            buf.writeString(entry.getKey());
-            buf.writeString(entry.getValue());
-        }
-        buf.writeVarInt(predefinedTags.size());
-        for (String tag : predefinedTags) {
-            buf.writeString(tag);
-        }
-        return buf.toByteArray();
+  // ---- C2S decode ----
+
+  public static PacketType readType(ByteBufReader buf) {
+    return PacketType.fromId(buf.readByte());
+  }
+
+  public static SaveQuestPayload readSaveQuest(ByteBufReader buf) {
+    UUID questId = buf.readUUID();
+    String title = buf.readString();
+    String content = buf.readString();
+    CoordinatesData coords = readNullableCoords(buf);
+    boolean isRegion = buf.readBoolean();
+    CoordinatesData coords2 = readNullableCoords(buf);
+    String map = readNullableString(buf);
+    int tagCount = buf.readVarInt();
+    List<String> tags = new ArrayList<>(tagCount);
+    for (int i = 0; i < tagCount; i++) {
+      tags.add(buf.readString());
     }
+    return new SaveQuestPayload(questId, title, content, coords, isRegion, coords2, map, tags);
+  }
 
-    public static byte[] writeSyncMyQuests(List<QuestData> quests) {
-        return writeSyncMyQuests(quests, Map.of());
+  public static UUID readDeleteQuest(ByteBufReader buf) {
+    return buf.readUUID();
+  }
+
+  public static UUID readJoinQuest(ByteBufReader buf) {
+    return buf.readUUID();
+  }
+
+  public static UUID readRequestCollaboration(ByteBufReader buf) {
+    return buf.readUUID();
+  }
+
+  public static RespondCollaborationPayload readRespondCollaboration(ByteBufReader buf) {
+    UUID requestId = buf.readUUID();
+    boolean approved = buf.readBoolean();
+    return new RespondCollaborationPayload(requestId, approved);
+  }
+
+  public static UpdateContributorsPayload readUpdateContributors(ByteBufReader buf) {
+    UUID questId = buf.readUUID();
+    int count = readCount(buf, MAX_OPS, "ContributorOp");
+    List<ContributorOpEntry> ops = new ArrayList<>(count);
+    for (int i = 0; i < count; i++) {
+      ContributorOp action = readEnum(buf, ContributorOp.class);
+      UUID playerUuid = readNullableUUID(buf);
+      String playerName = readNullableString(buf);
+      boolean canEdit = buf.readBoolean();
+      ops.add(new ContributorOpEntry(action, playerUuid, playerName, canEdit));
     }
+    return new UpdateContributorsPayload(questId, ops);
+  }
 
-    public static byte[] writeSyncMyQuests(List<QuestData> quests, Map<UUID, Integer> pendingCounts) {
-        ByteBufWriter buf = new ByteBufWriter();
-        buf.writeByte(PacketType.SYNC_MY_QUESTS.getId());
-        buf.writeVarInt(quests.size());
-        for (QuestData quest : quests) {
-            writeQuest(buf, quest);
-        }
-        if (!pendingCounts.isEmpty()) {
-            buf.writeVarInt(pendingCounts.size());
-            for (Map.Entry<UUID, Integer> entry : pendingCounts.entrySet()) {
-                buf.writeUUID(entry.getKey());
-                buf.writeVarInt(entry.getValue());
-            }
-        }
-        return buf.toByteArray();
+  public static UpdateVisibilityPayload readUpdateVisibility(ByteBufReader buf) {
+    UUID questId = buf.readUUID();
+    Visibility visibility = readEnum(buf, Visibility.class);
+    return new UpdateVisibilityPayload(questId, visibility);
+  }
+
+  public static UUID readPinQuest(ByteBufReader buf) {
+    return readNullableUUID(buf);
+  }
+
+  public static UUID readLeaveQuest(ByteBufReader r) {
+    return r.readUUID();
+  }
+
+  // ---- S2C decode ----
+
+  public static HandshakePayload readHandshake(ByteBufReader buf) {
+    String bluemapUrl = readNullableString(buf);
+    int pendingRequestCount = buf.readVarInt();
+    int pinnedCount = buf.readVarInt();
+    List<UUID> pinnedQuestIds = new ArrayList<>(pinnedCount);
+    for (int i = 0; i < pinnedCount; i++) {
+      pinnedQuestIds.add(buf.readUUID());
     }
-
-    public static byte[] writeSyncServerQuests(List<QuestData> quests) {
-        ByteBufWriter buf = new ByteBufWriter();
-        buf.writeByte(PacketType.SYNC_SERVER_QUESTS.getId());
-        buf.writeVarInt(quests.size());
-        for (QuestData quest : quests) {
-            writeQuest(buf, quest);
-        }
-        return buf.toByteArray();
+    UUID playerUuid = buf.readUUID();
+    Map<String, String> mapNames;
+    if (buf.remaining() > 0) {
+      int mapCount = buf.readVarInt();
+      mapNames = new HashMap<>(mapCount);
+      for (int i = 0; i < mapCount; i++) {
+        String key = buf.readString();
+        String value = buf.readString();
+        mapNames.put(key, value);
+      }
+    } else {
+      mapNames = Map.of();
     }
-
-    public static byte[] writeUpdateQuest(QuestData quest) {
-        ByteBufWriter buf = new ByteBufWriter();
-        buf.writeByte(PacketType.UPDATE_QUEST.getId());
-        writeQuest(buf, quest);
-        return buf.toByteArray();
+    List<String> predefinedTags;
+    if (buf.remaining() > 0) {
+      int tagCount = buf.readVarInt();
+      predefinedTags = new ArrayList<>(tagCount);
+      for (int i = 0; i < tagCount; i++) {
+        predefinedTags.add(buf.readString());
+      }
+    } else {
+      predefinedTags = List.of();
     }
+    return new HandshakePayload(
+        bluemapUrl, pendingRequestCount, pinnedQuestIds, playerUuid, mapNames, predefinedTags);
+  }
 
-    public static byte[] writeDeleteQuestS2C(UUID questId) {
-        ByteBufWriter buf = new ByteBufWriter();
-        buf.writeByte(PacketType.DELETE_QUEST_S2C.getId());
-        buf.writeUUID(questId);
-        return buf.toByteArray();
+  private static List<QuestData> readQuestList(ByteBufReader buf) {
+    int count = readCount(buf, MAX_QUEST_LIST, "Quest");
+    List<QuestData> quests = new ArrayList<>(count);
+    for (int i = 0; i < count; i++) {
+      quests.add(readQuest(buf));
     }
+    return quests;
+  }
 
-    public static byte[] writeCollaborationRequest(UUID requestId, UUID questId,
-            String questTitle, String requesterName) {
-        ByteBufWriter buf = new ByteBufWriter();
-        buf.writeByte(PacketType.COLLABORATION_REQUEST.getId());
-        buf.writeUUID(requestId);
-        buf.writeUUID(questId);
-        buf.writeString(questTitle);
-        buf.writeString(requesterName);
-        return buf.toByteArray();
+  public static List<QuestData> readSyncMyQuests(ByteBufReader buf) {
+    return readQuestList(buf);
+  }
+
+  public static Map<UUID, Integer> readPendingCounts(ByteBufReader r) {
+    if (r.remaining() <= 0) return Map.of();
+    int count = r.readVarInt();
+    Map<UUID, Integer> map = new HashMap<>(count);
+    for (int i = 0; i < count; i++) {
+      map.put(r.readUUID(), r.readVarInt());
     }
+    return map;
+  }
 
-    public static byte[] writeCollaborationResponse(UUID questId, boolean approved, QuestData quest) {
-        ByteBufWriter buf = new ByteBufWriter();
-        buf.writeByte(PacketType.COLLABORATION_RESPONSE.getId());
-        buf.writeUUID(questId);
-        buf.writeBoolean(approved);
-        writeNullableQuest(buf, quest);
-        return buf.toByteArray();
+  public static List<QuestData> readSyncServerQuests(ByteBufReader buf) {
+    return readQuestList(buf);
+  }
+
+  public static QuestData readUpdateQuest(ByteBufReader buf) {
+    return readQuest(buf);
+  }
+
+  public static UUID readDeleteQuestS2C(ByteBufReader buf) {
+    return buf.readUUID();
+  }
+
+  public static CollaborationRequestPayload readCollaborationRequest(ByteBufReader buf) {
+    UUID requestId = buf.readUUID();
+    UUID questId = buf.readUUID();
+    String questTitle = buf.readString();
+    String requesterName = buf.readString();
+    return new CollaborationRequestPayload(requestId, questId, questTitle, requesterName);
+  }
+
+  public static CollaborationResponsePayload readCollaborationResponse(ByteBufReader buf) {
+    UUID questId = buf.readUUID();
+    boolean approved = buf.readBoolean();
+    QuestData quest = readNullableQuest(buf);
+    return new CollaborationResponsePayload(questId, approved, quest);
+  }
+
+  public static List<CollaborationRequestData> readSyncPendingRequests(ByteBufReader r) {
+    int count = r.readVarInt();
+    List<CollaborationRequestData> requests = new ArrayList<>(count);
+    for (int i = 0; i < count; i++) {
+      UUID id = r.readUUID();
+      UUID questId = r.readUUID();
+      String questTitle = r.readString();
+      String requesterName = readNullableString(r);
+      long timestamp = r.readLong();
+      requests.add(
+          new CollaborationRequestData(id, questId, questTitle, null, requesterName, timestamp));
     }
+    return requests;
+  }
 
-    public static byte[] writeSyncPendingRequests(List<CollaborationRequestData> requests) {
-        ByteBufWriter buf = new ByteBufWriter();
-        buf.writeByte(PacketType.SYNC_PENDING_REQUESTS.getId());
-        buf.writeVarInt(requests.size());
-        for (CollaborationRequestData req : requests) {
-            buf.writeUUID(req.id());
-            buf.writeUUID(req.questId());
-            buf.writeString(req.questTitle());
-            writeNullableString(buf, req.requesterName());
-            buf.writeLong(req.timestamp());
-        }
-        return buf.toByteArray();
+  // ---- Private nullable helpers ----
+
+  private static void writeNullableCoords(ByteBufWriter buf, CoordinatesData coords) {
+    if (coords != null) {
+      buf.writeBoolean(true);
+      buf.writeLong(Double.doubleToRawLongBits(coords.x()));
+      buf.writeLong(Double.doubleToRawLongBits(coords.y()));
+      buf.writeLong(Double.doubleToRawLongBits(coords.z()));
+    } else {
+      buf.writeBoolean(false);
     }
+  }
 
-    // ---- Shared quest serialization ----
-
-    public static void writeQuest(ByteBufWriter buf, QuestData quest) {
-        buf.writeUUID(quest.id());
-        buf.writeString(quest.title());
-        buf.writeString(quest.content());
-        buf.writeUUID(quest.ownerUuid());
-        buf.writeString(quest.ownerName() != null ? quest.ownerName() : "");
-        buf.writeVarInt(quest.visibility().ordinal());
-        buf.writeVarInt(quest.contributors().size());
-        for (ContributorData contributor : quest.contributors()) {
-            buf.writeUUID(contributor.uuid());
-            buf.writeString(contributor.name());
-            buf.writeBoolean(contributor.canEdit());
-        }
-        buf.writeLong(quest.lastModified());
-        writeNullableCoords(buf, quest.coordinates());
-        buf.writeBoolean(quest.isRegion());
-        writeNullableCoords(buf, quest.coordinates2());
-        writeNullableString(buf, quest.map());
-        buf.writeVarInt(quest.tags().size());
-        for (String tag : quest.tags()) {
-            buf.writeString(tag);
-        }
+  private static CoordinatesData readNullableCoords(ByteBufReader buf) {
+    if (buf.readBoolean()) {
+      double x = Double.longBitsToDouble(buf.readLong());
+      double y = Double.longBitsToDouble(buf.readLong());
+      double z = Double.longBitsToDouble(buf.readLong());
+      return new CoordinatesData(x, y, z);
     }
+    return null;
+  }
 
-    public static QuestData readQuest(ByteBufReader buf) {
-        UUID id = buf.readUUID();
-        String title = buf.readString();
-        String content = buf.readString();
-        UUID ownerUuid = buf.readUUID();
-        String ownerName = buf.readString();
-        Visibility visibility = readEnum(buf, Visibility.class);
-        int contributorCount = readCount(buf, MAX_CONTRIBUTORS, "Contributor");
-        List<ContributorData> contributors = new ArrayList<>(contributorCount);
-        for (int i = 0; i < contributorCount; i++) {
-            UUID uuid = buf.readUUID();
-            String name = buf.readString();
-            boolean canEdit = buf.readBoolean();
-            contributors.add(new ContributorData(uuid, name, canEdit));
-        }
-        long lastModified = buf.readLong();
-        CoordinatesData coordinates = readNullableCoords(buf);
-        boolean isRegion = buf.readBoolean();
-        CoordinatesData coordinates2 = readNullableCoords(buf);
-        String map = readNullableString(buf);
-        int tagCount = buf.readVarInt();
-        List<String> tags = new ArrayList<>(tagCount);
-        for (int i = 0; i < tagCount; i++) {
-            tags.add(buf.readString());
-        }
-        return new QuestData(id, title, content, ownerUuid, ownerName, visibility,
-                contributors, lastModified, coordinates, isRegion, coordinates2, map, tags);
+  private static void writeNullableString(ByteBufWriter buf, String value) {
+    if (value != null) {
+      buf.writeBoolean(true);
+      buf.writeString(value);
+    } else {
+      buf.writeBoolean(false);
     }
+  }
 
-    // ---- C2S decode ----
-
-    public static PacketType readType(ByteBufReader buf) {
-        return PacketType.fromId(buf.readByte());
+  private static String readNullableString(ByteBufReader buf) {
+    if (buf.readBoolean()) {
+      return buf.readString();
     }
+    return null;
+  }
 
-    public static SaveQuestPayload readSaveQuest(ByteBufReader buf) {
-        UUID questId = buf.readUUID();
-        String title = buf.readString();
-        String content = buf.readString();
-        CoordinatesData coords = readNullableCoords(buf);
-        boolean isRegion = buf.readBoolean();
-        CoordinatesData coords2 = readNullableCoords(buf);
-        String map = readNullableString(buf);
-        int tagCount = buf.readVarInt();
-        List<String> tags = new ArrayList<>(tagCount);
-        for (int i = 0; i < tagCount; i++) {
-            tags.add(buf.readString());
-        }
-        return new SaveQuestPayload(questId, title, content, coords, isRegion, coords2, map, tags);
+  private static void writeNullableUUID(ByteBufWriter buf, UUID uuid) {
+    if (uuid != null) {
+      buf.writeBoolean(true);
+      buf.writeUUID(uuid);
+    } else {
+      buf.writeBoolean(false);
     }
+  }
 
-    public static UUID readDeleteQuest(ByteBufReader buf) {
-        return buf.readUUID();
+  private static UUID readNullableUUID(ByteBufReader buf) {
+    if (buf.readBoolean()) {
+      return buf.readUUID();
     }
+    return null;
+  }
 
-    public static UUID readJoinQuest(ByteBufReader buf) {
-        return buf.readUUID();
+  private static void writeNullableQuest(ByteBufWriter buf, QuestData quest) {
+    if (quest != null) {
+      buf.writeBoolean(true);
+      writeQuest(buf, quest);
+    } else {
+      buf.writeBoolean(false);
     }
+  }
 
-    public static UUID readRequestCollaboration(ByteBufReader buf) {
-        return buf.readUUID();
+  private static QuestData readNullableQuest(ByteBufReader buf) {
+    if (buf.readBoolean()) {
+      return readQuest(buf);
     }
-
-    public static RespondCollaborationPayload readRespondCollaboration(ByteBufReader buf) {
-        UUID requestId = buf.readUUID();
-        boolean approved = buf.readBoolean();
-        return new RespondCollaborationPayload(requestId, approved);
-    }
-
-    public static UpdateContributorsPayload readUpdateContributors(ByteBufReader buf) {
-        UUID questId = buf.readUUID();
-        int count = readCount(buf, MAX_OPS, "ContributorOp");
-        List<ContributorOpEntry> ops = new ArrayList<>(count);
-        for (int i = 0; i < count; i++) {
-            ContributorOp action = readEnum(buf, ContributorOp.class);
-            UUID playerUuid = readNullableUUID(buf);
-            String playerName = readNullableString(buf);
-            boolean canEdit = buf.readBoolean();
-            ops.add(new ContributorOpEntry(action, playerUuid, playerName, canEdit));
-        }
-        return new UpdateContributorsPayload(questId, ops);
-    }
-
-    public static UpdateVisibilityPayload readUpdateVisibility(ByteBufReader buf) {
-        UUID questId = buf.readUUID();
-        Visibility visibility = readEnum(buf, Visibility.class);
-        return new UpdateVisibilityPayload(questId, visibility);
-    }
-
-    public static UUID readPinQuest(ByteBufReader buf) {
-        return readNullableUUID(buf);
-    }
-
-    public static UUID readLeaveQuest(ByteBufReader r) {
-        return r.readUUID();
-    }
-
-    // ---- S2C decode ----
-
-    public static HandshakePayload readHandshake(ByteBufReader buf) {
-        String bluemapUrl = readNullableString(buf);
-        int pendingRequestCount = buf.readVarInt();
-        int pinnedCount = buf.readVarInt();
-        List<UUID> pinnedQuestIds = new ArrayList<>(pinnedCount);
-        for (int i = 0; i < pinnedCount; i++) {
-            pinnedQuestIds.add(buf.readUUID());
-        }
-        UUID playerUuid = buf.readUUID();
-        Map<String, String> mapNames;
-        if (buf.remaining() > 0) {
-            int mapCount = buf.readVarInt();
-            mapNames = new HashMap<>(mapCount);
-            for (int i = 0; i < mapCount; i++) {
-                String key = buf.readString();
-                String value = buf.readString();
-                mapNames.put(key, value);
-            }
-        } else {
-            mapNames = Map.of();
-        }
-        List<String> predefinedTags;
-        if (buf.remaining() > 0) {
-            int tagCount = buf.readVarInt();
-            predefinedTags = new ArrayList<>(tagCount);
-            for (int i = 0; i < tagCount; i++) {
-                predefinedTags.add(buf.readString());
-            }
-        } else {
-            predefinedTags = List.of();
-        }
-        return new HandshakePayload(bluemapUrl, pendingRequestCount, pinnedQuestIds, playerUuid, mapNames, predefinedTags);
-    }
-
-    private static List<QuestData> readQuestList(ByteBufReader buf) {
-        int count = readCount(buf, MAX_QUEST_LIST, "Quest");
-        List<QuestData> quests = new ArrayList<>(count);
-        for (int i = 0; i < count; i++) {
-            quests.add(readQuest(buf));
-        }
-        return quests;
-    }
-
-    public static List<QuestData> readSyncMyQuests(ByteBufReader buf) {
-        return readQuestList(buf);
-    }
-
-    public static Map<UUID, Integer> readPendingCounts(ByteBufReader r) {
-        if (r.remaining() <= 0) return Map.of();
-        int count = r.readVarInt();
-        Map<UUID, Integer> map = new HashMap<>(count);
-        for (int i = 0; i < count; i++) {
-            map.put(r.readUUID(), r.readVarInt());
-        }
-        return map;
-    }
-
-    public static List<QuestData> readSyncServerQuests(ByteBufReader buf) {
-        return readQuestList(buf);
-    }
-
-    public static QuestData readUpdateQuest(ByteBufReader buf) {
-        return readQuest(buf);
-    }
-
-    public static UUID readDeleteQuestS2C(ByteBufReader buf) {
-        return buf.readUUID();
-    }
-
-    public static CollaborationRequestPayload readCollaborationRequest(ByteBufReader buf) {
-        UUID requestId = buf.readUUID();
-        UUID questId = buf.readUUID();
-        String questTitle = buf.readString();
-        String requesterName = buf.readString();
-        return new CollaborationRequestPayload(requestId, questId, questTitle, requesterName);
-    }
-
-    public static CollaborationResponsePayload readCollaborationResponse(ByteBufReader buf) {
-        UUID questId = buf.readUUID();
-        boolean approved = buf.readBoolean();
-        QuestData quest = readNullableQuest(buf);
-        return new CollaborationResponsePayload(questId, approved, quest);
-    }
-
-    public static List<CollaborationRequestData> readSyncPendingRequests(ByteBufReader r) {
-        int count = r.readVarInt();
-        List<CollaborationRequestData> requests = new ArrayList<>(count);
-        for (int i = 0; i < count; i++) {
-            UUID id = r.readUUID();
-            UUID questId = r.readUUID();
-            String questTitle = r.readString();
-            String requesterName = readNullableString(r);
-            long timestamp = r.readLong();
-            requests.add(new CollaborationRequestData(id, questId, questTitle, null, requesterName, timestamp));
-        }
-        return requests;
-    }
-
-    // ---- Private nullable helpers ----
-
-    private static void writeNullableCoords(ByteBufWriter buf, CoordinatesData coords) {
-        if (coords != null) {
-            buf.writeBoolean(true);
-            buf.writeLong(Double.doubleToRawLongBits(coords.x()));
-            buf.writeLong(Double.doubleToRawLongBits(coords.y()));
-            buf.writeLong(Double.doubleToRawLongBits(coords.z()));
-        } else {
-            buf.writeBoolean(false);
-        }
-    }
-
-    private static CoordinatesData readNullableCoords(ByteBufReader buf) {
-        if (buf.readBoolean()) {
-            double x = Double.longBitsToDouble(buf.readLong());
-            double y = Double.longBitsToDouble(buf.readLong());
-            double z = Double.longBitsToDouble(buf.readLong());
-            return new CoordinatesData(x, y, z);
-        }
-        return null;
-    }
-
-    private static void writeNullableString(ByteBufWriter buf, String value) {
-        if (value != null) {
-            buf.writeBoolean(true);
-            buf.writeString(value);
-        } else {
-            buf.writeBoolean(false);
-        }
-    }
-
-    private static String readNullableString(ByteBufReader buf) {
-        if (buf.readBoolean()) {
-            return buf.readString();
-        }
-        return null;
-    }
-
-    private static void writeNullableUUID(ByteBufWriter buf, UUID uuid) {
-        if (uuid != null) {
-            buf.writeBoolean(true);
-            buf.writeUUID(uuid);
-        } else {
-            buf.writeBoolean(false);
-        }
-    }
-
-    private static UUID readNullableUUID(ByteBufReader buf) {
-        if (buf.readBoolean()) {
-            return buf.readUUID();
-        }
-        return null;
-    }
-
-    private static void writeNullableQuest(ByteBufWriter buf, QuestData quest) {
-        if (quest != null) {
-            buf.writeBoolean(true);
-            writeQuest(buf, quest);
-        } else {
-            buf.writeBoolean(false);
-        }
-    }
-
-    private static QuestData readNullableQuest(ByteBufReader buf) {
-        if (buf.readBoolean()) {
-            return readQuest(buf);
-        }
-        return null;
-    }
+    return null;
+  }
 }

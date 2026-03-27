@@ -18,40 +18,43 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 
 @Environment(EnvType.CLIENT)
 public class DisquestsClient implements ClientModInitializer {
-    public static final DisquestsConfigWrapper CONFIG = DisquestsConfigWrapper.createAndLoad();
+  public static final DisquestsConfigWrapper CONFIG = DisquestsConfigWrapper.createAndLoad();
 
-    @Override
-    public void onInitializeClient() {
-        CONFIG.subscribeToTheme(Theme::applyColors);
-        CONFIG.theme().applyColors();
-        KeyBinds.register();
-        DebugScreenEvents.register();
+  @Override
+  public void onInitializeClient() {
+    CONFIG.subscribeToTheme(Theme::applyColors);
+    CONFIG.theme().applyColors();
+    KeyBinds.register();
+    DebugScreenEvents.register();
 
-        // Register payload types before registering receivers
-        PayloadTypeRegistry.playS2C().register(RawPayload.ID, RawPayload.CODEC);
-        PayloadTypeRegistry.playC2S().register(RawPayload.ID, RawPayload.CODEC);
+    // Register payload types before registering receivers
+    PayloadTypeRegistry.playS2C().register(RawPayload.ID, RawPayload.CODEC);
+    PayloadTypeRegistry.playC2S().register(RawPayload.ID, RawPayload.CODEC);
 
-        ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            while (KeyBinds.openGuiKey.wasPressed()) {
-                if (client.currentScreen == null && ClientSession.isOnServer()) {
-                    client.setScreen(new MainScreen());
-                }
+    ClientTickEvents.END_CLIENT_TICK.register(
+        client -> {
+          while (KeyBinds.openGuiKey.wasPressed()) {
+            if (client.currentScreen == null && ClientSession.isOnServer()) {
+              client.setScreen(new MainScreen());
             }
-            while (KeyBinds.pinKey.wasPressed()) {
-                HudPinRenderer.toggleVisibility();
+          }
+          while (KeyBinds.pinKey.wasPressed()) {
+            HudPinRenderer.toggleVisibility();
+          }
+          while (KeyBinds.openConfigKey.wasPressed()) {
+            if (client.currentScreen == null) {
+              client.setScreen(ConfigScreen.create(CONFIG, null));
             }
-            while (KeyBinds.openConfigKey.wasPressed()) {
-                if (client.currentScreen == null) {
-                    client.setScreen(ConfigScreen.create(CONFIG, null));
-                }
-            }
+          }
         });
 
-        ClientPlayNetworking.registerGlobalReceiver(RawPayload.ID, ClientPacketHandler::handleRawPayload);
+    ClientPlayNetworking.registerGlobalReceiver(
+        RawPayload.ID, ClientPacketHandler::handleRawPayload);
 
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
-            ClientCache.clear();
-            ClientSession.leaveServer();
+    ClientPlayConnectionEvents.DISCONNECT.register(
+        (handler, client) -> {
+          ClientCache.clear();
+          ClientSession.leaveServer();
         });
-    }
+  }
 }
