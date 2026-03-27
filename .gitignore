@@ -39,6 +39,7 @@ run-b/
 .classpath
 .project
 .settings/
+.factorypath
 bin/
 
 # IDE - VS Code
@@ -70,4 +71,3 @@ logs/
 .claude/.lsp.json
 .claude/worktrees/
 integration-sync/
-client/.factorypath
