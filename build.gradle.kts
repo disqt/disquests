@@ -36,7 +36,21 @@ lefthook {
     ))
 }
 
+allprojects {
+    version = findProperty("mod_version") ?: "unspecified"
+}
+
 subprojects {
+    // Keep jar names stable (e.g. server.jar not server-0.3.1.jar)
+    // so CI, deploy scripts, and build.gradle.kts references all work.
+    // project.version is still set (for fabric.mod.json substitution) but
+    // stripped from archive filenames.
+    afterEvaluate {
+        tasks.withType<AbstractArchiveTask>().configureEach {
+            archiveVersion.set("")
+        }
+    }
+
     // Client uses Fabric Loom which manages its own Java config
     if (name != "client") {
         apply(plugin = "java")
