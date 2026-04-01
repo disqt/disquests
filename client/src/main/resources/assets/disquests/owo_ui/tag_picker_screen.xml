@@ -55,26 +55,24 @@
                     </flow-layout>
 
                     <!-- Chip cloud (tags added programmatically as TagChipComponents) -->
-                    <flow-layout direction="horizontal" id="chip-cloud">
+                    <flow-layout direction="ltr-text-flow" id="chip-cloud">
                         <sizing>
                             <horizontal method="fill">100</horizontal>
                             <vertical method="content"/>
                         </sizing>
                         <gap>4</gap>
-                        <allow-overflow>true</allow-overflow>
                         <children/>
                     </flow-layout>
 
-                    <!-- Custom tag row (text field + Add button added programmatically) -->
-                    <flow-layout direction="horizontal" id="custom-row">
+                    <!-- Hint for creating new tags -->
+                    <label id="hint-label">
+                        <text></text>
+                        <shadow>true</shadow>
                         <sizing>
                             <horizontal method="fill">100</horizontal>
                             <vertical method="content"/>
                         </sizing>
-                        <gap>4</gap>
-                        <vertical-alignment>center</vertical-alignment>
-                        <children/>
-                    </flow-layout>
+                    </label>
 
                     <!-- Cancel button -->
                     <button id="btn-cancel">
