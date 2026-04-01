@@ -500,6 +500,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
             player.getUniqueId(),
             config.getBluemapMapNames(),
             config.getPredefinedTags(),
+            config.getBluemapDefaultMap(),
             protocolVersion));
   }
 

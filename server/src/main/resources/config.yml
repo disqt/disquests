@@ -1,6 +1,10 @@
 # BlueMap web map URL. Leave empty to disable BlueMap links.
 bluemap-url: ""
 
+# Default map dimension used when a quest has no map set.
+# Must be a key in bluemap-map-names (e.g. "overworld").
+bluemap-default-map: "overworld"
+
 # Map name mappings: quest map name -> BlueMap map ID.
 # Used to generate correct BlueMap URLs from quest coordinates.
 bluemap-map-names:

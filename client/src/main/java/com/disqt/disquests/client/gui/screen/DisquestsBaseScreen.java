@@ -1,6 +1,7 @@
 package com.disqt.disquests.client.gui.screen;
 
 import com.disqt.disquests.client.DisquestsClient;
+import com.disqt.disquests.client.KeyBinds;
 import io.wispforest.owo.ui.base.BaseUIModelScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
@@ -38,6 +39,22 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
 
   @Override
   public boolean keyPressed(KeyInput keyInput) {
+    // Toggle: pressing the open-GUI key while a Disquests screen is open closes it.
+    // Check that no text field is focused (avoid closing while typing).
+    if (KeyBinds.openGuiKey.matchesKey(keyInput)) {
+      boolean textFieldFocused = false;
+      if (this.uiAdapter != null) {
+        var focused = this.uiAdapter.rootComponent.focusHandler().focused();
+        textFieldFocused = focused instanceof GreedyInputUIComponent;
+      }
+      if (!textFieldFocused) {
+        if (this.client != null) {
+          this.client.setScreen(null);
+        }
+        return true;
+      }
+    }
+
     // BaseOwoScreen skips GreedyInputUIComponent routing when Ctrl is held,
     // which prevents Ctrl+A, Ctrl+Z, Ctrl+Y etc from reaching text fields.
     // Route ALL key events to the focused greedy component first.
