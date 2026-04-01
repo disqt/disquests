@@ -1,19 +1,32 @@
 package com.disqt.disquests.common;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.Map;
 
 public class BlueMapUrlBuilder {
 
+  /**
+   * Builds a BlueMap URL that zooms to the given coordinates.
+   *
+   * <p>The base URL must end with a trailing slash so browsers don't trigger a 301 redirect (e.g.
+   * {@code /map} -> {@code /map/}) which would strip the {@code #fragment} and land on BlueMap's
+   * default view.
+   *
+   * <p>BlueMap hash format (10 colon-separated values): {@code
+   * #mapId:x:y:z:distance:rotation:angle:tilt:ortho:controlState}
+   */
   public static String buildUrl(
       String base, double x, double y, double z, String map, Map<String, String> mapNames) {
     if (base == null || base.isEmpty()) return null;
     if (!base.startsWith("http://") && !base.startsWith("https://")) return null;
 
+    if (!base.endsWith("/")) {
+      base = base + "/";
+    }
+
     String mapId = map != null ? mapNames.getOrDefault(map, map) : "world";
-    String encoded = URLEncoder.encode(mapId, StandardCharsets.UTF_8);
-    return String.format("%s/#%s:%.0f:%.0f:%.0f:300:0:0:0:0:perspective", base, encoded, x, y, z);
+    return String.format(
+        Locale.ROOT, "%s#%s:%.0f:%.0f:%.0f:300:0:0:0:0:perspective", base, mapId, x, y, z);
   }
 
   public static String buildUrlRegion(
