@@ -277,6 +277,29 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
     return getAbsoluteIndex(cursorY, cursorX);
   }
 
+  /** Returns the Y offset of the cursor relative to the widget's top, accounting for scroll. */
+  public int getCursorScreenY() {
+    int displayLine = 0;
+    if (wordWrap) {
+      for (int i = 0; i < displayToLogical.size(); i++) {
+        if (displayToLogical.get(i) == cursorY
+            && displayToOffset.get(i) + displayLines.get(i).length() >= cursorX) {
+          displayLine = i;
+          break;
+        }
+      }
+    } else {
+      displayLine = cursorY;
+    }
+    int padding = 5;
+    return displayLine * textRenderer.fontHeight - (int) scrollY + padding;
+  }
+
+  /** Returns the height of a single text line. */
+  public int getLineHeight() {
+    return textRenderer.fontHeight;
+  }
+
   public int getSelectionStartAbsolute() {
     return this.selectionStart;
   }

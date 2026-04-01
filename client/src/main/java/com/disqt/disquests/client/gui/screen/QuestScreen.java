@@ -392,6 +392,7 @@ public class QuestScreen extends DisquestsBaseScreen {
           }
         });
     contentFieldComponent.setAutocomplete(autocomplete);
+    autocomplete.setRootComponent(root);
 
     // Coords section
     buildCoordsSection(root);
