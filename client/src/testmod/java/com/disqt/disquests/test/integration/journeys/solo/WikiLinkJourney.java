@@ -205,4 +205,51 @@ class WikiLinkJourney {
             ClientCache.getMyQuests().stream().anyMatch(q -> "Link Source".equals(q.getTitle())),
         TIMEOUT);
   }
+
+  @Test
+  @Order(6)
+  @PlayerA
+  @DisplayName("Wiki-link on standalone line renders in view mode after re-open")
+  void standaloneWikiLinkRendersAfterReopen(ClientGameTestContext context) {
+    given("'Link Source' has only a wiki-link as content");
+    // Re-open from list to get server-resolved content
+    click(context, "btn-close");
+    waitForScreen(context, MainScreen.class);
+    openMainScreen(context);
+    waitForEntryCount(context, 2);
+    clickEntryByTitle(context, "Link Source");
+    click(context, "btn-open");
+    waitForViewMode(context);
+
+    then("content-area is present and quest is displayed");
+    assertComponentExists(context, "content-area");
+    assertScreenIs(context, QuestScreen.class);
+  }
+
+  @Test
+  @Order(7)
+  @PlayerA
+  @DisplayName("Edit mode shows quest title, not UUID, in wiki-link")
+  void editModeHidesUuid(ClientGameTestContext context) {
+    given("'Link Source' is in view mode with resolved wiki-link");
+    assertScreenIs(context, QuestScreen.class);
+
+    when("player enters edit mode");
+    click(context, "btn-edit");
+    waitForEditMode(context);
+
+    then("content field contains [[Link Target]], not a UUID");
+    String content = readContentField(context);
+    assertNotNull(content, "Content field should be readable");
+    assertTrue(
+        content.contains("[[Link Target]]"),
+        "Content should contain [[Link Target]], got: " + content);
+    assertFalse(
+        content.matches("(?s).*\\[\\[[0-9a-f-]{36}\\|.*"),
+        "Content should NOT contain UUID pipe format, got: " + content);
+
+    and("player cancels to return to view mode");
+    click(context, "btn-cancel");
+    waitForViewMode(context);
+  }
 }
