@@ -394,12 +394,12 @@ public class QuestScreen extends DisquestsBaseScreen {
         title -> {
           // Replace the partial query after [[ with the full title + ]]
           String current = contentFieldComponent.getText();
-          int openBracket = current.lastIndexOf("[[");
+          int cursorPos = contentFieldComponent.getDelegate().getCursorAbsolute();
+          int openBracket = current.lastIndexOf("[[", cursorPos - 1);
           if (openBracket >= 0) {
             String before = current.substring(0, openBracket + 2);
-            String replacement = before + title + "]]";
-            // Append any text after the cursor (approximated as end of text)
-            contentFieldComponent.getDelegate().setText(replacement);
+            String after = current.substring(cursorPos);
+            contentFieldComponent.getDelegate().setText(before + title + "]]" + after);
           }
         });
     contentFieldComponent.setAutocomplete(autocomplete);

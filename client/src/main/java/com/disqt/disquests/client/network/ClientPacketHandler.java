@@ -4,6 +4,7 @@ import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.screen.MainScreen;
+import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.common.ByteBufReader;
 import com.disqt.disquests.common.PacketCodec;
 import com.disqt.disquests.common.PacketType;
@@ -114,10 +115,16 @@ public class ClientPacketHandler {
       ClientCache.removeFromMyQuests(quest.getId());
     }
 
-    // Refresh the MainScreen list if it's currently open
+    // Refresh the current screen if it shows the updated quest
     MinecraftClient client = MinecraftClient.getInstance();
     if (client.currentScreen instanceof MainScreen mainScreen) {
       mainScreen.refreshListContents();
+    } else if (client.currentScreen instanceof QuestScreen questScreen
+        && !questScreen.isEditing()
+        && questScreen.getQuest().getId().equals(quest.getId())
+        && !java.util.Objects.equals(questScreen.getQuest().getContent(), quest.getContent())) {
+      // Re-open view mode when content changed (e.g. server resolved wiki-link UUIDs)
+      client.setScreen(new QuestScreen(questScreen.getParentScreen(), quest));
     }
     if (justJoined) {
       showOrDeferToast("Joined \"" + quest.getTitle() + "\" \u2014 see My Quests");

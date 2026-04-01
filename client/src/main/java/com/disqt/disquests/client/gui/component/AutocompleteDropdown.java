@@ -25,14 +25,15 @@ public class AutocompleteDropdown {
   private Consumer<String> onSelect;
 
   public void update(String query, int cursorX, int cursorY) {
-    if (query == null || query.isEmpty()) {
+    if (query == null) {
       hide();
       return;
     }
     String lowerQuery = query.toLowerCase();
     results =
         Stream.concat(ClientCache.getMyQuests().stream(), ClientCache.getServerQuests().stream())
-            .filter(q -> q.getTitle().toLowerCase().startsWith(lowerQuery))
+            .filter(q -> q.getTitle() != null)
+            .filter(q -> lowerQuery.isEmpty() || q.getTitle().toLowerCase().startsWith(lowerQuery))
             .limit(MAX_RESULTS)
             .toList();
     if (results.isEmpty()) {

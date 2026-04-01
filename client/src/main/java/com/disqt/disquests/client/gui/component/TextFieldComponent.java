@@ -124,7 +124,9 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
       }
     }
     delegate.setFocused(true);
-    return delegate.keyPressed(keyInput);
+    boolean result = delegate.keyPressed(keyInput);
+    updateAutocomplete();
+    return result;
   }
 
   @Override
@@ -136,8 +138,8 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
   }
 
   /**
-   * After each character, checks if the cursor is inside a [[...]] context. If so, extracts the
-   * partial query and updates the dropdown. If not, hides the dropdown.
+   * Checks if the cursor is inside a [[...]] context. If so, extracts the partial query and updates
+   * the dropdown. If not, hides the dropdown. Called after every keystroke or character input.
    */
   private void updateAutocomplete() {
     if (dropdown == null) return;
@@ -146,11 +148,14 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
       dropdown.hide();
       return;
     }
-    // Use full text length as a proxy for cursor position (end of text after typing)
-    int cursorPos = text.length();
+    int cursorPos = delegate.getCursorAbsolute();
+    if (cursorPos < 2) {
+      dropdown.hide();
+      return;
+    }
     // Find the last [[ before cursor
     int openBracket = text.lastIndexOf("[[", cursorPos - 1);
-    if (openBracket < 0) {
+    if (openBracket < 0 || openBracket + 2 > cursorPos) {
       dropdown.hide();
       return;
     }
