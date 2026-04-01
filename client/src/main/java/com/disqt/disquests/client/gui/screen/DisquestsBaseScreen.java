@@ -73,6 +73,12 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     component.surface(DisquestsClient.CONFIG.theme().panelSurface());
   }
 
+  /** Returns the parent screen used for back-navigation, or null if none. */
+  @Nullable
+  public Screen getParentScreen() {
+    return parent;
+  }
+
   /**
    * Exposes the root component for test access. Only valid after the screen has been initialized.
    */
