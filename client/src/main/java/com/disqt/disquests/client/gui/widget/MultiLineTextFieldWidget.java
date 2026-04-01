@@ -9,12 +9,16 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.*;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 import net.minecraft.client.input.CharInput;
 import net.minecraft.client.input.KeyInput;
+import net.minecraft.text.Style;
+import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
 public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
@@ -79,6 +83,12 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
   protected List<String> displayLines = new ArrayList<>();
   protected List<Integer> displayToLogical = new ArrayList<>();
   protected List<Integer> displayToOffset = new ArrayList<>();
+
+  // Wiki-link syntax highlighting
+  private static final Pattern WIKI_LINK_EDIT_PATTERN = Pattern.compile("\\[\\[[^\\]]*\\]\\]");
+  private static final int WIKI_LINK_COLOR = 0xFFe8a86d; // amber
+  private List<List<int[]>> displayLineWikiLinks = new ArrayList<>();
+  private boolean wikiLinkSegmentsDirty = true;
 
   public MultiLineTextFieldWidget(
       TextRenderer textRenderer,
@@ -165,6 +175,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
         displayToLogical.add(i);
         displayToOffset.add(0);
       }
+      wikiLinkSegmentsDirty = true;
       return;
     }
 
@@ -190,6 +201,39 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
         offset += trimmed.length();
       }
     }
+    wikiLinkSegmentsDirty = true;
+  }
+
+  /**
+   * Scans display lines for [[...]] patterns and caches their character ranges. Each entry in
+   * displayLineWikiLinks corresponds to a display line and contains a list of [start, end] pairs
+   * (relative to the display line string).
+   */
+  private void rebuildWikiLinkSegments() {
+    displayLineWikiLinks.clear();
+    for (int di = 0; di < displayLines.size(); di++) {
+      List<int[]> segments = new ArrayList<>();
+      int logicalLine = displayToLogical.get(di);
+      int dispOffset = displayToOffset.get(di);
+      String fullLogical = lines.get(logicalLine);
+
+      // Find all [[...]] in the logical line
+      Matcher m = WIKI_LINK_EDIT_PATTERN.matcher(fullLogical);
+      int dispLen = displayLines.get(di).length();
+      int dispEnd = dispOffset + dispLen;
+      while (m.find()) {
+        int matchStart = m.start();
+        int matchEnd = m.end();
+        // Clip to this display line's range
+        int segStart = Math.max(matchStart, dispOffset) - dispOffset;
+        int segEnd = Math.min(matchEnd, dispEnd) - dispOffset;
+        if (segStart < segEnd && segStart < dispLen) {
+          segments.add(new int[] {segStart, segEnd});
+        }
+      }
+      displayLineWikiLinks.add(segments);
+    }
+    wikiLinkSegmentsDirty = false;
   }
 
   protected int getDisplayLineForCursor() {
@@ -527,13 +571,53 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
       }
     }
 
-    // Draw lines (with horizontal scroll applied)
+    // Draw lines with wiki-link syntax highlighting
+    if (wikiLinkSegmentsDirty) rebuildWikiLinkSegments();
     for (int di = firstVisibleLine; di <= lastVisibleLine; di++) {
       int lineYPos = contentY + (di * textRenderer.fontHeight) - (int) scrollY;
       if (lineYPos > this.y - textRenderer.fontHeight && lineYPos < this.y + this.height) {
         int drawX = contentX - (int) Math.round(scrollX);
-        context.drawText(
-            this.textRenderer, displayLines.get(di), drawX, lineYPos, Colors.TEXT_PRIMARY, false);
+        String dispLine = displayLines.get(di);
+        List<int[]> wikiLinks =
+            di < displayLineWikiLinks.size() ? displayLineWikiLinks.get(di) : List.of();
+
+        if (wikiLinks.isEmpty()) {
+          // Fast path: no wiki-links on this line
+          context.drawText(
+              this.textRenderer, dispLine, drawX, lineYPos, Colors.TEXT_PRIMARY, false);
+        } else {
+          // Segmented drawing: alternate between normal and wiki-link styled text
+          int pos = 0;
+          int currentX = drawX;
+          for (int[] seg : wikiLinks) {
+            // Normal segment before this wiki-link
+            if (pos < seg[0]) {
+              String normal = dispLine.substring(pos, seg[0]);
+              context.drawText(
+                  this.textRenderer, normal, currentX, lineYPos, Colors.TEXT_PRIMARY, false);
+              currentX += this.textRenderer.getWidth(normal);
+            }
+            // Wiki-link segment: amber + italics + underline
+            String wikiText = dispLine.substring(seg[0], seg[1]);
+            Text styledText =
+                Text.literal(wikiText)
+                    .setStyle(
+                        Style.EMPTY
+                            .withColor(WIKI_LINK_COLOR)
+                            .withItalic(true)
+                            .withUnderline(true));
+            context.drawText(
+                this.textRenderer, styledText.asOrderedText(), currentX, lineYPos, -1, false);
+            currentX += this.textRenderer.getWidth(wikiText);
+            pos = seg[1];
+          }
+          // Remaining normal text after last wiki-link
+          if (pos < dispLine.length()) {
+            String remaining = dispLine.substring(pos);
+            context.drawText(
+                this.textRenderer, remaining, currentX, lineYPos, Colors.TEXT_PRIMARY, false);
+          }
+        }
       }
     }
 
