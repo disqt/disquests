@@ -198,6 +198,28 @@ public class MarkdownRenderer {
       lines.add(
           RenderedLine.normal(
               Text.literal("---").setStyle(Style.EMPTY.withColor(Formatting.DARK_GRAY)), indent));
+    } else if (node instanceof org.commonmark.node.HtmlBlock htmlBlock) {
+      // HtmlBlock occurs when <dqlink .../> is on its own line after a blank line.
+      // Scan for dqlink tags and render them the same way as inline wiki-links.
+      String literal = htmlBlock.getLiteral();
+      Matcher m = DQLINK_ATTR_PATTERN.matcher(literal);
+      if (m.find()) {
+        String uuid = m.group(1);
+        String title =
+            m.group(2)
+                .replace("&amp;", "&")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&quot;", "\"");
+        boolean isValid = !uuid.isEmpty();
+        int color = isValid ? 0xe8a86d : 0xe86d6d;
+        Style wikiStyle = style.withColor(color).withUnderline(true);
+        if (!isValid) wikiStyle = wikiStyle.withStrikethrough(true);
+        String command =
+            isValid ? WIKI_LINK_COMMAND_PREFIX + uuid : WIKI_LINK_COMMAND_PREFIX + WIKI_LINK_BROKEN;
+        wikiStyle = wikiStyle.withClickEvent(new ClickEvent.RunCommand(command));
+        lines.add(RenderedLine.normal(Text.literal(title).setStyle(wikiStyle), indent));
+      }
     } else {
       // Fallback: try to render children
       renderChildren(node, lines, indent, style);
