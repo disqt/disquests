@@ -93,7 +93,13 @@ Channel: `disquests:main`. First byte = PacketType ID.
 
 **C2S**: REQUEST_SYNC, SAVE_QUEST, DELETE_QUEST, JOIN_QUEST, REQUEST_COLLABORATION, RESPOND_COLLABORATION, UPDATE_CONTRIBUTORS, UPDATE_VISIBILITY, PIN_QUEST, LEAVE_QUEST
 
-**S2C**: HANDSHAKE, SYNC_MY_QUESTS, SYNC_SERVER_QUESTS, UPDATE_QUEST, DELETE_QUEST_S2C, COLLABORATION_REQUEST, COLLABORATION_RESPONSE, SYNC_PENDING_REQUESTS
+**S2C**: HANDSHAKE, SYNC_MY_QUESTS, SYNC_SERVER_QUESTS, UPDATE_QUEST, DELETE_QUEST_S2C, COLLABORATION_REQUEST, COLLABORATION_RESPONSE, SYNC_PENDING_REQUESTS, SYNC_TAGS
+
+### Protocol Versioning
+- `ProtocolVersion.java`: V0 (legacy, pre-tags), V1 (current with tags). Client sends version in REQUEST_SYNC.
+- Server tracks per-player version in `ServerPacketHandler`. V0 clients get packets without tag fields.
+- **All new packet fields must be trailing-optional** with `buf.remaining() > 0` guards on the reader side.
+- When adding new fields: append at end, never insert mid-packet. Update `ProtocolVersion.CURRENT`.
 
 ## Key Files
 
@@ -101,6 +107,8 @@ Channel: `disquests:main`. First byte = PacketType ID.
 |------|---------|
 | `common/src/main/java/com/disqt/disquests/common/PacketCodec.java` | All packet encode/decode methods |
 | `common/src/main/java/com/disqt/disquests/common/PacketType.java` | Packet type enum with byte IDs |
+| `common/src/main/java/com/disqt/disquests/common/ProtocolVersion.java` | Protocol version enum (V0, V1) |
+| `common/src/main/java/com/disqt/disquests/common/BlueMapUrlBuilder.java` | BlueMap URL construction with coords |
 | `common/src/main/java/com/disqt/disquests/common/model/` | QuestData, Visibility, ContributorData, ContributorOp, CoordinatesData, CollaborationRequestData |
 | `client/src/main/java/com/disqt/disquests/client/DisquestsClient.java` | Fabric mod entrypoint, keybinds, channel registration |
 | `client/src/main/java/com/disqt/disquests/client/ClientSession.java` | Tracks connection state, dispatches S2C packets |
@@ -108,7 +116,9 @@ Channel: `disquests:main`. First byte = PacketType ID.
 | `client/src/main/java/com/disqt/disquests/client/gui/screen/` | All screens use owo-ui: MainScreen, QuestScreen (view/edit), ContributorScreen, TagPickerScreen. Config uses owo-config auto-generated screen. Confirm dialogs use overlay on DisquestsBaseScreen. |
 | `client/src/main/java/com/disqt/disquests/client/gui/screen/DisquestsBaseScreen.java` | Shared owo-ui base screen with parent navigation |
 | `client/src/main/java/com/disqt/disquests/client/gui/component/QuestEntryComponent.java` | Custom owo-ui component for quest list entries |
+| `client/src/main/java/com/disqt/disquests/client/gui/component/TagChipComponent.java` | Rounded-rect tag chip owo-ui component |
 | `client/src/main/java/com/disqt/disquests/client/gui/component/TextFieldComponent.java` | BaseUIComponent wrapper for MultiLineTextFieldWidget |
+| `client/src/main/java/com/disqt/disquests/client/gui/helper/TagColors.java` | HSL computed tag colours (golden-angle hue spacing) |
 | `client/src/main/java/com/disqt/disquests/client/gui/helper/Colors.java` | Color constants (AMBER, TEXT_PRIMARY, etc.) |
 | `client/src/main/java/com/disqt/disquests/client/gui/helper/Theme.java` | Theme enum (VANILLA, FLAT, INSET, FROSTED, ACCENT_LINE) with color palettes and surfaces |
 | `client/src/main/java/com/disqt/disquests/client/gui/helper/DisquestsConfigModel.java` | owo-config annotated model (theme, pinnedWidth, pin position) |
@@ -131,6 +141,9 @@ Channel: `disquests:main`. First byte = PacketType ID.
 
 ## Gotchas
 
+- **`project.version` changes jar filenames** — Setting `allprojects { version = ... }` makes Gradle rename `server.jar` to `server-0.3.1.jar`. The root `build.gradle.kts` clears `archiveVersion` in `afterEvaluate` to keep names stable. Don't remove this.
+- **Production deploy: only one plugin jar** — Never leave multiple Disquests jars in the plugins folder. Paper's "Ambiguous plugin name" error prevents loading. Always remove old jars before deploying new ones.
+- **Release workflow permissions** — `release.yml` must grant all permissions that `e2e-test.yml` declares (including `pull-requests: write`), since reusable workflows can't escalate beyond caller permissions.
 - **Gradle Kotlin DSL shadows `java` package** — `java.lang.management.*` won't resolve in `.gradle.kts` because `java` is a Gradle DSL accessor. Use `Class.forName("java.lang.management.ManagementFactory")` instead.
 - **Never push to main** — always create a branch and PR. Even config/infra changes go through PRs.
 - **PR target** — origin is `disqt/disquests`. No upstream remote.
@@ -159,7 +172,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 ## Deploy
 
 - **Paper plugin**: `scp server/build/libs/server.jar minecraft:~/serverfiles/plugins/Disquests.jar` then `ssh minecraft "tmux -S /tmp/tmux-1000/pmcserver-bb664df1 send-keys -t pmcserver 'plugman reload Disquests' Enter"`
-- **Client mod**: `cp client/build/libs/client.jar "C:/Users/leole/AppData/Roaming/PrismLauncher/instances/1.21.11 v2.7/.minecraft/mods/disquests-client-0.3.0.jar"`
+- **Client mod**: `cp client/build/libs/client.jar "C:/Users/leole/AppData/Roaming/PrismLauncher/instances/1.21.11 v2.9/.minecraft/mods/disquests-client-0.3.1.jar"`
 - **owo-lib (Prism)**: Must be in Prism mods folder alongside client mod. Find in `~/.gradle/caches/modules-2/files-2.1/io.wispforest/owo-lib/`.
 
 ## Release
@@ -167,8 +180,8 @@ Channel: `disquests:main`. First byte = PacketType ID.
 Tag-triggered via GitHub Actions (`.github/workflows/release.yml`). Pushes a `v*` tag, runs E2E tests, generates changelog from conventional commits, creates GitHub release with `disquests-client-{version}.jar` and `disquests-paper-{version}.jar`.
 
 ```bash
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.3.1
+git push origin v0.3.1
 ```
 
 ## References
@@ -180,6 +193,7 @@ Library docs and design specs live in the repo, not in memory or CLAUDE.md:
 | `docs/references/owo-ui.md` | owo-ui API reference (layout, components, surfaces, animations, XML hot-reload) |
 | `docs/superpowers/specs/` | Design specs for features |
 | `docs/superpowers/plans/` | Implementation plans |
+| `docs/feedback/` | Playtest feedback logs with issue tracking |
 
 Read these on-demand when working on the relevant area. For owo-ui, Context7 MCP can also fetch live docs (`resolve-library-id` for "owo-lib").
 
