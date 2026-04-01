@@ -9,6 +9,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public class Config {
   private String bluemapUrl;
   private Map<String, String> bluemapMapNames;
+  private String bluemapDefaultMap;
   private List<String> predefinedTags;
   private boolean debug;
 
@@ -28,6 +29,7 @@ public class Config {
         bluemapMapNames.put(key, section.getString(key));
       }
     }
+    this.bluemapDefaultMap = cfg.getString("bluemap-default-map", "overworld");
     if (!cfg.contains("predefined-tags")) {
       List<String> defaults = List.of("building", "expedition");
       cfg.set("predefined-tags", defaults);
@@ -53,6 +55,10 @@ public class Config {
 
   public Map<String, String> getBluemapMapNames() {
     return bluemapMapNames;
+  }
+
+  public String getBluemapDefaultMap() {
+    return bluemapDefaultMap;
   }
 
   public List<String> getPredefinedTags() {

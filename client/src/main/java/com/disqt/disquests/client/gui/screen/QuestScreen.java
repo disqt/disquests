@@ -166,7 +166,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     // Tag display -- inline chips (no collapsible)
     List<String> viewTags = quest.getTags();
 
-    FlowLayout tagDisplay = UIContainers.horizontalFlow(Sizing.fill(85), Sizing.content());
+    FlowLayout tagDisplay = UIContainers.ltrTextFlow(Sizing.fill(85), Sizing.content());
     tagDisplay.id("tag-display");
     tagDisplay.gap(4);
     tagDisplay.margins(Insets.bottom(4));

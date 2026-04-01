@@ -255,7 +255,7 @@ class TagJourney {
   @Test
   @Order(6)
   @PlayerA
-  @DisplayName("Add custom tag")
+  @DisplayName("Add custom tag via unified input")
   void addCustomTag(ClientGameTestContext context) {
     given("player is on MainScreen");
     openMainScreen(context);
@@ -268,9 +268,10 @@ class TagJourney {
     and("clicks '+ Tag' to open picker");
     click(context, "btn-add-tag");
     waitForScreen(context, TagPickerScreen.class);
-    and("types 'piwigord' in the custom field and clicks Add");
-    type(context, "custom-tag-field", "piwigord");
-    clickAddButtonInCustomRow(context);
+    and("types 'piwigord' in the unified input and presses Enter");
+    type(context, "filter-field", "piwigord");
+    context.getInput().pressKey(GLFW.GLFW_KEY_ENTER);
+    context.waitTicks(2);
     then("edit mode shows the custom tag as a chip");
     waitForEditMode(context);
     context.waitFor(
@@ -290,35 +291,6 @@ class TagJourney {
                   });
         },
         TIMEOUT);
-  }
-
-  /**
-   * Click the "Add" button in the custom-row of TagPickerScreen. It is the last child of
-   * custom-row.
-   */
-  private void clickAddButtonInCustomRow(ClientGameTestContext context) {
-    double[] pos =
-        context.computeOnClient(
-            c -> {
-              if (!(c.currentScreen instanceof DisquestsBaseScreen dScreen)) return null;
-              var root = dScreen.getRootComponent();
-              if (root == null) return null;
-              FlowLayout customRow = root.childById(FlowLayout.class, "custom-row");
-              if (customRow == null || customRow.children().isEmpty()) return null;
-              UIComponent addBtn = customRow.children().get(customRow.children().size() - 1);
-              return new double[] {
-                addBtn.x() + addBtn.width() / 2.0, addBtn.y() + addBtn.height() / 2.0
-              };
-            });
-
-    if (pos == null) {
-      throw new AssertionError("Could not find 'Add' button in custom-row");
-    }
-
-    double scale = scaleFactor(context);
-    context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-    context.waitTicks(2);
   }
 
   @Test
@@ -371,6 +343,141 @@ class TagJourney {
 
     if (pos == null) {
       throw new AssertionError("Could not find TagChipComponent in tag-editor");
+    }
+
+    double scale = scaleFactor(context);
+    context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
+    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.waitTicks(2);
+  }
+
+  @Test
+  @Order(8)
+  @PlayerA
+  @DisplayName("Multiple tags wrap in chip cloud")
+  void multipleTagsWrap(ClientGameTestContext context) {
+    given("quest is in edit mode");
+    waitForEditMode(context);
+
+    // Add several tags to force wrapping
+    String[] tagsToAdd = {"building", "redstone", "farm"};
+    for (String tag : tagsToAdd) {
+      click(context, "btn-add-tag");
+      waitForScreen(context, TagPickerScreen.class);
+      clickChipByTag(context, tag);
+      waitForEditMode(context);
+    }
+
+    then("tag editor contains multiple tags");
+    int count = tagEditorTagCount(context);
+    org.junit.jupiter.api.Assertions.assertTrue(
+        count >= 3, "Expected at least 3 tags, got: " + count);
+
+    when("player saves");
+    click(context, "btn-save");
+    waitForViewMode(context);
+    then("view mode shows wrapped tags");
+    int viewCount = tagDisplayTagCount(context);
+    org.junit.jupiter.api.Assertions.assertTrue(
+        viewCount >= 3, "Expected at least 3 tags in view mode, got: " + viewCount);
+  }
+
+  @Test
+  @Order(9)
+  @PlayerA
+  @DisplayName("Unified input filters then creates tag on Enter")
+  void unifiedInputFilterAndCreate(ClientGameTestContext context) {
+    given("player opens tag picker");
+    openMainScreen(context);
+    clickEntry(context, 0);
+    click(context, "btn-open");
+    waitForViewMode(context);
+    click(context, "btn-edit");
+    waitForEditMode(context);
+    click(context, "btn-add-tag");
+    waitForScreen(context, TagPickerScreen.class);
+
+    when("player types 'mynewtag' and presses Enter");
+    type(context, "filter-field", "mynewtag");
+    context.getInput().pressKey(GLFW.GLFW_KEY_ENTER);
+    context.waitTicks(2);
+
+    then("returns to edit mode with the new custom tag");
+    waitForEditMode(context);
+    context.waitFor(
+        client -> {
+          if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+          var root = dScreen.getRootComponent();
+          if (root == null) return false;
+          FlowLayout tagEditor = root.childById(FlowLayout.class, "tag-editor");
+          if (tagEditor == null) return false;
+          return tagEditor.children().stream()
+              .anyMatch(
+                  child ->
+                      child instanceof TagChipComponent chip && "mynewtag".equals(chip.getTag()));
+        },
+        TIMEOUT);
+  }
+
+  @Test
+  @Order(10)
+  @PlayerA
+  @DisplayName("Hashtag-independent tag search in picker")
+  void hashtagIndependentSearch(ClientGameTestContext context) {
+    given("player opens tag picker");
+    waitForEditMode(context);
+    click(context, "btn-add-tag");
+    waitForScreen(context, TagPickerScreen.class);
+
+    when("player types '#nether' in the filter");
+    type(context, "filter-field", "#nether");
+    context.waitTicks(2);
+
+    then("nether tag chip appears in the cloud");
+    boolean found =
+        context.computeOnClient(
+            c -> {
+              if (!(c.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+              var root = dScreen.getRootComponent();
+              if (root == null) return false;
+              FlowLayout chipCloud = root.childById(FlowLayout.class, "chip-cloud");
+              if (chipCloud == null) return false;
+              return chipCloud.children().stream()
+                  .anyMatch(
+                      child ->
+                          child instanceof TagChipComponent chip && "nether".equals(chip.getTag()));
+            });
+    org.junit.jupiter.api.Assertions.assertTrue(found, "Expected 'nether' chip to be visible");
+
+    // Cancel to return
+    click(context, "btn-cancel");
+    waitForEditMode(context);
+  }
+
+  /** Click a specific tag chip by tag name in the TagPickerScreen chip cloud. */
+  private void clickChipByTag(ClientGameTestContext context, String tagName) {
+    waitForScreen(context, TagPickerScreen.class);
+
+    double[] pos =
+        context.computeOnClient(
+            c -> {
+              if (!(c.currentScreen instanceof DisquestsBaseScreen dScreen)) return null;
+              var root = dScreen.getRootComponent();
+              if (root == null) return null;
+              FlowLayout chipCloud = root.childById(FlowLayout.class, "chip-cloud");
+              if (chipCloud == null) return null;
+              for (UIComponent child : chipCloud.children()) {
+                if (child instanceof TagChipComponent chip && tagName.equals(chip.getTag())) {
+                  return new double[] {
+                    chip.x() + chip.width() / 2.0, chip.y() + chip.height() / 2.0
+                  };
+                }
+              }
+              return null;
+            });
+
+    if (pos == null) {
+      throw new AssertionError("Tag chip '" + tagName + "' not found in chip-cloud");
     }
 
     double scale = scaleFactor(context);

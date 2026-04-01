@@ -41,8 +41,7 @@
     "search": "Search... (#tag to filter)",
     "title": "Quest title...",
     "content": "Quest content...",
-    "custom_tag": "custom-tag...",
-    "filter_tags": "Filter tags...",
+    "filter_or_create": "Search or create tag...",
   },
 
   // Visibility badges
@@ -72,6 +71,7 @@
     "no_predefined_tags": "No predefined tags",
     "no_matching_tags": "No matching tags",
     "request_access": "Request access to view",
+    "enter_to_create": "Press Enter to create new tag",
   },
 
   // Confirm dialogs

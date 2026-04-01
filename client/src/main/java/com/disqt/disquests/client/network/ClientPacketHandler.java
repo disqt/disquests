@@ -74,6 +74,7 @@ public class ClientPacketHandler {
         payload.playerUuid(),
         payload.bluemapMapNames(),
         payload.predefinedTags());
+    ClientSession.setBluemapDefaultMap(payload.bluemapDefaultMap());
     PacketSender.requestSync();
   }
 

@@ -41,8 +41,7 @@
     "search": "Rechercher... (#tag pour filtrer)",
     "title": "Titre de la quête...",
     "content": "Contenu de la quête...",
-    "custom_tag": "tag-personnalisé...",
-    "filter_tags": "Filtrer les tags...",
+    "filter_or_create": "Chercher ou créer un tag...",
   },
 
   // Badges de visibilité
@@ -72,6 +71,7 @@
     "no_predefined_tags": "Aucun tag prédéfini",
     "no_matching_tags": "Aucun tag correspondant",
     "request_access": "Demander l'accès pour voir",
+    "enter_to_create": "Appuie sur Entrée pour créer un tag",
   },
 
   // Dialogues de confirmation
