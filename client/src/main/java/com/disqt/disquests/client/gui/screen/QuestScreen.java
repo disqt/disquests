@@ -5,9 +5,9 @@ import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.AutocompleteDropdown;
+import com.disqt.disquests.client.gui.component.TagChipComponent;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
-import com.disqt.disquests.client.gui.helper.TagColors;
 import com.disqt.disquests.client.gui.widget.MarkdownWidget;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
@@ -163,22 +163,13 @@ public class QuestScreen extends DisquestsBaseScreen {
     root.childById(LabelComponent.class, "owner-label")
         .text(Text.literal(ownerInfo).withColor(Colors.TEXT_MUTED));
 
-    // Tag display -- wrapped in collapsible
+    // Tag display -- inline chips (no collapsible)
     List<String> viewTags = quest.getTags();
-    int tagCount = viewTags.size();
-    boolean tagsExpanded = tagCount <= 5;
-    CollapsibleContainer tagsCollapse =
-        UIContainers.collapsible(
-            Sizing.fill(85),
-            Sizing.content(),
-            Text.translatable("gui.disquests.section.tags", tagCount),
-            tagsExpanded);
-    tagsCollapse.id("tags-collapse");
-    tagsCollapse.margins(Insets.bottom(4));
 
-    FlowLayout tagDisplay = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+    FlowLayout tagDisplay = UIContainers.horizontalFlow(Sizing.fill(85), Sizing.content());
     tagDisplay.id("tag-display");
-    tagDisplay.gap(3);
+    tagDisplay.gap(4);
+    tagDisplay.margins(Insets.bottom(4));
     if (viewTags.isEmpty()) {
       LabelComponent noTagsLabel =
           UIComponents.label(
@@ -189,15 +180,11 @@ public class QuestScreen extends DisquestsBaseScreen {
       tagDisplay.child(noTagsLabel);
     } else {
       for (String tag : viewTags) {
-        LabelComponent tagLabel =
-            UIComponents.label(Text.literal(tag).withColor(TagColors.getForeground(tag)));
-        tagLabel.shadow(true);
-        tagDisplay.child(tagLabel);
+        tagDisplay.child(new TagChipComponent(tag));
       }
     }
-    tagsCollapse.child(tagDisplay);
 
-    replaceSlot(root, "tag-display-slot", tagsCollapse);
+    replaceSlot(root, "tag-display-slot", tagDisplay);
 
     // Content area -- add MarkdownWidget
     String contentToRender =
@@ -583,26 +570,19 @@ public class QuestScreen extends DisquestsBaseScreen {
 
     List<String> tags = quest.getTags();
     for (int i = 0; i < tags.size(); i++) {
-      final String tag = tags.get(i);
       final int idx = i;
+      final String tag = tags.get(idx);
 
-      // Tag label
-      LabelComponent tagLabel =
-          UIComponents.label(Text.literal(tag).withColor(TagColors.getForeground(tag)));
-      tagLabel.shadow(true);
-      tagEditor.child(tagLabel);
-
-      // Remove "x" button
-      ButtonComponent removeBtn =
-          UIComponents.button(
-              Text.literal("x"),
-              b -> {
-                persistFieldValues();
-                quest.getTags().remove(idx);
-                rebuildEditMode();
-              });
-      removeBtn.sizing(Sizing.fixed(12), Sizing.fixed(12));
-      tagEditor.child(removeBtn);
+      TagChipComponent chip =
+          new TagChipComponent(tag, true)
+              .onRemove(
+                  t -> {
+                    persistFieldValues();
+                    quest.getTags().remove(idx);
+                    rebuildEditMode();
+                  });
+      chip.id("tag-chip-" + idx);
+      tagEditor.child(chip);
     }
 
     // "+ Tag" button (only if below max)
@@ -618,6 +598,7 @@ public class QuestScreen extends DisquestsBaseScreen {
                 navigateToScreen(new TagPickerScreen(returnScreen, quest, returnScreen));
               });
       addTagBtn.sizing(Sizing.content(), Sizing.fixed(12));
+      addTagBtn.id("btn-add-tag");
       tagEditor.child(addTagBtn);
     }
   }

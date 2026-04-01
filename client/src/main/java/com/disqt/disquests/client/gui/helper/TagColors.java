@@ -1,38 +1,80 @@
 package com.disqt.disquests.client.gui.helper;
 
-import java.util.Map;
-
+/**
+ * Deterministic tag colour palette using HSL golden-angle spacing. Same tag name always produces
+ * the same colour everywhere (edit chips, view chips, quest list entries, picker).
+ */
 public class TagColors {
 
-  // Background + foreground pairs for predefined tags
-  private static final Map<String, int[]> PREDEFINED =
-      Map.of(
-          "overworld", new int[] {0xFF5c4a2e, 0xFFe8c86d},
-          "nether", new int[] {0xFF5c3d2e, 0xFFe8a86d},
-          "the_end", new int[] {0xFF3d2e5c, 0xFFa86de8},
-          "building", new int[] {0xFF2e4a3d, 0xFF6de8a8},
-          "redstone", new int[] {0xFF2e3d5c, 0xFF6da8e8},
-          "farm", new int[] {0xFF2e5c4a, 0xFF6de8c8});
+  /** Number of distinct hue slots. Chosen to give good visual separation. */
+  private static final int PALETTE_SIZE = 16;
 
-  // Palette for custom tags (hash selects index)
-  private static final int[][] CUSTOM_PALETTE = {
-    {0xFF4a3d2e, 0xFFd8b87d}, {0xFF2e4a4a, 0xFF6dd8d8},
-    {0xFF4a2e3d, 0xFFd86da8}, {0xFF3d4a2e, 0xFFa8d86d},
-    {0xFF2e3d4a, 0xFF6da8d8}, {0xFF4a2e4a, 0xFFd86dd8},
-    {0xFF3d2e4a, 0xFFa86dd8}, {0xFF4a4a2e, 0xFFd8d86d},
-  };
+  /** Golden angle in degrees, producing maximally-spaced hues. */
+  private static final double GOLDEN_ANGLE = 137.508;
 
-  public static int getBackground(String tag) {
-    int[] colors = PREDEFINED.get(tag);
-    if (colors != null) return colors[0];
-    int idx = (tag.hashCode() & 0x7FFFFFFF) % CUSTOM_PALETTE.length;
-    return CUSTOM_PALETTE[idx][0];
+  /** Pre-computed ARGB background/foreground pairs, indexed by hue slot. */
+  private static final int[] BACKGROUNDS = new int[PALETTE_SIZE];
+
+  private static final int[] FOREGROUNDS = new int[PALETTE_SIZE];
+
+  static {
+    for (int i = 0; i < PALETTE_SIZE; i++) {
+      double hue = (i * GOLDEN_ANGLE) % 360.0;
+      BACKGROUNDS[i] = hslToArgb(hue, 0.35, 0.22, 0xFF);
+      FOREGROUNDS[i] = hslToArgb(hue, 0.65, 0.78, 0xFF);
+    }
   }
 
+  /** Returns the background ARGB colour for a tag. */
+  public static int getBackground(String tag) {
+    return BACKGROUNDS[slot(tag)];
+  }
+
+  /** Returns the foreground (text) ARGB colour for a tag. */
   public static int getForeground(String tag) {
-    int[] colors = PREDEFINED.get(tag);
-    if (colors != null) return colors[1];
-    int idx = (tag.hashCode() & 0x7FFFFFFF) % CUSTOM_PALETTE.length;
-    return CUSTOM_PALETTE[idx][1];
+    return FOREGROUNDS[slot(tag)];
+  }
+
+  /** Deterministic slot from tag name hash. */
+  private static int slot(String tag) {
+    return (tag.hashCode() & 0x7FFFFFFF) % PALETTE_SIZE;
+  }
+
+  /** Convert HSL + alpha to ARGB int. Hue in [0, 360), s/l in [0, 1]. */
+  private static int hslToArgb(double h, double s, double l, int a) {
+    double c = (1.0 - Math.abs(2.0 * l - 1.0)) * s;
+    double hp = h / 60.0;
+    double x = c * (1.0 - Math.abs(hp % 2.0 - 1.0));
+    double r1, g1, b1;
+    if (hp < 1) {
+      r1 = c;
+      g1 = x;
+      b1 = 0;
+    } else if (hp < 2) {
+      r1 = x;
+      g1 = c;
+      b1 = 0;
+    } else if (hp < 3) {
+      r1 = 0;
+      g1 = c;
+      b1 = x;
+    } else if (hp < 4) {
+      r1 = 0;
+      g1 = x;
+      b1 = c;
+    } else if (hp < 5) {
+      r1 = x;
+      g1 = 0;
+      b1 = c;
+    } else {
+      r1 = c;
+      g1 = 0;
+      b1 = x;
+    }
+    double m = l - c / 2.0;
+    int r = (int) Math.round((r1 + m) * 255);
+    int g = (int) Math.round((g1 + m) * 255);
+    int b = (int) Math.round((b1 + m) * 255);
+    return (a << 24) | (r << 16) | (g << 8) | b;
   }
 }

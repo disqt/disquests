@@ -18,7 +18,7 @@
             <!-- Picker panel -->
             <flow-layout direction="vertical" id="panel">
                 <sizing>
-                    <horizontal method="fixed">180</horizontal>
+                    <horizontal method="fixed">220</horizontal>
                     <vertical method="content"/>
                 </sizing>
                 <surface>
@@ -45,13 +45,23 @@
                         </margins>
                     </label>
 
-                    <!-- Predefined tags list (buttons added programmatically) -->
-                    <flow-layout direction="vertical" id="predefined-list">
+                    <!-- Filter row (text field added programmatically) -->
+                    <flow-layout direction="horizontal" id="filter-row">
                         <sizing>
                             <horizontal method="fill">100</horizontal>
                             <vertical method="content"/>
                         </sizing>
-                        <gap>3</gap>
+                        <children/>
+                    </flow-layout>
+
+                    <!-- Chip cloud (tags added programmatically as TagChipComponents) -->
+                    <flow-layout direction="horizontal" id="chip-cloud">
+                        <sizing>
+                            <horizontal method="fill">100</horizontal>
+                            <vertical method="content"/>
+                        </sizing>
+                        <gap>4</gap>
+                        <allow-overflow>true</allow-overflow>
                         <children/>
                     </flow-layout>
 

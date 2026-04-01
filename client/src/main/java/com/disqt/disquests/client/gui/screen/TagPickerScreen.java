@@ -2,9 +2,9 @@ package com.disqt.disquests.client.gui.screen;
 
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
+import com.disqt.disquests.client.gui.component.TagChipComponent;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
-import com.disqt.disquests.client.gui.helper.TagColors;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.common.TagConstraints;
 import io.wispforest.owo.ui.component.ButtonComponent;
@@ -12,7 +12,10 @@ import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.Sizing;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -23,6 +26,8 @@ public class TagPickerScreen extends DisquestsBaseScreen {
   private final Quest quest;
   private final Screen returnScreen;
 
+  private TextFieldComponent filterField;
+  private FlowLayout chipCloud;
   private TextFieldComponent customTagField;
 
   public TagPickerScreen(@Nullable Screen parent, Quest quest, Screen returnScreen) {
@@ -38,29 +43,30 @@ public class TagPickerScreen extends DisquestsBaseScreen {
     FlowLayout panel = root.childById(FlowLayout.class, "panel");
     if (panel != null) applyThemePanel(panel);
 
-    // Predefined tag list
-    FlowLayout predefinedList = root.childById(FlowLayout.class, "predefined-list");
-    List<String> existing = quest.getTags();
-    List<String> predefined = ClientSession.getPredefinedTags();
-
-    if (predefined.isEmpty()) {
-      LabelComponent none =
-          UIComponents.label(
-              Text.translatable("gui.disquests.label.no_predefined_tags")
-                  .withColor(Colors.TEXT_MUTED));
-      none.shadow(true);
-      predefinedList.child(none);
-    } else {
-      for (String tag : predefined) {
-        if (existing.contains(tag)) continue; // already on quest
-        ButtonComponent btn =
-            UIComponents.button(
-                Text.literal(tag).withColor(TagColors.getForeground(tag)),
-                b -> addTagAndReturn(tag));
-        btn.sizing(Sizing.fill(100), Sizing.fixed(16));
-        predefinedList.child(btn);
-      }
+    // Filter field
+    FlowLayout filterRow = root.childById(FlowLayout.class, "filter-row");
+    if (filterRow != null) {
+      MultiLineTextFieldWidget filterWidget =
+          new MultiLineTextFieldWidget(
+              client.textRenderer,
+              0,
+              0,
+              160,
+              14,
+              "",
+              Text.translatable("gui.disquests.placeholder.filter_tags").getString(),
+              1,
+              false);
+      filterField = new TextFieldComponent(filterWidget);
+      filterField.sizing(Sizing.fill(100), Sizing.fixed(14));
+      filterField.id("filter-field");
+      filterField.getDelegate().setChangedListener(text -> rebuildChipCloud());
+      filterRow.child(filterField);
     }
+
+    // Chip cloud container
+    chipCloud = root.childById(FlowLayout.class, "chip-cloud");
+    rebuildChipCloud();
 
     // Custom tag field + Add button
     FlowLayout customRow = root.childById(FlowLayout.class, "custom-row");
@@ -88,6 +94,41 @@ public class TagPickerScreen extends DisquestsBaseScreen {
     // Cancel button
     root.childById(ButtonComponent.class, "btn-cancel")
         .onPress(b -> navigateToScreen(returnScreen));
+  }
+
+  /** Build or rebuild the chip cloud based on the current filter text. */
+  private void rebuildChipCloud() {
+    if (chipCloud == null) return;
+    chipCloud.clearChildren();
+
+    String filter = filterField != null ? filterField.getText().trim().toLowerCase() : "";
+    List<String> existing = quest.getTags();
+
+    // Merge predefined + server tags, deduplicated, preserving order
+    Set<String> allTags = new LinkedHashSet<>();
+    allTags.addAll(ClientSession.getPredefinedTags());
+    allTags.addAll(ClientSession.getServerTags());
+
+    List<String> available = new ArrayList<>();
+    for (String tag : allTags) {
+      if (existing.contains(tag)) continue; // already on quest
+      if (!filter.isEmpty() && !tag.contains(filter)) continue; // doesn't match filter
+      available.add(tag);
+    }
+
+    if (available.isEmpty()) {
+      LabelComponent none =
+          UIComponents.label(
+              Text.translatable("gui.disquests.label.no_matching_tags")
+                  .withColor(Colors.TEXT_MUTED));
+      none.shadow(true);
+      chipCloud.child(none);
+    } else {
+      for (String tag : available) {
+        TagChipComponent chip = new TagChipComponent(tag).onSelect(t -> addTagAndReturn(t));
+        chipCloud.child(chip);
+      }
+    }
   }
 
   private void addTagAndReturn(String tag) {
