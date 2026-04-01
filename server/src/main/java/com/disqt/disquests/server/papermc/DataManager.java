@@ -876,4 +876,21 @@ public class DataManager {
     }
     return result;
   }
+
+  /** Returns all distinct tags from the DB merged with config seed tags, alphabetically sorted. */
+  public synchronized List<String> getAllDistinctTags(List<String> seedTags) {
+    java.util.TreeSet<String> tags = new java.util.TreeSet<>();
+    for (String seed : seedTags) {
+      tags.add(seed.toLowerCase());
+    }
+    try (Statement stmt = connection.createStatement();
+        ResultSet rs = stmt.executeQuery("SELECT DISTINCT tag FROM quest_tags")) {
+      while (rs.next()) {
+        tags.add(rs.getString("tag"));
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to get distinct tags", e);
+    }
+    return new ArrayList<>(tags);
+  }
 }

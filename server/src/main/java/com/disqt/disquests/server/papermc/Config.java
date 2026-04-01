@@ -28,8 +28,15 @@ public class Config {
         bluemapMapNames.put(key, section.getString(key));
       }
     }
-    this.predefinedTags = cfg.getStringList("predefined-tags");
-    if (this.predefinedTags == null) this.predefinedTags = List.of();
+    if (!cfg.contains("predefined-tags")) {
+      List<String> defaults = List.of("building", "expedition");
+      cfg.set("predefined-tags", defaults);
+      plugin.saveConfig();
+      this.predefinedTags = defaults;
+    } else {
+      this.predefinedTags = cfg.getStringList("predefined-tags");
+      if (this.predefinedTags == null) this.predefinedTags = List.of();
+    }
     this.debug = cfg.getBoolean("debug", false);
     if (Boolean.getBoolean("disquests.debug")) {
       this.debug = true;

@@ -5,6 +5,7 @@ import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.DisquestsClient;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.helper.RoundedRect;
 import com.disqt.disquests.client.gui.helper.TagColors;
 import com.disqt.disquests.client.gui.helper.Theme;
 import com.disqt.disquests.client.hud.HudPinManager;
@@ -311,21 +312,23 @@ public class QuestEntryComponent extends BaseUIComponent {
           RenderPipelines.GUI_TEXTURED, pinIcon, pinIconX, pinIconY, pinIconSize, pinIconSize);
     }
 
-    // --- Row 3: Tags ---
+    // --- Row 3: Tags (rounded-rect chips) ---
     List<String> tags = quest.getTags();
     if (tags == null || tags.isEmpty()) {
       context.drawText(
           textRenderer, EMPTY_TAGS_TEXT, entryX + 4, entryY + 24, Colors.TEXT_MUTED, false);
     } else {
       int tagX = entryX + 4;
+      int tagH = 10;
+      int hPad = 4;
       for (String tag : tags) {
         int bg = TagColors.getBackground(tag);
         int fg = TagColors.getForeground(tag);
-        int tagWidth = textRenderer.getWidth(tag) + 6; // 3px padding each side
-        if (tagX + tagWidth > entryX + entryWidth - 4) break; // don't overflow
-        context.fill(tagX, entryY + 24, tagX + tagWidth, entryY + 34, bg);
-        context.drawText(textRenderer, Text.literal(tag), tagX + 3, entryY + 25, fg, false);
-        tagX += tagWidth + 3; // 3px gap
+        int tagWidth = textRenderer.getWidth(tag) + hPad * 2;
+        if (tagX + tagWidth > entryX + entryWidth - 4) break;
+        RoundedRect.draw(context, tagX, entryY + 24, tagWidth, tagH, bg);
+        context.drawText(textRenderer, Text.literal(tag), tagX + hPad, entryY + 25, fg, false);
+        tagX += tagWidth + 3;
       }
     }
   }

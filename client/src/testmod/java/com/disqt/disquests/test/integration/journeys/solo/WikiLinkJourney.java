@@ -159,12 +159,13 @@ class WikiLinkJourney {
     click(context, "btn-edit");
     waitForEditMode(context);
 
-    then("content field still contains the wiki-link text");
+    then("content field contains the wiki-link text (raw or server-resolved)");
     String content = readContentField(context);
     assertNotNull(content, "Content field should be readable");
+    // Content may be raw [[Link Target]] or server-resolved [[uuid|Link Target]]
     assertTrue(
-        content.contains("[[Link Target]]"),
-        "Content should contain '[[Link Target]]', got: " + content);
+        content.contains("Link Target]]"),
+        "Content should contain wiki-link with 'Link Target', got: " + content);
 
     and("player cancels to return to view mode");
     click(context, "btn-cancel");

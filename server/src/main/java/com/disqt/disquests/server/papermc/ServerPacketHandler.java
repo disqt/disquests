@@ -4,11 +4,13 @@ import com.disqt.disquests.common.*;
 import com.disqt.disquests.common.TagConstraints;
 import com.disqt.disquests.common.model.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.messaging.PluginMessageListener;
 
 public class ServerPacketHandler implements PluginMessageListener, Listener {
@@ -19,6 +21,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
   private final DataManager dataManager;
   private final Config config;
   private final WikiLinkResolver wikiLinkResolver;
+  private final Map<UUID, Integer> playerProtocolVersions = new ConcurrentHashMap<>();
 
   public ServerPacketHandler(DisquestsPlugin plugin, DataManager dataManager, Config config) {
     this.plugin = plugin;
@@ -37,7 +40,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
       PacketType type = PacketType.fromId(buf.readByte());
 
       switch (type) {
-        case REQUEST_SYNC -> handleRequestSync(player);
+        case REQUEST_SYNC -> handleRequestSync(player, buf);
         case SAVE_QUEST -> handleSaveQuest(player, PacketCodec.readSaveQuest(buf));
         case DELETE_QUEST -> handleDeleteQuest(player, PacketCodec.readDeleteQuest(buf));
         case JOIN_QUEST -> handleJoinQuest(player, PacketCodec.readJoinQuest(buf));
@@ -87,9 +90,17 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
             20L);
   }
 
+  @EventHandler
+  public void onPlayerQuit(PlayerQuitEvent event) {
+    playerProtocolVersions.remove(event.getPlayer().getUniqueId());
+  }
+
   // --- Packet Handlers ---
 
-  private void handleRequestSync(Player player) {
+  private void handleRequestSync(Player player, ByteBufReader buf) {
+    int protocolVersion = PacketCodec.readRequestSyncVersion(buf);
+    playerProtocolVersions.put(player.getUniqueId(), protocolVersion);
+
     UUID uuid = player.getUniqueId();
     List<QuestData> myQuests = dataManager.getQuestsForPlayer(uuid);
     List<QuestData> serverQuests = dataManager.getServerQuests(uuid);
@@ -101,9 +112,16 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
     List<QuestData> resolvedServerQuests =
         serverQuests.stream().map(q -> resolveWikiLinks(q, uuid)).toList();
 
-    sendPacket(player, PacketCodec.writeSyncMyQuests(resolvedMyQuests, pendingCounts));
-    sendPacket(player, PacketCodec.writeSyncServerQuests(resolvedServerQuests));
+    sendPacket(
+        player, PacketCodec.writeSyncMyQuests(resolvedMyQuests, pendingCounts, protocolVersion));
+    sendPacket(player, PacketCodec.writeSyncServerQuests(resolvedServerQuests, protocolVersion));
     sendPacket(player, PacketCodec.writeSyncPendingRequests(pendingRequests));
+
+    // Send SYNC_TAGS to v1+ clients
+    if (protocolVersion >= ProtocolVersion.V1) {
+      List<String> allTags = dataManager.getAllDistinctTags(config.getPredefinedTags());
+      sendPacket(player, PacketCodec.writeSyncTags(allTags));
+    }
   }
 
   private void handleSaveQuest(Player player, PacketCodec.SaveQuestPayload payload) {
@@ -145,7 +163,10 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
       dataManager.saveQuest(newQuest);
       QuestData saved = dataManager.getQuest(payload.questId());
       // Private quest - only send back to owner
-      sendPacket(player, PacketCodec.writeUpdateQuest(resolveWikiLinks(saved, playerUuid)));
+      sendPacket(
+          player,
+          PacketCodec.writeUpdateQuest(
+              resolveWikiLinks(saved, playerUuid), getProtocolVersion(player)));
     } else {
       // Existing quest - check permission
       boolean isOwner = existing.ownerUuid().equals(playerUuid);
@@ -207,7 +228,9 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
 
     // Send updated quest to the joiner (they'll move it to My Quests)
     sendPacket(
-        player, PacketCodec.writeUpdateQuest(resolveWikiLinks(updated, player.getUniqueId())));
+        player,
+        PacketCodec.writeUpdateQuest(
+            resolveWikiLinks(updated, player.getUniqueId()), getProtocolVersion(player)));
     // Also broadcast to other viewers so their contributor list updates
     broadcastQuestUpdate(updated);
   }
@@ -259,7 +282,10 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
         sendPacket(
             requester,
             PacketCodec.writeCollaborationResponse(
-                quest.id(), true, resolveWikiLinks(updated, request.requesterUuid())));
+                quest.id(),
+                true,
+                resolveWikiLinks(updated, request.requesterUuid()),
+                getProtocolVersion(requester)));
       }
       // Broadcast updated quest to all relevant
       broadcastQuestUpdate(updated);
@@ -267,7 +293,10 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
       // Notify requester of denial
       Player requester = Bukkit.getPlayer(request.requesterUuid());
       if (requester != null && isModPlayer(requester)) {
-        sendPacket(requester, PacketCodec.writeCollaborationResponse(quest.id(), false, null));
+        sendPacket(
+            requester,
+            PacketCodec.writeCollaborationResponse(
+                quest.id(), false, null, getProtocolVersion(requester)));
       }
     }
   }
@@ -322,14 +351,19 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
             && !updated.ownerUuid().equals(targetUuid)) {
           sendPacket(target, PacketCodec.writeDeleteQuestS2C(payload.questId()));
         } else {
-          sendPacket(target, PacketCodec.writeUpdateQuest(resolveWikiLinks(updated, targetUuid)));
+          sendPacket(
+              target,
+              PacketCodec.writeUpdateQuest(
+                  resolveWikiLinks(updated, targetUuid), getProtocolVersion(target)));
         }
       }
     }
 
     // Send updated quest back to owner
     sendPacket(
-        player, PacketCodec.writeUpdateQuest(resolveWikiLinks(updated, player.getUniqueId())));
+        player,
+        PacketCodec.writeUpdateQuest(
+            resolveWikiLinks(updated, player.getUniqueId()), getProtocolVersion(player)));
   }
 
   private void handleUpdateVisibility(Player player, PacketCodec.UpdateVisibilityPayload payload) {
@@ -346,7 +380,8 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
       // Private -> Open/Closed: quest appears for all mod players (per-recipient wiki-link
       // resolution)
       for (Player p : getModPlayers()) {
-        sendPacket(p, PacketCodec.writeUpdateQuest(resolveWikiLinks(updated, p.getUniqueId())));
+        int pv = getProtocolVersion(p);
+        sendPacket(p, PacketCodec.writeUpdateQuest(resolveWikiLinks(updated, p.getUniqueId()), pv));
       }
     } else if (oldVisibility != Visibility.PRIVATE && newVisibility == Visibility.PRIVATE) {
       // Open/Closed -> Private: quest disappears for non-contributors
@@ -360,11 +395,14 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
       }
       // Send updated quest to owner + contributors (per-recipient wiki-link resolution)
       sendPacket(
-          player, PacketCodec.writeUpdateQuest(resolveWikiLinks(updated, player.getUniqueId())));
+          player,
+          PacketCodec.writeUpdateQuest(
+              resolveWikiLinks(updated, player.getUniqueId()), getProtocolVersion(player)));
       for (ContributorData c : updated.contributors()) {
         Player p = Bukkit.getPlayer(c.uuid());
         if (p != null && isModPlayer(p)) {
-          sendPacket(p, PacketCodec.writeUpdateQuest(resolveWikiLinks(updated, c.uuid())));
+          int pv = getProtocolVersion(p);
+          sendPacket(p, PacketCodec.writeUpdateQuest(resolveWikiLinks(updated, c.uuid()), pv));
         }
       }
     } else {
@@ -424,6 +462,10 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
     }
   }
 
+  private int getProtocolVersion(Player player) {
+    return playerProtocolVersions.getOrDefault(player.getUniqueId(), ProtocolVersion.V0);
+  }
+
   // --- Helpers ---
 
   private QuestData resolveWikiLinks(QuestData quest, UUID recipientUuid) {
@@ -446,6 +488,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
   }
 
   private void sendHandshake(Player player) {
+    int protocolVersion = getProtocolVersion(player);
     List<UUID> pinnedIds = dataManager.getPinnedQuestIds(player.getUniqueId());
     int pendingCount = dataManager.getPendingRequestCount(player.getUniqueId());
     sendPacket(
@@ -456,7 +499,8 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
             pinnedIds,
             player.getUniqueId(),
             config.getBluemapMapNames(),
-            config.getPredefinedTags()));
+            config.getPredefinedTags(),
+            protocolVersion));
   }
 
   private void sendPacket(Player player, byte[] data) {
@@ -495,18 +539,22 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
       // Private: owner + contributors only (per-recipient wiki-link resolution)
       Player owner = Bukkit.getPlayer(quest.ownerUuid());
       if (owner != null && isModPlayer(owner)) {
-        sendPacket(owner, PacketCodec.writeUpdateQuest(resolveWikiLinks(quest, quest.ownerUuid())));
+        int pv = getProtocolVersion(owner);
+        sendPacket(
+            owner, PacketCodec.writeUpdateQuest(resolveWikiLinks(quest, quest.ownerUuid()), pv));
       }
       for (ContributorData c : quest.contributors()) {
         Player p = Bukkit.getPlayer(c.uuid());
         if (p != null && isModPlayer(p)) {
-          sendPacket(p, PacketCodec.writeUpdateQuest(resolveWikiLinks(quest, c.uuid())));
+          int pv = getProtocolVersion(p);
+          sendPacket(p, PacketCodec.writeUpdateQuest(resolveWikiLinks(quest, c.uuid()), pv));
         }
       }
     } else {
       // Open/Closed: all mod players (per-recipient wiki-link resolution)
       for (Player p : getModPlayers()) {
-        sendPacket(p, PacketCodec.writeUpdateQuest(resolveWikiLinks(quest, p.getUniqueId())));
+        int pv = getProtocolVersion(p);
+        sendPacket(p, PacketCodec.writeUpdateQuest(resolveWikiLinks(quest, p.getUniqueId()), pv));
       }
     }
   }
