@@ -2,7 +2,9 @@ package com.disqt.disquests.client.gui.widget;
 
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
+import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.helper.HoverPreviewRenderer;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.client.markdown.RenderedLine;
@@ -38,6 +40,7 @@ public class MarkdownWidget extends BaseUIComponent {
   private CheckboxToggleListener checkboxToggleListener;
   private int lastKnownWidth = -1;
   private List<RenderedLine> currentLines;
+  private boolean previewVisible = false;
 
   @FunctionalInterface
   public interface CheckboxToggleListener {
@@ -46,6 +49,11 @@ public class MarkdownWidget extends BaseUIComponent {
 
   public void setCheckboxToggleListener(CheckboxToggleListener listener) {
     this.checkboxToggleListener = listener;
+  }
+
+  /** Returns true if a hover preview is currently being drawn. For E2E testing. */
+  public boolean isPreviewVisible() {
+    return previewVisible;
   }
 
   private record CheckboxHitbox(
@@ -233,6 +241,32 @@ public class MarkdownWidget extends BaseUIComponent {
     for (LinkHitbox lh : linkHitboxes) {
       if (hitTest(mouseX, mouseY, lh.x(), lh.y(), lh.width(), lh.height())) {
         context.drawTooltip(textRenderer, lh.displayText(), mouseX, mouseY);
+        break;
+      }
+    }
+
+    // Wiki-link hover preview
+    previewVisible = false;
+    for (WikiLinkHitbox wh : wikiLinkHitboxes) {
+      if (hitTest(mouseX, mouseY, wh.x(), wh.y(), wh.width(), wh.height())) {
+        if (!MarkdownRenderer.WIKI_LINK_BROKEN.equals(wh.uuid())) {
+          try {
+            UUID questId = UUID.fromString(wh.uuid());
+            Quest quest = ClientCache.getQuestById(questId);
+            if (quest != null) {
+              MinecraftClient mc = MinecraftClient.getInstance();
+              HoverPreviewRenderer.draw(
+                  (net.minecraft.client.gui.DrawContext) context,
+                  quest,
+                  mouseX,
+                  mouseY,
+                  mc.getWindow().getScaledWidth(),
+                  mc.getWindow().getScaledHeight());
+              previewVisible = true;
+            }
+          } catch (IllegalArgumentException ignored) {
+          }
+        }
         break;
       }
     }
