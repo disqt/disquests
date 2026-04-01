@@ -855,4 +855,219 @@ class PacketCodecTest {
     assertTrue(payload.predefinedTags().isEmpty());
     assertEquals(0, reader.remaining());
   }
+
+  // ---- Protocol versioning tests ----
+
+  @Test
+  void writeQuestV0_omitsTags() {
+    QuestData quest =
+        new QuestData(
+            UUID.randomUUID(),
+            "Tagged Quest",
+            "Has tags",
+            UUID.randomUUID(),
+            "owner",
+            Visibility.OPEN,
+            List.of(),
+            1000L,
+            null,
+            false,
+            null,
+            null,
+            List.of("combat", "exploration"));
+    ByteBufWriter buf = new ByteBufWriter();
+    PacketCodec.writeQuest(buf, quest, ProtocolVersion.V0);
+    ByteBufReader reader = new ByteBufReader(buf.toByteArray());
+    QuestData decoded = PacketCodec.readQuest(reader);
+    // v0 format has no tags, reader falls back to empty list
+    assertTrue(decoded.tags().isEmpty());
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void writeQuestV1_includesTags() {
+    List<String> tags = List.of("combat", "exploration");
+    QuestData quest =
+        new QuestData(
+            UUID.randomUUID(),
+            "Tagged Quest",
+            "Has tags",
+            UUID.randomUUID(),
+            "owner",
+            Visibility.OPEN,
+            List.of(),
+            1000L,
+            null,
+            false,
+            null,
+            null,
+            tags);
+    ByteBufWriter buf = new ByteBufWriter();
+    PacketCodec.writeQuest(buf, quest, ProtocolVersion.V1);
+    ByteBufReader reader = new ByteBufReader(buf.toByteArray());
+    QuestData decoded = PacketCodec.readQuest(reader);
+    assertEquals(tags, decoded.tags());
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void writeHandshakeV0_omitsPredefinedTags() {
+    UUID playerUuid = UUID.randomUUID();
+    Map<String, String> mapNames = Map.of("overworld", "world_new");
+    List<String> predefinedTags = List.of("combat", "exploration");
+    byte[] packet =
+        PacketCodec.writeHandshake(
+            "https://example.com",
+            1,
+            List.of(),
+            playerUuid,
+            mapNames,
+            predefinedTags,
+            ProtocolVersion.V0);
+    ByteBufReader reader = new ByteBufReader(packet);
+    assertEquals(PacketType.HANDSHAKE, PacketCodec.readType(reader));
+    PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(reader);
+    assertEquals("https://example.com", payload.bluemapUrl());
+    assertEquals(mapNames, payload.bluemapMapNames());
+    // v0: predefinedTags not written, reader falls back to empty
+    assertTrue(payload.predefinedTags().isEmpty());
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void writeHandshakeV1_includesPredefinedTags() {
+    UUID playerUuid = UUID.randomUUID();
+    Map<String, String> mapNames = Map.of("overworld", "world_new");
+    List<String> predefinedTags = List.of("combat", "exploration");
+    byte[] packet =
+        PacketCodec.writeHandshake(
+            "https://example.com",
+            1,
+            List.of(),
+            playerUuid,
+            mapNames,
+            predefinedTags,
+            ProtocolVersion.V1);
+    ByteBufReader reader = new ByteBufReader(packet);
+    assertEquals(PacketType.HANDSHAKE, PacketCodec.readType(reader));
+    PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(reader);
+    assertEquals(predefinedTags, payload.predefinedTags());
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void requestSyncV1_roundTrip() {
+    byte[] packet = PacketCodec.writeRequestSync(ProtocolVersion.V1);
+    ByteBufReader reader = new ByteBufReader(packet);
+    assertEquals(PacketType.REQUEST_SYNC, PacketCodec.readType(reader));
+    int version = PacketCodec.readRequestSyncVersion(reader);
+    assertEquals(ProtocolVersion.V1, version);
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void requestSyncV0_noVersionByte() {
+    byte[] packet = PacketCodec.writeRequestSync();
+    ByteBufReader reader = new ByteBufReader(packet);
+    assertEquals(PacketType.REQUEST_SYNC, PacketCodec.readType(reader));
+    int version = PacketCodec.readRequestSyncVersion(reader);
+    assertEquals(ProtocolVersion.V0, version);
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void syncTagsRoundTrip() {
+    List<String> tags = List.of("building", "redstone", "farm", "nether");
+    byte[] packet = PacketCodec.writeSyncTags(tags);
+    ByteBufReader reader = new ByteBufReader(packet);
+    assertEquals(PacketType.SYNC_TAGS, PacketCodec.readType(reader));
+    List<String> decoded = PacketCodec.readSyncTags(reader);
+    assertEquals(tags, decoded);
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void syncTagsEmpty() {
+    byte[] packet = PacketCodec.writeSyncTags(List.of());
+    ByteBufReader reader = new ByteBufReader(packet);
+    assertEquals(PacketType.SYNC_TAGS, PacketCodec.readType(reader));
+    List<String> decoded = PacketCodec.readSyncTags(reader);
+    assertTrue(decoded.isEmpty());
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void writeUpdateQuestV0_omitsTags() {
+    QuestData quest =
+        new QuestData(
+            UUID.randomUUID(),
+            "Quest",
+            "content",
+            UUID.randomUUID(),
+            "owner",
+            Visibility.OPEN,
+            List.of(),
+            1000L,
+            null,
+            false,
+            null,
+            null,
+            List.of("tag1"));
+    byte[] packet = PacketCodec.writeUpdateQuest(quest, ProtocolVersion.V0);
+    ByteBufReader reader = new ByteBufReader(packet);
+    assertEquals(PacketType.UPDATE_QUEST, PacketCodec.readType(reader));
+    QuestData decoded = PacketCodec.readQuest(reader);
+    assertTrue(decoded.tags().isEmpty());
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void writeSyncMyQuestsV0_omitsTags() {
+    QuestData quest =
+        new QuestData(
+            UUID.randomUUID(),
+            "Quest",
+            "content",
+            UUID.randomUUID(),
+            "owner",
+            Visibility.OPEN,
+            List.of(),
+            1000L,
+            null,
+            false,
+            null,
+            null,
+            List.of("tag1", "tag2"));
+    byte[] packet = PacketCodec.writeSyncMyQuests(List.of(quest), Map.of(), ProtocolVersion.V0);
+    ByteBufReader reader = new ByteBufReader(packet);
+    assertEquals(PacketType.SYNC_MY_QUESTS, PacketCodec.readType(reader));
+    List<QuestData> decoded = PacketCodec.readSyncMyQuests(reader);
+    assertEquals(1, decoded.size());
+    assertTrue(decoded.get(0).tags().isEmpty());
+  }
+
+  @Test
+  void writeSyncServerQuestsV0_omitsTags() {
+    QuestData quest =
+        new QuestData(
+            UUID.randomUUID(),
+            "Quest",
+            "content",
+            UUID.randomUUID(),
+            "owner",
+            Visibility.OPEN,
+            List.of(),
+            1000L,
+            null,
+            false,
+            null,
+            null,
+            List.of("tag1"));
+    byte[] packet = PacketCodec.writeSyncServerQuests(List.of(quest), ProtocolVersion.V0);
+    ByteBufReader reader = new ByteBufReader(packet);
+    assertEquals(PacketType.SYNC_SERVER_QUESTS, PacketCodec.readType(reader));
+    List<QuestData> decoded = PacketCodec.readSyncServerQuests(reader);
+    assertEquals(1, decoded.size());
+    assertTrue(decoded.get(0).tags().isEmpty());
+  }
 }

@@ -45,6 +45,7 @@ public class ClientPacketHandler {
                   case COLLABORATION_REQUEST -> handleCollaborationRequest(r);
                   case COLLABORATION_RESPONSE -> handleCollaborationResponse(r);
                   case SYNC_PENDING_REQUESTS -> handleSyncPendingRequests(r);
+                  case SYNC_TAGS -> handleSyncTags(r);
                   default -> {}
                 }
               } catch (Exception e) {
@@ -148,6 +149,12 @@ public class ClientPacketHandler {
   private static void handleSyncPendingRequests(ByteBufReader r) {
     List<CollaborationRequestData> requests = PacketCodec.readSyncPendingRequests(r);
     ClientCache.setPendingRequests(requests);
+  }
+
+  private static void handleSyncTags(ByteBufReader r) {
+    List<String> tags = PacketCodec.readSyncTags(r);
+    ClientSession.setServerTags(tags);
+    LOGGER.debug("Received {} server tags", tags.size());
   }
 
   private static void handleCollaborationResponse(ByteBufReader r) {
