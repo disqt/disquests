@@ -13,7 +13,7 @@ import net.minecraft.text.Text;
 
 /**
  * A rounded-rectangle tag chip component. Renders the tag name on a coloured background with
- * optional remove ("x") button.
+ * optional remove ("x") button. Provides hover highlight and click press feedback.
  */
 public class TagChipComponent extends BaseUIComponent {
 
@@ -21,12 +21,25 @@ public class TagChipComponent extends BaseUIComponent {
   private static final int V_PADDING = 2;
   private static final int REMOVE_AREA_WIDTH = 10;
 
+  /** Additive brightness applied to the background when hovered. */
+  private static final int HOVER_BRIGHTEN = 0x22;
+
+  /** Subtractive brightness applied to the background when pressed. */
+  private static final int PRESS_DARKEN = 0x20;
+
+  /** Duration in ticks for the press flash effect. */
+  private static final int PRESS_FLASH_TICKS = 3;
+
   private final String tag;
   private final int bgColor;
   private final int fgColor;
   private final boolean showRemove;
   private Consumer<String> onRemove;
   private Consumer<String> onSelect;
+
+  private boolean hovered;
+  private boolean removeHovered;
+  private int pressFlashRemaining;
 
   /** Creates a chip for the given tag. If showRemove is true, an "x" button is rendered. */
   public TagChipComponent(String tag, boolean showRemove) {
@@ -79,21 +92,41 @@ public class TagChipComponent extends BaseUIComponent {
     int h = this.height();
     TextRenderer tr = MinecraftClient.getInstance().textRenderer;
 
-    RoundedRect.draw(context, x, y, w, h, bgColor);
+    // Update hover state from mouse position
+    this.hovered = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h;
+    this.removeHovered = this.hovered && showRemove && mouseX >= x + w - REMOVE_AREA_WIDTH;
+
+    // Tick press flash
+    if (pressFlashRemaining > 0) {
+      pressFlashRemaining--;
+    }
+
+    // Compute effective background color
+    int effectiveBg = bgColor;
+    if (pressFlashRemaining > 0) {
+      effectiveBg = darkenColor(effectiveBg, PRESS_DARKEN);
+    } else if (hovered) {
+      effectiveBg = brightenColor(effectiveBg, HOVER_BRIGHTEN);
+    }
+
+    RoundedRect.draw(context, x, y, w, h, effectiveBg);
 
     // Tag text
     context.drawText(tr, Text.literal(tag), x + H_PADDING, y + V_PADDING, fgColor, false);
 
     // Remove "x" indicator
     if (showRemove) {
+      int xBtnColor = removeHovered ? brightenColor(fgColor, 0x30) : fgColor;
       int xBtnX = x + w - REMOVE_AREA_WIDTH + (REMOVE_AREA_WIDTH - tr.getWidth("x")) / 2;
-      context.drawText(tr, Text.literal("x"), xBtnX, y + V_PADDING, fgColor, false);
+      context.drawText(tr, Text.literal("x"), xBtnX, y + V_PADDING, xBtnColor, false);
     }
   }
 
   @Override
   public boolean onMouseDown(Click click, boolean doubled) {
     if (click.button() != 0) return false;
+
+    pressFlashRemaining = PRESS_FLASH_TICKS;
 
     if (showRemove && onRemove != null) {
       double relX = click.x();
@@ -108,5 +141,23 @@ public class TagChipComponent extends BaseUIComponent {
       return true;
     }
     return false;
+  }
+
+  /** Brighten each RGB channel by amount, clamped to 255. Alpha is preserved. */
+  private static int brightenColor(int argb, int amount) {
+    int a = (argb >> 24) & 0xFF;
+    int r = Math.min(255, ((argb >> 16) & 0xFF) + amount);
+    int g = Math.min(255, ((argb >> 8) & 0xFF) + amount);
+    int b = Math.min(255, (argb & 0xFF) + amount);
+    return (a << 24) | (r << 16) | (g << 8) | b;
+  }
+
+  /** Darken each RGB channel by amount, clamped to 0. Alpha is preserved. */
+  private static int darkenColor(int argb, int amount) {
+    int a = (argb >> 24) & 0xFF;
+    int r = Math.max(0, ((argb >> 16) & 0xFF) - amount);
+    int g = Math.max(0, ((argb >> 8) & 0xFF) - amount);
+    int b = Math.max(0, (argb & 0xFF) - amount);
+    return (a << 24) | (r << 16) | (g << 8) | b;
   }
 }
