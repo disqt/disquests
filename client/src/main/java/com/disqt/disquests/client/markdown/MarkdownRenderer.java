@@ -48,6 +48,32 @@ public class MarkdownRenderer {
             });
   }
 
+  /**
+   * Converts server-resolved wiki-links back to raw form for editing. {@code [[uuid|title]]}
+   * becomes {@code [[Current Title]]} using cache lookup, or {@code [[title]]} if not found.
+   */
+  public static String reverseResolveWikiLinks(String content) {
+    if (content == null || content.isEmpty()) return content;
+    return WIKI_LINK_PATTERN
+        .matcher(content)
+        .replaceAll(
+            m -> {
+              String uuidStr = m.group(1);
+              String displayTitle = m.group(2);
+              if (uuidStr.isEmpty()) {
+                return java.util.regex.Matcher.quoteReplacement("[[" + displayTitle + "]]");
+              }
+              try {
+                java.util.UUID questId = java.util.UUID.fromString(uuidStr);
+                var quest = com.disqt.disquests.client.ClientCache.getQuestById(questId);
+                String title = quest != null ? quest.getTitle() : displayTitle;
+                return java.util.regex.Matcher.quoteReplacement("[[" + title + "]]");
+              } catch (IllegalArgumentException e) {
+                return java.util.regex.Matcher.quoteReplacement("[[" + displayTitle + "]]");
+              }
+            });
+  }
+
   public static List<RenderedLine> render(String markdown) {
     if (markdown == null || markdown.isEmpty()) {
       return List.of(RenderedLine.empty());

@@ -365,7 +365,9 @@ public class QuestScreen extends DisquestsBaseScreen {
             0,
             400,
             200,
-            quest.getContent() != null ? quest.getContent() : "",
+            quest.getContent() != null
+                ? MarkdownRenderer.reverseResolveWikiLinks(quest.getContent())
+                : "",
             Text.translatable("gui.disquests.placeholder.content").getString(),
             Integer.MAX_VALUE,
             true,
