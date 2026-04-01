@@ -1,6 +1,9 @@
 package com.disqt.disquests.client.gui.widget;
 
+import com.disqt.disquests.client.ClientCache;
+import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.helper.HoverPreviewRenderer;
 import com.disqt.disquests.client.gui.widget.undoredo.TextAction;
 import com.disqt.disquests.client.gui.widget.undoredo.UndoManager;
 import com.google.common.collect.Lists;
@@ -11,6 +14,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.*;
@@ -89,6 +93,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
   private static final int WIKI_LINK_COLOR = 0xFFe8a86d; // amber
   private List<List<int[]>> displayLineWikiLinks = new ArrayList<>();
   private boolean wikiLinkSegmentsDirty = true;
+  private boolean previewVisible = false;
 
   public MultiLineTextFieldWidget(
       TextRenderer textRenderer,
@@ -342,6 +347,20 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
   /** Returns the height of a single text line. */
   public int getLineHeight() {
     return textRenderer.fontHeight;
+  }
+
+  /** Returns true if a wiki-link hover preview is currently being drawn. For E2E testing. */
+  public boolean isPreviewVisible() {
+    return previewVisible;
+  }
+
+  /** Searches ClientCache for a quest matching the given title. Returns null if not found. */
+  private static Quest findQuestByTitle(String title) {
+    if (title == null || title.isEmpty()) return null;
+    return Stream.concat(ClientCache.getMyQuests().stream(), ClientCache.getServerQuests().stream())
+        .filter(q -> title.equals(q.getTitle()))
+        .findFirst()
+        .orElse(null);
   }
 
   public int getSelectionStartAbsolute() {
@@ -616,6 +635,48 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
             String remaining = dispLine.substring(pos);
             context.drawText(
                 this.textRenderer, remaining, currentX, lineYPos, Colors.TEXT_PRIMARY, false);
+          }
+        }
+      }
+    }
+
+    // Wiki-link hover preview in edit mode
+    previewVisible = false;
+    if (this.focused) {
+      // Check if mouse is over a wiki-link segment
+      int hoverAbsIndex = absoluteIndexFromMouse(mouseX, mouseY);
+      // Find which display line the mouse is on
+      int hoverDisplayLine =
+          (int) ((mouseY - (this.y + padding) + scrollY) / textRenderer.fontHeight);
+      hoverDisplayLine = Math.max(0, Math.min(hoverDisplayLine, displayLines.size() - 1));
+      if (hoverDisplayLine < displayLineWikiLinks.size()) {
+        List<int[]> segments = displayLineWikiLinks.get(hoverDisplayLine);
+        int dispOffset = displayToOffset.get(hoverDisplayLine);
+        int logicalLine = displayToLogical.get(hoverDisplayLine);
+        // Convert absolute index to position within this display line
+        int absLineStart = getAbsoluteIndex(logicalLine, dispOffset);
+        int posInDispLine = hoverAbsIndex - absLineStart;
+        for (int[] seg : segments) {
+          if (posInDispLine >= seg[0] && posInDispLine < seg[1]) {
+            // Extract title from between [[ and ]]
+            String dispLine = displayLines.get(hoverDisplayLine);
+            String wikiText = dispLine.substring(seg[0], seg[1]);
+            if (wikiText.startsWith("[[") && wikiText.endsWith("]]")) {
+              String title = wikiText.substring(2, wikiText.length() - 2);
+              Quest quest = findQuestByTitle(title);
+              if (quest != null) {
+                MinecraftClient mc = MinecraftClient.getInstance();
+                HoverPreviewRenderer.draw(
+                    context,
+                    quest,
+                    mouseX,
+                    mouseY,
+                    mc.getWindow().getScaledWidth(),
+                    mc.getWindow().getScaledHeight());
+                previewVisible = true;
+              }
+            }
+            break;
           }
         }
       }
