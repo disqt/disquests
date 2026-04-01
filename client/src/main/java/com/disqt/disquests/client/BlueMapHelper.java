@@ -15,14 +15,16 @@ public class BlueMapHelper {
     Map<String, String> mapNames = ClientSession.getBluemapMapNames();
     String map = quest.getMap();
 
+    String defaultMap = ClientSession.getBluemapDefaultMap();
+
     if (quest.isRegion() && quest.getCoordinates2() != null) {
       CoordinatesData c1 = quest.getCoordinates();
       CoordinatesData c2 = quest.getCoordinates2();
       return BlueMapUrlBuilder.buildUrlRegion(
-          base, c1.x(), c1.y(), c1.z(), c2.x(), c2.y(), c2.z(), map, mapNames);
+          base, c1.x(), c1.y(), c1.z(), c2.x(), c2.y(), c2.z(), map, mapNames, defaultMap);
     } else {
       CoordinatesData c = quest.getCoordinates();
-      return BlueMapUrlBuilder.buildUrl(base, c.x(), c.y(), c.z(), map, mapNames);
+      return BlueMapUrlBuilder.buildUrl(base, c.x(), c.y(), c.z(), map, mapNames, defaultMap);
     }
   }
 }

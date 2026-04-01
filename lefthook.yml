@@ -1,0 +1,4 @@
+pre-commit:
+  commands:
+    java-format: {glob: '*.java', run: './gradlew spotlessApply',
+      stage_fixed: true}

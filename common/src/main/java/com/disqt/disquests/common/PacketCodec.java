@@ -70,7 +70,8 @@ public final class PacketCodec {
       List<UUID> pinnedQuestIds,
       UUID playerUuid,
       Map<String, String> bluemapMapNames,
-      List<String> predefinedTags) {}
+      List<String> predefinedTags,
+      String bluemapDefaultMap) {}
 
   public record CollaborationRequestPayload(
       UUID requestId, UUID questId, String questTitle, String requesterName) {}
@@ -225,6 +226,26 @@ public final class PacketCodec {
       Map<String, String> mapNames,
       List<String> predefinedTags,
       int protocolVersion) {
+    return writeHandshake(
+        bluemapUrl,
+        pendingRequestCount,
+        pinnedQuestIds,
+        playerUuid,
+        mapNames,
+        predefinedTags,
+        "overworld",
+        protocolVersion);
+  }
+
+  public static byte[] writeHandshake(
+      String bluemapUrl,
+      int pendingRequestCount,
+      List<UUID> pinnedQuestIds,
+      UUID playerUuid,
+      Map<String, String> mapNames,
+      List<String> predefinedTags,
+      String defaultMap,
+      int protocolVersion) {
     ByteBufWriter buf = new ByteBufWriter();
     buf.writeByte(PacketType.HANDSHAKE.getId());
     writeNullableString(buf, bluemapUrl);
@@ -244,6 +265,7 @@ public final class PacketCodec {
       for (String tag : predefinedTags) {
         buf.writeString(tag);
       }
+      buf.writeString(defaultMap != null ? defaultMap : "overworld");
     }
     return buf.toByteArray();
   }
@@ -561,8 +583,15 @@ public final class PacketCodec {
     } else {
       predefinedTags = List.of();
     }
+    String defaultMap = buf.remaining() > 0 ? buf.readString() : "overworld";
     return new HandshakePayload(
-        bluemapUrl, pendingRequestCount, pinnedQuestIds, playerUuid, mapNames, predefinedTags);
+        bluemapUrl,
+        pendingRequestCount,
+        pinnedQuestIds,
+        playerUuid,
+        mapNames,
+        predefinedTags,
+        defaultMap);
   }
 
   private static List<QuestData> readQuestList(ByteBufReader buf) {

@@ -28,6 +28,7 @@ public class ClientSession {
   private static final Set<UUID> requestedQuestIds = ConcurrentHashMap.newKeySet();
   private static UUID playerUuid = null;
   private static Map<String, String> bluemapMapNames = Map.of();
+  private static String bluemapDefaultMap = "overworld";
   private static List<String> predefinedTags = List.of();
   private static List<String> serverTags = List.of();
 
@@ -77,6 +78,7 @@ public class ClientSession {
     pendingToast = null;
     playerUuid = null;
     bluemapMapNames = Map.of();
+    bluemapDefaultMap = "overworld";
     predefinedTags = List.of();
     serverTags = List.of();
     activeTab = Tab.MY_QUESTS;
@@ -103,6 +105,14 @@ public class ClientSession {
   /** Returns the server-provided map name mappings (dimension key -> BlueMap map ID). */
   public static Map<String, String> getBluemapMapNames() {
     return bluemapMapNames;
+  }
+
+  public static String getBluemapDefaultMap() {
+    return bluemapDefaultMap;
+  }
+
+  public static void setBluemapDefaultMap(String defaultMap) {
+    bluemapDefaultMap = defaultMap;
   }
 
   public static List<String> getPredefinedTags() {

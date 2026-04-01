@@ -51,7 +51,7 @@
             </flow-layout>
 
             <!-- Tag editor row (populated programmatically) -->
-            <flow-layout direction="horizontal" id="tag-editor">
+            <flow-layout direction="ltr-text-flow" id="tag-editor">
                 <sizing>
                     <horizontal method="fill">85</horizontal>
                     <vertical method="content"/>
