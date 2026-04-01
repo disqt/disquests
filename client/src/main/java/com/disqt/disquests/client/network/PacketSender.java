@@ -1,6 +1,7 @@
 package com.disqt.disquests.client.network;
 
 import com.disqt.disquests.common.PacketCodec;
+import com.disqt.disquests.common.ProtocolVersion;
 import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.Visibility;
 import java.util.List;
@@ -10,7 +11,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 public class PacketSender {
 
   public static void requestSync() {
-    send(PacketCodec.writeRequestSync());
+    send(PacketCodec.writeRequestSync(ProtocolVersion.CURRENT));
   }
 
   public static void saveQuest(

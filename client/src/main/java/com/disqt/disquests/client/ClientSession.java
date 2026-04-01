@@ -29,6 +29,7 @@ public class ClientSession {
   private static UUID playerUuid = null;
   private static Map<String, String> bluemapMapNames = Map.of();
   private static List<String> predefinedTags = List.of();
+  private static List<String> serverTags = List.of();
 
   // UI state
   private static Tab activeTab = Tab.MY_QUESTS;
@@ -77,6 +78,7 @@ public class ClientSession {
     playerUuid = null;
     bluemapMapNames = Map.of();
     predefinedTags = List.of();
+    serverTags = List.of();
     activeTab = Tab.MY_QUESTS;
     searchTerm = "";
     serverQuestsFilter = QuestFilter.ALL;
@@ -105,6 +107,14 @@ public class ClientSession {
 
   public static List<String> getPredefinedTags() {
     return predefinedTags;
+  }
+
+  public static List<String> getServerTags() {
+    return serverTags;
+  }
+
+  public static void setServerTags(List<String> tags) {
+    serverTags = tags != null ? List.copyOf(tags) : List.of();
   }
 
   public static int getPendingRequestCount() {

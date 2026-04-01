@@ -85,6 +85,13 @@ public final class PacketCodec {
     return buf.toByteArray();
   }
 
+  public static byte[] writeRequestSync(int protocolVersion) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.REQUEST_SYNC.getId());
+    buf.writeVarInt(protocolVersion);
+    return buf.toByteArray();
+  }
+
   public static byte[] writeSaveQuest(
       UUID questId,
       String title,
@@ -200,6 +207,24 @@ public final class PacketCodec {
       UUID playerUuid,
       Map<String, String> mapNames,
       List<String> predefinedTags) {
+    return writeHandshake(
+        bluemapUrl,
+        pendingRequestCount,
+        pinnedQuestIds,
+        playerUuid,
+        mapNames,
+        predefinedTags,
+        ProtocolVersion.CURRENT);
+  }
+
+  public static byte[] writeHandshake(
+      String bluemapUrl,
+      int pendingRequestCount,
+      List<UUID> pinnedQuestIds,
+      UUID playerUuid,
+      Map<String, String> mapNames,
+      List<String> predefinedTags,
+      int protocolVersion) {
     ByteBufWriter buf = new ByteBufWriter();
     buf.writeByte(PacketType.HANDSHAKE.getId());
     writeNullableString(buf, bluemapUrl);
@@ -214,9 +239,11 @@ public final class PacketCodec {
       buf.writeString(entry.getKey());
       buf.writeString(entry.getValue());
     }
-    buf.writeVarInt(predefinedTags.size());
-    for (String tag : predefinedTags) {
-      buf.writeString(tag);
+    if (protocolVersion >= ProtocolVersion.V1) {
+      buf.writeVarInt(predefinedTags.size());
+      for (String tag : predefinedTags) {
+        buf.writeString(tag);
+      }
     }
     return buf.toByteArray();
   }
@@ -226,11 +253,16 @@ public final class PacketCodec {
   }
 
   public static byte[] writeSyncMyQuests(List<QuestData> quests, Map<UUID, Integer> pendingCounts) {
+    return writeSyncMyQuests(quests, pendingCounts, ProtocolVersion.CURRENT);
+  }
+
+  public static byte[] writeSyncMyQuests(
+      List<QuestData> quests, Map<UUID, Integer> pendingCounts, int protocolVersion) {
     ByteBufWriter buf = new ByteBufWriter();
     buf.writeByte(PacketType.SYNC_MY_QUESTS.getId());
     buf.writeVarInt(quests.size());
     for (QuestData quest : quests) {
-      writeQuest(buf, quest);
+      writeQuest(buf, quest, protocolVersion);
     }
     if (!pendingCounts.isEmpty()) {
       buf.writeVarInt(pendingCounts.size());
@@ -243,19 +275,27 @@ public final class PacketCodec {
   }
 
   public static byte[] writeSyncServerQuests(List<QuestData> quests) {
+    return writeSyncServerQuests(quests, ProtocolVersion.CURRENT);
+  }
+
+  public static byte[] writeSyncServerQuests(List<QuestData> quests, int protocolVersion) {
     ByteBufWriter buf = new ByteBufWriter();
     buf.writeByte(PacketType.SYNC_SERVER_QUESTS.getId());
     buf.writeVarInt(quests.size());
     for (QuestData quest : quests) {
-      writeQuest(buf, quest);
+      writeQuest(buf, quest, protocolVersion);
     }
     return buf.toByteArray();
   }
 
   public static byte[] writeUpdateQuest(QuestData quest) {
+    return writeUpdateQuest(quest, ProtocolVersion.CURRENT);
+  }
+
+  public static byte[] writeUpdateQuest(QuestData quest, int protocolVersion) {
     ByteBufWriter buf = new ByteBufWriter();
     buf.writeByte(PacketType.UPDATE_QUEST.getId());
-    writeQuest(buf, quest);
+    writeQuest(buf, quest, protocolVersion);
     return buf.toByteArray();
   }
 
@@ -278,11 +318,21 @@ public final class PacketCodec {
   }
 
   public static byte[] writeCollaborationResponse(UUID questId, boolean approved, QuestData quest) {
+    return writeCollaborationResponse(questId, approved, quest, ProtocolVersion.CURRENT);
+  }
+
+  public static byte[] writeCollaborationResponse(
+      UUID questId, boolean approved, QuestData quest, int protocolVersion) {
     ByteBufWriter buf = new ByteBufWriter();
     buf.writeByte(PacketType.COLLABORATION_RESPONSE.getId());
     buf.writeUUID(questId);
     buf.writeBoolean(approved);
-    writeNullableQuest(buf, quest);
+    if (quest != null) {
+      buf.writeBoolean(true);
+      writeQuest(buf, quest, protocolVersion);
+    } else {
+      buf.writeBoolean(false);
+    }
     return buf.toByteArray();
   }
 
@@ -303,6 +353,14 @@ public final class PacketCodec {
   // ---- Shared quest serialization ----
 
   public static void writeQuest(ByteBufWriter buf, QuestData quest) {
+    writeQuest(buf, quest, ProtocolVersion.CURRENT);
+  }
+
+  /**
+   * Writes a quest with protocol-version-aware encoding. v0: omits trailing tags list. v1+: full
+   * format including tags.
+   */
+  public static void writeQuest(ByteBufWriter buf, QuestData quest, int protocolVersion) {
     buf.writeUUID(quest.id());
     buf.writeString(quest.title());
     buf.writeString(quest.content());
@@ -320,9 +378,11 @@ public final class PacketCodec {
     buf.writeBoolean(quest.isRegion());
     writeNullableCoords(buf, quest.coordinates2());
     writeNullableString(buf, quest.map());
-    buf.writeVarInt(quest.tags().size());
-    for (String tag : quest.tags()) {
-      buf.writeString(tag);
+    if (protocolVersion >= ProtocolVersion.V1) {
+      buf.writeVarInt(quest.tags().size());
+      for (String tag : quest.tags()) {
+        buf.writeString(tag);
+      }
     }
   }
 
@@ -346,10 +406,15 @@ public final class PacketCodec {
     boolean isRegion = buf.readBoolean();
     CoordinatesData coordinates2 = readNullableCoords(buf);
     String map = readNullableString(buf);
-    int tagCount = buf.readVarInt();
-    List<String> tags = new ArrayList<>(tagCount);
-    for (int i = 0; i < tagCount; i++) {
-      tags.add(buf.readString());
+    List<String> tags;
+    if (buf.remaining() > 0) {
+      int tagCount = readCount(buf, TagConstraints.MAX_TAGS, "Tag");
+      tags = new ArrayList<>(tagCount);
+      for (int i = 0; i < tagCount; i++) {
+        tags.add(buf.readString());
+      }
+    } else {
+      tags = List.of();
     }
     return new QuestData(
         id,
@@ -367,10 +432,38 @@ public final class PacketCodec {
         tags);
   }
 
+  // ---- SYNC_TAGS ----
+
+  public static byte[] writeSyncTags(List<String> tags) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.SYNC_TAGS.getId());
+    buf.writeVarInt(tags.size());
+    for (String tag : tags) {
+      buf.writeString(tag);
+    }
+    return buf.toByteArray();
+  }
+
+  public static List<String> readSyncTags(ByteBufReader buf) {
+    int count = readCount(buf, MAX_QUEST_LIST, "Tag");
+    List<String> tags = new ArrayList<>(count);
+    for (int i = 0; i < count; i++) {
+      tags.add(buf.readString());
+    }
+    return tags;
+  }
+
   // ---- C2S decode ----
 
   public static PacketType readType(ByteBufReader buf) {
     return PacketType.fromId(buf.readByte());
+  }
+
+  public static int readRequestSyncVersion(ByteBufReader buf) {
+    if (buf.remaining() > 0) {
+      return buf.readVarInt();
+    }
+    return ProtocolVersion.V0;
   }
 
   public static SaveQuestPayload readSaveQuest(ByteBufReader buf) {
