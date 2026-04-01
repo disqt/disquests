@@ -2,6 +2,7 @@ package com.disqt.disquests.client.hud;
 
 import com.disqt.disquests.client.DisquestsClient;
 import com.disqt.disquests.client.data.Quest;
+import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.client.markdown.RenderedLine;
 import java.util.ArrayList;
@@ -22,7 +23,7 @@ public class HudPinRenderer {
   private static final int TITLE_COLOR = 0xFFFFFFFF;
   private static final int CONTENT_COLOR = 0xFFBBBBBB;
 
-  /** Sentinel value meaning "use default position" (top-right corner). */
+  /** Sentinel value meaning "use default position" (top-left corner). */
   private static final int DEFAULT_POSITION = -1;
 
   private static int getMaxWidth() {
@@ -45,11 +46,11 @@ public class HudPinRenderer {
 
   /**
    * Returns the X origin for pin rendering. If configX is -1 (default), pins are placed at the
-   * top-right corner. Otherwise, the configured value is used directly.
+   * top-left corner. Otherwise, the configured value is used directly.
    */
   private static int resolveX(int screenWidth, int maxWidth, int configX) {
     if (configX == DEFAULT_POSITION) {
-      return screenWidth - maxWidth - DEFAULT_MARGIN;
+      return DEFAULT_MARGIN;
     }
     return configX;
   }
@@ -67,6 +68,11 @@ public class HudPinRenderer {
 
   public static void render(DrawContext context) {
     if (!visible) return;
+
+    // Don't render pins over Disquests screens (they have their own UI)
+    MinecraftClient client = MinecraftClient.getInstance();
+    if (client.currentScreen instanceof DisquestsBaseScreen) return;
+
     List<Quest> quests = HudPinManager.getPinnedQuests();
     if (quests.isEmpty()) {
       lastPinnedIds = List.of();
@@ -76,7 +82,6 @@ public class HudPinRenderer {
       return;
     }
 
-    MinecraftClient client = MinecraftClient.getInstance();
     if (client.inGameHud.getDebugHud().shouldShowDebugHud()) return;
 
     // Rebuild cache if pin list or quest content changed
