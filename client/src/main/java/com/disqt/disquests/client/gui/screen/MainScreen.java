@@ -4,6 +4,7 @@ import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.QuestEntryComponent;
+import com.disqt.disquests.client.gui.component.TagAutocompleteDropdown;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.widget.ToastOverlay;
 import com.disqt.disquests.client.network.PacketSender;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Nullable;
@@ -53,6 +55,7 @@ public class MainScreen extends DisquestsBaseScreen {
   // Search
   private TextBoxComponent searchField;
   private String searchTerm;
+  private TagAutocompleteDropdown tagDropdown;
 
   // State
   private ClientSession.Tab currentTab;
@@ -132,6 +135,18 @@ public class MainScreen extends DisquestsBaseScreen {
     this.searchField.onChanged().subscribe(this::onSearchTermChanged);
     this.searchField.id("search-box");
     this.searchRow.child(this.searchField);
+
+    // --- Tag autocomplete dropdown ---
+    tagDropdown = new TagAutocompleteDropdown();
+    tagDropdown.setRootComponent(root);
+    tagDropdown.setOnSelect(
+        tag -> {
+          // Replace the current #partial with #tagname
+          String current = searchField.getText();
+          int hashIndex = current.lastIndexOf('#');
+          String before = hashIndex >= 0 ? current.substring(0, hashIndex) : current;
+          searchField.text(before + "#" + tag + " ");
+        });
 
     // Cache title width
     this.titleWidth = MinecraftClient.getInstance().textRenderer.getWidth("Disquests");
@@ -248,6 +263,39 @@ public class MainScreen extends DisquestsBaseScreen {
     this.searchTerm = newTerm.toLowerCase().trim();
     ClientSession.setSearchTerm(this.searchTerm);
     refreshListContents();
+    updateTagAutocomplete(newTerm);
+  }
+
+  private void updateTagAutocomplete(String text) {
+    if (tagDropdown == null || searchField == null) return;
+    // Find the last # in the text
+    int hashIndex = text.lastIndexOf('#');
+    if (hashIndex < 0) {
+      tagDropdown.hide();
+      return;
+    }
+    // Extract partial tag after #
+    String partial = text.substring(hashIndex + 1);
+    // If there's a space after the #tag, it's already completed
+    if (partial.contains(" ")) {
+      tagDropdown.hide();
+      return;
+    }
+    // Position dropdown above the search box
+    int anchorX = searchField.x();
+    int anchorY = searchField.y();
+    tagDropdown.update(partial, anchorX, anchorY, true);
+  }
+
+  @Override
+  public boolean keyPressed(KeyInput keyInput) {
+    // Intercept arrow/enter/tab/escape for the tag autocomplete dropdown
+    if (tagDropdown != null && tagDropdown.isVisible()) {
+      if (tagDropdown.onKeyDown(keyInput.key())) {
+        return true;
+      }
+    }
+    return super.keyPressed(keyInput);
   }
 
   // --- DATA REFRESH ---
