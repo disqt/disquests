@@ -33,8 +33,6 @@ public class QuestEntryComponent extends BaseUIComponent {
   // Static constants cached once across all instances
   private static final Text HIDDEN_CONTENT_TEXT =
       Text.translatable("gui.disquests.label.request_access").formatted(Formatting.ITALIC);
-  private static final Text EMPTY_TAGS_TEXT =
-      Text.translatable("gui.disquests.label.no_tags").formatted(Formatting.ITALIC);
 
   private final Quest quest;
   private final String firstLine;
@@ -314,10 +312,7 @@ public class QuestEntryComponent extends BaseUIComponent {
 
     // --- Row 3: Tags (rounded-rect chips) ---
     List<String> tags = quest.getTags();
-    if (tags == null || tags.isEmpty()) {
-      context.drawText(
-          textRenderer, EMPTY_TAGS_TEXT, entryX + 4, entryY + 24, Colors.TEXT_MUTED, false);
-    } else {
+    if (tags != null && !tags.isEmpty()) {
       int tagX = entryX + 4;
       int tagH = 10;
       int hPad = 4;
