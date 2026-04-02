@@ -465,7 +465,7 @@ class TagJourney {
     when("player cancels edit mode and closes quest");
     click(context, "btn-cancel");
     waitForViewMode(context);
-    click(context, "btn-close");
+    click(context, "btn-back");
     waitForScreen(context, MainScreen.class);
 
     and("creates a second quest 'Tag Test 2'");

@@ -50,7 +50,7 @@ class NavigationJourney {
   void openQuestFromMainScreen(ClientGameTestContext context) {
     given("player is on QuestScreen");
     when("player closes QuestScreen and reopens quest from MainScreen");
-    click(context, "btn-close");
+    click(context, "btn-back");
     waitForScreen(context, MainScreen.class);
     openMainScreen(context);
     waitForEntryCount(context, 1);
