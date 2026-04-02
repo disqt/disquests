@@ -327,13 +327,15 @@ public class QuestScreen extends DisquestsBaseScreen {
   // ===================== EDIT MODE =====================
 
   private void buildEditMode(FlowLayout root) {
+    String editableContent =
+        quest.getContent() != null
+            ? MarkdownRenderer.reverseResolveWikiLinks(quest.getContent())
+            : "";
+
     // Snapshot originals for dirty tracking
     if (originalTitle == null) {
       originalTitle = quest.getTitle() != null ? quest.getTitle() : "";
-      originalContent =
-          quest.getContent() != null
-              ? MarkdownRenderer.reverseResolveWikiLinks(quest.getContent())
-              : "";
+      originalContent = editableContent;
     }
 
     // Title field
@@ -368,9 +370,7 @@ public class QuestScreen extends DisquestsBaseScreen {
             0,
             400,
             200,
-            quest.getContent() != null
-                ? MarkdownRenderer.reverseResolveWikiLinks(quest.getContent())
-                : "",
+            editableContent,
             Text.translatable("gui.disquests.placeholder.content").getString(),
             Integer.MAX_VALUE,
             true,
@@ -630,21 +630,15 @@ public class QuestScreen extends DisquestsBaseScreen {
     if (!canEdit) return;
     persistFieldValues();
     String origTitle = quest.getTitle() != null ? quest.getTitle() : "";
-    String origContent = quest.getContent() != null ? quest.getContent() : "";
+    String origContent =
+        quest.getContent() != null
+            ? MarkdownRenderer.reverseResolveWikiLinks(quest.getContent())
+            : "";
     navigateToScreen(new QuestScreen(this.parent, quest, true, isNewQuest, origTitle, origContent));
   }
 
   private void cancelEdit() {
     if (isDirty()) {
-      var log = org.slf4j.LoggerFactory.getLogger("Disquests");
-      String ct = titleFieldComponent != null ? titleFieldComponent.getText() : "";
-      String cc = contentFieldComponent != null ? contentFieldComponent.getText() : "";
-      log.warn(
-          "[DEBUG] isDirty=true titleMatch={} contentMatch={}",
-          ct.equals(originalTitle),
-          cc.equals(originalContent));
-      log.warn("[DEBUG] originalTitle=[{}] currentTitle=[{}]", originalTitle, ct);
-      log.warn("[DEBUG] originalContent=[{}] currentContent=[{}]", originalContent, cc);
       showConfirmOverlay(
           Text.translatable("gui.disquests.confirm.discard"),
           () -> {
