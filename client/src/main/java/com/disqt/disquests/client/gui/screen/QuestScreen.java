@@ -170,18 +170,8 @@ public class QuestScreen extends DisquestsBaseScreen {
     tagDisplay.id("tag-display");
     tagDisplay.gap(4);
     tagDisplay.margins(Insets.bottom(4));
-    if (viewTags.isEmpty()) {
-      LabelComponent noTagsLabel =
-          UIComponents.label(
-              Text.translatable("gui.disquests.label.no_tags")
-                  .withColor(Colors.TEXT_MUTED)
-                  .styled(s -> s.withItalic(true)));
-      noTagsLabel.shadow(false);
-      tagDisplay.child(noTagsLabel);
-    } else {
-      for (String tag : viewTags) {
-        tagDisplay.child(new TagChipComponent(tag));
-      }
+    for (String tag : viewTags) {
+      tagDisplay.child(new TagChipComponent(tag));
     }
 
     replaceSlot(root, "tag-display-slot", tagDisplay);
