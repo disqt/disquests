@@ -119,7 +119,11 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
             );
             dataManager.saveQuest(updated);
             QuestData saved = dataManager.getQuest(payload.questId());
-            broadcastQuestUpdate(saved);
+            // Only notify owner + contributors, not all players
+            byte[] packet = PacketCodec.writeUpdateQuest(saved);
+            Player owner = Bukkit.getPlayer(saved.ownerUuid());
+            if (owner != null && isModPlayer(owner)) sendPacket(owner, packet);
+            broadcastToContributors(saved, packet);
         }
     }
 
