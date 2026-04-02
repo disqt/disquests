@@ -113,8 +113,9 @@ public class AutocompleteDropdown {
       existing.remove();
     }
 
-    FlowLayout panel = UIContainers.verticalFlow(Sizing.fixed(150), Sizing.content());
-    panel.surface(Surface.flat(BG_COLOR));
+    FlowLayout panel = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
+    panel.surface(Surface.flat(BG_COLOR).and(Surface.outline(0xFF3a3a5e)));
+    panel.padding(Insets.of(2));
     panel.positioning(Positioning.absolute(dropdownX, dropdownY));
 
     for (int i = 0; i < results.size(); i++) {
@@ -122,10 +123,10 @@ public class AutocompleteDropdown {
       LabelComponent label = UIComponents.label(Text.literal(q.getTitle()));
       label.color(Color.ofArgb(TEXT_COLOR));
       label.shadow(true);
-      label.sizing(Sizing.fill(100), Sizing.fixed(12));
-      label.margins(Insets.of(1, 1, 2, 2));
+      label.sizing(Sizing.content(), Sizing.content());
+      label.margins(Insets.of(2, 2, 4, 4));
       if (i == selectedIndex) {
-        FlowLayout highlight = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+        FlowLayout highlight = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
         highlight.surface(Surface.flat(HOVER_COLOR));
         highlight.child(label);
         panel.child(highlight);
@@ -136,6 +137,7 @@ public class AutocompleteDropdown {
 
     OverlayContainer<FlowLayout> overlay = UIContainers.overlay(panel);
     overlay.id(OVERLAY_ID);
+    overlay.surface(Surface.BLANK);
     overlay.closeOnClick(true);
     rootComponent.child(overlay);
   }
