@@ -436,13 +436,13 @@ public class MainScreen extends DisquestsBaseScreen {
     newQuest.setOwnerName(MinecraftClient.getInstance().getSession().getUsername());
     newQuest.setLastModified(System.currentTimeMillis() / 1000);
     newQuest.setContributors(new ArrayList<>());
-    this.client.setScreen(new QuestScreen(this, newQuest, true));
+    navigateToScreen(new QuestScreen(this, newQuest, true));
   }
 
   public void openSelected() {
     Quest sel = getSelectedQuest();
     if (sel != null) {
-      this.client.setScreen(new QuestScreen(this, sel));
+      navigateToScreen(new QuestScreen(this, sel));
     }
   }
 
