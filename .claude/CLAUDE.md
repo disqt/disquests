@@ -86,6 +86,7 @@ Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with GLFW physical inpu
 - **CI Xvfb** — `854x480x24` with `guiScale:1` via `ensureClientOptions()`. Do NOT increase Xvfb resolution -- 1920x1080 causes 4x software-rendering overhead, making tests 2x slower.
 - **`catch(Throwable)` not `catch(Exception)` for `waitFor`** — Fabric's `waitFor` throws `AssertionError` (extends `Error`). `catch(Exception)` won't catch it.
 - **Server handshake retry** — `ServerPacketHandler.onPlayerJoin` retries every 20 ticks (up to 10 attempts) because client channel registration can be delayed on slow CI.
+- **Server packet handler tests** use Mockito (`mockito-core:5.14.2`) with `mockStatic(Bukkit.class)` for static method mocking. Must `upsertPlayerName()` for all test players before saving quests (DataManager joins with player_names table; null ownerName causes NPE in PacketCodec).
 
 ## Networking Protocol
 
@@ -100,6 +101,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - Server tracks per-player version in `ServerPacketHandler`. V0 clients get packets without tag fields.
 - **All new packet fields must be trailing-optional** with `buf.remaining() > 0` guards on the reader side.
 - When adding new fields: append at end, never insert mid-packet. Update `ProtocolVersion.CURRENT`.
+- **Save broadcast scoping** — `handleSaveQuest` sends `UPDATE_QUEST` only to owner + contributors (not all mod players). Other handlers like `handleUpdateVisibility` still use `broadcastQuestUpdate()` which sends to all mod players for Open/Closed quests.
 
 ## Key Files
 
@@ -113,16 +115,9 @@ Channel: `disquests:main`. First byte = PacketType ID.
 | `client/src/main/java/com/disqt/disquests/client/DisquestsClient.java` | Fabric mod entrypoint, keybinds, channel registration |
 | `client/src/main/java/com/disqt/disquests/client/ClientSession.java` | Tracks connection state, dispatches S2C packets |
 | `client/src/main/java/com/disqt/disquests/client/ClientCache.java` | Client-side quest cache |
-| `client/src/main/java/com/disqt/disquests/client/gui/screen/` | All screens use owo-ui: MainScreen, QuestScreen (view/edit), ContributorScreen, TagPickerScreen. Config uses owo-config auto-generated screen. Confirm dialogs use overlay on DisquestsBaseScreen. |
-| `client/src/main/java/com/disqt/disquests/client/gui/screen/DisquestsBaseScreen.java` | Shared owo-ui base screen with parent navigation |
-| `client/src/main/java/com/disqt/disquests/client/gui/component/QuestEntryComponent.java` | Custom owo-ui component for quest list entries |
-| `client/src/main/java/com/disqt/disquests/client/gui/component/TagChipComponent.java` | Rounded-rect tag chip owo-ui component |
-| `client/src/main/java/com/disqt/disquests/client/gui/component/TextFieldComponent.java` | BaseUIComponent wrapper for MultiLineTextFieldWidget |
-| `client/src/main/java/com/disqt/disquests/client/gui/helper/TagColors.java` | HSL computed tag colours (golden-angle hue spacing) |
-| `client/src/main/java/com/disqt/disquests/client/gui/helper/Colors.java` | Color constants (AMBER, TEXT_PRIMARY, etc.) |
-| `client/src/main/java/com/disqt/disquests/client/gui/helper/Theme.java` | Theme enum (VANILLA, FLAT, INSET, FROSTED, ACCENT_LINE) with color palettes and surfaces |
-| `client/src/main/java/com/disqt/disquests/client/gui/helper/DisquestsConfigModel.java` | owo-config annotated model (theme, pinnedWidth, pin position) |
-| `client/src/main/java/com/disqt/disquests/client/debug/DebugScreenEvents.java` | Fabric screen event hooks for debug logging |
+| `client/.../gui/screen/` | All screens (MainScreen, QuestScreen, ContributorScreen, TagPickerScreen). Base: `DisquestsBaseScreen`. Confirm dialogs use overlay. |
+| `client/.../gui/component/` | Custom owo-ui components: QuestEntryComponent, TagChipComponent, TextFieldComponent |
+| `client/.../gui/helper/` | Colors, Theme, TagColors, HoverPreviewRenderer, DisquestsConfigModel (owo-config) |
 | `client/src/main/resources/assets/disquests/owo_ui/*.xml` | XML UI models for all screens (hot-reloadable) |
 | `server/src/main/java/com/disqt/disquests/server/papermc/DisquestsPlugin.java` | Plugin entry, channel registration |
 | `server/src/main/java/com/disqt/disquests/server/papermc/ServerPacketHandler.java` | Handles C2S, broadcasts S2C |
@@ -141,38 +136,51 @@ Channel: `disquests:main`. First byte = PacketType ID.
 
 ## Gotchas
 
-- **`project.version` changes jar filenames** — Setting `allprojects { version = ... }` makes Gradle rename `server.jar` to `server-0.3.1.jar`. The root `build.gradle.kts` clears `archiveVersion` in `afterEvaluate` to keep names stable. Don't remove this.
-- **Production deploy: only one plugin jar** — Never leave multiple Disquests jars in the plugins folder. Paper's "Ambiguous plugin name" error prevents loading. Always remove old jars before deploying new ones.
+### Build & Deploy
+- **`project.version` changes jar filenames** — The root `build.gradle.kts` clears `archiveVersion` in `afterEvaluate` to keep names stable. Don't remove this.
+- **Production deploy: only one plugin jar** — Never leave multiple Disquests jars in the plugins folder. Paper's "Ambiguous plugin name" error prevents loading.
 - **Release workflow permissions** — `release.yml` must grant all permissions that `e2e-test.yml` declares (including `pull-requests: write`), since reusable workflows can't escalate beyond caller permissions.
 - **Gradle Kotlin DSL shadows `java` package** — `java.lang.management.*` won't resolve in `.gradle.kts` because `java` is a Gradle DSL accessor. Use `Class.forName("java.lang.management.ManagementFactory")` instead.
+
+### Git & PR
 - **Never push to main** — always create a branch and PR. Even config/infra changes go through PRs.
 - **PR target** — origin is `disqt/disquests`. No upstream remote.
-- **MC 1.21.11 ClickEvent API** — sealed classes, not enum. Use `new ClickEvent.OpenUrl(URI)` and `instanceof ClickEvent.OpenUrl openUrl` for pattern matching.
-- **MC 1.21.11 `Click` record** — `Click(double x, double y, MouseInput buttonInfo)` where `MouseInput(int button, int modifiers)`. Not `(double, double, int)`.
+
+### Minecraft API (1.21.11)
+- **ClickEvent API** — sealed classes, not enum. Use `new ClickEvent.OpenUrl(URI)` and `instanceof ClickEvent.OpenUrl openUrl` for pattern matching.
+- **`Click` record** — `Click(double x, double y, MouseInput buttonInfo)` where `MouseInput(int button, int modifiers)`. Not `(double, double, int)`.
 - **Contributor is immutable** — `canEdit` is final. To update, replace with `new Contributor(new ContributorData(...))`.
-- **QuestScreen auto-close** — `tick()` closes the screen if the quest is not in `ClientCache`. E2E tests must add quests to cache before opening screens.
-- **owo-config wrapper IDE errors** — `DisquestsConfigWrapper cannot be resolved` cascades false errors across all files that reference `CONFIG`. IDE-only (annotation processor output not indexed). Gradle compiles fine. Don't chase these.
-- **owo-ui v0.13.0 renames** — `BaseComponent` -> `BaseUIComponent`, `Components` -> `UIComponents`, `Containers` -> `UIContainers`, `OwoUIDrawContext` -> `OwoUIGraphics`. XML tags unchanged.
-- **owo-ui `onMouseDown` coordinates are relative** — `Click.x()`/`Click.y()` are already relative to the component. Do NOT subtract `this.x()`/`this.y()`.
-- **owo-ui XML scroll container** — child element must be FIRST (before `<sizing>`, `<surface>`, `<padding>`). `WrappingParentUIComponent.parseProperties` takes first element child.
-- **owo-ui XML requires `<components>` wrapper** — root component must be inside `<components>` tag, not directly under `<owo-ui>`.
-- **owo-ui zero-sizing doesn't hide buttons** — text still renders. Use `parent.removeChild(component)` instead of zero-sizing.
-- **owo-ui keyboard input requires `GreedyInputUIComponent`** — custom `BaseUIComponent` subclasses that need key/char events must implement this marker interface, and the screen must override `charTyped()` to route to the focused greedy component (see `DisquestsBaseScreen.charTyped()`).
-- **owo-ui delegate focus desync** — `MultiLineTextFieldWidget.focused` can be reset by `mouseClicked()` after `onFocusGained` sets it. Force `delegate.setFocused(true)` in `onKeyPress`/`onCharTyped` before forwarding.
-- **owo-ui `ParentUIComponent` not `ParentComponent`** — v0.13.0 renamed to `ParentUIComponent`. Use this for `childById` when targeting `<scroll>` containers.
-- **owo-ui Surface composing** — `Surface.flat(color).and(Surface.outline(color))` chains surfaces. Available: `flat`, `outline`, `blur`, `DARK_PANEL`, `PANEL_INSET`, `panelWithInset`, `VANILLA_TRANSLUCENT`, `BLANK`.
-- **owo-ui no `clearAndInit()`** — to rebuild a screen after state change, reopen it: `client.setScreen(new MyScreen(parent))`. There is no method to re-trigger `build()` on an existing screen.
+- **`ClientCache.getQuestById` searches both lists** — returns quests from myQuests AND serverQuests. Use `getMyQuests().stream()` to check membership specifically.
+
+### owo-ui
+- **v0.13.0 renames** — `BaseComponent` -> `BaseUIComponent`, `Components` -> `UIComponents`, `Containers` -> `UIContainers`, `OwoUIDrawContext` -> `OwoUIGraphics`, `ParentComponent` -> `ParentUIComponent`. XML tags unchanged.
+- **`onMouseDown` coordinates are relative** — `Click.x()`/`Click.y()` are already relative to the component. Do NOT subtract `this.x()`/`this.y()`.
+- **`doubled` flag is screen-level** — comes from vanilla `Screen`, not per-component. Components that care must track their own state (see `QuestEntryComponent`).
+- **XML scroll container** — child element must be FIRST (before `<sizing>`, `<surface>`, `<padding>`).
+- **XML requires `<components>` wrapper** — root component must be inside `<components>` tag, not directly under `<owo-ui>`.
 - **XML comments cannot contain `--`** — causes `SAXParseException`. Use commas instead.
-- **Fire-and-forget C2S race** — `PacketSender.pinQuest()`, `respondCollaboration()` etc. have no server acknowledgment. In tests, use `waitForQuestCondition()` or `waitFor` with cache version polling instead of fixed `waitTicks`. UI code using optimistic cache updates (e.g. `ContributorScreen.respondToRequest` calls `removePendingRequest` locally) must be replicated in tests.
-- **`ClientCache.getQuestById` searches both lists** — returns quests from myQuests AND serverQuests. After leaving an OPEN quest, it's removed from myQuests but still in serverQuests. Use `getMyQuests().stream()` to check membership specifically.
-- **Logger names use `.` not `/`** — `LoggerFactory.getLogger("Disquests.MainScreen")` not `"Disquests/MainScreen"`. Log4j2 uses `.` for hierarchy; `/` creates flat names that don't inherit parent logger config (e.g. test log4j2-test.xml).
-- **owo-ui `doubled` flag is screen-level** — The `boolean doubled` in `onMouseDown(Click, boolean)` comes from vanilla Minecraft's `Screen` class, not per-component. Clicking two different components quickly registers as a double-click. Components that care must track their own state (see `QuestEntryComponent`).
+- **Zero-sizing doesn't hide buttons** — text still renders. Use `parent.removeChild(component)` instead.
+- **Keyboard input requires `GreedyInputUIComponent`** — custom `BaseUIComponent` subclasses that need key/char events must implement this marker interface. Screen must override `charTyped()` to route to focused greedy component.
+- **Delegate focus desync** — `MultiLineTextFieldWidget.focused` can be reset by `mouseClicked()` after `onFocusGained`. Force `delegate.setFocused(true)` in `onKeyPress`/`onCharTyped` before forwarding.
+- **Surface composing** — `Surface.flat(color).and(Surface.outline(color))` chains surfaces. Available: `flat`, `outline`, `blur`, `DARK_PANEL`, `PANEL_INSET`, `panelWithInset`, `VANILLA_TRANSLUCENT`, `BLANK`.
+- **No `clearAndInit()`** — to rebuild a screen after state change, reopen it: `client.setScreen(new MyScreen(parent))`.
+- **owo-config wrapper IDE errors** — `DisquestsConfigWrapper cannot be resolved` cascades false errors. IDE-only. Gradle compiles fine. Don't chase these.
+
+### Wiki-links
+- **Dirty tracking has two entry points** — `enterEditMode()` passes `origContent` to the constructor, `buildEditMode()` has a fallback snapshot guarded by `if (originalTitle == null)`. Both must reverse-resolve wiki-link UUIDs. The constructor path is the one used in practice (view→edit mode switch).
+- **Server resolution is per-recipient** — `WikiLinkResolver.resolveForRecipient()` converts `[[Quest Name]]` → `[[uuid|title]]` when sending to clients. `reverseResolve()` converts back on save. DB stores raw `[[Quest Name]]` form, clients receive UUID form.
+
+### Testing & E2E
+- **QuestScreen auto-close** — `tick()` closes the screen if the quest is not in `ClientCache`. E2E tests must add quests to cache before opening screens.
+- **Fire-and-forget C2S race** — `PacketSender.pinQuest()`, `respondCollaboration()` etc. have no server acknowledgment. Use `waitForQuestCondition()` or `waitFor` with cache polling instead of fixed `waitTicks`.
+- **Server packet handler tests** use Mockito (`mockito-core:5.14.2`) with `mockStatic(Bukkit.class)`. Must `upsertPlayerName()` for all test players before saving quests (null ownerName causes NPE in PacketCodec).
+- **Logger names use `.` not `/`** — `LoggerFactory.getLogger("Disquests.MainScreen")` not `"Disquests/MainScreen"`. Log4j2 uses `.` for hierarchy.
 - **`javax.annotation` not on testmod classpath** — Don't use `@Nullable` etc. in testmod code. JUnit is also unresolvable in IDE (cosmetic, compiles fine via Gradle).
 
 ## Deploy
 
 - **Paper plugin**: `scp server/build/libs/server.jar minecraft:~/serverfiles/plugins/Disquests.jar` then `ssh minecraft "tmux -S /tmp/tmux-1000/pmcserver-bb664df1 send-keys -t pmcserver 'plugman reload Disquests' Enter"`
-- **Client mod**: `cp client/build/libs/client.jar "C:/Users/leole/AppData/Roaming/PrismLauncher/instances/1.21.11 v2.9/.minecraft/mods/disquests-client-0.3.1.jar"`
+- **Client mod**: Copy `client/build/libs/client.jar` to Prism Launcher's `mods/` folder, renaming to match the current version
 - **owo-lib (Prism)**: Must be in Prism mods folder alongside client mod. Find in `~/.gradle/caches/modules-2/files-2.1/io.wispforest/owo-lib/`.
 
 ## Release
@@ -180,8 +188,8 @@ Channel: `disquests:main`. First byte = PacketType ID.
 Tag-triggered via GitHub Actions (`.github/workflows/release.yml`). Pushes a `v*` tag, runs E2E tests, generates changelog from conventional commits, creates GitHub release with `disquests-client-{version}.jar` and `disquests-paper-{version}.jar`.
 
 ```bash
-git tag v0.3.1
-git push origin v0.3.1
+git tag v<version>
+git push origin v<version>
 ```
 
 ## References
