@@ -1,16 +1,13 @@
 package com.disqt.disquests.client.gui.component;
 
 import com.disqt.disquests.client.ClientCache;
-import com.disqt.disquests.client.ClientSession;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Consumer;
 import net.minecraft.text.Text;
 
@@ -46,15 +43,8 @@ public class TagAutocompleteDropdown {
     }
     String lowerQuery = query != null ? query.toLowerCase() : "";
 
-    // Collect all known tags: predefined + server + cached quests
-    Set<String> allTags = new LinkedHashSet<>();
-    allTags.addAll(ClientSession.getPredefinedTags());
-    allTags.addAll(ClientSession.getServerTags());
-    ClientCache.getMyQuests().forEach(q -> allTags.addAll(q.getTags()));
-    ClientCache.getServerQuests().forEach(q -> allTags.addAll(q.getTags()));
-
     results =
-        allTags.stream()
+        ClientCache.getAllKnownTags().stream()
             .filter(t -> lowerQuery.isEmpty() || t.toLowerCase().contains(lowerQuery))
             .limit(MAX_RESULTS)
             .toList();
@@ -149,6 +139,7 @@ public class TagAutocompleteDropdown {
 
     OverlayContainer<FlowLayout> overlay = UIContainers.overlay(panel);
     overlay.id(OVERLAY_ID);
+    overlay.surface(Surface.BLANK);
     overlay.closeOnClick(true);
     rootComponent.child(overlay);
   }

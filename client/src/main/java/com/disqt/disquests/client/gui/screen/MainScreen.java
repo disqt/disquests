@@ -35,6 +35,7 @@ public class MainScreen extends DisquestsBaseScreen {
 
   private static final org.slf4j.Logger LOGGER =
       org.slf4j.LoggerFactory.getLogger("Disquests.MainScreen");
+  private static final List<TooltipComponent> NO_TOOLTIP = Collections.emptyList();
 
   // Component references (looked up by ID from XML model)
   private FlowLayout rootLayout;
@@ -414,7 +415,7 @@ public class MainScreen extends DisquestsBaseScreen {
     if (selected == null) {
       btnInteract.active(false);
       btnInteract.setMessage(Text.translatable("gui.disquests.btn.join"));
-      btnInteract.tooltip(Collections.<TooltipComponent>emptyList());
+      btnInteract.tooltip(NO_TOOLTIP);
       return;
     }
     if (ClientSession.isRequested(selected.getId())) {
@@ -424,14 +425,14 @@ public class MainScreen extends DisquestsBaseScreen {
     } else if (selected.getVisibility() == Visibility.OPEN) {
       btnInteract.setMessage(Text.translatable("gui.disquests.btn.join"));
       btnInteract.active(true);
-      btnInteract.tooltip(Collections.<TooltipComponent>emptyList());
+      btnInteract.tooltip(NO_TOOLTIP);
     } else if (selected.getVisibility() == Visibility.CLOSED) {
       btnInteract.setMessage(Text.translatable("gui.disquests.btn.request"));
       btnInteract.active(true);
-      btnInteract.tooltip(Collections.<TooltipComponent>emptyList());
+      btnInteract.tooltip(NO_TOOLTIP);
     } else {
       btnInteract.active(false);
-      btnInteract.tooltip(Collections.<TooltipComponent>emptyList());
+      btnInteract.tooltip(NO_TOOLTIP);
     }
   }
 
@@ -464,12 +465,6 @@ public class MainScreen extends DisquestsBaseScreen {
     }
   }
 
-  private void markInteractButtonAsRequested() {
-    btnInteract.setMessage(Text.translatable("gui.disquests.btn.requested"));
-    btnInteract.active(false);
-    btnInteract.tooltip(Text.translatable("gui.disquests.tooltip.already_requested"));
-  }
-
   private void requestAccess() {
     Quest sel = getSelectedQuest();
     LOGGER.debug(
@@ -480,7 +475,7 @@ public class MainScreen extends DisquestsBaseScreen {
     if (sel != null && sel.getVisibility() == Visibility.CLOSED) {
       PacketSender.requestCollaboration(sel.getId());
       ClientSession.markRequested(sel.getId());
-      markInteractButtonAsRequested();
+      updateInteractButton(sel);
       showToast("Request sent to " + sel.getOwnerName());
     }
   }

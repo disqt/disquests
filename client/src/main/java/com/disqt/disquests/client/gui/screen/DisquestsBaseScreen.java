@@ -52,11 +52,10 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
 
   @Override
   public boolean mouseClicked(Click click, boolean simulated) {
-    // GLFW button 3 = mouse back, button 4 = mouse forward
-    if (click.button() == 3) {
+    if (click.button() == org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_4) {
       goBack();
       return true;
-    } else if (click.button() == 4) {
+    } else if (click.button() == org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_5) {
       goForward();
       return true;
     }

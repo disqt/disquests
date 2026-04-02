@@ -1,7 +1,6 @@
 package com.disqt.disquests.client.gui.screen;
 
 import com.disqt.disquests.client.ClientCache;
-import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.TagChipComponent;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
@@ -14,7 +13,6 @@ import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.Sizing;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import net.minecraft.client.gui.screen.Screen;
@@ -120,17 +118,7 @@ public class TagPickerScreen extends DisquestsBaseScreen {
 
     List<String> existing = quest.getTags();
 
-    // Merge predefined + server tags, deduplicated, preserving order
-    Set<String> allTags = new LinkedHashSet<>();
-    allTags.addAll(ClientSession.getPredefinedTags());
-    allTags.addAll(ClientSession.getServerTags());
-    // Also include tags from cached quests (immediate feedback for newly-created tags)
-    for (Quest q : ClientCache.getMyQuests()) {
-      allTags.addAll(q.getTags());
-    }
-    for (Quest q : ClientCache.getServerQuests()) {
-      allTags.addAll(q.getTags());
-    }
+    Set<String> allTags = ClientCache.getAllKnownTags();
 
     List<String> available = new ArrayList<>();
     for (String tag : allTags) {

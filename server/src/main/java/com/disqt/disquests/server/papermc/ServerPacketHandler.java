@@ -192,6 +192,8 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
               payload.coords2(),
               payload.map(),
               tags);
+      boolean tagsChanged =
+          !new java.util.HashSet<>(existing.tags()).equals(new java.util.HashSet<>(tags));
       dataManager.saveQuest(updated);
       QuestData saved = dataManager.getQuest(payload.questId());
       // Only notify owner + contributors, not all players
@@ -199,7 +201,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
       Player owner = Bukkit.getPlayer(saved.ownerUuid());
       if (owner != null && isModPlayer(owner)) sendPacket(owner, packet);
       broadcastToContributors(saved, packet);
-      broadcastSyncTags();
+      if (tagsChanged) broadcastSyncTags();
     }
   }
 
