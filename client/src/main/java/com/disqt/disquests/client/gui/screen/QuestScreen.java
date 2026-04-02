@@ -275,30 +275,43 @@ public class QuestScreen extends DisquestsBaseScreen {
     FlowLayout buttonRow = root.childById(FlowLayout.class, "button-row");
     boolean canJoinOrRequest = !isOwner && !isContributor;
 
-    // Join button (OPEN quests, not yet a member)
-    ButtonComponent joinBtn = root.childById(ButtonComponent.class, "btn-join");
-    if (canJoinOrRequest && quest.getVisibility() == Visibility.OPEN) {
-      joinBtn.onPress(b -> joinQuest());
-    } else {
-      buttonRow.removeChild(joinBtn);
-    }
-
-    // Request button (CLOSED quests, not yet a member)
-    ButtonComponent requestBtn = root.childById(ButtonComponent.class, "btn-request");
-    if (canJoinOrRequest && quest.getVisibility() == Visibility.CLOSED) {
-      if (ClientSession.isRequested(quest.getId())) {
-        requestBtn.active = false;
-        requestBtn.setMessage(Text.translatable("gui.disquests.btn.requested"));
+    // Interact button: Join (OPEN), Request (CLOSED), or hidden (member/owner)
+    ButtonComponent interactBtn = root.childById(ButtonComponent.class, "btn-interact");
+    if (canJoinOrRequest) {
+      if (quest.getVisibility() == Visibility.OPEN) {
+        interactBtn.setMessage(Text.translatable("gui.disquests.btn.join"));
+        interactBtn.onPress(b -> joinQuest());
+      } else if (quest.getVisibility() == Visibility.CLOSED) {
+        if (ClientSession.isRequested(quest.getId())) {
+          interactBtn.setMessage(Text.translatable("gui.disquests.btn.requested"));
+          interactBtn.active(false);
+          interactBtn.tooltip(Text.translatable("gui.disquests.tooltip.already_requested"));
+        } else {
+          interactBtn.setMessage(Text.translatable("gui.disquests.btn.request"));
+          interactBtn.onPress(b -> requestAccess());
+        }
       } else {
-        requestBtn.onPress(b -> requestAccess());
+        // PRIVATE quest viewed by non-member (shouldn't normally happen)
+        buttonRow.removeChild(interactBtn);
       }
     } else {
-      buttonRow.removeChild(requestBtn);
+      buttonRow.removeChild(interactBtn);
     }
 
+    // Edit button: hidden for non-members, greyed with tooltip for view-only contributors
     ButtonComponent editBtn = root.childById(ButtonComponent.class, "btn-edit");
-    editBtn.onPress(b -> enterEditMode());
-    editBtn.active = canEdit;
+    if (canJoinOrRequest) {
+      // Non-member: hide Edit entirely
+      buttonRow.removeChild(editBtn);
+    } else {
+      editBtn.onPress(b -> enterEditMode());
+      if (canEdit) {
+        editBtn.active(true);
+      } else {
+        editBtn.active(false);
+        editBtn.tooltip(Text.translatable("gui.disquests.tooltip.view_only"));
+      }
+    }
 
     ButtonComponent leaveBtn = root.childById(ButtonComponent.class, "btn-leave");
     if (isContributor && !isOwner) {
@@ -307,9 +320,13 @@ public class QuestScreen extends DisquestsBaseScreen {
       buttonRow.removeChild(leaveBtn);
     }
 
+    // Delete button: only visible for owner
     ButtonComponent deleteBtn = root.childById(ButtonComponent.class, "btn-delete");
-    deleteBtn.onPress(b -> confirmDelete());
-    deleteBtn.active = isOwner;
+    if (isOwner) {
+      deleteBtn.onPress(b -> confirmDelete());
+    } else {
+      buttonRow.removeChild(deleteBtn);
+    }
 
     wireBackButton(root);
   }
