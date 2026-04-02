@@ -90,6 +90,9 @@ dependencies {
     "testmodImplementation"("org.junit.platform:junit-platform-launcher:1.11.4")
 }
 
+val testServerPort = providers.gradleProperty("testServerPort").getOrElse("25565")
+val testRconPort = providers.gradleProperty("testRconPort").getOrElse("25575")
+
 loom {
     log4jConfigs.from(file("src/testmod/resources/log4j2-test.xml"))
     runs {
@@ -100,8 +103,8 @@ loom {
             vmArg("-Dfabric.client.gametest")
             vmArg("-Dfabric.client.gametest.disableNetworkSynchronizer=true")
             vmArg("-Ddisquests.test.server.host=localhost")
-            vmArg("-Ddisquests.test.server.port=25565")
-            vmArg("-Ddisquests.test.rcon.port=25575")
+            vmArg("-Ddisquests.test.server.port=$testServerPort")
+            vmArg("-Ddisquests.test.rcon.port=$testRconPort")
             vmArg("-Ddisquests.test.rcon.password=testpassword")
             // Integration test properties (passed via -P from orchestrator)
             val journey = providers.gradleProperty("testJourney")
@@ -124,8 +127,8 @@ loom {
             vmArg("-Dfabric.client.gametest")
             vmArg("-Dfabric.client.gametest.disableNetworkSynchronizer=true")
             vmArg("-Ddisquests.test.server.host=localhost")
-            vmArg("-Ddisquests.test.server.port=25565")
-            vmArg("-Ddisquests.test.rcon.port=25575")
+            vmArg("-Ddisquests.test.server.port=$testServerPort")
+            vmArg("-Ddisquests.test.rcon.port=$testRconPort")
             vmArg("-Ddisquests.test.rcon.password=testpassword")
             val journeyB = providers.gradleProperty("testJourney")
             val phaseB = providers.gradleProperty("testPhase")
@@ -325,8 +328,8 @@ fun bootstrapServerDir(serverDir: File, mcVersion: String, logger: org.gradle.ap
         |max-players=4
         |enable-rcon=true
         |rcon.password=testpassword
-        |rcon.port=25575
-        |server-port=25565
+        |rcon.port=$testRconPort
+        |server-port=$testServerPort
         |level-type=flat
         |spawn-protection=0
         |difficulty=peaceful
@@ -337,7 +340,7 @@ fun bootstrapServerDir(serverDir: File, mcVersion: String, logger: org.gradle.ap
 
 fun ensureServer(serverDir: File, logger: org.gradle.api.logging.Logger, pluginJar: File, mcVersion: String, coverageAgentJar: File? = null): Process? {
     val serverRunning = try {
-        Socket("localhost", 25565).use { true }
+        Socket("localhost", testServerPort.toInt()).use { true }
     } catch (_: Exception) { false }
 
     if (!serverRunning) {
@@ -377,7 +380,7 @@ fun ensureServer(serverDir: File, logger: org.gradle.api.logging.Logger, pluginJ
 
         // Wait for server to accept connections
         logger.lifecycle("Waiting for Paper server...")
-        val serverPort = 25565
+        val serverPort = testServerPort.toInt()
         val startupDeadline = System.currentTimeMillis() + 120_000L
         while (System.currentTimeMillis() < startupDeadline) {
             try {
@@ -395,14 +398,14 @@ fun ensureServer(serverDir: File, logger: org.gradle.api.logging.Logger, pluginJ
         logger.lifecycle("Paper server ready")
         return serverProcess
     } else {
-        logger.lifecycle("Server already running on port 25565")
+        logger.lifecycle("Server already running on port $testServerPort")
         return null
     }
 }
 
 fun rconReset(logger: org.gradle.api.logging.Logger) {
     try {
-        sendRconCommand("localhost", 25575, "testpassword", "disquests reset")
+        sendRconCommand("localhost", testRconPort.toInt(), "testpassword", "disquests reset")
         logger.lifecycle("Sent RCON reset")
         Thread.sleep(1000)
     } catch (e: Exception) {
