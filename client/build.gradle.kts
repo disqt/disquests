@@ -10,6 +10,20 @@ import java.nio.ByteOrder
 plugins {
     id("fabric-loom") version "1.15.5"
     jacoco
+    eclipse
+}
+
+eclipse {
+    classpath {
+        file.whenMerged {
+            val cp = this as org.gradle.plugins.ide.eclipse.model.Classpath
+            cp.entries.add(
+                org.gradle.plugins.ide.eclipse.model.SourceFolder(
+                    "build/generated/sources/annotationProcessor/java/main", "bin/main"
+                )
+            )
+        }
+    }
 }
 
 repositories {
