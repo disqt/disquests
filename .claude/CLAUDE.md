@@ -18,7 +18,7 @@ server/   — Paper plugin: SQLite storage, permissions, packet handler, command
 
 Both `client` and `server` depend on `common`. The client registers a single `RawPayload` CustomPayload type that wraps raw bytes; the Paper plugin uses `Messenger.registerIncomingPluginChannel()`. Both sides use `PacketCodec` from common for serialization.
 
-**GUI migration state:** All screens migrated to owo-ui (XML layouts + `DisquestsBaseScreen`). MarkdownWidget ported to `BaseUIComponent`. MultiLineTextFieldWidget wrapped via `TextFieldComponent`.
+All screens use owo-ui (XML layouts + `DisquestsBaseScreen`). MarkdownWidget is a `BaseUIComponent`. MultiLineTextFieldWidget wrapped via `TextFieldComponent`.
 
 **All modules share the same package namespace**: `com.disqt.disquests.*`
 - Common: `com.disqt.disquests.common.*`
@@ -30,7 +30,7 @@ Both `client` and `server` depend on `common`. The client registers a single `Ra
 All versions (MC, Fabric, Paper, Java) are in `gradle.properties` — that is the source of truth.
 
 ```bash
-./gradlew build              # build all
+./gradlew build              # build all + run unit tests
 ./gradlew :common:test       # run codec unit tests (JUnit 5)
 ./gradlew :client:build      # build Fabric mod jar
 ./gradlew :server:build       # build Paper plugin jar
@@ -137,13 +137,15 @@ Channel: `disquests:main`. First byte = PacketType ID.
 ## Gotchas
 
 ### Build & Deploy
+- **CI uses `gradle/actions/setup-gradle@v5`** — not manual `actions/cache`. Build cache enabled (`org.gradle.caching=true`). Cache is write-only on `main`, read-only on PR branches.
+- **`./gradlew build` includes all unit tests** — don't add separate `:common:test :server:test` invocations.
 - **`project.version` changes jar filenames** — The root `build.gradle.kts` clears `archiveVersion` in `afterEvaluate` to keep names stable. Don't remove this.
 - **Production deploy: only one plugin jar** — Never leave multiple Disquests jars in the plugins folder. Paper's "Ambiguous plugin name" error prevents loading.
 - **Release workflow permissions** — `release.yml` must grant all permissions that `e2e-test.yml` declares (including `pull-requests: write`), since reusable workflows can't escalate beyond caller permissions.
 - **Gradle Kotlin DSL shadows `java` package** — `java.lang.management.*` won't resolve in `.gradle.kts` because `java` is a Gradle DSL accessor. Use `Class.forName("java.lang.management.ManagementFactory")` instead.
 
 ### Git & PR
-- **Never push to main** — always create a branch and PR. Even config/infra changes go through PRs.
+- **Never push to main** — always create a branch and PR. Exception: non-code changes (docs, CLAUDE.md, plans) can go directly to main to avoid unnecessary CI runs.
 - **PR target** — origin is `disqt/disquests`. No upstream remote.
 
 ### Minecraft API (1.21.11)
