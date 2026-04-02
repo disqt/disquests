@@ -636,6 +636,15 @@ public class QuestScreen extends DisquestsBaseScreen {
 
   private void cancelEdit() {
     if (isDirty()) {
+      var log = org.slf4j.LoggerFactory.getLogger("Disquests");
+      String ct = titleFieldComponent != null ? titleFieldComponent.getText() : "";
+      String cc = contentFieldComponent != null ? contentFieldComponent.getText() : "";
+      log.warn(
+          "[DEBUG] isDirty=true titleMatch={} contentMatch={}",
+          ct.equals(originalTitle),
+          cc.equals(originalContent));
+      log.warn("[DEBUG] originalTitle=[{}] currentTitle=[{}]", originalTitle, ct);
+      log.warn("[DEBUG] originalContent=[{}] currentContent=[{}]", originalContent, cc);
       showConfirmOverlay(
           Text.translatable("gui.disquests.confirm.discard"),
           () -> {
