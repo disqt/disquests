@@ -59,6 +59,7 @@
     "closed": "Visible on Quest Board, others must request access",
     "open": "Anyone can join and view this quest",
     "already_requested": "You have already requested access",
+    "view_only": "You have view-only access",
   },
 
   // Filter tooltips
