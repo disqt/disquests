@@ -27,14 +27,7 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Cache Gradle dependencies
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: gradle-
+      - uses: gradle/actions/setup-gradle@v5
 
       - name: Check formatting
         run: ./gradlew spotlessCheck
@@ -50,27 +43,10 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Cache Gradle dependencies
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: gradle-
+      - uses: gradle/actions/setup-gradle@v5
 
-      - name: Cache Loom assets
-        uses: actions/cache@v5
-        with:
-          path: ~/.gradle/caches/fabric-loom
-          key: loom-${{ hashFiles('gradle.properties') }}
-          restore-keys: loom-
-
-      - name: Build all JARs
+      - name: Build and test
         run: ./gradlew build
-
-      - name: Run unit tests
-        run: ./gradlew :common:test :server:test
 
   e2e-test:
     runs-on: ubuntu-latest
@@ -84,21 +60,7 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Cache Gradle dependencies
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: gradle-
-
-      - name: Cache Loom assets
-        uses: actions/cache@v5
-        with:
-          path: ~/.gradle/caches/fabric-loom
-          key: loom-${{ hashFiles('gradle.properties') }}
-          restore-keys: loom-
+      - uses: gradle/actions/setup-gradle@v5
 
       - name: Build
         run: ./gradlew build
@@ -126,23 +88,6 @@ jobs:
           title: Test Coverage
           update-comment: true
 
-      - name: Generate coverage badges
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: cicirello/jacoco-badge-generator@v2
-        with:
-          jacoco-csv-file: client/build/reports/jacoco/integrationTest/report.csv
-          badges-directory: .github/badges
-          generate-branches-badge: true
-          coverage-label: coverage
-
-      - name: Commit coverage badges
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .github/badges/
-          git diff --staged --quiet || git commit -m "ci: update coverage badges [skip ci]" && git push
-
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v6
@@ -155,3 +100,31 @@ jobs:
             integration-sync/
             client/build/reports/jacoco/integrationTest/
           retention-days: 14
+
+  badges:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: e2e-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v6
+        with:
+          name: e2e-results
+          path: .
+
+      - name: Generate coverage badges
+        uses: cicirello/jacoco-badge-generator@v2
+        with:
+          jacoco-csv-file: client/build/reports/jacoco/integrationTest/report.csv
+          badges-directory: .github/badges
+          generate-branches-badge: true
+          coverage-label: coverage
+
+      - name: Commit coverage badges
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/badges/
+          git diff --staged --quiet || (git commit -m "ci: update coverage badges [skip ci]" && git push)
