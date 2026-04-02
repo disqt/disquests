@@ -135,8 +135,8 @@ public class ContributorScreen extends DisquestsBaseScreen {
       }
     }
 
-    // --- Close button ---
-    root.childById(ButtonComponent.class, "btn-close").onPress(b -> this.close());
+    // --- Back button ---
+    wireBackButton(root);
   }
 
   // --- Actions ---
