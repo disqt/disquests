@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.tooltip.TooltipComponent;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -418,7 +419,7 @@ public class MainScreen extends DisquestsBaseScreen {
     if (selected == null) {
       btnInteract.active(false);
       btnInteract.setMessage(Text.translatable("gui.disquests.btn.join"));
-      btnInteract.tooltip((Text) null);
+      btnInteract.tooltip(Collections.<TooltipComponent>emptyList());
       return;
     }
     if (ClientSession.isRequested(selected.getId())) {
@@ -428,14 +429,14 @@ public class MainScreen extends DisquestsBaseScreen {
     } else if (selected.getVisibility() == Visibility.OPEN) {
       btnInteract.setMessage(Text.translatable("gui.disquests.btn.join"));
       btnInteract.active(true);
-      btnInteract.tooltip((Text) null);
+      btnInteract.tooltip(Collections.<TooltipComponent>emptyList());
     } else if (selected.getVisibility() == Visibility.CLOSED) {
       btnInteract.setMessage(Text.translatable("gui.disquests.btn.request"));
       btnInteract.active(true);
-      btnInteract.tooltip((Text) null);
+      btnInteract.tooltip(Collections.<TooltipComponent>emptyList());
     } else {
       btnInteract.active(false);
-      btnInteract.tooltip((Text) null);
+      btnInteract.tooltip(Collections.<TooltipComponent>emptyList());
     }
   }
 
