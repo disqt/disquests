@@ -11,6 +11,7 @@ import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
 import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.input.CharInput;
 import net.minecraft.client.input.KeyInput;
@@ -47,6 +48,33 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
       }
       this.client.setScreen(parent);
     }
+  }
+
+  @Override
+  public boolean mouseClicked(Click click, boolean simulated) {
+    // GLFW button 3 = mouse back, button 4 = mouse forward
+    if (click.button() == 3) {
+      goBack();
+      return true;
+    } else if (click.button() == 4) {
+      goForward();
+      return true;
+    }
+    return super.mouseClicked(click, simulated);
+  }
+
+  private void goBack() {
+    if (this.client == null || backStack.isEmpty()) return;
+    forwardStack.push(this);
+    if (forwardStack.size() > MAX_HISTORY) forwardStack.removeLast();
+    this.client.setScreen(backStack.pop());
+  }
+
+  private void goForward() {
+    if (this.client == null || forwardStack.isEmpty()) return;
+    backStack.push(this);
+    if (backStack.size() > MAX_HISTORY) backStack.removeLast();
+    this.client.setScreen(forwardStack.pop());
   }
 
   @Override
