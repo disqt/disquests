@@ -330,7 +330,10 @@ public class QuestScreen extends DisquestsBaseScreen {
     // Snapshot originals for dirty tracking
     if (originalTitle == null) {
       originalTitle = quest.getTitle() != null ? quest.getTitle() : "";
-      originalContent = quest.getContent() != null ? quest.getContent() : "";
+      originalContent =
+          quest.getContent() != null
+              ? MarkdownRenderer.reverseResolveWikiLinks(quest.getContent())
+              : "";
     }
 
     // Title field
