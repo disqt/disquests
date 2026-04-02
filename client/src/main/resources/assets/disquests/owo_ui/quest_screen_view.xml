@@ -18,7 +18,7 @@
 
         <children>
 
-            <!-- Header row: title + owner/visibility info -->
+            <!-- Header row: back arrow + title + owner/visibility info -->
             <flow-layout direction="horizontal" id="header-row">
                 <sizing>
                     <horizontal method="fill">85</horizontal>
@@ -29,6 +29,13 @@
                     <bottom>4</bottom>
                 </margins>
                 <children>
+                    <button id="btn-back">
+                        <text>&lt;</text>
+                        <sizing>
+                            <horizontal method="fixed">20</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
                     <label id="title-label">
                         <text>Quest</text>
                         <shadow>true</shadow>
@@ -36,6 +43,9 @@
                             <horizontal method="fill">50</horizontal>
                             <vertical method="content"/>
                         </sizing>
+                        <margins>
+                            <left>4</left>
+                        </margins>
                     </label>
                     <label id="owner-label">
                         <text></text>
@@ -146,13 +156,6 @@
                     </button>
                     <button id="btn-delete">
                         <text>Delete</text>
-                        <sizing>
-                            <horizontal method="fixed">60</horizontal>
-                            <vertical method="fixed">20</vertical>
-                        </sizing>
-                    </button>
-                    <button id="btn-close">
-                        <text>Close</text>
                         <sizing>
                             <horizontal method="fixed">60</horizontal>
                             <vertical method="fixed">20</vertical>

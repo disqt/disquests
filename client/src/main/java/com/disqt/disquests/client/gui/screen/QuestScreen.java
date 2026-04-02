@@ -311,7 +311,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     deleteBtn.onPress(b -> confirmDelete());
     deleteBtn.active = isOwner;
 
-    root.childById(ButtonComponent.class, "btn-close").onPress(b -> this.close());
+    wireBackButton(root);
   }
 
   // ===================== EDIT MODE =====================
