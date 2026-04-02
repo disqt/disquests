@@ -47,8 +47,7 @@ public class MainScreen extends DisquestsBaseScreen {
   private FlowLayout questList;
   private FlowLayout searchRow;
   private ButtonComponent btnNewQuest;
-  private ButtonComponent btnJoin;
-  private ButtonComponent btnRequest;
+  private ButtonComponent btnInteract;
   private ButtonComponent btnOpen;
   private ButtonComponent btnClose;
 
@@ -100,8 +99,7 @@ public class MainScreen extends DisquestsBaseScreen {
     this.questList = root.childById(FlowLayout.class, "quest-list");
     this.searchRow = root.childById(FlowLayout.class, "search-row");
     this.btnNewQuest = root.childById(ButtonComponent.class, "btn-new-quest");
-    this.btnJoin = root.childById(ButtonComponent.class, "btn-join");
-    this.btnRequest = root.childById(ButtonComponent.class, "btn-request");
+    this.btnInteract = root.childById(ButtonComponent.class, "btn-interact");
     this.btnOpen = root.childById(ButtonComponent.class, "btn-open");
     this.btnClose = root.childById(ButtonComponent.class, "btn-close");
 
@@ -120,8 +118,7 @@ public class MainScreen extends DisquestsBaseScreen {
 
     // --- Wire action button handlers ---
     this.btnNewQuest.onPress(btn -> createNewQuest());
-    this.btnJoin.onPress(btn -> joinQuest());
-    this.btnRequest.onPress(btn -> requestAccess());
+    this.btnInteract.onPress(btn -> interactWithQuest());
     this.btnOpen.onPress(btn -> openSelected());
     this.btnClose.onPress(
         btn -> {
@@ -182,23 +179,20 @@ public class MainScreen extends DisquestsBaseScreen {
     }
 
     // Action button visibility: hide/show by removing/adding
-    // New Quest only on My Quests; Join+Request only on Server Quests
+    // New Quest only on My Quests; Interact only on Server Quests
     btnNewQuest.active(isMyQuests);
-    btnJoin.active(!isMyQuests);
-    btnRequest.active(!isMyQuests);
+    btnInteract.active(!isMyQuests);
 
     // Hide/show buttons by removing/re-adding to parent flow
     FlowLayout actionRow = rootLayout.childById(FlowLayout.class, "action-row");
     actionRow.removeChild(btnNewQuest);
-    actionRow.removeChild(btnJoin);
-    actionRow.removeChild(btnRequest);
+    actionRow.removeChild(btnInteract);
     if (isMyQuests) {
       // Insert New Quest before Open and Close
       actionRow.child(0, btnNewQuest);
     } else {
-      // Insert Join and Request before Open and Close
-      actionRow.child(0, btnRequest);
-      actionRow.child(0, btnJoin);
+      // Insert Interact before Open and Close
+      actionRow.child(0, btnInteract);
     }
 
     refreshListContents();
@@ -416,11 +410,32 @@ public class MainScreen extends DisquestsBaseScreen {
       Quest selected = getSelectedQuest();
       boolean hasSelection = selected != null;
       btnOpen.active(hasSelection);
-      btnJoin.active(hasSelection && selected.getVisibility() == Visibility.OPEN);
-      btnRequest.active(hasSelection && selected.getVisibility() == Visibility.CLOSED);
-      if (selected != null && ClientSession.isRequested(selected.getId())) {
-        markRequestButtonAsRequested();
-      }
+      updateInteractButton(selected);
+    }
+  }
+
+  private void updateInteractButton(Quest selected) {
+    if (selected == null) {
+      btnInteract.active(false);
+      btnInteract.setMessage(Text.translatable("gui.disquests.btn.join"));
+      btnInteract.tooltip((Text) null);
+      return;
+    }
+    if (ClientSession.isRequested(selected.getId())) {
+      btnInteract.setMessage(Text.translatable("gui.disquests.btn.requested"));
+      btnInteract.active(false);
+      btnInteract.tooltip(Text.translatable("gui.disquests.tooltip.already_requested"));
+    } else if (selected.getVisibility() == Visibility.OPEN) {
+      btnInteract.setMessage(Text.translatable("gui.disquests.btn.join"));
+      btnInteract.active(true);
+      btnInteract.tooltip((Text) null);
+    } else if (selected.getVisibility() == Visibility.CLOSED) {
+      btnInteract.setMessage(Text.translatable("gui.disquests.btn.request"));
+      btnInteract.active(true);
+      btnInteract.tooltip((Text) null);
+    } else {
+      btnInteract.active(false);
+      btnInteract.tooltip((Text) null);
     }
   }
 
@@ -453,9 +468,10 @@ public class MainScreen extends DisquestsBaseScreen {
     }
   }
 
-  private void markRequestButtonAsRequested() {
-    btnRequest.setMessage(Text.translatable("gui.disquests.btn.requested"));
-    btnRequest.active(false);
+  private void markInteractButtonAsRequested() {
+    btnInteract.setMessage(Text.translatable("gui.disquests.btn.requested"));
+    btnInteract.active(false);
+    btnInteract.tooltip(Text.translatable("gui.disquests.tooltip.already_requested"));
   }
 
   private void requestAccess() {
@@ -464,12 +480,22 @@ public class MainScreen extends DisquestsBaseScreen {
         "requestAccess: sel={}, visibility={}, btnActive={}",
         sel != null ? sel.getTitle() : "null",
         sel != null ? sel.getVisibility() : "n/a",
-        btnRequest.active());
+        btnInteract.active());
     if (sel != null && sel.getVisibility() == Visibility.CLOSED) {
       PacketSender.requestCollaboration(sel.getId());
       ClientSession.markRequested(sel.getId());
-      markRequestButtonAsRequested();
+      markInteractButtonAsRequested();
       showToast("Request sent to " + sel.getOwnerName());
+    }
+  }
+
+  private void interactWithQuest() {
+    Quest sel = getSelectedQuest();
+    if (sel == null) return;
+    if (sel.getVisibility() == Visibility.OPEN) {
+      joinQuest();
+    } else if (sel.getVisibility() == Visibility.CLOSED) {
+      requestAccess();
     }
   }
 
