@@ -81,7 +81,7 @@ class QuestContentJourney {
     then("view mode is shown again");
     waitForScreen(context, QuestScreen.class);
     when("player closes the quest");
-    click(context, "btn-close");
+    click(context, "btn-back");
     then("MainScreen is shown with one quest");
     waitForScreen(context, MainScreen.class);
     // Reopen fresh MainScreen to pick up new quest (parent screen is stale)

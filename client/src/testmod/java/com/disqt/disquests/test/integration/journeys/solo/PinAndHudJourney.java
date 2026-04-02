@@ -48,7 +48,7 @@ class PinAndHudJourney {
     type(context, "title-field", "First");
     click(context, "btn-save");
     waitForScreen(context, QuestScreen.class);
-    click(context, "btn-close");
+    click(context, "btn-back");
     waitForScreen(context, MainScreen.class);
     // Reopen fresh MainScreen to pick up new quest (parent screen is stale)
     openMainScreen(context);
@@ -59,7 +59,7 @@ class PinAndHudJourney {
     type(context, "title-field", "Second");
     click(context, "btn-save");
     waitForScreen(context, QuestScreen.class);
-    click(context, "btn-close");
+    click(context, "btn-back");
     waitForScreen(context, MainScreen.class);
     // Reopen fresh MainScreen to pick up new quest (parent screen is stale)
     openMainScreen(context);

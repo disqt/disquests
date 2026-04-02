@@ -59,7 +59,7 @@ class TwoPlayerJourneys {
     assertLabelText(context, "title-label", "Collab Quest");
 
     and("PlayerA closes the quest");
-    click(context, "btn-close");
+    click(context, "btn-back");
     waitForScreen(context, MainScreen.class);
     assertEntryCount(context, 1);
 
@@ -327,7 +327,7 @@ class TwoPlayerJourneys {
     assertLabelText(context, "title-label", "Open Quest");
 
     and("PlayerA closes the quest");
-    click(context, "btn-close");
+    click(context, "btn-back");
     waitForScreen(context, MainScreen.class);
 
     PhaseSync.signal("open-quest-created");

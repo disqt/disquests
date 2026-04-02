@@ -190,7 +190,7 @@ class CoordinatesJourney {
   @DisplayName("Return to MainScreen")
   void returnToMain(ClientGameTestContext context) {
     when("player closes the quest screen");
-    click(context, "btn-close");
+    click(context, "btn-back");
     then("MainScreen is shown");
     waitForScreen(context, MainScreen.class);
   }

@@ -40,7 +40,7 @@ class WikiLinkJourney {
     type(context, "title-field", title);
     click(context, "btn-save");
     waitForViewMode(context);
-    click(context, "btn-close");
+    click(context, "btn-back");
     waitForScreen(context, MainScreen.class);
   }
 
@@ -243,7 +243,7 @@ class WikiLinkJourney {
   @DisplayName("Content with only wiki-link syntax saves and view mode is stable")
   void contentOnlyWikiLink(ClientGameTestContext context) {
     given("player returns to MainScreen");
-    click(context, "btn-close");
+    click(context, "btn-back");
     waitForScreen(context, MainScreen.class);
     openMainScreen(context);
     waitForEntryCount(context, 2);
@@ -278,7 +278,7 @@ class WikiLinkJourney {
   void standaloneWikiLinkRendersAfterReopen(ClientGameTestContext context) {
     given("'Link Source' has only a wiki-link as content");
     // Re-open from list to get server-resolved content
-    click(context, "btn-close");
+    click(context, "btn-back");
     waitForScreen(context, MainScreen.class);
     openMainScreen(context);
     waitForEntryCount(context, 2);

@@ -209,7 +209,7 @@ class TagJourney {
   void verifyQuestInList(ClientGameTestContext context) {
     given("quest is saved with a tag");
     when("player closes quest and opens MainScreen");
-    click(context, "btn-close");
+    click(context, "btn-back");
     waitForScreen(context, MainScreen.class);
     openMainScreen(context);
     then("quest appears in the list");
