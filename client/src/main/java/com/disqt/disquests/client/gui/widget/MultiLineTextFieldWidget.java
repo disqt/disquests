@@ -344,6 +344,16 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
     return displayLine * textRenderer.fontHeight - (int) scrollY + padding;
   }
 
+  /** Returns the X offset of the cursor relative to the widget's left, accounting for scroll. */
+  public int getCursorScreenX() {
+    int displayCursorX = getDisplayCursorX();
+    int displayLine = getDisplayLineForCursor();
+    String dispLineStr = displayLines.get(displayLine);
+    String beforeCursor = dispLineStr.substring(0, Math.min(displayCursorX, dispLineStr.length()));
+    int padding = 5;
+    return padding + (int) Math.round(textRenderer.getWidth(beforeCursor) - scrollX);
+  }
+
   /** Returns the height of a single text line. */
   public int getLineHeight() {
     return textRenderer.fontHeight;

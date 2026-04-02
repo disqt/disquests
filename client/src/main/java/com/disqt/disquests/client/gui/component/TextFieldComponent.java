@@ -163,7 +163,7 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
     }
     // afterOpen is the partial query typed after [[
     // Position dropdown below the current cursor line within the text field
-    int cursorScreenX = this.x() + 4;
+    int cursorScreenX = this.x() + delegate.getCursorScreenX();
     int cursorScreenY = this.y() + delegate.getCursorScreenY() + delegate.getLineHeight();
     dropdown.update(afterOpen, cursorScreenX, cursorScreenY);
   }
