@@ -86,10 +86,10 @@ class TwoPlayerJourneys {
 
     when("PlayerB selects the quest and clicks Request");
     clickEntryByTitle(context, "Collab Quest");
-    click(context, "btn-request");
+    click(context, "btn-interact");
 
     then("button shows Requested");
-    assertButtonText(context, "btn-request", "Requested");
+    assertButtonText(context, "btn-interact", "Requested");
 
     PhaseSync.signal("collab-request-sent");
   }
@@ -353,7 +353,7 @@ class TwoPlayerJourneys {
 
     when("PlayerB selects the quest and clicks Join");
     clickEntryByTitle(context, "Open Quest");
-    click(context, "btn-join");
+    click(context, "btn-interact");
 
     then("quest appears in PlayerB's My Quests");
     waitForQuestByTitle(context, "Open Quest", true);
