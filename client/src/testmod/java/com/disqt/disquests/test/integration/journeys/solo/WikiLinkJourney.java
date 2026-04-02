@@ -162,14 +162,6 @@ class WikiLinkJourney {
           return root.childById(OverlayContainer.class, "autocomplete-overlay") != null;
         },
         TIMEOUT);
-
-    and("player presses Escape to dismiss");
-    context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
-    context.waitTicks(2);
-
-    and("cancels edit");
-    click(context, "btn-cancel");
-    waitForViewMode(context);
   }
 
   @Test
@@ -177,27 +169,21 @@ class WikiLinkJourney {
   @PlayerA
   @DisplayName("Selecting autocomplete suggestion completes wiki-link")
   void autocompleteSelectionCompletesLink(ClientGameTestContext context) {
-    given("player is viewing 'Link Source'");
-    assertScreenIs(context, QuestScreen.class);
+    given("player is still on edit mode with autocomplete open from previous test");
 
-    when("player enters edit mode and types [[L");
-    click(context, "btn-edit");
-    waitForEditMode(context);
-    type(context, "content-field", "[[L");
+    when("player presses Enter to select the first suggestion");
+    context.getInput().pressKey(GLFW.GLFW_KEY_ENTER);
+    context.waitTicks(10);
 
-    and("waits for autocomplete to appear");
+    then("autocomplete overlay is dismissed");
     context.waitFor(
         client -> {
           if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
           var root = dScreen.getRootComponent();
           if (root == null) return false;
-          return root.childById(OverlayContainer.class, "autocomplete-overlay") != null;
+          return root.childById(OverlayContainer.class, "autocomplete-overlay") == null;
         },
         TIMEOUT);
-
-    and("presses Enter to select the first suggestion");
-    context.getInput().pressKey(GLFW.GLFW_KEY_ENTER);
-    context.waitTicks(2);
 
     then("content field contains the completed wiki-link");
     String content = readContentField(context);
@@ -206,8 +192,8 @@ class WikiLinkJourney {
         content.contains("[[Link Target]]"),
         "Content should contain completed wiki-link, got: " + content);
 
-    and("cancels edit");
-    click(context, "btn-cancel");
+    and("saves to return to view mode");
+    click(context, "btn-save");
     waitForViewMode(context);
   }
 
