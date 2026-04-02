@@ -126,17 +126,10 @@
                     <bottom>4</bottom>
                 </margins>
                 <children>
-                    <button id="btn-join">
+                    <button id="btn-interact">
                         <text>Join</text>
                         <sizing>
-                            <horizontal method="fixed">60</horizontal>
-                            <vertical method="fixed">20</vertical>
-                        </sizing>
-                    </button>
-                    <button id="btn-request">
-                        <text>Request</text>
-                        <sizing>
-                            <horizontal method="fixed">60</horizontal>
+                            <horizontal method="fixed">70</horizontal>
                             <vertical method="fixed">20</vertical>
                         </sizing>
                     </button>
