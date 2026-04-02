@@ -167,6 +167,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
           player,
           PacketCodec.writeUpdateQuest(
               resolveWikiLinks(saved, playerUuid), getProtocolVersion(player)));
+      broadcastSyncTags();
     } else {
       // Existing quest - check permission
       boolean isOwner = existing.ownerUuid().equals(playerUuid);
@@ -198,6 +199,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
       Player owner = Bukkit.getPlayer(saved.ownerUuid());
       if (owner != null && isModPlayer(owner)) sendPacket(owner, packet);
       broadcastToContributors(saved, packet);
+      broadcastSyncTags();
     }
   }
 
@@ -535,6 +537,17 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
       Player p = Bukkit.getPlayer(c.uuid());
       if (p != null && isModPlayer(p)) {
         sendPacket(p, data);
+      }
+    }
+  }
+
+  /** Broadcasts an updated SYNC_TAGS packet to all connected V1+ mod players. */
+  private void broadcastSyncTags() {
+    List<String> allTags = dataManager.getAllDistinctTags(config.getPredefinedTags());
+    byte[] packet = PacketCodec.writeSyncTags(allTags);
+    for (Player p : getModPlayers()) {
+      if (getProtocolVersion(p) >= ProtocolVersion.V1) {
+        sendPacket(p, packet);
       }
     }
   }
