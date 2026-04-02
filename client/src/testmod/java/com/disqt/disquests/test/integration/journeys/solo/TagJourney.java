@@ -14,6 +14,7 @@ import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
 import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.core.UIComponent;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import org.junit.jupiter.api.BeforeAll;
@@ -501,6 +502,66 @@ class TagJourney {
     waitForEditMode(context);
     click(context, "btn-cancel");
     waitForViewMode(context);
+  }
+
+  @Test
+  @Order(12)
+  @PlayerA
+  @DisplayName("Plain text search matches tag names")
+  void plainTextSearchMatchesTags(ClientGameTestContext context) {
+    given("player is on MainScreen with a tagged quest");
+    openMainScreen(context);
+    waitForEntryCount(context, 1);
+
+    // Get tag name from cache
+    String tagName =
+        context.computeOnClient(
+            c ->
+                ClientCache.getMyQuests().stream()
+                    .filter(q -> "Tag Test".equals(q.getTitle()))
+                    .findFirst()
+                    .flatMap(q -> q.getTags().stream().findFirst())
+                    .orElse(null));
+    org.junit.jupiter.api.Assertions.assertNotNull(tagName, "Quest should have a tag");
+
+    when("player types the tag name WITHOUT # prefix");
+    type(context, "search-box", tagName);
+    then("quest with that tag is shown");
+    waitForEntryCount(context, 1);
+
+    when("player clears search");
+    type(context, "search-box", "");
+    then("all quests return");
+    waitForEntryCount(context, 1);
+  }
+
+  @Test
+  @Order(13)
+  @PlayerA
+  @DisplayName("Tag autocomplete appears when typing # in search")
+  void tagAutocompleteAppearsOnHash(ClientGameTestContext context) {
+    given("player is on MainScreen");
+    openMainScreen(context);
+
+    when("player types '#' in the search box");
+    type(context, "search-box", "#");
+
+    then("tag autocomplete overlay appears");
+    context.waitFor(
+        client -> {
+          if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+          var root = dScreen.getRootComponent();
+          if (root == null) return false;
+          return root.childById(OverlayContainer.class, "tag-autocomplete-overlay") != null;
+        },
+        TIMEOUT);
+
+    and("player presses Escape to dismiss");
+    context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+    context.waitTicks(2);
+
+    when("player clears search");
+    type(context, "search-box", "");
   }
 
   /** Click a specific tag chip by tag name in the TagPickerScreen chip cloud. */
