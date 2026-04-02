@@ -511,7 +511,7 @@ class TagJourney {
   void plainTextSearchMatchesTags(ClientGameTestContext context) {
     given("player is on MainScreen with a tagged quest");
     openMainScreen(context);
-    waitForEntryCount(context, 1);
+    waitForEntryCount(context, 2);
 
     // Get tag name from cache
     String tagName =
@@ -532,7 +532,7 @@ class TagJourney {
     when("player clears search");
     type(context, "search-box", "");
     then("all quests return");
-    waitForEntryCount(context, 1);
+    waitForEntryCount(context, 2);
   }
 
   @Test
