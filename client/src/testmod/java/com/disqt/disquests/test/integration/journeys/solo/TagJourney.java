@@ -454,6 +454,55 @@ class TagJourney {
     waitForEditMode(context);
   }
 
+  @Test
+  @Order(11)
+  @PlayerA
+  @DisplayName("Custom tag from one quest appears in another quest's picker")
+  void customTagAppearsInOtherQuestPicker(ClientGameTestContext context) {
+    given("'Tag Test' has custom tag 'piwigord' from previous test");
+
+    when("player cancels edit mode and closes quest");
+    click(context, "btn-cancel");
+    waitForViewMode(context);
+    click(context, "btn-close");
+    waitForScreen(context, MainScreen.class);
+
+    and("creates a second quest 'Tag Test 2'");
+    openMainScreen(context);
+    click(context, "btn-new-quest");
+    waitForScreen(context, QuestScreen.class);
+    type(context, "title-field", "Tag Test 2");
+    click(context, "btn-save");
+    waitForViewMode(context);
+
+    and("opens edit mode and tag picker");
+    click(context, "btn-edit");
+    waitForEditMode(context);
+    click(context, "btn-add-tag");
+    waitForScreen(context, TagPickerScreen.class);
+
+    then("'piwigord' appears as a chip in the picker");
+    context.waitFor(
+        client -> {
+          if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+          var root = dScreen.getRootComponent();
+          if (root == null) return false;
+          FlowLayout chipCloud = root.childById(FlowLayout.class, "chip-cloud");
+          if (chipCloud == null) return false;
+          return chipCloud.children().stream()
+              .anyMatch(
+                  child ->
+                      child instanceof TagChipComponent chip && "piwigord".equals(chip.getTag()));
+        },
+        TIMEOUT);
+
+    and("player cancels picker");
+    click(context, "btn-cancel");
+    waitForEditMode(context);
+    click(context, "btn-cancel");
+    waitForViewMode(context);
+  }
+
   /** Click a specific tag chip by tag name in the TagPickerScreen chip cloud. */
   private void clickChipByTag(ClientGameTestContext context, String tagName) {
     waitForScreen(context, TagPickerScreen.class);
