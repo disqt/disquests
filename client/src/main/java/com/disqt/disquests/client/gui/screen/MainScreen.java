@@ -50,7 +50,6 @@ public class MainScreen extends DisquestsBaseScreen {
   private ButtonComponent btnNewQuest;
   private ButtonComponent btnInteract;
   private ButtonComponent btnOpen;
-  private ButtonComponent btnClose;
 
   // Search
   private TextBoxComponent searchField;
@@ -102,7 +101,6 @@ public class MainScreen extends DisquestsBaseScreen {
     this.btnNewQuest = root.childById(ButtonComponent.class, "btn-new-quest");
     this.btnInteract = root.childById(ButtonComponent.class, "btn-interact");
     this.btnOpen = root.childById(ButtonComponent.class, "btn-open");
-    this.btnClose = root.childById(ButtonComponent.class, "btn-close");
 
     // --- Wire tab button handlers ---
     this.tabMyQuests.onPress(btn -> selectTab(ClientSession.Tab.MY_QUESTS));
@@ -121,10 +119,7 @@ public class MainScreen extends DisquestsBaseScreen {
     this.btnNewQuest.onPress(btn -> createNewQuest());
     this.btnInteract.onPress(btn -> interactWithQuest());
     this.btnOpen.onPress(btn -> openSelected());
-    this.btnClose.onPress(
-        btn -> {
-          if (this.client != null) this.client.setScreen(null);
-        });
+    wireBackButton(root);
 
     // --- Create search text box programmatically ---
     this.searchField = UIComponents.textBox(Sizing.fixed(200));
@@ -189,10 +184,10 @@ public class MainScreen extends DisquestsBaseScreen {
     actionRow.removeChild(btnNewQuest);
     actionRow.removeChild(btnInteract);
     if (isMyQuests) {
-      // Insert New Quest before Open and Close
+      // Insert New Quest before Open
       actionRow.child(0, btnNewQuest);
     } else {
-      // Insert Interact before Open and Close
+      // Insert Interact before Open
       actionRow.child(0, btnInteract);
     }
 
