@@ -1,6 +1,9 @@
 package com.disqt.disquests.client.gui.widget;
 
+import com.disqt.disquests.client.ClientCache;
+import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.helper.HoverPreviewRenderer;
 import com.disqt.disquests.client.gui.widget.undoredo.TextAction;
 import com.disqt.disquests.client.gui.widget.undoredo.UndoManager;
 import com.google.common.collect.Lists;
@@ -9,12 +12,17 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.*;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 import net.minecraft.client.input.CharInput;
 import net.minecraft.client.input.KeyInput;
+import net.minecraft.text.Style;
+import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
 public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
@@ -79,6 +87,13 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
   protected List<String> displayLines = new ArrayList<>();
   protected List<Integer> displayToLogical = new ArrayList<>();
   protected List<Integer> displayToOffset = new ArrayList<>();
+
+  // Wiki-link syntax highlighting
+  private static final Pattern WIKI_LINK_EDIT_PATTERN = Pattern.compile("\\[\\[[^\\]]*\\]\\]");
+  private static final int WIKI_LINK_COLOR = 0xFFe8a86d; // amber
+  private List<List<int[]>> displayLineWikiLinks = new ArrayList<>();
+  private boolean wikiLinkSegmentsDirty = true;
+  private boolean previewVisible = false;
 
   public MultiLineTextFieldWidget(
       TextRenderer textRenderer,
@@ -165,6 +180,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
         displayToLogical.add(i);
         displayToOffset.add(0);
       }
+      wikiLinkSegmentsDirty = true;
       return;
     }
 
@@ -190,6 +206,39 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
         offset += trimmed.length();
       }
     }
+    wikiLinkSegmentsDirty = true;
+  }
+
+  /**
+   * Scans display lines for [[...]] patterns and caches their character ranges. Each entry in
+   * displayLineWikiLinks corresponds to a display line and contains a list of [start, end] pairs
+   * (relative to the display line string).
+   */
+  private void rebuildWikiLinkSegments() {
+    displayLineWikiLinks.clear();
+    for (int di = 0; di < displayLines.size(); di++) {
+      List<int[]> segments = new ArrayList<>();
+      int logicalLine = displayToLogical.get(di);
+      int dispOffset = displayToOffset.get(di);
+      String fullLogical = lines.get(logicalLine);
+
+      // Find all [[...]] in the logical line
+      Matcher m = WIKI_LINK_EDIT_PATTERN.matcher(fullLogical);
+      int dispLen = displayLines.get(di).length();
+      int dispEnd = dispOffset + dispLen;
+      while (m.find()) {
+        int matchStart = m.start();
+        int matchEnd = m.end();
+        // Clip to this display line's range
+        int segStart = Math.max(matchStart, dispOffset) - dispOffset;
+        int segEnd = Math.min(matchEnd, dispEnd) - dispOffset;
+        if (segStart < segEnd && segStart < dispLen) {
+          segments.add(new int[] {segStart, segEnd});
+        }
+      }
+      displayLineWikiLinks.add(segments);
+    }
+    wikiLinkSegmentsDirty = false;
   }
 
   protected int getDisplayLineForCursor() {
@@ -275,6 +324,43 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
 
   public int getCursorAbsolute() {
     return getAbsoluteIndex(cursorY, cursorX);
+  }
+
+  /** Returns the Y offset of the cursor relative to the widget's top, accounting for scroll. */
+  public int getCursorScreenY() {
+    int displayLine = 0;
+    if (wordWrap) {
+      for (int i = 0; i < displayToLogical.size(); i++) {
+        if (displayToLogical.get(i) == cursorY
+            && displayToOffset.get(i) + displayLines.get(i).length() >= cursorX) {
+          displayLine = i;
+          break;
+        }
+      }
+    } else {
+      displayLine = cursorY;
+    }
+    int padding = 5;
+    return displayLine * textRenderer.fontHeight - (int) scrollY + padding;
+  }
+
+  /** Returns the height of a single text line. */
+  public int getLineHeight() {
+    return textRenderer.fontHeight;
+  }
+
+  /** Returns true if a wiki-link hover preview is currently being drawn. For E2E testing. */
+  public boolean isPreviewVisible() {
+    return previewVisible;
+  }
+
+  /** Searches ClientCache for a quest matching the given title. Returns null if not found. */
+  private static Quest findQuestByTitle(String title) {
+    if (title == null || title.isEmpty()) return null;
+    return Stream.concat(ClientCache.getMyQuests().stream(), ClientCache.getServerQuests().stream())
+        .filter(q -> title.equals(q.getTitle()))
+        .findFirst()
+        .orElse(null);
   }
 
   public int getSelectionStartAbsolute() {
@@ -504,13 +590,95 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
       }
     }
 
-    // Draw lines (with horizontal scroll applied)
+    // Draw lines with wiki-link syntax highlighting
+    if (wikiLinkSegmentsDirty) rebuildWikiLinkSegments();
     for (int di = firstVisibleLine; di <= lastVisibleLine; di++) {
       int lineYPos = contentY + (di * textRenderer.fontHeight) - (int) scrollY;
       if (lineYPos > this.y - textRenderer.fontHeight && lineYPos < this.y + this.height) {
         int drawX = contentX - (int) Math.round(scrollX);
-        context.drawText(
-            this.textRenderer, displayLines.get(di), drawX, lineYPos, Colors.TEXT_PRIMARY, false);
+        String dispLine = displayLines.get(di);
+        List<int[]> wikiLinks =
+            di < displayLineWikiLinks.size() ? displayLineWikiLinks.get(di) : List.of();
+
+        if (wikiLinks.isEmpty()) {
+          // Fast path: no wiki-links on this line
+          context.drawText(
+              this.textRenderer, dispLine, drawX, lineYPos, Colors.TEXT_PRIMARY, false);
+        } else {
+          // Segmented drawing: alternate between normal and wiki-link styled text
+          int pos = 0;
+          int currentX = drawX;
+          for (int[] seg : wikiLinks) {
+            // Normal segment before this wiki-link
+            if (pos < seg[0]) {
+              String normal = dispLine.substring(pos, seg[0]);
+              context.drawText(
+                  this.textRenderer, normal, currentX, lineYPos, Colors.TEXT_PRIMARY, false);
+              currentX += this.textRenderer.getWidth(normal);
+            }
+            // Wiki-link segment: amber + italics + underline
+            String wikiText = dispLine.substring(seg[0], seg[1]);
+            Text styledText =
+                Text.literal(wikiText)
+                    .setStyle(
+                        Style.EMPTY
+                            .withColor(WIKI_LINK_COLOR)
+                            .withItalic(true)
+                            .withUnderline(true));
+            context.drawText(
+                this.textRenderer, styledText.asOrderedText(), currentX, lineYPos, -1, false);
+            currentX += this.textRenderer.getWidth(wikiText);
+            pos = seg[1];
+          }
+          // Remaining normal text after last wiki-link
+          if (pos < dispLine.length()) {
+            String remaining = dispLine.substring(pos);
+            context.drawText(
+                this.textRenderer, remaining, currentX, lineYPos, Colors.TEXT_PRIMARY, false);
+          }
+        }
+      }
+    }
+
+    // Wiki-link hover preview in edit mode
+    previewVisible = false;
+    if (this.focused) {
+      // Check if mouse is over a wiki-link segment
+      int hoverAbsIndex = absoluteIndexFromMouse(mouseX, mouseY);
+      // Find which display line the mouse is on
+      int hoverDisplayLine =
+          (int) ((mouseY - (this.y + padding) + scrollY) / textRenderer.fontHeight);
+      hoverDisplayLine = Math.max(0, Math.min(hoverDisplayLine, displayLines.size() - 1));
+      if (hoverDisplayLine < displayLineWikiLinks.size()) {
+        List<int[]> segments = displayLineWikiLinks.get(hoverDisplayLine);
+        int dispOffset = displayToOffset.get(hoverDisplayLine);
+        int logicalLine = displayToLogical.get(hoverDisplayLine);
+        // Convert absolute index to position within this display line
+        int absLineStart = getAbsoluteIndex(logicalLine, dispOffset);
+        int posInDispLine = hoverAbsIndex - absLineStart;
+        for (int[] seg : segments) {
+          if (posInDispLine >= seg[0] && posInDispLine < seg[1]) {
+            // Extract title from between [[ and ]]
+            String dispLine = displayLines.get(hoverDisplayLine);
+            String wikiText = dispLine.substring(seg[0], seg[1]);
+            if (wikiText.startsWith("[[") && wikiText.endsWith("]]")) {
+              String title = wikiText.substring(2, wikiText.length() - 2);
+              Quest quest = findQuestByTitle(title);
+              if (quest != null) {
+                MinecraftClient mc = MinecraftClient.getInstance();
+                HoverPreviewRenderer.draw(
+                    context,
+                    quest,
+                    mouseX,
+                    mouseY,
+                    mc.getWindow().getScaledWidth(),
+                    mc.getWindow().getScaledHeight());
+                previewVisible = true;
+              }
+            }
+            break;
+          }
+        }
       }
     }
 

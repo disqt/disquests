@@ -69,10 +69,6 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
     context.getMatrices().translate(offsetX, offsetY);
     delegate.render((DrawContext) context, mouseX - offsetX, mouseY - offsetY, delta);
     context.getMatrices().popMatrix();
-    // Draw autocomplete dropdown on top, positioned relative to this component
-    if (dropdown != null) {
-      dropdown.draw(context, this.x(), this.y());
-    }
   }
 
   @Override
@@ -166,8 +162,10 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
       return;
     }
     // afterOpen is the partial query typed after [[
-    // Position dropdown at bottom-left of this component
-    dropdown.update(afterOpen, 0, this.height());
+    // Position dropdown below the current cursor line within the text field
+    int cursorScreenX = this.x() + 4;
+    int cursorScreenY = this.y() + delegate.getCursorScreenY() + delegate.getLineHeight();
+    dropdown.update(afterOpen, cursorScreenX, cursorScreenY);
   }
 
   @Override

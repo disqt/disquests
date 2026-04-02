@@ -327,10 +327,15 @@ public class QuestScreen extends DisquestsBaseScreen {
   // ===================== EDIT MODE =====================
 
   private void buildEditMode(FlowLayout root) {
+    String editableContent =
+        quest.getContent() != null
+            ? MarkdownRenderer.reverseResolveWikiLinks(quest.getContent())
+            : "";
+
     // Snapshot originals for dirty tracking
     if (originalTitle == null) {
       originalTitle = quest.getTitle() != null ? quest.getTitle() : "";
-      originalContent = quest.getContent() != null ? quest.getContent() : "";
+      originalContent = editableContent;
     }
 
     // Title field
@@ -365,7 +370,7 @@ public class QuestScreen extends DisquestsBaseScreen {
             0,
             400,
             200,
-            quest.getContent() != null ? quest.getContent() : "",
+            editableContent,
             Text.translatable("gui.disquests.placeholder.content").getString(),
             Integer.MAX_VALUE,
             true,
@@ -390,6 +395,7 @@ public class QuestScreen extends DisquestsBaseScreen {
           }
         });
     contentFieldComponent.setAutocomplete(autocomplete);
+    autocomplete.setRootComponent(root);
 
     // Coords section
     buildCoordsSection(root);
@@ -624,7 +630,10 @@ public class QuestScreen extends DisquestsBaseScreen {
     if (!canEdit) return;
     persistFieldValues();
     String origTitle = quest.getTitle() != null ? quest.getTitle() : "";
-    String origContent = quest.getContent() != null ? quest.getContent() : "";
+    String origContent =
+        quest.getContent() != null
+            ? MarkdownRenderer.reverseResolveWikiLinks(quest.getContent())
+            : "";
     navigateToScreen(new QuestScreen(this.parent, quest, true, isNewQuest, origTitle, origContent));
   }
 

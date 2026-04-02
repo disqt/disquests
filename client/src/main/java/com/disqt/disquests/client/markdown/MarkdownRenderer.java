@@ -48,6 +48,32 @@ public class MarkdownRenderer {
             });
   }
 
+  /**
+   * Converts server-resolved wiki-links back to raw form for editing. {@code [[uuid|title]]}
+   * becomes {@code [[Current Title]]} using cache lookup, or {@code [[title]]} if not found.
+   */
+  public static String reverseResolveWikiLinks(String content) {
+    if (content == null || content.isEmpty()) return content;
+    return WIKI_LINK_PATTERN
+        .matcher(content)
+        .replaceAll(
+            m -> {
+              String uuidStr = m.group(1);
+              String displayTitle = m.group(2);
+              if (uuidStr.isEmpty()) {
+                return java.util.regex.Matcher.quoteReplacement("[[" + displayTitle + "]]");
+              }
+              try {
+                java.util.UUID questId = java.util.UUID.fromString(uuidStr);
+                var quest = com.disqt.disquests.client.ClientCache.getQuestById(questId);
+                String title = quest != null ? quest.getTitle() : displayTitle;
+                return java.util.regex.Matcher.quoteReplacement("[[" + title + "]]");
+              } catch (IllegalArgumentException e) {
+                return java.util.regex.Matcher.quoteReplacement("[[" + displayTitle + "]]");
+              }
+            });
+  }
+
   public static List<RenderedLine> render(String markdown) {
     if (markdown == null || markdown.isEmpty()) {
       return List.of(RenderedLine.empty());
@@ -198,6 +224,28 @@ public class MarkdownRenderer {
       lines.add(
           RenderedLine.normal(
               Text.literal("---").setStyle(Style.EMPTY.withColor(Formatting.DARK_GRAY)), indent));
+    } else if (node instanceof org.commonmark.node.HtmlBlock htmlBlock) {
+      // HtmlBlock occurs when <dqlink .../> is on its own line after a blank line.
+      // Scan for dqlink tags and render them the same way as inline wiki-links.
+      String literal = htmlBlock.getLiteral();
+      Matcher m = DQLINK_ATTR_PATTERN.matcher(literal);
+      if (m.find()) {
+        String uuid = m.group(1);
+        String title =
+            m.group(2)
+                .replace("&amp;", "&")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&quot;", "\"");
+        boolean isValid = !uuid.isEmpty();
+        int color = isValid ? 0xe8a86d : 0xe86d6d;
+        Style wikiStyle = style.withColor(color).withUnderline(true);
+        if (!isValid) wikiStyle = wikiStyle.withStrikethrough(true);
+        String command =
+            isValid ? WIKI_LINK_COMMAND_PREFIX + uuid : WIKI_LINK_COMMAND_PREFIX + WIKI_LINK_BROKEN;
+        wikiStyle = wikiStyle.withClickEvent(new ClickEvent.RunCommand(command));
+        lines.add(RenderedLine.normal(Text.literal(title).setStyle(wikiStyle), indent));
+      }
     } else {
       // Fallback: try to render children
       renderChildren(node, lines, indent, style);
