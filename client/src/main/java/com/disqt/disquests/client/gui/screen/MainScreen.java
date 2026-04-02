@@ -230,7 +230,8 @@ public class MainScreen extends DisquestsBaseScreen {
       String tf = query.textFilter();
       boolean textMatch =
           q.getTitle().toLowerCase().contains(tf)
-              || (q.getContent() != null && q.getContent().toLowerCase().contains(tf));
+              || (q.getContent() != null && q.getContent().toLowerCase().contains(tf))
+              || q.getTags().stream().anyMatch(t -> t.toLowerCase().contains(tf));
       if (!textMatch) return false;
     }
     if (!query.tagFilters().isEmpty()) {
