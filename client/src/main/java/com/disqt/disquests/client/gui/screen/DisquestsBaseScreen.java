@@ -122,6 +122,17 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     return super.charTyped(charInput);
   }
 
+  /**
+   * Wires the back arrow button (btn-back) to close this screen. Call from each screen's build()
+   * after the root is available.
+   */
+  protected void wireBackButton(FlowLayout root) {
+    ButtonComponent backBtn = root.childById(ButtonComponent.class, "btn-back");
+    if (backBtn != null) {
+      backBtn.onPress(b -> this.close());
+    }
+  }
+
   protected void applyThemeRoot(FlowLayout root) {
     root.surface(DisquestsClient.CONFIG.theme().rootSurface());
   }
