@@ -23,6 +23,10 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   public static final String CONFIRM_YES_ID = "btn-confirm-yes";
   public static final String CONFIRM_NO_ID = "btn-confirm-no";
 
+  private static final java.util.Deque<Screen> backStack = new java.util.ArrayDeque<>();
+  private static final java.util.Deque<Screen> forwardStack = new java.util.ArrayDeque<>();
+  private static final int MAX_HISTORY = 20;
+
   @Nullable protected final Screen parent;
 
   protected DisquestsBaseScreen(DataSource source, @Nullable Screen parent) {
@@ -30,9 +34,17 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     this.parent = parent;
   }
 
+  public static void clearHistory() {
+    backStack.clear();
+    forwardStack.clear();
+  }
+
   @Override
   public void close() {
     if (this.client != null) {
+      if (parent == null) {
+        clearHistory();
+      }
       this.client.setScreen(parent);
     }
   }
@@ -110,6 +122,9 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
 
   protected void navigateToScreen(Screen screen) {
     if (this.client != null) {
+      backStack.push(this);
+      if (backStack.size() > MAX_HISTORY) backStack.removeLast();
+      forwardStack.clear();
       this.client.setScreen(screen);
     }
   }
