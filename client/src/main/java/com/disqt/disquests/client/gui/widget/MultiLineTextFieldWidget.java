@@ -650,9 +650,9 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
       }
     }
 
-    // Wiki-link hover preview in edit mode
+    // Wiki-link hover preview in edit mode (works without focus)
     previewVisible = false;
-    if (this.focused) {
+    {
       // Check if mouse is over a wiki-link segment
       int hoverAbsIndex = absoluteIndexFromMouse(mouseX, mouseY);
       // Find which display line the mouse is on
