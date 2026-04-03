@@ -237,7 +237,7 @@ public class MarkdownRenderer {
                 .replace("&lt;", "<")
                 .replace("&gt;", ">")
                 .replace("&quot;", "\"");
-        boolean isValid = !uuid.isEmpty();
+        boolean isValid = isWikiLinkResolvable(uuid);
         int color = isValid ? 0xe8a86d : 0xe86d6d;
         Style wikiStyle = style.withColor(color).withUnderline(true);
         if (!isValid) wikiStyle = wikiStyle.withStrikethrough(true);
@@ -323,7 +323,7 @@ public class MarkdownRenderer {
                 .replace("&lt;", "<")
                 .replace("&gt;", ">")
                 .replace("&quot;", "\"");
-        boolean isValid = !uuid.isEmpty();
+        boolean isValid = isWikiLinkResolvable(uuid);
         int color = isValid ? 0xe8a86d : 0xe86d6d; // amber or red
         Style wikiStyle = style.withColor(color).withUnderline(true);
         if (!isValid) wikiStyle = wikiStyle.withStrikethrough(true);
@@ -341,6 +341,17 @@ public class MarkdownRenderer {
       // Unknown inline -- try children
       MutableText inner = collectInlineText(node, style);
       target.append(inner);
+    }
+  }
+
+  /** A wiki-link is resolvable if the UUID is non-empty and the quest exists in the cache. */
+  private static boolean isWikiLinkResolvable(String uuid) {
+    if (uuid == null || uuid.isEmpty()) return false;
+    try {
+      return com.disqt.disquests.client.ClientCache.getQuestById(java.util.UUID.fromString(uuid))
+          != null;
+    } catch (IllegalArgumentException e) {
+      return false;
     }
   }
 }
