@@ -73,7 +73,7 @@
                 <scroll-id>content-scroll</scroll-id>
                 <list-id>content-area</list-id>
                 <width>85</width>
-                <height>65</height>
+                <height>55</height>
             </template>
 
             <!-- Metadata row (coords, map, BlueMap button, hidden when no coords) -->
