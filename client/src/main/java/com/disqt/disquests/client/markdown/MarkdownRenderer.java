@@ -95,6 +95,48 @@ public class MarkdownRenderer {
   }
 
   /**
+   * Returns the first non-heading content line as a styled MutableText with muted colors. Headings
+   * (scale != 1.0) and empty lines are skipped. Wiki-links are resolved to display titles. Returns
+   * null if no content line is found.
+   */
+  public static MutableText renderPreviewLine(String markdown) {
+    if (markdown == null || markdown.isEmpty()) return null;
+    List<RenderedLine> lines = render(markdown);
+    for (RenderedLine line : lines) {
+      if (line.scale() != 1.0f) continue; // skip headings
+      String plain = line.text().getString();
+      if (plain.isBlank()) continue;
+      return muteColors(line.text());
+    }
+    return null;
+  }
+
+  /** Copies a MutableText tree, dimming all colors for use as a content preview. */
+  private static MutableText muteColors(MutableText original) {
+    Style style = original.getStyle();
+    // Dim existing colors; default to GRAY
+    if (style.getColor() != null) {
+      int rgb = style.getColor().getRgb();
+      // Blend toward gray: reduce brightness by ~40%
+      int r = ((rgb >> 16) & 0xFF) * 6 / 10;
+      int g = ((rgb >> 8) & 0xFF) * 6 / 10;
+      int b = (rgb & 0xFF) * 6 / 10;
+      style = style.withColor((r << 16) | (g << 8) | b);
+    } else {
+      style = style.withColor(Formatting.GRAY);
+    }
+    // Remove click events from preview
+    style = style.withClickEvent(null);
+    MutableText result = Text.literal(original.getString()).setStyle(style);
+    for (Text sibling : original.getSiblings()) {
+      if (sibling instanceof MutableText mt) {
+        result.append(muteColors(mt));
+      }
+    }
+    return result;
+  }
+
+  /**
    * Strips all markdown formatting and returns plain text. Useful for HUD display where styled text
    * is not needed.
    */

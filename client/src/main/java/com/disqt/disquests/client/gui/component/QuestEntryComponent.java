@@ -20,6 +20,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.Click;
+import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
@@ -35,7 +36,7 @@ public class QuestEntryComponent extends BaseUIComponent {
       Text.translatable("gui.disquests.label.request_access").formatted(Formatting.ITALIC);
 
   private final Quest quest;
-  private final String firstLine;
+  private final MutableText styledFirstLine;
   private final boolean isOwnedByPlayer;
   private final boolean isContributor;
   private final boolean hideContent;
@@ -47,10 +48,6 @@ public class QuestEntryComponent extends BaseUIComponent {
   // Cached owner text (fix 2)
   private final Text cachedOwnerText;
   private final int cachedOwnerWidth;
-
-  // Cached truncated content (fix 5) — depends on width known at draw time
-  private Text cachedContentText;
-  private int cachedContentWidth = -1;
 
   // Cached truncated title (fix 6) — depends on width known at draw time
   private String cachedTruncatedTitle;
@@ -79,15 +76,13 @@ public class QuestEntryComponent extends BaseUIComponent {
     this.hideContent = quest.isContentHidden(playerUuid);
 
     if (hideContent) {
-      this.firstLine = "";
+      this.styledFirstLine = null;
     } else {
       String content = quest.getContent();
       if (content == null || content.isEmpty()) {
-        this.firstLine = "";
+        this.styledFirstLine = null;
       } else {
-        String plain = MarkdownRenderer.stripToPlainText(content);
-        String[] lines = plain.split("\n");
-        this.firstLine = lines.length > 0 ? lines[0] : "";
+        this.styledFirstLine = MarkdownRenderer.renderPreviewLine(content);
       }
     }
 
@@ -287,16 +282,14 @@ public class QuestEntryComponent extends BaseUIComponent {
       // Static constant (fix 3)
       context.drawText(
           textRenderer, HIDDEN_CONTENT_TEXT, entryX + 4, entryY + 14, Colors.TEXT_MUTED, false);
-    } else {
-      // Cache truncated content (fix 5): recompute only when available width changes
-      int contentAvailWidth = entryWidth - 22;
-      if (contentAvailWidth != cachedContentWidth) {
-        String truncated = textRenderer.trimToWidth(firstLine, contentAvailWidth);
-        cachedContentText = Text.literal(truncated).formatted(Formatting.GRAY);
-        cachedContentWidth = contentAvailWidth;
-      }
+    } else if (styledFirstLine != null) {
       context.drawText(
-          textRenderer, cachedContentText, entryX + 4, entryY + 14, Colors.TEXT_MUTED, false);
+          textRenderer,
+          styledFirstLine.asOrderedText(),
+          entryX + 4,
+          entryY + 14,
+          Colors.TEXT_MUTED,
+          false);
     }
 
     // Only show pin icon for quests the player is part of
