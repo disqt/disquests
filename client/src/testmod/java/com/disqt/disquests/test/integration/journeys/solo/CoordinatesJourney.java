@@ -77,12 +77,11 @@ class CoordinatesJourney {
   void toggleRegion(ClientGameTestContext context) {
     when("player clicks Edit");
     click(context, "btn-edit");
-    waitForScreen(context, QuestScreen.class);
+    waitForComponent(context, "title-field");
     and("player toggles Region on");
-    waitForComponent(context, "btn-region");
     click(context, "btn-region");
-    // Region toggle rebuilds screen
-    waitForScreen(context, QuestScreen.class);
+    // Region toggle rebuilds edit mode
+    waitForComponent(context, "coord-x2");
     then("corner 2 row appears");
     assertComponentExists(context, "coord-x2");
     when("player types corner 2 coordinates");
