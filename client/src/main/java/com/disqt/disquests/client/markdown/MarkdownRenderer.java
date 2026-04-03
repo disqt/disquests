@@ -114,10 +114,8 @@ public class MarkdownRenderer {
   /** Copies a MutableText tree, dimming all colors for use as a content preview. */
   private static MutableText muteColors(MutableText original) {
     Style style = original.getStyle();
-    // Dim existing colors; default to GRAY
     if (style.getColor() != null) {
       int rgb = style.getColor().getRgb();
-      // Blend toward gray: reduce brightness by ~40%
       int r = ((rgb >> 16) & 0xFF) * 6 / 10;
       int g = ((rgb >> 8) & 0xFF) * 6 / 10;
       int b = (rgb & 0xFF) * 6 / 10;
@@ -125,9 +123,9 @@ public class MarkdownRenderer {
     } else {
       style = style.withColor(Formatting.GRAY);
     }
-    // Remove click events from preview
     style = style.withClickEvent(null);
-    MutableText result = Text.literal(original.getString()).setStyle(style);
+    // Use copy() to preserve only this node's literal content, then restyle
+    MutableText result = original.copyContentOnly().setStyle(style);
     for (Text sibling : original.getSiblings()) {
       if (sibling instanceof MutableText mt) {
         result.append(muteColors(mt));
