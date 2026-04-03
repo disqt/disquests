@@ -100,7 +100,16 @@ public class MarkdownRenderer {
    */
   public static String stripToPlainText(String markdown) {
     if (markdown == null || markdown.isEmpty()) return "";
-    Node document = PARSER.parse(markdown);
+    // Resolve wiki-links to just their display title before parsing
+    String resolved =
+        WIKI_LINK_PATTERN
+            .matcher(markdown)
+            .replaceAll(
+                m -> {
+                  String title = m.group(2);
+                  return title != null ? java.util.regex.Matcher.quoteReplacement(title) : "";
+                });
+    Node document = PARSER.parse(resolved);
     StringBuilder sb = new StringBuilder();
     collectPlainText(document, sb);
     return sb.toString().trim();
