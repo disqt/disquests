@@ -658,8 +658,10 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
       // Find which display line the mouse is on
       int hoverDisplayLine =
           (int) ((mouseY - (this.y + padding) + scrollY) / textRenderer.fontHeight);
-      hoverDisplayLine = Math.max(0, Math.min(hoverDisplayLine, displayLines.size() - 1));
-      if (hoverDisplayLine < displayLineWikiLinks.size()) {
+      // Don't clamp to last line -- if mouse is below all text, no hover
+      if (hoverDisplayLine >= 0
+          && hoverDisplayLine < displayLines.size()
+          && hoverDisplayLine < displayLineWikiLinks.size()) {
         List<int[]> segments = displayLineWikiLinks.get(hoverDisplayLine);
         int dispOffset = displayToOffset.get(hoverDisplayLine);
         int logicalLine = displayToLogical.get(hoverDisplayLine);
