@@ -162,6 +162,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **XML requires `<components>` wrapper** — root component must be inside `<components>` tag, not directly under `<owo-ui>`.
 - **XML comments cannot contain `--`** — causes `SAXParseException`. Use commas instead.
 - **Zero-sizing doesn't hide buttons** — text still renders. Use `parent.removeChild(component)` instead.
+- **`fill` vs `expand` sizing** — `fill(100)` = 100% of parent's total space (ignores siblings). `expand(100)` = 100% of remaining space after non-expand siblings are measured. Use `expand` when a child should fill leftover space alongside content-sized siblings.
 - **Keyboard input requires `GreedyInputUIComponent`** — custom `BaseUIComponent` subclasses that need key/char events must implement this marker interface. Screen must override `charTyped()` to route to focused greedy component.
 - **Delegate focus desync** — `MultiLineTextFieldWidget.focused` can be reset by `mouseClicked()` after `onFocusGained`. Force `delegate.setFocused(true)` in `onKeyPress`/`onCharTyped` before forwarding.
 - **Surface composing** — `Surface.flat(color).and(Surface.outline(color))` chains surfaces. Available: `flat`, `outline`, `blur`, `DARK_PANEL`, `PANEL_INSET`, `panelWithInset`, `VANILLA_TRANSLUCENT`, `BLANK`.
