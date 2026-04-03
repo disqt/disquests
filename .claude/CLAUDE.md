@@ -142,6 +142,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **`project.version` changes jar filenames** — The root `build.gradle.kts` clears `archiveVersion` in `afterEvaluate` to keep names stable. Don't remove this.
 - **Production deploy: only one plugin jar** — Never leave multiple Disquests jars in the plugins folder. Paper's "Ambiguous plugin name" error prevents loading.
 - **Server config drift** — deployed `config.yml` doesn't auto-update when new fields are added to the default. After adding new config fields, manually update the VPS config: `ssh minecraft "cat /home/minecraft/serverfiles/plugins/Disquests/config.yml"`.
+- **`modpack-version.txt` format** — must contain bare version number (e.g. `2.9`), NOT `v2.9`. The DisqtVersion plugin's `extractVersion()` strips the `v` prefix from manifest versions but compares against the raw client string.
 - **Release workflow permissions** — `release.yml` must grant all permissions that `e2e-test.yml` declares (including `pull-requests: write`), since reusable workflows can't escalate beyond caller permissions.
 - **Gradle Kotlin DSL shadows `java` package** — `java.lang.management.*` won't resolve in `.gradle.kts` because `java` is a Gradle DSL accessor. Use `Class.forName("java.lang.management.ManagementFactory")` instead.
 
