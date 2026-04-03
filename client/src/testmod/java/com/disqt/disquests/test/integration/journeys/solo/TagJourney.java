@@ -229,7 +229,7 @@ class TagJourney {
     // Get the actual tag name from cache to use in the search filter
     String tagName =
         context.computeOnClient(
-            c ->
+            ignored ->
                 ClientCache.getMyQuests().stream()
                     .filter(q -> "Tag Test".equals(q.getTitle()))
                     .findFirst()
@@ -516,7 +516,7 @@ class TagJourney {
     // Get tag name from cache
     String tagName =
         context.computeOnClient(
-            c ->
+            ignored ->
                 ClientCache.getMyQuests().stream()
                     .filter(q -> "Tag Test".equals(q.getTitle()))
                     .findFirst()

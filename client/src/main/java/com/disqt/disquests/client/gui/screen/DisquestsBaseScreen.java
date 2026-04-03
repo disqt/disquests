@@ -128,7 +128,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   protected void wireBackButton(FlowLayout root) {
     ButtonComponent backBtn = root.childById(ButtonComponent.class, "btn-back");
     if (backBtn != null) {
-      backBtn.onPress(b -> this.close());
+      backBtn.onPress(ignored -> this.close());
     }
   }
 

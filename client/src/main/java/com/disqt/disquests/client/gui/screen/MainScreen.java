@@ -104,22 +104,22 @@ public class MainScreen extends DisquestsBaseScreen {
     this.btnOpen = root.childById(ButtonComponent.class, "btn-open");
 
     // --- Wire tab button handlers ---
-    this.tabMyQuests.onPress(btn -> selectTab(ClientSession.Tab.MY_QUESTS));
-    this.tabQuestBoard.onPress(btn -> selectTab(ClientSession.Tab.SERVER_QUESTS));
+    this.tabMyQuests.onPress(ignored -> selectTab(ClientSession.Tab.MY_QUESTS));
+    this.tabQuestBoard.onPress(ignored -> selectTab(ClientSession.Tab.SERVER_QUESTS));
 
     // --- Wire filter button handlers ---
-    this.filterAll.onPress(btn -> selectServerFilter(ClientSession.QuestFilter.ALL));
-    this.filterOpen.onPress(btn -> selectServerFilter(ClientSession.QuestFilter.OPEN));
-    this.filterClosed.onPress(btn -> selectServerFilter(ClientSession.QuestFilter.CLOSED));
+    this.filterAll.onPress(ignored -> selectServerFilter(ClientSession.QuestFilter.ALL));
+    this.filterOpen.onPress(ignored -> selectServerFilter(ClientSession.QuestFilter.OPEN));
+    this.filterClosed.onPress(ignored -> selectServerFilter(ClientSession.QuestFilter.CLOSED));
 
     this.filterAll.tooltip(Text.translatable("gui.disquests.filter.all"));
     this.filterOpen.tooltip(Text.translatable("gui.disquests.filter.open"));
     this.filterClosed.tooltip(Text.translatable("gui.disquests.filter.closed"));
 
     // --- Wire action button handlers ---
-    this.btnNewQuest.onPress(btn -> createNewQuest());
-    this.btnInteract.onPress(btn -> interactWithQuest());
-    this.btnOpen.onPress(btn -> openSelected());
+    this.btnNewQuest.onPress(ignored -> createNewQuest());
+    this.btnInteract.onPress(ignored -> interactWithQuest());
+    this.btnOpen.onPress(ignored -> openSelected());
     wireBackButton(root);
 
     // --- Create search text box programmatically ---

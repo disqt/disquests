@@ -229,7 +229,8 @@ public class QuestScreen extends DisquestsBaseScreen {
         final String url = bluemapUrl;
         ButtonComponent bmBtn =
             UIComponents.button(
-                Text.translatable("gui.disquests.btn.view_bluemap"), b -> UrlOpener.open(url));
+                Text.translatable("gui.disquests.btn.view_bluemap"),
+                ignored -> UrlOpener.open(url));
         bmBtn.sizing(Sizing.content(), Sizing.fixed(14));
         metadataRow.child(bmBtn);
       }
@@ -274,7 +275,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     if (canJoinOrRequest) {
       if (quest.getVisibility() == Visibility.OPEN) {
         interactBtn.setMessage(Text.translatable("gui.disquests.btn.join"));
-        interactBtn.onPress(b -> joinQuest());
+        interactBtn.onPress(ignored -> joinQuest());
       } else if (quest.getVisibility() == Visibility.CLOSED) {
         if (ClientSession.isRequested(quest.getId())) {
           interactBtn.setMessage(Text.translatable("gui.disquests.btn.requested"));
@@ -282,7 +283,7 @@ public class QuestScreen extends DisquestsBaseScreen {
           interactBtn.tooltip(Text.translatable("gui.disquests.tooltip.already_requested"));
         } else {
           interactBtn.setMessage(Text.translatable("gui.disquests.btn.request"));
-          interactBtn.onPress(b -> requestAccess());
+          interactBtn.onPress(ignored -> requestAccess());
         }
       } else {
         // PRIVATE quest viewed by non-member (shouldn't normally happen)
@@ -298,7 +299,7 @@ public class QuestScreen extends DisquestsBaseScreen {
       // Non-member: hide Edit entirely
       buttonRow.removeChild(editBtn);
     } else {
-      editBtn.onPress(b -> enterEditMode());
+      editBtn.onPress(ignored -> enterEditMode());
       if (canEdit) {
         editBtn.active(true);
       } else {
@@ -309,7 +310,7 @@ public class QuestScreen extends DisquestsBaseScreen {
 
     ButtonComponent leaveBtn = root.childById(ButtonComponent.class, "btn-leave");
     if (isContributor && !isOwner) {
-      leaveBtn.onPress(b -> leaveQuest());
+      leaveBtn.onPress(ignored -> leaveQuest());
     } else {
       buttonRow.removeChild(leaveBtn);
     }
@@ -317,7 +318,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     // Delete button: only visible for owner
     ButtonComponent deleteBtn = root.childById(ButtonComponent.class, "btn-delete");
     if (isOwner) {
-      deleteBtn.onPress(b -> confirmDelete());
+      deleteBtn.onPress(ignored -> confirmDelete());
     } else {
       buttonRow.removeChild(deleteBtn);
     }
@@ -421,7 +422,7 @@ public class QuestScreen extends DisquestsBaseScreen {
                 case CLOSED -> "gui.disquests.tooltip.closed";
                 case OPEN -> "gui.disquests.tooltip.open";
               }));
-      visBtn.onPress(b -> cycleVisibility());
+      visBtn.onPress(ignored -> cycleVisibility());
 
       int contribCount = quest.getContributors().size();
       int pendingReqCount = ClientCache.getPendingCount(quest.getId());
@@ -436,14 +437,14 @@ public class QuestScreen extends DisquestsBaseScreen {
       }
       ButtonComponent contribBtn = root.childById(ButtonComponent.class, "btn-contributors");
       contribBtn.setMessage(contribText);
-      contribBtn.onPress(b -> openContributors());
+      contribBtn.onPress(ignored -> openContributors());
     } else {
       settingsRow.sizing(Sizing.fixed(0), Sizing.fixed(0));
     }
 
     // Bottom buttons
-    root.childById(ButtonComponent.class, "btn-save").onPress(b -> saveAndView());
-    root.childById(ButtonComponent.class, "btn-cancel").onPress(b -> cancelEdit());
+    root.childById(ButtonComponent.class, "btn-save").onPress(ignored -> saveAndView());
+    root.childById(ButtonComponent.class, "btn-cancel").onPress(ignored -> cancelEdit());
 
     // Style formatting panel labels with rendered examples
     LabelComponent fmtBold = root.childById(LabelComponent.class, "fmt-bold");
