@@ -3,6 +3,7 @@ package com.disqt.disquests.client.gui.screen;
 import com.disqt.disquests.client.BlueMapHelper;
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
+import com.disqt.disquests.client.UrlOpener;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.AutocompleteDropdown;
 import com.disqt.disquests.client.gui.component.TagChipComponent;
@@ -26,7 +27,6 @@ import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.ParentUIComponent;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.UIComponent;
-import java.net.URI;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -229,13 +229,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         final String url = bluemapUrl;
         ButtonComponent bmBtn =
             UIComponents.button(
-                Text.translatable("gui.disquests.btn.view_bluemap"),
-                b -> {
-                  try {
-                    net.minecraft.util.Util.getOperatingSystem().open(URI.create(url));
-                  } catch (Exception ignored) {
-                  }
-                });
+                Text.translatable("gui.disquests.btn.view_bluemap"), b -> UrlOpener.open(url));
         bmBtn.sizing(Sizing.content(), Sizing.fixed(14));
         metadataRow.child(bmBtn);
       }

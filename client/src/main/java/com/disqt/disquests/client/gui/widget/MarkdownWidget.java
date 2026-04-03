@@ -333,10 +333,7 @@ public class MarkdownWidget extends BaseUIComponent {
     }
     for (LinkHitbox lh : linkHitboxes) {
       if (hitTest(mx, my, lh.x(), lh.y(), lh.width(), lh.height())) {
-        try {
-          net.minecraft.util.Util.getOperatingSystem().open(java.net.URI.create(lh.url()));
-        } catch (Exception ignored) {
-        }
+        com.disqt.disquests.client.UrlOpener.open(lh.url());
         return true;
       }
     }
