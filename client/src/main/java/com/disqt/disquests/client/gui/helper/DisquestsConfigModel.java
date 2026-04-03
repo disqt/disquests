@@ -9,6 +9,8 @@ public class DisquestsConfigModel {
   @Hook public Theme theme = Theme.FROSTED;
 
   @SectionHeader("hud")
+  public boolean pinnedVisible = true;
+
   @RangeConstraint(min = 100, max = 400)
   public int pinnedWidth = 200;
 

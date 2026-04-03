@@ -32,6 +32,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Nullable;
@@ -155,13 +156,22 @@ public class QuestScreen extends DisquestsBaseScreen {
     root.childById(LabelComponent.class, "title-label")
         .text(Text.literal(quest.getTitle() != null ? quest.getTitle() : "Untitled"));
 
-    // Owner + visibility info
-    String ownerInfo = "by " + quest.getOwnerName();
+    // Owner + visibility info (built programmatically so content sizing measures real text)
+    MutableText ownerText = Text.literal("by " + quest.getOwnerName()).withColor(Colors.TEXT_MUTED);
     if (quest.getVisibility() != null) {
-      ownerInfo += "  [" + quest.getVisibility().name() + "]";
+      int visColor =
+          switch (quest.getVisibility()) {
+            case PRIVATE -> 0xFF5555; // red
+            case CLOSED -> 0xFFAA00; // amber
+            case OPEN -> 0x55FF55; // green
+          };
+      ownerText.append(
+          Text.literal("  [" + quest.getVisibility().name() + "]").withColor(visColor));
     }
-    root.childById(LabelComponent.class, "owner-label")
-        .text(Text.literal(ownerInfo).withColor(Colors.TEXT_MUTED));
+    LabelComponent ownerLabel = UIComponents.label(ownerText);
+    ownerLabel.shadow(true);
+    ownerLabel.sizing(Sizing.content(), Sizing.content());
+    root.childById(FlowLayout.class, "header-row").child(ownerLabel);
 
     // Tag display -- inline chips (no collapsible)
     List<String> viewTags = quest.getTags();

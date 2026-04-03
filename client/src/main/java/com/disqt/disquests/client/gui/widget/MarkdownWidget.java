@@ -67,34 +67,97 @@ public class MarkdownWidget extends BaseUIComponent {
     return mx >= x && mx < x + w && my >= y && my < y + h;
   }
 
-  private static String findUrlInText(OrderedText text) {
-    String[] result = {null};
+  /**
+   * Walks an OrderedText character-by-character, computing pixel offsets for each styled segment
+   * (links and wiki-links), and creates tight hitboxes only around the actual link text.
+   */
+  private void collectStyledHitboxes(
+      OrderedText text, int lineX, int lineY, TextRenderer textRenderer) {
+    // Track current segment state
+    final int[] pixelX = {0}; // running pixel offset
+    final String[] currentUrl = {null};
+    final String[] currentWikiUuid = {null};
+    final int[] segStartX = {0}; // pixel X where current segment started
+
     text.accept(
         (index, style, codepoint) -> {
+          int charWidth = textRenderer.getWidth(String.valueOf(Character.toChars(codepoint)));
+
+          // Determine what this character belongs to
+          String url = null;
+          String wikiUuid = null;
           ClickEvent clickEvent = style.getClickEvent();
           if (clickEvent instanceof ClickEvent.OpenUrl openUrl) {
-            result[0] = openUrl.uri().toString();
-            return false;
-          }
-          return true;
-        });
-    return result[0];
-  }
-
-  private static String findWikiLinkUuidInText(OrderedText text) {
-    String[] result = {null};
-    text.accept(
-        (index, style, codepoint) -> {
-          ClickEvent clickEvent = style.getClickEvent();
-          if (clickEvent instanceof ClickEvent.RunCommand runCmd
+            url = openUrl.uri().toString();
+          } else if (clickEvent instanceof ClickEvent.RunCommand runCmd
               && runCmd.command().startsWith(MarkdownRenderer.WIKI_LINK_COMMAND_PREFIX)) {
-            result[0] =
+            wikiUuid =
                 runCmd.command().substring(MarkdownRenderer.WIKI_LINK_COMMAND_PREFIX.length());
-            return false;
           }
+
+          // If we were in a URL segment and this char is different, close it
+          if (currentUrl[0] != null && !currentUrl[0].equals(url)) {
+            int w = pixelX[0] - segStartX[0];
+            if (w > 0) {
+              linkHitboxes.add(
+                  new LinkHitbox(
+                      lineX + segStartX[0],
+                      lineY,
+                      w,
+                      textRenderer.fontHeight,
+                      currentUrl[0],
+                      Text.literal(currentUrl[0])));
+            }
+            currentUrl[0] = null;
+          }
+
+          // If we were in a wiki-link segment and this char is different, close it
+          if (currentWikiUuid[0] != null && !currentWikiUuid[0].equals(wikiUuid)) {
+            int w = pixelX[0] - segStartX[0];
+            if (w > 0) {
+              wikiLinkHitboxes.add(
+                  new WikiLinkHitbox(
+                      lineX + segStartX[0], lineY, w, textRenderer.fontHeight, currentWikiUuid[0]));
+            }
+            currentWikiUuid[0] = null;
+          }
+
+          // Start new segments if needed
+          if (url != null && currentUrl[0] == null) {
+            currentUrl[0] = url;
+            segStartX[0] = pixelX[0];
+          }
+          if (wikiUuid != null && currentWikiUuid[0] == null) {
+            currentWikiUuid[0] = wikiUuid;
+            segStartX[0] = pixelX[0];
+          }
+
+          pixelX[0] += charWidth;
           return true;
         });
-    return result[0];
+
+    // Close any remaining open segments at end of line
+    if (currentUrl[0] != null) {
+      int w = pixelX[0] - segStartX[0];
+      if (w > 0) {
+        linkHitboxes.add(
+            new LinkHitbox(
+                lineX + segStartX[0],
+                lineY,
+                w,
+                textRenderer.fontHeight,
+                currentUrl[0],
+                Text.literal(currentUrl[0])));
+      }
+    }
+    if (currentWikiUuid[0] != null) {
+      int w = pixelX[0] - segStartX[0];
+      if (w > 0) {
+        wikiLinkHitboxes.add(
+            new WikiLinkHitbox(
+                lineX + segStartX[0], lineY, w, textRenderer.fontHeight, currentWikiUuid[0]));
+      }
+    }
   }
 
   private record WrappedEntry(
@@ -216,20 +279,7 @@ public class MarkdownWidget extends BaseUIComponent {
                   drawX, drawY, cbWidth, lineHeight, entry.checkboxIndex, entry.checked));
         }
 
-        String url = findUrlInText(entry.text());
-        if (url != null) {
-          int textWidth = textRenderer.getWidth(entry.text());
-          linkHitboxes.add(
-              new LinkHitbox(
-                  drawX, drawY, textWidth, textRenderer.fontHeight, url, Text.literal(url)));
-        }
-
-        String wikiUuid = findWikiLinkUuidInText(entry.text());
-        if (wikiUuid != null) {
-          int textWidth = textRenderer.getWidth(entry.text());
-          wikiLinkHitboxes.add(
-              new WikiLinkHitbox(drawX, drawY, textWidth, textRenderer.fontHeight, wikiUuid));
-        }
+        collectStyledHitboxes(entry.text(), drawX, drawY, textRenderer);
       }
 
       drawY += lineHeight;

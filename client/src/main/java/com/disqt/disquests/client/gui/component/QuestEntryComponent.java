@@ -21,6 +21,7 @@ import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.Click;
 import net.minecraft.text.MutableText;
+import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
@@ -283,13 +284,14 @@ public class QuestEntryComponent extends BaseUIComponent {
       context.drawText(
           textRenderer, HIDDEN_CONTENT_TEXT, entryX + 4, entryY + 14, Colors.TEXT_MUTED, false);
     } else if (styledFirstLine != null) {
-      context.drawText(
-          textRenderer,
-          styledFirstLine.asOrderedText(),
-          entryX + 4,
-          entryY + 14,
-          Colors.TEXT_MUTED,
-          false);
+      // Reserve space for pin icon if player can pin this quest
+      int pinReserve = (isOwnedByPlayer || isContributor) ? 18 : 0;
+      int maxPreviewWidth = entryWidth - 8 - pinReserve;
+      List<OrderedText> trimmed = textRenderer.wrapLines(styledFirstLine, maxPreviewWidth);
+      if (!trimmed.isEmpty()) {
+        context.drawText(
+            textRenderer, trimmed.getFirst(), entryX + 4, entryY + 14, Colors.TEXT_MUTED, false);
+      }
     }
 
     // Only show pin icon for quests the player is part of

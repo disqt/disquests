@@ -18,7 +18,11 @@ public class UrlOpener {
   public static void open(String url) {
     try {
       if (Util.getOperatingSystem() == Util.OperatingSystem.WINDOWS) {
-        Runtime.getRuntime().exec(new String[] {"cmd", "/c", "start", "", url});
+        String safeUrl = url.replace("'", "''");
+        new ProcessBuilder(
+                "powershell", "-NoProfile", "-Command", "Start-Process '" + safeUrl + "'")
+            .redirectErrorStream(true)
+            .start();
       } else {
         Util.getOperatingSystem().open(URI.create(url));
       }

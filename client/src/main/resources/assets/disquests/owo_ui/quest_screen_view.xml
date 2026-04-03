@@ -40,21 +40,12 @@
                         <text>Quest</text>
                         <shadow>true</shadow>
                         <sizing>
-                            <horizontal method="fill">50</horizontal>
+                            <horizontal method="expand">100</horizontal>
                             <vertical method="content"/>
                         </sizing>
                         <margins>
                             <left>4</left>
                         </margins>
-                    </label>
-                    <label id="owner-label">
-                        <text></text>
-                        <shadow>true</shadow>
-                        <horizontal-text-alignment>right</horizontal-text-alignment>
-                        <sizing>
-                            <horizontal method="fill">50</horizontal>
-                            <vertical method="content"/>
-                        </sizing>
                     </label>
                 </children>
             </flow-layout>
