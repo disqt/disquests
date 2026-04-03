@@ -18,18 +18,37 @@
 
         <children>
 
-            <!-- Title -->
-            <label id="title-label">
-                <text>Contributors</text>
-                <shadow>true</shadow>
+            <!-- Header row: back arrow + title -->
+            <flow-layout direction="horizontal" id="header-row">
                 <sizing>
-                    <horizontal method="content"/>
+                    <horizontal method="fill">85</horizontal>
                     <vertical method="content"/>
                 </sizing>
+                <vertical-alignment>center</vertical-alignment>
                 <margins>
                     <bottom>6</bottom>
                 </margins>
-            </label>
+                <children>
+                    <button id="btn-back">
+                        <text>&lt;</text>
+                        <sizing>
+                            <horizontal method="fixed">20</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                    <label id="title-label">
+                        <text>Contributors</text>
+                        <shadow>true</shadow>
+                        <sizing>
+                            <horizontal method="content"/>
+                            <vertical method="content"/>
+                        </sizing>
+                        <margins>
+                            <left>4</left>
+                        </margins>
+                    </label>
+                </children>
+            </flow-layout>
 
             <!-- Pending requests section (hidden via zero-sizing when empty) -->
             <flow-layout direction="vertical" id="pending-section">
@@ -78,26 +97,6 @@
                 </margins>
             </label>
 
-            <!-- Close button -->
-            <flow-layout direction="horizontal" id="button-row">
-                <sizing>
-                    <horizontal method="content"/>
-                    <vertical method="content"/>
-                </sizing>
-                <margins>
-                    <top>4</top>
-                    <bottom>4</bottom>
-                </margins>
-                <children>
-                    <button id="btn-close">
-                        <text>Close</text>
-                        <sizing>
-                            <horizontal method="fixed">70</horizontal>
-                            <vertical method="fixed">20</vertical>
-                        </sizing>
-                    </button>
-                </children>
-            </flow-layout>
 
         </children>
     </flow-layout>

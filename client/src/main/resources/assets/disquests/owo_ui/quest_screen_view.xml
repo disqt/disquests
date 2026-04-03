@@ -18,7 +18,7 @@
 
         <children>
 
-            <!-- Header row: title + owner/visibility info -->
+            <!-- Header row: back arrow + title + owner/visibility info -->
             <flow-layout direction="horizontal" id="header-row">
                 <sizing>
                     <horizontal method="fill">85</horizontal>
@@ -29,22 +29,23 @@
                     <bottom>4</bottom>
                 </margins>
                 <children>
+                    <button id="btn-back">
+                        <text>&lt;</text>
+                        <sizing>
+                            <horizontal method="fixed">20</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
                     <label id="title-label">
                         <text>Quest</text>
                         <shadow>true</shadow>
                         <sizing>
-                            <horizontal method="fill">50</horizontal>
+                            <horizontal method="expand">100</horizontal>
                             <vertical method="content"/>
                         </sizing>
-                    </label>
-                    <label id="owner-label">
-                        <text></text>
-                        <shadow>true</shadow>
-                        <horizontal-text-alignment>right</horizontal-text-alignment>
-                        <sizing>
-                            <horizontal method="fill">50</horizontal>
-                            <vertical method="content"/>
-                        </sizing>
+                        <margins>
+                            <left>4</left>
+                        </margins>
                     </label>
                 </children>
             </flow-layout>
@@ -63,7 +64,7 @@
                 <scroll-id>content-scroll</scroll-id>
                 <list-id>content-area</list-id>
                 <width>85</width>
-                <height>65</height>
+                <height>55</height>
             </template>
 
             <!-- Metadata row (coords, map, BlueMap button, hidden when no coords) -->
@@ -116,17 +117,10 @@
                     <bottom>4</bottom>
                 </margins>
                 <children>
-                    <button id="btn-join">
+                    <button id="btn-interact">
                         <text>Join</text>
                         <sizing>
-                            <horizontal method="fixed">60</horizontal>
-                            <vertical method="fixed">20</vertical>
-                        </sizing>
-                    </button>
-                    <button id="btn-request">
-                        <text>Request</text>
-                        <sizing>
-                            <horizontal method="fixed">60</horizontal>
+                            <horizontal method="fixed">70</horizontal>
                             <vertical method="fixed">20</vertical>
                         </sizing>
                     </button>
@@ -146,13 +140,6 @@
                     </button>
                     <button id="btn-delete">
                         <text>Delete</text>
-                        <sizing>
-                            <horizontal method="fixed">60</horizontal>
-                            <vertical method="fixed">20</vertical>
-                        </sizing>
-                    </button>
-                    <button id="btn-close">
-                        <text>Close</text>
                         <sizing>
                             <horizontal method="fixed">60</horizontal>
                             <vertical method="fixed">20</vertical>

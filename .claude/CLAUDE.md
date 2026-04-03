@@ -141,6 +141,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **`./gradlew build` includes all unit tests** — don't add separate `:common:test :server:test` invocations.
 - **`project.version` changes jar filenames** — The root `build.gradle.kts` clears `archiveVersion` in `afterEvaluate` to keep names stable. Don't remove this.
 - **Production deploy: only one plugin jar** — Never leave multiple Disquests jars in the plugins folder. Paper's "Ambiguous plugin name" error prevents loading.
+- **Server config drift** — deployed `config.yml` doesn't auto-update when new fields are added to the default. After adding new config fields, manually update the VPS config: `ssh minecraft "cat /home/minecraft/serverfiles/plugins/Disquests/config.yml"`.
 - **Release workflow permissions** — `release.yml` must grant all permissions that `e2e-test.yml` declares (including `pull-requests: write`), since reusable workflows can't escalate beyond caller permissions.
 - **Gradle Kotlin DSL shadows `java` package** — `java.lang.management.*` won't resolve in `.gradle.kts` because `java` is a Gradle DSL accessor. Use `Class.forName("java.lang.management.ManagementFactory")` instead.
 
@@ -162,6 +163,8 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **XML requires `<components>` wrapper** — root component must be inside `<components>` tag, not directly under `<owo-ui>`.
 - **XML comments cannot contain `--`** — causes `SAXParseException`. Use commas instead.
 - **Zero-sizing doesn't hide buttons** — text still renders. Use `parent.removeChild(component)` instead.
+- **`fill` vs `expand` sizing** — `fill(100)` = 100% of parent's total space (ignores siblings). `expand(100)` = 100% of remaining space after non-expand siblings are measured. Use `expand` when a child should fill leftover space alongside content-sized siblings.
+- **Windows URI fragment stripping** — `rundll32 url.dll` and `cmd /c start` both strip `#fragment` from URLs. `UrlOpener.java` uses PowerShell `Start-Process` which preserves fragments. Don't switch back to `Runtime.exec` with `cmd`.
 - **Keyboard input requires `GreedyInputUIComponent`** — custom `BaseUIComponent` subclasses that need key/char events must implement this marker interface. Screen must override `charTyped()` to route to focused greedy component.
 - **Delegate focus desync** — `MultiLineTextFieldWidget.focused` can be reset by `mouseClicked()` after `onFocusGained`. Force `delegate.setFocused(true)` in `onKeyPress`/`onCharTyped` before forwarding.
 - **Surface composing** — `Surface.flat(color).and(Surface.outline(color))` chains surfaces. Available: `flat`, `outline`, `blur`, `DARK_PANEL`, `PANEL_INSET`, `panelWithInset`, `VANILLA_TRANSLUCENT`, `BLANK`.

@@ -11,6 +11,7 @@ import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
 import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.input.CharInput;
 import net.minecraft.client.input.KeyInput;
@@ -23,6 +24,10 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   public static final String CONFIRM_YES_ID = "btn-confirm-yes";
   public static final String CONFIRM_NO_ID = "btn-confirm-no";
 
+  private static final java.util.Deque<Screen> backStack = new java.util.ArrayDeque<>();
+  private static final java.util.Deque<Screen> forwardStack = new java.util.ArrayDeque<>();
+  private static final int MAX_HISTORY = 20;
+
   @Nullable protected final Screen parent;
 
   protected DisquestsBaseScreen(DataSource source, @Nullable Screen parent) {
@@ -30,11 +35,45 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     this.parent = parent;
   }
 
+  public static void clearHistory() {
+    backStack.clear();
+    forwardStack.clear();
+  }
+
   @Override
   public void close() {
     if (this.client != null) {
+      if (parent == null) {
+        clearHistory();
+      }
       this.client.setScreen(parent);
     }
+  }
+
+  @Override
+  public boolean mouseClicked(Click click, boolean simulated) {
+    if (click.button() == org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_4) {
+      goBack();
+      return true;
+    } else if (click.button() == org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_5) {
+      goForward();
+      return true;
+    }
+    return super.mouseClicked(click, simulated);
+  }
+
+  private void goBack() {
+    if (this.client == null || backStack.isEmpty()) return;
+    forwardStack.push(this);
+    if (forwardStack.size() > MAX_HISTORY) forwardStack.removeLast();
+    this.client.setScreen(backStack.pop());
+  }
+
+  private void goForward() {
+    if (this.client == null || forwardStack.isEmpty()) return;
+    backStack.push(this);
+    if (backStack.size() > MAX_HISTORY) backStack.removeLast();
+    this.client.setScreen(forwardStack.pop());
   }
 
   @Override
@@ -82,6 +121,17 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     return super.charTyped(charInput);
   }
 
+  /**
+   * Wires the back arrow button (btn-back) to close this screen. Call from each screen's build()
+   * after the root is available.
+   */
+  protected void wireBackButton(FlowLayout root) {
+    ButtonComponent backBtn = root.childById(ButtonComponent.class, "btn-back");
+    if (backBtn != null) {
+      backBtn.onPress(ignored -> this.close());
+    }
+  }
+
   protected void applyThemeRoot(FlowLayout root) {
     root.surface(DisquestsClient.CONFIG.theme().rootSurface());
   }
@@ -110,6 +160,9 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
 
   protected void navigateToScreen(Screen screen) {
     if (this.client != null) {
+      backStack.push(this);
+      if (backStack.size() > MAX_HISTORY) backStack.removeLast();
+      forwardStack.clear();
       this.client.setScreen(screen);
     }
   }

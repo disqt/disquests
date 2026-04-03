@@ -23,6 +23,8 @@
     "set_pos": "Set Pos",
     "clear": "Clear",
     "view_bluemap": "View on BlueMap",
+    "join": "Join",
+    "request": "Request",
     "requested": "Requested",
     "add_tag": "+ Tag",
     "add": "Add",
@@ -56,6 +58,8 @@
     "private": "Only you can see this quest",
     "closed": "Visible on Quest Board, others must request access",
     "open": "Anyone can join and view this quest",
+    "already_requested": "You have already requested access",
+    "view_only": "You have view-only access",
   },
 
   // Filter tooltips

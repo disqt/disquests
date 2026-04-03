@@ -13,6 +13,7 @@ import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
 import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.container.OverlayContainer;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -39,7 +40,7 @@ class WikiLinkJourney {
     type(context, "title-field", title);
     click(context, "btn-save");
     waitForViewMode(context);
-    click(context, "btn-close");
+    click(context, "btn-back");
     waitForScreen(context, MainScreen.class);
   }
 
@@ -136,6 +137,69 @@ class WikiLinkJourney {
   @Test
   @Order(3)
   @PlayerA
+  @DisplayName("Autocomplete dropdown appears when typing [[")
+  void autocompleteDropdownAppears(ClientGameTestContext context) {
+    given("player has quests 'Link Source' and 'Link Target'");
+    openMainScreen(context);
+    waitForEntryCount(context, 2);
+
+    when("player opens 'Link Source' in edit mode");
+    clickEntryByTitle(context, "Link Source");
+    click(context, "btn-open");
+    waitForViewMode(context);
+    click(context, "btn-edit");
+    waitForEditMode(context);
+
+    and("types [[ in the content field");
+    type(context, "content-field", "[[");
+
+    then("autocomplete overlay appears");
+    context.waitFor(
+        client -> {
+          if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+          var root = dScreen.getRootComponent();
+          if (root == null) return false;
+          return root.childById(OverlayContainer.class, "autocomplete-overlay") != null;
+        },
+        TIMEOUT);
+  }
+
+  @Test
+  @Order(4)
+  @PlayerA
+  @DisplayName("Selecting autocomplete suggestion completes wiki-link")
+  void autocompleteSelectionCompletesLink(ClientGameTestContext context) {
+    given("player is still on edit mode with autocomplete open from previous test");
+
+    when("player presses Enter to select the first suggestion");
+    context.getInput().pressKey(GLFW.GLFW_KEY_ENTER);
+    context.waitTicks(10);
+
+    then("autocomplete overlay is dismissed");
+    context.waitFor(
+        client -> {
+          if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+          var root = dScreen.getRootComponent();
+          if (root == null) return false;
+          return root.childById(OverlayContainer.class, "autocomplete-overlay") == null;
+        },
+        TIMEOUT);
+
+    then("content field contains the completed wiki-link");
+    String content = readContentField(context);
+    assertNotNull(content, "Content field should be readable");
+    assertTrue(
+        content.contains("[[Link Target]]"),
+        "Content should contain completed wiki-link, got: " + content);
+
+    and("saves to return to view mode");
+    click(context, "btn-save");
+    waitForViewMode(context);
+  }
+
+  @Test
+  @Order(5)
+  @PlayerA
   @DisplayName("View mode renders content area after wiki-link save")
   void viewModeRendersContentArea(ClientGameTestContext context) {
     given("'Link Source' quest is open in view mode");
@@ -149,7 +213,7 @@ class WikiLinkJourney {
   }
 
   @Test
-  @Order(4)
+  @Order(6)
   @PlayerA
   @DisplayName("Wiki-link content survives round-trip (edit -> save -> edit)")
   void wikiLinkRoundTrip(ClientGameTestContext context) {
@@ -174,12 +238,12 @@ class WikiLinkJourney {
   }
 
   @Test
-  @Order(5)
+  @Order(7)
   @PlayerA
   @DisplayName("Content with only wiki-link syntax saves and view mode is stable")
   void contentOnlyWikiLink(ClientGameTestContext context) {
     given("player returns to MainScreen");
-    click(context, "btn-close");
+    click(context, "btn-back");
     waitForScreen(context, MainScreen.class);
     openMainScreen(context);
     waitForEntryCount(context, 2);
@@ -208,13 +272,13 @@ class WikiLinkJourney {
   }
 
   @Test
-  @Order(6)
+  @Order(8)
   @PlayerA
   @DisplayName("Wiki-link on standalone line renders in view mode after re-open")
   void standaloneWikiLinkRendersAfterReopen(ClientGameTestContext context) {
     given("'Link Source' has only a wiki-link as content");
     // Re-open from list to get server-resolved content
-    click(context, "btn-close");
+    click(context, "btn-back");
     waitForScreen(context, MainScreen.class);
     openMainScreen(context);
     waitForEntryCount(context, 2);
@@ -228,7 +292,7 @@ class WikiLinkJourney {
   }
 
   @Test
-  @Order(7)
+  @Order(9)
   @PlayerA
   @DisplayName("Edit mode shows quest title, not UUID, in wiki-link")
   void editModeHidesUuid(ClientGameTestContext context) {
@@ -255,7 +319,7 @@ class WikiLinkJourney {
   }
 
   @Test
-  @Order(8)
+  @Order(10)
   @PlayerA
   @DisplayName("Hover over wiki-link in view mode shows preview popup")
   void hoverWikiLinkShowsPreview(ClientGameTestContext context) {
@@ -294,7 +358,7 @@ class WikiLinkJourney {
   }
 
   @Test
-  @Order(9)
+  @Order(11)
   @PlayerA
   @DisplayName("Click wiki-link in view mode navigates to linked quest")
   void clickWikiLinkNavigatesToQuest(ClientGameTestContext context) {

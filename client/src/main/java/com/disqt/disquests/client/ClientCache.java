@@ -2,8 +2,10 @@ package com.disqt.disquests.client;
 
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.common.model.CollaborationRequestData;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -29,6 +31,20 @@ public class ClientCache {
 
   public static List<Quest> getServerQuests() {
     return serverQuests;
+  }
+
+  /** Collects all known tags from predefined, server, and cached quest sources. */
+  public static Set<String> getAllKnownTags() {
+    Set<String> allTags = new LinkedHashSet<>();
+    allTags.addAll(ClientSession.getPredefinedTags());
+    allTags.addAll(ClientSession.getServerTags());
+    for (Quest q : myQuests) {
+      allTags.addAll(q.getTags());
+    }
+    for (Quest q : serverQuests) {
+      allTags.addAll(q.getTags());
+    }
+    return allTags;
   }
 
   public static void setMyQuests(List<Quest> quests) {

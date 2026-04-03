@@ -38,10 +38,10 @@ public class HudPinRenderer {
   private static long lastContentHash = 0;
   private static int lastWidth = 0;
   private static List<CachedPin> cachedPins = List.of();
-  private static boolean visible = true;
 
   public static void toggleVisibility() {
-    visible = !visible;
+    boolean current = DisquestsClient.CONFIG.pinnedVisible();
+    DisquestsClient.CONFIG.pinnedVisible(!current);
   }
 
   /**
@@ -67,7 +67,7 @@ public class HudPinRenderer {
   }
 
   public static void render(DrawContext context) {
-    if (!visible) return;
+    if (!DisquestsClient.CONFIG.pinnedVisible()) return;
 
     // Don't render pins over Disquests screens (they have their own UI)
     MinecraftClient client = MinecraftClient.getInstance();

@@ -3,6 +3,7 @@ package com.disqt.disquests.client.gui.screen;
 import com.disqt.disquests.client.BlueMapHelper;
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
+import com.disqt.disquests.client.UrlOpener;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.AutocompleteDropdown;
 import com.disqt.disquests.client.gui.component.TagChipComponent;
@@ -26,12 +27,12 @@ import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.ParentUIComponent;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.UIComponent;
-import java.net.URI;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Nullable;
@@ -155,13 +156,22 @@ public class QuestScreen extends DisquestsBaseScreen {
     root.childById(LabelComponent.class, "title-label")
         .text(Text.literal(quest.getTitle() != null ? quest.getTitle() : "Untitled"));
 
-    // Owner + visibility info
-    String ownerInfo = "by " + quest.getOwnerName();
+    // Owner + visibility info (built programmatically so content sizing measures real text)
+    MutableText ownerText = Text.literal("by " + quest.getOwnerName()).withColor(Colors.TEXT_MUTED);
     if (quest.getVisibility() != null) {
-      ownerInfo += "  [" + quest.getVisibility().name() + "]";
+      int visColor =
+          switch (quest.getVisibility()) {
+            case PRIVATE -> 0xFF5555; // red
+            case CLOSED -> 0xFFAA00; // amber
+            case OPEN -> 0x55FF55; // green
+          };
+      ownerText.append(
+          Text.literal("  [" + quest.getVisibility().name() + "]").withColor(visColor));
     }
-    root.childById(LabelComponent.class, "owner-label")
-        .text(Text.literal(ownerInfo).withColor(Colors.TEXT_MUTED));
+    LabelComponent ownerLabel = UIComponents.label(ownerText);
+    ownerLabel.shadow(true);
+    ownerLabel.sizing(Sizing.content(), Sizing.content());
+    root.childById(FlowLayout.class, "header-row").child(ownerLabel);
 
     // Tag display -- inline chips (no collapsible)
     List<String> viewTags = quest.getTags();
@@ -170,18 +180,8 @@ public class QuestScreen extends DisquestsBaseScreen {
     tagDisplay.id("tag-display");
     tagDisplay.gap(4);
     tagDisplay.margins(Insets.bottom(4));
-    if (viewTags.isEmpty()) {
-      LabelComponent noTagsLabel =
-          UIComponents.label(
-              Text.translatable("gui.disquests.label.no_tags")
-                  .withColor(Colors.TEXT_MUTED)
-                  .styled(s -> s.withItalic(true)));
-      noTagsLabel.shadow(false);
-      tagDisplay.child(noTagsLabel);
-    } else {
-      for (String tag : viewTags) {
-        tagDisplay.child(new TagChipComponent(tag));
-      }
+    for (String tag : viewTags) {
+      tagDisplay.child(new TagChipComponent(tag));
     }
 
     replaceSlot(root, "tag-display-slot", tagDisplay);
@@ -240,12 +240,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         ButtonComponent bmBtn =
             UIComponents.button(
                 Text.translatable("gui.disquests.btn.view_bluemap"),
-                b -> {
-                  try {
-                    net.minecraft.util.Util.getOperatingSystem().open(URI.create(url));
-                  } catch (Exception ignored) {
-                  }
-                });
+                ignored -> UrlOpener.open(url));
         bmBtn.sizing(Sizing.content(), Sizing.fixed(14));
         metadataRow.child(bmBtn);
       }
@@ -285,43 +280,60 @@ public class QuestScreen extends DisquestsBaseScreen {
     FlowLayout buttonRow = root.childById(FlowLayout.class, "button-row");
     boolean canJoinOrRequest = !isOwner && !isContributor;
 
-    // Join button (OPEN quests, not yet a member)
-    ButtonComponent joinBtn = root.childById(ButtonComponent.class, "btn-join");
-    if (canJoinOrRequest && quest.getVisibility() == Visibility.OPEN) {
-      joinBtn.onPress(b -> joinQuest());
-    } else {
-      buttonRow.removeChild(joinBtn);
-    }
-
-    // Request button (CLOSED quests, not yet a member)
-    ButtonComponent requestBtn = root.childById(ButtonComponent.class, "btn-request");
-    if (canJoinOrRequest && quest.getVisibility() == Visibility.CLOSED) {
-      if (ClientSession.isRequested(quest.getId())) {
-        requestBtn.active = false;
-        requestBtn.setMessage(Text.translatable("gui.disquests.btn.requested"));
+    // Interact button: Join (OPEN), Request (CLOSED), or hidden (member/owner)
+    ButtonComponent interactBtn = root.childById(ButtonComponent.class, "btn-interact");
+    if (canJoinOrRequest) {
+      if (quest.getVisibility() == Visibility.OPEN) {
+        interactBtn.setMessage(Text.translatable("gui.disquests.btn.join"));
+        interactBtn.onPress(ignored -> joinQuest());
+      } else if (quest.getVisibility() == Visibility.CLOSED) {
+        if (ClientSession.isRequested(quest.getId())) {
+          interactBtn.setMessage(Text.translatable("gui.disquests.btn.requested"));
+          interactBtn.active(false);
+          interactBtn.tooltip(Text.translatable("gui.disquests.tooltip.already_requested"));
+        } else {
+          interactBtn.setMessage(Text.translatable("gui.disquests.btn.request"));
+          interactBtn.onPress(ignored -> requestAccess());
+        }
       } else {
-        requestBtn.onPress(b -> requestAccess());
+        // PRIVATE quest viewed by non-member (shouldn't normally happen)
+        buttonRow.removeChild(interactBtn);
       }
     } else {
-      buttonRow.removeChild(requestBtn);
+      buttonRow.removeChild(interactBtn);
     }
 
+    // Edit button: hidden for non-members, greyed with tooltip for view-only contributors
     ButtonComponent editBtn = root.childById(ButtonComponent.class, "btn-edit");
-    editBtn.onPress(b -> enterEditMode());
-    editBtn.active = canEdit;
+    if (canJoinOrRequest) {
+      // Non-member: hide Edit entirely
+      buttonRow.removeChild(editBtn);
+    } else {
+      editBtn.onPress(ignored -> enterEditMode());
+      if (canEdit) {
+        editBtn.active(true);
+      } else {
+        editBtn.active(false);
+        editBtn.tooltip(Text.translatable("gui.disquests.tooltip.view_only"));
+      }
+    }
 
     ButtonComponent leaveBtn = root.childById(ButtonComponent.class, "btn-leave");
     if (isContributor && !isOwner) {
-      leaveBtn.onPress(b -> leaveQuest());
+      leaveBtn.onPress(ignored -> leaveQuest());
     } else {
       buttonRow.removeChild(leaveBtn);
     }
 
+    // Delete button: only visible for owner
     ButtonComponent deleteBtn = root.childById(ButtonComponent.class, "btn-delete");
-    deleteBtn.onPress(b -> confirmDelete());
-    deleteBtn.active = isOwner;
+    if (isOwner) {
+      deleteBtn.onPress(ignored -> confirmDelete());
+    } else {
+      buttonRow.removeChild(deleteBtn);
+    }
 
-    root.childById(ButtonComponent.class, "btn-close").onPress(b -> this.close());
+    wireBackButton(root);
   }
 
   // ===================== EDIT MODE =====================
@@ -420,7 +432,7 @@ public class QuestScreen extends DisquestsBaseScreen {
                 case CLOSED -> "gui.disquests.tooltip.closed";
                 case OPEN -> "gui.disquests.tooltip.open";
               }));
-      visBtn.onPress(b -> cycleVisibility());
+      visBtn.onPress(ignored -> cycleVisibility());
 
       int contribCount = quest.getContributors().size();
       int pendingReqCount = ClientCache.getPendingCount(quest.getId());
@@ -435,14 +447,14 @@ public class QuestScreen extends DisquestsBaseScreen {
       }
       ButtonComponent contribBtn = root.childById(ButtonComponent.class, "btn-contributors");
       contribBtn.setMessage(contribText);
-      contribBtn.onPress(b -> openContributors());
+      contribBtn.onPress(ignored -> openContributors());
     } else {
       settingsRow.sizing(Sizing.fixed(0), Sizing.fixed(0));
     }
 
     // Bottom buttons
-    root.childById(ButtonComponent.class, "btn-save").onPress(b -> saveAndView());
-    root.childById(ButtonComponent.class, "btn-cancel").onPress(b -> cancelEdit());
+    root.childById(ButtonComponent.class, "btn-save").onPress(ignored -> saveAndView());
+    root.childById(ButtonComponent.class, "btn-cancel").onPress(ignored -> cancelEdit());
 
     // Style formatting panel labels with rendered examples
     LabelComponent fmtBold = root.childById(LabelComponent.class, "fmt-bold");

@@ -36,7 +36,7 @@ class SearchAndFilterJourney {
     type(context, "title-field", title);
     click(context, "btn-save");
     waitForScreen(context, QuestScreen.class);
-    click(context, "btn-close");
+    click(context, "btn-back");
     waitForScreen(context, MainScreen.class);
     openMainScreen(context);
   }

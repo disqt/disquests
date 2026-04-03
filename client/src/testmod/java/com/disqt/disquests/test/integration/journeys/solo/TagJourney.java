@@ -14,6 +14,7 @@ import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
 import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.core.UIComponent;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import org.junit.jupiter.api.BeforeAll;
@@ -208,7 +209,7 @@ class TagJourney {
   void verifyQuestInList(ClientGameTestContext context) {
     given("quest is saved with a tag");
     when("player closes quest and opens MainScreen");
-    click(context, "btn-close");
+    click(context, "btn-back");
     waitForScreen(context, MainScreen.class);
     openMainScreen(context);
     then("quest appears in the list");
@@ -228,7 +229,7 @@ class TagJourney {
     // Get the actual tag name from cache to use in the search filter
     String tagName =
         context.computeOnClient(
-            c ->
+            ignored ->
                 ClientCache.getMyQuests().stream()
                     .filter(q -> "Tag Test".equals(q.getTitle()))
                     .findFirst()
@@ -452,6 +453,115 @@ class TagJourney {
     // Cancel to return
     click(context, "btn-cancel");
     waitForEditMode(context);
+  }
+
+  @Test
+  @Order(11)
+  @PlayerA
+  @DisplayName("Custom tag from one quest appears in another quest's picker")
+  void customTagAppearsInOtherQuestPicker(ClientGameTestContext context) {
+    given("'Tag Test' has custom tag 'piwigord' from previous test");
+
+    when("player cancels edit mode and closes quest");
+    click(context, "btn-cancel");
+    waitForViewMode(context);
+    click(context, "btn-back");
+    waitForScreen(context, MainScreen.class);
+
+    and("creates a second quest 'Tag Test 2'");
+    openMainScreen(context);
+    click(context, "btn-new-quest");
+    waitForScreen(context, QuestScreen.class);
+    type(context, "title-field", "Tag Test 2");
+    click(context, "btn-save");
+    waitForViewMode(context);
+
+    and("opens edit mode and tag picker");
+    click(context, "btn-edit");
+    waitForEditMode(context);
+    click(context, "btn-add-tag");
+    waitForScreen(context, TagPickerScreen.class);
+
+    then("'piwigord' appears as a chip in the picker");
+    context.waitFor(
+        client -> {
+          if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+          var root = dScreen.getRootComponent();
+          if (root == null) return false;
+          FlowLayout chipCloud = root.childById(FlowLayout.class, "chip-cloud");
+          if (chipCloud == null) return false;
+          return chipCloud.children().stream()
+              .anyMatch(
+                  child ->
+                      child instanceof TagChipComponent chip && "piwigord".equals(chip.getTag()));
+        },
+        TIMEOUT);
+
+    and("player cancels picker");
+    click(context, "btn-cancel");
+    waitForEditMode(context);
+    click(context, "btn-cancel");
+    waitForViewMode(context);
+  }
+
+  @Test
+  @Order(12)
+  @PlayerA
+  @DisplayName("Plain text search matches tag names")
+  void plainTextSearchMatchesTags(ClientGameTestContext context) {
+    given("player is on MainScreen with a tagged quest");
+    openMainScreen(context);
+    waitForEntryCount(context, 2);
+
+    // Get tag name from cache
+    String tagName =
+        context.computeOnClient(
+            ignored ->
+                ClientCache.getMyQuests().stream()
+                    .filter(q -> "Tag Test".equals(q.getTitle()))
+                    .findFirst()
+                    .flatMap(q -> q.getTags().stream().findFirst())
+                    .orElse(null));
+    org.junit.jupiter.api.Assertions.assertNotNull(tagName, "Quest should have a tag");
+
+    when("player types the tag name WITHOUT # prefix");
+    type(context, "search-box", tagName);
+    then("quest with that tag is shown");
+    waitForEntryCount(context, 1);
+
+    when("player clears search");
+    type(context, "search-box", "");
+    then("all quests return");
+    waitForEntryCount(context, 2);
+  }
+
+  @Test
+  @Order(13)
+  @PlayerA
+  @DisplayName("Tag autocomplete appears when typing # in search")
+  void tagAutocompleteAppearsOnHash(ClientGameTestContext context) {
+    given("player is on MainScreen");
+    openMainScreen(context);
+
+    when("player types '#' in the search box");
+    type(context, "search-box", "#");
+
+    then("tag autocomplete overlay appears");
+    context.waitFor(
+        client -> {
+          if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+          var root = dScreen.getRootComponent();
+          if (root == null) return false;
+          return root.childById(OverlayContainer.class, "tag-autocomplete-overlay") != null;
+        },
+        TIMEOUT);
+
+    and("player presses Escape to dismiss");
+    context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+    context.waitTicks(2);
+
+    when("player clears search");
+    type(context, "search-box", "");
   }
 
   /** Click a specific tag chip by tag name in the TagPickerScreen chip cloud. */

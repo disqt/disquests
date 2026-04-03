@@ -1,7 +1,6 @@
 package com.disqt.disquests.client.gui.component;
 
 import com.disqt.disquests.client.ClientCache;
-import com.disqt.disquests.client.data.Quest;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
@@ -10,20 +9,19 @@ import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.stream.Stream;
 import net.minecraft.text.Text;
 
-public class AutocompleteDropdown {
+public class TagAutocompleteDropdown {
 
-  private static final String OVERLAY_ID = "autocomplete-overlay";
-  private static final int MAX_RESULTS = 5;
+  private static final String OVERLAY_ID = "tag-autocomplete-overlay";
+  private static final int MAX_RESULTS = 8;
   private static final int BG_COLOR = 0xEE1a1a2e;
   private static final int HOVER_COLOR = 0xEE3a3a5e;
   private static final int TEXT_COLOR = 0xFFe0e0e0;
 
   private FlowLayout rootComponent;
   private Consumer<String> onSelect;
-  private List<Quest> results = List.of();
+  private List<String> results = List.of();
   private int selectedIndex = 0;
   private boolean visible = false;
 
@@ -38,16 +36,16 @@ public class AutocompleteDropdown {
     this.onSelect = onSelect;
   }
 
-  public void update(String query, int anchorX, int anchorY) {
-    if (query == null || rootComponent == null) {
+  public void update(String query, int anchorX, int anchorY, boolean positionAbove) {
+    if (rootComponent == null) {
       hide();
       return;
     }
-    String lowerQuery = query.toLowerCase();
+    String lowerQuery = query != null ? query.toLowerCase() : "";
+
     results =
-        Stream.concat(ClientCache.getMyQuests().stream(), ClientCache.getServerQuests().stream())
-            .filter(q -> q.getTitle() != null)
-            .filter(q -> lowerQuery.isEmpty() || q.getTitle().toLowerCase().startsWith(lowerQuery))
+        ClientCache.getAllKnownTags().stream()
+            .filter(t -> lowerQuery.isEmpty() || t.toLowerCase().contains(lowerQuery))
             .limit(MAX_RESULTS)
             .toList();
     if (results.isEmpty()) {
@@ -55,7 +53,10 @@ public class AutocompleteDropdown {
       return;
     }
     this.dropdownX = anchorX;
-    this.dropdownY = anchorY;
+    // If positioning above, subtract estimated height
+    int lineHeight = 16;
+    int panelHeight = results.size() * lineHeight + 4;
+    this.dropdownY = positionAbove ? anchorY - panelHeight : anchorY;
     this.selectedIndex = 0;
     this.visible = true;
     rebuildOverlay();
@@ -88,7 +89,8 @@ public class AutocompleteDropdown {
       rebuildOverlay();
       return true;
     } else if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER
-        || keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER) {
+        || keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER
+        || keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_TAB) {
       selectCurrent();
       return true;
     } else if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
@@ -100,7 +102,7 @@ public class AutocompleteDropdown {
 
   private void selectCurrent() {
     if (selectedIndex < results.size() && onSelect != null) {
-      onSelect.accept(results.get(selectedIndex).getTitle());
+      onSelect.accept(results.get(selectedIndex));
     }
     hide();
   }
@@ -119,8 +121,8 @@ public class AutocompleteDropdown {
     panel.positioning(Positioning.absolute(dropdownX, dropdownY));
 
     for (int i = 0; i < results.size(); i++) {
-      Quest q = results.get(i);
-      LabelComponent label = UIComponents.label(Text.literal(q.getTitle()));
+      String tag = results.get(i);
+      LabelComponent label = UIComponents.label(Text.literal("#" + tag));
       label.color(Color.ofArgb(TEXT_COLOR));
       label.shadow(true);
       label.sizing(Sizing.content(), Sizing.content());

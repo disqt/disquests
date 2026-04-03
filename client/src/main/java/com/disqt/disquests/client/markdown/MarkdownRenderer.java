@@ -95,12 +95,61 @@ public class MarkdownRenderer {
   }
 
   /**
+   * Returns the first non-heading content line as a styled MutableText with muted colors. Headings
+   * (scale != 1.0) and empty lines are skipped. Wiki-links are resolved to display titles. Returns
+   * null if no content line is found.
+   */
+  public static MutableText renderPreviewLine(String markdown) {
+    if (markdown == null || markdown.isEmpty()) return null;
+    List<RenderedLine> lines = render(markdown);
+    for (RenderedLine line : lines) {
+      if (line.scale() != 1.0f) continue; // skip headings
+      String plain = line.text().getString();
+      if (plain.isBlank()) continue;
+      return muteColors(line.text());
+    }
+    return null;
+  }
+
+  /** Copies a MutableText tree, dimming all colors for use as a content preview. */
+  private static MutableText muteColors(MutableText original) {
+    Style style = original.getStyle();
+    if (style.getColor() != null) {
+      int rgb = style.getColor().getRgb();
+      int r = ((rgb >> 16) & 0xFF) * 6 / 10;
+      int g = ((rgb >> 8) & 0xFF) * 6 / 10;
+      int b = (rgb & 0xFF) * 6 / 10;
+      style = style.withColor((r << 16) | (g << 8) | b);
+    } else {
+      style = style.withColor(Formatting.GRAY);
+    }
+    style = style.withClickEvent(null);
+    // Use copy() to preserve only this node's literal content, then restyle
+    MutableText result = original.copyContentOnly().setStyle(style);
+    for (Text sibling : original.getSiblings()) {
+      if (sibling instanceof MutableText mt) {
+        result.append(muteColors(mt));
+      }
+    }
+    return result;
+  }
+
+  /**
    * Strips all markdown formatting and returns plain text. Useful for HUD display where styled text
    * is not needed.
    */
   public static String stripToPlainText(String markdown) {
     if (markdown == null || markdown.isEmpty()) return "";
-    Node document = PARSER.parse(markdown);
+    // Resolve wiki-links to just their display title before parsing
+    String resolved =
+        WIKI_LINK_PATTERN
+            .matcher(markdown)
+            .replaceAll(
+                m -> {
+                  String title = m.group(2);
+                  return title != null ? java.util.regex.Matcher.quoteReplacement(title) : "";
+                });
+    Node document = PARSER.parse(resolved);
     StringBuilder sb = new StringBuilder();
     collectPlainText(document, sb);
     return sb.toString().trim();
@@ -237,7 +286,7 @@ public class MarkdownRenderer {
                 .replace("&lt;", "<")
                 .replace("&gt;", ">")
                 .replace("&quot;", "\"");
-        boolean isValid = !uuid.isEmpty();
+        boolean isValid = isWikiLinkResolvable(uuid);
         int color = isValid ? 0xe8a86d : 0xe86d6d;
         Style wikiStyle = style.withColor(color).withUnderline(true);
         if (!isValid) wikiStyle = wikiStyle.withStrikethrough(true);
@@ -323,7 +372,7 @@ public class MarkdownRenderer {
                 .replace("&lt;", "<")
                 .replace("&gt;", ">")
                 .replace("&quot;", "\"");
-        boolean isValid = !uuid.isEmpty();
+        boolean isValid = isWikiLinkResolvable(uuid);
         int color = isValid ? 0xe8a86d : 0xe86d6d; // amber or red
         Style wikiStyle = style.withColor(color).withUnderline(true);
         if (!isValid) wikiStyle = wikiStyle.withStrikethrough(true);
@@ -341,6 +390,17 @@ public class MarkdownRenderer {
       // Unknown inline -- try children
       MutableText inner = collectInlineText(node, style);
       target.append(inner);
+    }
+  }
+
+  /** A wiki-link is resolvable if the UUID is non-empty and the quest exists in the cache. */
+  private static boolean isWikiLinkResolvable(String uuid) {
+    if (uuid == null || uuid.isEmpty()) return false;
+    try {
+      return com.disqt.disquests.client.ClientCache.getQuestById(java.util.UUID.fromString(uuid))
+          != null;
+    } catch (IllegalArgumentException e) {
+      return false;
     }
   }
 }

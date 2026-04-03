@@ -23,6 +23,8 @@
     "set_pos": "Position",
     "clear": "Effacer",
     "view_bluemap": "Voir sur BlueMap",
+    "join": "Rejoindre",
+    "request": "Demander",
     "requested": "Demandé",
     "add_tag": "+ Tag",
     "add": "Ajouter",
@@ -56,6 +58,8 @@
     "private": "Toi seul peux voir cette quête",
     "closed": "Visible sur le tableau des quêtes, les autres doivent demander l'accès",
     "open": "N'importe qui peut rejoindre et voir cette quête",
+    "already_requested": "Tu as déjà demandé l'accès",
+    "view_only": "Tu as un accès en lecture seule",
   },
 
   // Infobulles des filtres

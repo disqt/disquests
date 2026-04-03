@@ -3,6 +3,8 @@ package com.disqt.disquests.server.papermc;
 import static org.mockito.Mockito.*;
 
 import com.disqt.disquests.common.PacketCodec;
+import com.disqt.disquests.common.PacketType;
+import com.disqt.disquests.common.ProtocolVersion;
 import com.disqt.disquests.common.model.*;
 import java.nio.file.Path;
 import java.util.*;
@@ -38,6 +40,7 @@ class ServerPacketHandlerTest {
     when(plugin.getLogger()).thenReturn(java.util.logging.Logger.getLogger("test"));
     Config config = mock(Config.class);
     when(config.getBluemapUrl()).thenReturn("");
+    when(config.getPredefinedTags()).thenReturn(List.of());
 
     handler = new ServerPacketHandler(plugin, dm, config);
 
@@ -67,6 +70,40 @@ class ServerPacketHandlerTest {
     when(player.getListeningPluginChannels()).thenReturn(Set.of(CHANNEL));
     when(player.isOnline()).thenReturn(true);
     return player;
+  }
+
+  @Test
+  void saveNewQuest_broadcastsSyncTagsToV1Players() {
+    dm.upsertPlayerName(OWNER, "Owner");
+    dm.upsertPlayerName(BYSTANDER, "Bystander");
+
+    // Register owner as V1 by sending REQUEST_SYNC
+    byte[] syncPacket = PacketCodec.writeRequestSync(ProtocolVersion.V1);
+    handler.onPluginMessageReceived(CHANNEL, ownerPlayer, syncPacket);
+    // Register bystander as V1
+    handler.onPluginMessageReceived(CHANNEL, bystanderPlayer, syncPacket);
+
+    // Clear invocations from the sync setup
+    clearInvocations(ownerPlayer, bystanderPlayer, contributorPlayer);
+
+    // Save a new quest with a custom tag
+    UUID questId = UUID.randomUUID();
+    byte[] savePacket =
+        PacketCodec.writeSaveQuest(
+            questId, "Tagged Quest", "Content", null, false, null, null, List.of("newtag"));
+
+    handler.onPluginMessageReceived(CHANNEL, ownerPlayer, savePacket);
+
+    // Verify SYNC_TAGS was sent to the owner (V1) and bystander (V1)
+    // Owner gets UPDATE_QUEST + SYNC_TAGS, bystander gets only SYNC_TAGS
+    verify(ownerPlayer, atLeast(2)).sendPluginMessage(eq(plugin), eq(CHANNEL), any(byte[].class));
+    verify(bystanderPlayer, atLeastOnce())
+        .sendPluginMessage(
+            eq(plugin),
+            eq(CHANNEL),
+            argThat(data -> data.length > 0 && data[0] == PacketType.SYNC_TAGS.getId()));
+    // Contributor is V0 (never sent REQUEST_SYNC with V1), should NOT get SYNC_TAGS
+    verify(contributorPlayer, never()).sendPluginMessage(any(), any(), any());
   }
 
   @Test

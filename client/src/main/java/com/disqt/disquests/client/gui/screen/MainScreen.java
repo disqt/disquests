@@ -4,6 +4,7 @@ import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.QuestEntryComponent;
+import com.disqt.disquests.client.gui.component.TagAutocompleteDropdown;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.widget.ToastOverlay;
 import com.disqt.disquests.client.network.PacketSender;
@@ -24,6 +25,8 @@ import java.util.stream.Collectors;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.tooltip.TooltipComponent;
+import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Nullable;
@@ -32,6 +35,7 @@ public class MainScreen extends DisquestsBaseScreen {
 
   private static final org.slf4j.Logger LOGGER =
       org.slf4j.LoggerFactory.getLogger("Disquests.MainScreen");
+  private static final List<TooltipComponent> NO_TOOLTIP = Collections.emptyList();
 
   // Component references (looked up by ID from XML model)
   private FlowLayout rootLayout;
@@ -45,14 +49,13 @@ public class MainScreen extends DisquestsBaseScreen {
   private FlowLayout questList;
   private FlowLayout searchRow;
   private ButtonComponent btnNewQuest;
-  private ButtonComponent btnJoin;
-  private ButtonComponent btnRequest;
+  private ButtonComponent btnInteract;
   private ButtonComponent btnOpen;
-  private ButtonComponent btnClose;
 
   // Search
   private TextBoxComponent searchField;
   private String searchTerm;
+  private TagAutocompleteDropdown tagDropdown;
 
   // State
   private ClientSession.Tab currentTab;
@@ -97,33 +100,27 @@ public class MainScreen extends DisquestsBaseScreen {
     this.questList = root.childById(FlowLayout.class, "quest-list");
     this.searchRow = root.childById(FlowLayout.class, "search-row");
     this.btnNewQuest = root.childById(ButtonComponent.class, "btn-new-quest");
-    this.btnJoin = root.childById(ButtonComponent.class, "btn-join");
-    this.btnRequest = root.childById(ButtonComponent.class, "btn-request");
+    this.btnInteract = root.childById(ButtonComponent.class, "btn-interact");
     this.btnOpen = root.childById(ButtonComponent.class, "btn-open");
-    this.btnClose = root.childById(ButtonComponent.class, "btn-close");
 
     // --- Wire tab button handlers ---
-    this.tabMyQuests.onPress(btn -> selectTab(ClientSession.Tab.MY_QUESTS));
-    this.tabQuestBoard.onPress(btn -> selectTab(ClientSession.Tab.SERVER_QUESTS));
+    this.tabMyQuests.onPress(ignored -> selectTab(ClientSession.Tab.MY_QUESTS));
+    this.tabQuestBoard.onPress(ignored -> selectTab(ClientSession.Tab.SERVER_QUESTS));
 
     // --- Wire filter button handlers ---
-    this.filterAll.onPress(btn -> selectServerFilter(ClientSession.QuestFilter.ALL));
-    this.filterOpen.onPress(btn -> selectServerFilter(ClientSession.QuestFilter.OPEN));
-    this.filterClosed.onPress(btn -> selectServerFilter(ClientSession.QuestFilter.CLOSED));
+    this.filterAll.onPress(ignored -> selectServerFilter(ClientSession.QuestFilter.ALL));
+    this.filterOpen.onPress(ignored -> selectServerFilter(ClientSession.QuestFilter.OPEN));
+    this.filterClosed.onPress(ignored -> selectServerFilter(ClientSession.QuestFilter.CLOSED));
 
     this.filterAll.tooltip(Text.translatable("gui.disquests.filter.all"));
     this.filterOpen.tooltip(Text.translatable("gui.disquests.filter.open"));
     this.filterClosed.tooltip(Text.translatable("gui.disquests.filter.closed"));
 
     // --- Wire action button handlers ---
-    this.btnNewQuest.onPress(btn -> createNewQuest());
-    this.btnJoin.onPress(btn -> joinQuest());
-    this.btnRequest.onPress(btn -> requestAccess());
-    this.btnOpen.onPress(btn -> openSelected());
-    this.btnClose.onPress(
-        btn -> {
-          if (this.client != null) this.client.setScreen(null);
-        });
+    this.btnNewQuest.onPress(ignored -> createNewQuest());
+    this.btnInteract.onPress(ignored -> interactWithQuest());
+    this.btnOpen.onPress(ignored -> openSelected());
+    wireBackButton(root);
 
     // --- Create search text box programmatically ---
     this.searchField = UIComponents.textBox(Sizing.fixed(200));
@@ -132,6 +129,18 @@ public class MainScreen extends DisquestsBaseScreen {
     this.searchField.onChanged().subscribe(this::onSearchTermChanged);
     this.searchField.id("search-box");
     this.searchRow.child(this.searchField);
+
+    // --- Tag autocomplete dropdown ---
+    tagDropdown = new TagAutocompleteDropdown();
+    tagDropdown.setRootComponent(root);
+    tagDropdown.setOnSelect(
+        tag -> {
+          // Replace the current #partial with #tagname
+          String current = searchField.getText();
+          int hashIndex = current.lastIndexOf('#');
+          String before = hashIndex >= 0 ? current.substring(0, hashIndex) : current;
+          searchField.text(before + "#" + tag + " ");
+        });
 
     // Cache title width
     this.titleWidth = MinecraftClient.getInstance().textRenderer.getWidth("Disquests");
@@ -167,23 +176,20 @@ public class MainScreen extends DisquestsBaseScreen {
     }
 
     // Action button visibility: hide/show by removing/adding
-    // New Quest only on My Quests; Join+Request only on Server Quests
+    // New Quest only on My Quests; Interact only on Server Quests
     btnNewQuest.active(isMyQuests);
-    btnJoin.active(!isMyQuests);
-    btnRequest.active(!isMyQuests);
+    btnInteract.active(!isMyQuests);
 
     // Hide/show buttons by removing/re-adding to parent flow
     FlowLayout actionRow = rootLayout.childById(FlowLayout.class, "action-row");
     actionRow.removeChild(btnNewQuest);
-    actionRow.removeChild(btnJoin);
-    actionRow.removeChild(btnRequest);
+    actionRow.removeChild(btnInteract);
     if (isMyQuests) {
-      // Insert New Quest before Open and Close
+      // Insert New Quest before Open
       actionRow.child(0, btnNewQuest);
     } else {
-      // Insert Join and Request before Open and Close
-      actionRow.child(0, btnRequest);
-      actionRow.child(0, btnJoin);
+      // Insert Interact before Open
+      actionRow.child(0, btnInteract);
     }
 
     refreshListContents();
@@ -230,7 +236,8 @@ public class MainScreen extends DisquestsBaseScreen {
       String tf = query.textFilter();
       boolean textMatch =
           q.getTitle().toLowerCase().contains(tf)
-              || (q.getContent() != null && q.getContent().toLowerCase().contains(tf));
+              || (q.getContent() != null && q.getContent().toLowerCase().contains(tf))
+              || q.getTags().stream().anyMatch(t -> t.toLowerCase().contains(tf));
       if (!textMatch) return false;
     }
     if (!query.tagFilters().isEmpty()) {
@@ -247,6 +254,39 @@ public class MainScreen extends DisquestsBaseScreen {
     this.searchTerm = newTerm.toLowerCase().trim();
     ClientSession.setSearchTerm(this.searchTerm);
     refreshListContents();
+    updateTagAutocomplete(newTerm);
+  }
+
+  private void updateTagAutocomplete(String text) {
+    if (tagDropdown == null || searchField == null) return;
+    // Find the last # in the text
+    int hashIndex = text.lastIndexOf('#');
+    if (hashIndex < 0) {
+      tagDropdown.hide();
+      return;
+    }
+    // Extract partial tag after #
+    String partial = text.substring(hashIndex + 1);
+    // If there's a space after the #tag, it's already completed
+    if (partial.contains(" ")) {
+      tagDropdown.hide();
+      return;
+    }
+    // Position dropdown above the search box
+    int anchorX = searchField.x();
+    int anchorY = searchField.y();
+    tagDropdown.update(partial, anchorX, anchorY, true);
+  }
+
+  @Override
+  public boolean keyPressed(KeyInput keyInput) {
+    // Intercept arrow/enter/tab/escape for the tag autocomplete dropdown
+    if (tagDropdown != null && tagDropdown.isVisible()) {
+      if (tagDropdown.onKeyDown(keyInput.key())) {
+        return true;
+      }
+    }
+    return super.keyPressed(keyInput);
   }
 
   // --- DATA REFRESH ---
@@ -367,11 +407,32 @@ public class MainScreen extends DisquestsBaseScreen {
       Quest selected = getSelectedQuest();
       boolean hasSelection = selected != null;
       btnOpen.active(hasSelection);
-      btnJoin.active(hasSelection && selected.getVisibility() == Visibility.OPEN);
-      btnRequest.active(hasSelection && selected.getVisibility() == Visibility.CLOSED);
-      if (selected != null && ClientSession.isRequested(selected.getId())) {
-        markRequestButtonAsRequested();
-      }
+      updateInteractButton(selected);
+    }
+  }
+
+  private void updateInteractButton(Quest selected) {
+    if (selected == null) {
+      btnInteract.active(false);
+      btnInteract.setMessage(Text.translatable("gui.disquests.btn.join"));
+      btnInteract.tooltip(NO_TOOLTIP);
+      return;
+    }
+    if (ClientSession.isRequested(selected.getId())) {
+      btnInteract.setMessage(Text.translatable("gui.disquests.btn.requested"));
+      btnInteract.active(false);
+      btnInteract.tooltip(Text.translatable("gui.disquests.tooltip.already_requested"));
+    } else if (selected.getVisibility() == Visibility.OPEN) {
+      btnInteract.setMessage(Text.translatable("gui.disquests.btn.join"));
+      btnInteract.active(true);
+      btnInteract.tooltip(NO_TOOLTIP);
+    } else if (selected.getVisibility() == Visibility.CLOSED) {
+      btnInteract.setMessage(Text.translatable("gui.disquests.btn.request"));
+      btnInteract.active(true);
+      btnInteract.tooltip(NO_TOOLTIP);
+    } else {
+      btnInteract.active(false);
+      btnInteract.tooltip(NO_TOOLTIP);
     }
   }
 
@@ -387,13 +448,13 @@ public class MainScreen extends DisquestsBaseScreen {
     newQuest.setOwnerName(MinecraftClient.getInstance().getSession().getUsername());
     newQuest.setLastModified(System.currentTimeMillis() / 1000);
     newQuest.setContributors(new ArrayList<>());
-    this.client.setScreen(new QuestScreen(this, newQuest, true));
+    navigateToScreen(new QuestScreen(this, newQuest, true));
   }
 
   public void openSelected() {
     Quest sel = getSelectedQuest();
     if (sel != null) {
-      this.client.setScreen(new QuestScreen(this, sel));
+      navigateToScreen(new QuestScreen(this, sel));
     }
   }
 
@@ -404,23 +465,28 @@ public class MainScreen extends DisquestsBaseScreen {
     }
   }
 
-  private void markRequestButtonAsRequested() {
-    btnRequest.setMessage(Text.translatable("gui.disquests.btn.requested"));
-    btnRequest.active(false);
-  }
-
   private void requestAccess() {
     Quest sel = getSelectedQuest();
     LOGGER.debug(
         "requestAccess: sel={}, visibility={}, btnActive={}",
         sel != null ? sel.getTitle() : "null",
         sel != null ? sel.getVisibility() : "n/a",
-        btnRequest.active());
+        btnInteract.active());
     if (sel != null && sel.getVisibility() == Visibility.CLOSED) {
       PacketSender.requestCollaboration(sel.getId());
       ClientSession.markRequested(sel.getId());
-      markRequestButtonAsRequested();
+      updateInteractButton(sel);
       showToast("Request sent to " + sel.getOwnerName());
+    }
+  }
+
+  private void interactWithQuest() {
+    Quest sel = getSelectedQuest();
+    if (sel == null) return;
+    if (sel.getVisibility() == Visibility.OPEN) {
+      joinQuest();
+    } else if (sel.getVisibility() == Visibility.CLOSED) {
+      requestAccess();
     }
   }
 

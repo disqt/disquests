@@ -84,7 +84,7 @@ class QuestLifecycleJourney {
   @DisplayName("Return to MainScreen and see quest in list")
   void returnToMain(ClientGameTestContext context) {
     when("player clicks Close and reopens MainScreen");
-    click(context, "btn-close");
+    click(context, "btn-back");
     waitForScreen(context, MainScreen.class);
     // Reopen fresh MainScreen to pick up new quests (parent screen is stale)
     openMainScreen(context);

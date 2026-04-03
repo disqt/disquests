@@ -19,18 +19,37 @@
 
         <children>
 
-            <!-- Title label -->
-            <label id="title-label">
-                <text>Disquests</text>
-                <shadow>true</shadow>
+            <!-- Header row: back arrow + title -->
+            <flow-layout direction="horizontal" id="header-row">
                 <sizing>
-                    <horizontal method="content"/>
+                    <horizontal method="fill">85</horizontal>
                     <vertical method="content"/>
                 </sizing>
+                <vertical-alignment>center</vertical-alignment>
                 <margins>
                     <bottom>4</bottom>
                 </margins>
-            </label>
+                <children>
+                    <button id="btn-back">
+                        <text>&lt;</text>
+                        <sizing>
+                            <horizontal method="fixed">20</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                    <label id="title-label">
+                        <text>Disquests</text>
+                        <shadow>true</shadow>
+                        <sizing>
+                            <horizontal method="content"/>
+                            <vertical method="content"/>
+                        </sizing>
+                        <margins>
+                            <left>4</left>
+                        </margins>
+                    </label>
+                </children>
+            </flow-layout>
 
             <!-- Tab row -->
             <flow-layout direction="horizontal" id="tab-row">
@@ -136,15 +155,8 @@
                             <vertical method="fixed">20</vertical>
                         </sizing>
                     </button>
-                    <button id="btn-join">
+                    <button id="btn-interact">
                         <text>Join</text>
-                        <sizing>
-                            <horizontal method="fixed">70</horizontal>
-                            <vertical method="fixed">20</vertical>
-                        </sizing>
-                    </button>
-                    <button id="btn-request">
-                        <text>Request</text>
                         <sizing>
                             <horizontal method="fixed">70</horizontal>
                             <vertical method="fixed">20</vertical>
@@ -152,13 +164,6 @@
                     </button>
                     <button id="btn-open">
                         <text>Open</text>
-                        <sizing>
-                            <horizontal method="fixed">70</horizontal>
-                            <vertical method="fixed">20</vertical>
-                        </sizing>
-                    </button>
-                    <button id="btn-close">
-                        <text>Close</text>
                         <sizing>
                             <horizontal method="fixed">70</horizontal>
                             <vertical method="fixed">20</vertical>

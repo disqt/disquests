@@ -59,7 +59,7 @@ class TwoPlayerJourneys {
     assertLabelText(context, "title-label", "Collab Quest");
 
     and("PlayerA closes the quest");
-    click(context, "btn-close");
+    click(context, "btn-back");
     waitForScreen(context, MainScreen.class);
     assertEntryCount(context, 1);
 
@@ -86,10 +86,10 @@ class TwoPlayerJourneys {
 
     when("PlayerB selects the quest and clicks Request");
     clickEntryByTitle(context, "Collab Quest");
-    click(context, "btn-request");
+    click(context, "btn-interact");
 
     then("button shows Requested");
-    assertButtonText(context, "btn-request", "Requested");
+    assertButtonText(context, "btn-interact", "Requested");
 
     PhaseSync.signal("collab-request-sent");
   }
@@ -327,7 +327,7 @@ class TwoPlayerJourneys {
     assertLabelText(context, "title-label", "Open Quest");
 
     and("PlayerA closes the quest");
-    click(context, "btn-close");
+    click(context, "btn-back");
     waitForScreen(context, MainScreen.class);
 
     PhaseSync.signal("open-quest-created");
@@ -353,7 +353,7 @@ class TwoPlayerJourneys {
 
     when("PlayerB selects the quest and clicks Join");
     clickEntryByTitle(context, "Open Quest");
-    click(context, "btn-join");
+    click(context, "btn-interact");
 
     then("quest appears in PlayerB's My Quests");
     waitForQuestByTitle(context, "Open Quest", true);
