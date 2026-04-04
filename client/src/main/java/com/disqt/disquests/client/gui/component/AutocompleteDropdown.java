@@ -5,7 +5,6 @@ import com.disqt.disquests.client.data.Quest;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
-import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
 import java.util.List;
@@ -66,7 +65,7 @@ public class AutocompleteDropdown {
     visible = false;
     results = List.of();
     if (rootComponent != null) {
-      var existing = rootComponent.childById(OverlayContainer.class, OVERLAY_ID);
+      var existing = rootComponent.childById(FlowLayout.class, OVERLAY_ID);
       if (existing != null) {
         existing.remove();
       }
@@ -108,12 +107,13 @@ public class AutocompleteDropdown {
   private void rebuildOverlay() {
     if (rootComponent == null) return;
 
-    var existing = rootComponent.childById(OverlayContainer.class, OVERLAY_ID);
+    var existing = rootComponent.childById(FlowLayout.class, OVERLAY_ID);
     if (existing != null) {
       existing.remove();
     }
 
     FlowLayout panel = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
+    panel.id(OVERLAY_ID);
     panel.surface(Surface.flat(BG_COLOR).and(Surface.outline(0xFF3a3a5e)));
     panel.padding(Insets.of(2));
     panel.positioning(Positioning.absolute(dropdownX, dropdownY));
@@ -135,10 +135,6 @@ public class AutocompleteDropdown {
       }
     }
 
-    OverlayContainer<FlowLayout> overlay = UIContainers.overlay(panel);
-    overlay.id(OVERLAY_ID);
-    overlay.surface(Surface.BLANK);
-    overlay.closeOnClick(true);
-    rootComponent.child(overlay);
+    rootComponent.child(panel);
   }
 }
