@@ -140,6 +140,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **CI uses `gradle/actions/setup-gradle@v5`** — not manual `actions/cache`. Build cache enabled (`org.gradle.caching=true`). Cache is write-only on `main`, read-only on PR branches.
 - **`./gradlew build` includes all unit tests** — don't add separate `:common:test :server:test` invocations.
 - **`project.version` changes jar filenames** — The root `build.gradle.kts` clears `archiveVersion` in `afterEvaluate` to keep names stable. Don't remove this.
+- **Loom `include()` doesn't bundle transitives** — if a bundled library has its own dependencies (e.g., `commonmark-ext-autolink` depends on `org.nibor.autolink:autolink`), each transitive must be explicitly `include()`'d or you get `NoClassDefFoundError` at runtime.
 - **Production deploy: only one plugin jar** — Never leave multiple Disquests jars in the plugins folder. Paper's "Ambiguous plugin name" error prevents loading.
 - **Server config drift** — deployed `config.yml` doesn't auto-update when new fields are added to the default. After adding new config fields, manually update the VPS config: `ssh minecraft "cat /home/minecraft/serverfiles/plugins/Disquests/config.yml"`.
 - **`modpack-version.txt` format** — must contain bare version number (e.g. `2.9`), NOT `v2.9`. The DisqtVersion plugin's `extractVersion()` strips the `v` prefix from manifest versions but compares against the raw client string.
@@ -169,6 +170,8 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **Keyboard input requires `GreedyInputUIComponent`** — custom `BaseUIComponent` subclasses that need key/char events must implement this marker interface. Screen must override `charTyped()` to route to focused greedy component.
 - **Delegate focus desync** — `MultiLineTextFieldWidget.focused` can be reset by `mouseClicked()` after `onFocusGained`. Force `delegate.setFocused(true)` in `onKeyPress`/`onCharTyped` before forwarding.
 - **Surface composing** — `Surface.flat(color).and(Surface.outline(color))` chains surfaces. Available: `flat`, `outline`, `blur`, `DARK_PANEL`, `PANEL_INSET`, `panelWithInset`, `VANILLA_TRANSLUCENT`, `BLANK`.
+- **`OverlayContainer` centers its child** — `Positioning.absolute()` is ignored. For positioned dropdowns/popups, add the panel directly to the root with absolute positioning instead of wrapping in `OverlayContainer`.
+- **Back/forward navigation uses `NavEntry` records** — `DisquestsBaseScreen` stores `Deque<NavEntry>` (not `Deque<Screen>`). Each screen implements `toNavEntry()` to serialize itself. On back/forward, screens are rebuilt from current cache state via `rebuildFromEntry()`. Never store screen instances in the stacks.
 - **No `clearAndInit()`** — to rebuild a screen after state change, reopen it: `client.setScreen(new MyScreen(parent))`.
 - **owo-config wrapper IDE errors** — `DisquestsConfigWrapper cannot be resolved` cascades false errors. IDE-only. Gradle compiles fine. Don't chase these.
 
@@ -182,6 +185,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **Server packet handler tests** use Mockito (`mockito-core:5.14.2`) with `mockStatic(Bukkit.class)`. Must `upsertPlayerName()` for all test players before saving quests (null ownerName causes NPE in PacketCodec).
 - **Logger names use `.` not `/`** — `LoggerFactory.getLogger("Disquests.MainScreen")` not `"Disquests/MainScreen"`. Log4j2 uses `.` for hierarchy.
 - **`javax.annotation` not on testmod classpath** — Don't use `@Nullable` etc. in testmod code. JUnit is also unresolvable in IDE (cosmetic, compiles fine via Gradle).
+- **`childById(Class, id)` is type-strict** — changing a component's container type (e.g., `OverlayContainer` to `FlowLayout`) breaks any test using `childById(OverlayContainer.class, id)`. Search testmod for the component ID before changing container types.
 
 ## Deploy
 
