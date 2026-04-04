@@ -69,9 +69,11 @@ dependencies {
     implementation("org.commonmark:commonmark:0.27.1")
     implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.27.1")
     implementation("org.commonmark:commonmark-ext-task-list-items:0.27.1")
+    implementation("org.commonmark:commonmark-ext-autolink:0.27.1")
     include("org.commonmark:commonmark:0.27.1")
     include("org.commonmark:commonmark-ext-gfm-strikethrough:0.27.1")
     include("org.commonmark:commonmark-ext-task-list-items:0.27.1")
+    include("org.commonmark:commonmark-ext-autolink:0.27.1")
 
 }
 
