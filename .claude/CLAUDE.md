@@ -86,7 +86,6 @@ Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with GLFW physical inpu
 - **CI Xvfb** — `854x480x24` with `guiScale:1` via `ensureClientOptions()`. Do NOT increase Xvfb resolution -- 1920x1080 causes 4x software-rendering overhead, making tests 2x slower.
 - **`catch(Throwable)` not `catch(Exception)` for `waitFor`** — Fabric's `waitFor` throws `AssertionError` (extends `Error`). `catch(Exception)` won't catch it.
 - **Server handshake retry** — `ServerPacketHandler.onPlayerJoin` retries every 20 ticks (up to 10 attempts) because client channel registration can be delayed on slow CI.
-- **Server packet handler tests** use Mockito (`mockito-core:5.14.2`) with `mockStatic(Bukkit.class)` for static method mocking. Must `upsertPlayerName()` for all test players before saving quests (DataManager joins with player_names table; null ownerName causes NPE in PacketCodec).
 
 ## Networking Protocol
 
