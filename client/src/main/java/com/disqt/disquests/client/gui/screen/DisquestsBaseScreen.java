@@ -1,7 +1,10 @@
 package com.disqt.disquests.client.gui.screen;
 
+import com.disqt.disquests.client.ClientCache;
+import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.DisquestsClient;
 import com.disqt.disquests.client.KeyBinds;
+import com.disqt.disquests.client.data.Quest;
 import io.wispforest.owo.ui.base.BaseUIModelScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
@@ -11,6 +14,7 @@ import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
 import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
+import java.util.UUID;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.input.CharInput;
@@ -24,8 +28,8 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   public static final String CONFIRM_YES_ID = "btn-confirm-yes";
   public static final String CONFIRM_NO_ID = "btn-confirm-no";
 
-  private static final java.util.Deque<Screen> backStack = new java.util.ArrayDeque<>();
-  private static final java.util.Deque<Screen> forwardStack = new java.util.ArrayDeque<>();
+  private static final java.util.Deque<NavEntry> backStack = new java.util.ArrayDeque<>();
+  private static final java.util.Deque<NavEntry> forwardStack = new java.util.ArrayDeque<>();
   private static final int MAX_HISTORY = 20;
 
   @Nullable protected final Screen parent;
@@ -38,6 +42,29 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   public static void clearHistory() {
     backStack.clear();
     forwardStack.clear();
+  }
+
+  public sealed interface NavEntry {
+    record QuestNav(UUID questId, boolean editing) implements NavEntry {}
+
+    record MainNav(boolean serverTab, String searchTerm) implements NavEntry {}
+  }
+
+  public abstract NavEntry toNavEntry();
+
+  @Nullable
+  private Screen rebuildFromEntry(NavEntry entry) {
+    if (entry instanceof NavEntry.QuestNav qn) {
+      Quest quest = ClientCache.getQuestById(qn.questId());
+      if (quest == null) return null;
+      return new QuestScreen(this.parent, quest, qn.editing());
+    } else if (entry instanceof NavEntry.MainNav mn) {
+      ClientSession.setActiveTab(
+          mn.serverTab() ? ClientSession.Tab.SERVER_QUESTS : ClientSession.Tab.MY_QUESTS);
+      ClientSession.setSearchTerm(mn.searchTerm());
+      return new MainScreen(this.parent);
+    }
+    return null;
   }
 
   @Override
@@ -63,17 +90,31 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   }
 
   private void goBack() {
-    if (this.client == null || backStack.isEmpty()) return;
-    forwardStack.push(this);
-    if (forwardStack.size() > MAX_HISTORY) forwardStack.removeLast();
-    this.client.setScreen(backStack.pop());
+    if (this.client == null) return;
+    while (!backStack.isEmpty()) {
+      NavEntry entry = backStack.pop();
+      Screen screen = rebuildFromEntry(entry);
+      if (screen != null) {
+        forwardStack.push(this.toNavEntry());
+        if (forwardStack.size() > MAX_HISTORY) forwardStack.removeLast();
+        this.client.setScreen(screen);
+        return;
+      }
+    }
   }
 
   private void goForward() {
-    if (this.client == null || forwardStack.isEmpty()) return;
-    backStack.push(this);
-    if (backStack.size() > MAX_HISTORY) backStack.removeLast();
-    this.client.setScreen(forwardStack.pop());
+    if (this.client == null) return;
+    while (!forwardStack.isEmpty()) {
+      NavEntry entry = forwardStack.pop();
+      Screen screen = rebuildFromEntry(entry);
+      if (screen != null) {
+        backStack.push(this.toNavEntry());
+        if (backStack.size() > MAX_HISTORY) backStack.removeLast();
+        this.client.setScreen(screen);
+        return;
+      }
+    }
   }
 
   @Override
@@ -158,9 +199,9 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     return false;
   }
 
-  protected void navigateToScreen(Screen screen) {
+  public void navigateToScreen(Screen screen) {
     if (this.client != null) {
-      backStack.push(this);
+      backStack.push(this.toNavEntry());
       if (backStack.size() > MAX_HISTORY) backStack.removeLast();
       forwardStack.clear();
       this.client.setScreen(screen);

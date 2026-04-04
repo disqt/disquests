@@ -5,6 +5,7 @@ import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.helper.HoverPreviewRenderer;
+import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.client.markdown.RenderedLine;
@@ -17,6 +18,7 @@ import java.util.UUID;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.Click;
+import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.ClickEvent;
 import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
@@ -397,8 +399,12 @@ public class MarkdownWidget extends BaseUIComponent {
           UUID questId = UUID.fromString(wh.uuid());
           var quest = ClientCache.getQuestById(questId);
           if (quest != null) {
-            MinecraftClient.getInstance()
-                .setScreen(new QuestScreen(MinecraftClient.getInstance().currentScreen, quest));
+            Screen currentScreen = MinecraftClient.getInstance().currentScreen;
+            if (currentScreen instanceof DisquestsBaseScreen baseScreen) {
+              baseScreen.navigateToScreen(new QuestScreen(baseScreen.getParentScreen(), quest));
+            } else {
+              MinecraftClient.getInstance().setScreen(new QuestScreen(currentScreen, quest));
+            }
           } else {
             ClientSession.setPendingToast(QUEST_INACCESSIBLE_MSG);
           }

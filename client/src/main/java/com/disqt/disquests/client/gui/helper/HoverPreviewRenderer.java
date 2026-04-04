@@ -12,7 +12,8 @@ import net.minecraft.text.Text;
 
 public final class HoverPreviewRenderer {
 
-  private static final int WIDTH = 150;
+  private static final int MIN_WIDTH = 120;
+  private static final int MAX_WIDTH = 250;
   private static final int MAX_LINES = 3;
   private static final int PADDING = 4;
   private static final int OFFSET_X = 12;
@@ -54,6 +55,16 @@ public final class HoverPreviewRenderer {
     // Compute tag chips
     List<String> tags = quest.getTags();
 
+    // Compute width to fit content (clamped between MIN_WIDTH and MAX_WIDTH)
+    String title = quest.getTitle() != null ? quest.getTitle() : "Untitled";
+    int contentArea = PADDING * 2;
+    int neededWidth = textRenderer.getWidth(title) + contentArea;
+    for (RenderedLine line : renderedLines) {
+      neededWidth =
+          Math.max(neededWidth, textRenderer.getWidth(line.text().getString()) + contentArea);
+    }
+    int width = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, neededWidth));
+
     // Compute card height: padding + title + gap + content lines + gap + tags + padding
     int contentLinesHeight = renderedLines.size() * lineHeight;
     int tagsHeight = tags.isEmpty() ? 0 : lineHeight + 2; // one row of tag text
@@ -70,20 +81,19 @@ public final class HoverPreviewRenderer {
     // Position with offset, clamp to screen edges
     int x = mouseX + OFFSET_X;
     int y = mouseY + OFFSET_Y;
-    if (x + WIDTH > screenWidth) x = mouseX - WIDTH - 4;
+    if (x + width > screenWidth) x = mouseX - width - 4;
     if (y + totalHeight > screenHeight) y = mouseY - totalHeight - 4;
     if (x < 0) x = 0;
     if (y < 0) y = 0;
 
     // Draw background + border
-    context.fill(x - 1, y - 1, x + WIDTH + 1, y + totalHeight + 1, BORDER_COLOR);
-    context.fill(x, y, x + WIDTH, y + totalHeight, BG_COLOR);
+    context.fill(x - 1, y - 1, x + width + 1, y + totalHeight + 1, BORDER_COLOR);
+    context.fill(x, y, x + width, y + totalHeight, BG_COLOR);
 
     int drawY = y + PADDING;
 
     // Title (bold)
-    String title = quest.getTitle() != null ? quest.getTitle() : "Untitled";
-    String rawTitle = textRenderer.trimToWidth(title, WIDTH - PADDING * 2);
+    String rawTitle = textRenderer.trimToWidth(title, width - PADDING * 2);
     if (rawTitle.length() < title.length()) rawTitle = rawTitle + "...";
     Text titleText =
         Text.literal(rawTitle).setStyle(Style.EMPTY.withBold(true).withColor(TITLE_COLOR));
@@ -94,7 +104,7 @@ public final class HoverPreviewRenderer {
     // compact tooltip preview, not a full markdown renderer. Headings and bullet indentation are
     // deliberately flattened.
     for (RenderedLine line : renderedLines) {
-      String rawLine = textRenderer.trimToWidth(line.text().getString(), WIDTH - PADDING * 2);
+      String rawLine = textRenderer.trimToWidth(line.text().getString(), width - PADDING * 2);
       context.drawText(
           textRenderer, Text.literal(rawLine), x + PADDING, drawY, Colors.TEXT_MUTED, false);
       drawY += lineHeight;
@@ -113,7 +123,7 @@ public final class HoverPreviewRenderer {
         int tagColor = TagColors.getForeground(tag);
         int tagBg = TagColors.getBackground(tag);
         int tagWidth = textRenderer.getWidth(tag) + 6; // 3px padding each side
-        if (tagX + tagWidth > x + WIDTH - PADDING) break; // don't overflow
+        if (tagX + tagWidth > x + width - PADDING) break; // don't overflow
         context.fill(tagX, drawY, tagX + tagWidth, drawY + lineHeight, tagBg);
         context.drawText(textRenderer, Text.literal(tag), tagX + 3, drawY + 1, tagColor, false);
         tagX += tagWidth + 2;

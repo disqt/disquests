@@ -90,4 +90,34 @@ class NavigationJourney {
     waitForScreen(context, QuestScreen.class);
     assertScreenIs(context, QuestScreen.class);
   }
+
+  @Test
+  @Order(5)
+  @PlayerA
+  @DisplayName("Back navigation shows fresh content after edit")
+  void backShowsFreshContentAfterEdit(ClientGameTestContext context) {
+    given("player is on QuestScreen viewing 'Nav Test'");
+    assertScreenIs(context, QuestScreen.class);
+    assertLabelText(context, "title-label", "Nav Test");
+
+    when("player enters edit mode and changes the title");
+    click(context, "btn-edit");
+    waitForScreen(context, QuestScreen.class);
+    type(context, "title-field", "Nav Test Edited");
+    click(context, "btn-save");
+    waitForScreen(context, QuestScreen.class);
+
+    then("view mode shows the updated title");
+    assertLabelText(context, "title-label", "Nav Test Edited");
+
+    when("player presses mouse back twice (past edit screen to original view)");
+    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_4);
+    context.waitTicks(5);
+    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_4);
+    context.waitTicks(5);
+
+    then("original view shows the updated title (rebuilt from cache, not stale)");
+    waitForScreen(context, QuestScreen.class);
+    assertLabelText(context, "title-label", "Nav Test Edited");
+  }
 }

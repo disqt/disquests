@@ -38,6 +38,11 @@ public class TagPickerScreen extends DisquestsBaseScreen {
   }
 
   @Override
+  public NavEntry toNavEntry() {
+    return new NavEntry.QuestNav(quest.getId(), false);
+  }
+
+  @Override
   protected void build(FlowLayout root) {
     applyThemeRoot(root);
 

@@ -10,6 +10,7 @@ import net.minecraft.text.MutableText;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import org.commonmark.ext.autolink.AutolinkExtension;
 import org.commonmark.ext.gfm.strikethrough.Strikethrough;
 import org.commonmark.ext.gfm.strikethrough.StrikethroughExtension;
 import org.commonmark.ext.task.list.items.TaskListItemMarker;
@@ -23,7 +24,11 @@ public class MarkdownRenderer {
 
   private static final Parser PARSER =
       Parser.builder()
-          .extensions(List.of(StrikethroughExtension.create(), TaskListItemsExtension.create()))
+          .extensions(
+              List.of(
+                  StrikethroughExtension.create(),
+                  TaskListItemsExtension.create(),
+                  AutolinkExtension.create()))
           .build();
 
   private static final Pattern WIKI_LINK_PATTERN =
