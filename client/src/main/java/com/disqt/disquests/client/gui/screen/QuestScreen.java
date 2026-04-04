@@ -112,6 +112,11 @@ public class QuestScreen extends DisquestsBaseScreen {
     return editing;
   }
 
+  @Override
+  public NavEntry toNavEntry() {
+    return new NavEntry.QuestNav(quest.getId(), editing);
+  }
+
   public boolean hasLeaveButton() {
     return isContributor && !isOwner && !editing;
   }

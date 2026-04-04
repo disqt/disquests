@@ -60,7 +60,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
       return new QuestScreen(this.parent, quest, qn.editing());
     } else if (entry instanceof NavEntry.MainNav mn) {
       ClientSession.setActiveTab(
-          mn.serverTab() ? ClientSession.Tab.QUEST_BOARD : ClientSession.Tab.MY_QUESTS);
+          mn.serverTab() ? ClientSession.Tab.SERVER_QUESTS : ClientSession.Tab.MY_QUESTS);
       ClientSession.setSearchTerm(mn.searchTerm());
       return new MainScreen(this.parent);
     }

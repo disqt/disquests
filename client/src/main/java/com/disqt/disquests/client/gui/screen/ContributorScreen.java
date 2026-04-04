@@ -35,6 +35,11 @@ public class ContributorScreen extends DisquestsBaseScreen {
   }
 
   @Override
+  public NavEntry toNavEntry() {
+    return new NavEntry.QuestNav(quest.getId(), false);
+  }
+
+  @Override
   protected void build(FlowLayout root) {
     applyThemeRoot(root);
     applyThemePanel(root.childById(ParentUIComponent.class, "contributor-scroll"));

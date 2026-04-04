@@ -83,6 +83,12 @@ public class MainScreen extends DisquestsBaseScreen {
   }
 
   @Override
+  public NavEntry toNavEntry() {
+    return new NavEntry.MainNav(
+        currentTab == ClientSession.Tab.SERVER_QUESTS, searchTerm != null ? searchTerm : "");
+  }
+
+  @Override
   protected void build(FlowLayout root) {
     applyThemeRoot(root);
     applyThemePanel(root.childById(ParentUIComponent.class, "quest-scroll"));
