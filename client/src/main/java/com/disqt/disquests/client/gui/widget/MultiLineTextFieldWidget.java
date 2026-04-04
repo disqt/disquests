@@ -30,8 +30,8 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
   private final TextRenderer textRenderer;
   public final int x;
   public final int y;
-  public final int width;
-  public final int height;
+  public int width;
+  public int height;
 
   protected final int maxLines;
 
@@ -154,6 +154,17 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
     this.allowHorizontalScroll = !wordWrap;
 
     setText(initialText);
+  }
+
+  /**
+   * Updates the widget dimensions and rebuilds display lines for the new width. Called by
+   * TextFieldComponent when owo-ui resolves the actual container size.
+   */
+  public void resize(int newWidth, int newHeight) {
+    if (this.width == newWidth && this.height == newHeight) return;
+    this.width = newWidth;
+    this.height = newHeight;
+    rebuildDisplayLines();
   }
 
   public void setCaretEnabled(boolean enabled) {
