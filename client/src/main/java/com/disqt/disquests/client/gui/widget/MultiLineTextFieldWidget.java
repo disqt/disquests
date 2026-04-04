@@ -156,10 +156,6 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
     setText(initialText);
   }
 
-  /**
-   * Updates the widget dimensions and rebuilds display lines for the new width. Called by
-   * TextFieldComponent when owo-ui resolves the actual container size.
-   */
   public void resize(int newWidth, int newHeight) {
     if (this.width == newWidth && this.height == newHeight) return;
     this.width = newWidth;

@@ -63,7 +63,6 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
 
   @Override
   public void draw(OwoUIGraphics context, int mouseX, int mouseY, float partialTicks, float delta) {
-    // Sync delegate dimensions with owo-ui resolved size
     delegate.resize(this.width(), this.height());
 
     computeOffset();
