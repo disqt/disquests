@@ -74,6 +74,7 @@ dependencies {
     include("org.commonmark:commonmark-ext-gfm-strikethrough:0.27.1")
     include("org.commonmark:commonmark-ext-task-list-items:0.27.1")
     include("org.commonmark:commonmark-ext-autolink:0.27.1")
+    include("org.nibor.autolink:autolink:0.12.0")
 
 }
 
