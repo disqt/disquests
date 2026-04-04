@@ -13,7 +13,6 @@ import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
 import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
 import io.wispforest.owo.ui.container.FlowLayout;
-import io.wispforest.owo.ui.container.OverlayContainer;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -159,7 +158,7 @@ class WikiLinkJourney {
           if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
           var root = dScreen.getRootComponent();
           if (root == null) return false;
-          return root.childById(OverlayContainer.class, "autocomplete-overlay") != null;
+          return root.childById(FlowLayout.class, "autocomplete-overlay") != null;
         },
         TIMEOUT);
   }
@@ -181,7 +180,7 @@ class WikiLinkJourney {
           if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
           var root = dScreen.getRootComponent();
           if (root == null) return false;
-          return root.childById(OverlayContainer.class, "autocomplete-overlay") == null;
+          return root.childById(FlowLayout.class, "autocomplete-overlay") == null;
         },
         TIMEOUT);
 
