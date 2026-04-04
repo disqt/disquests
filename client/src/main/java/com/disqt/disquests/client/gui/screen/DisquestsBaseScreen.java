@@ -158,7 +158,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     return false;
   }
 
-  protected void navigateToScreen(Screen screen) {
+  public void navigateToScreen(Screen screen) {
     if (this.client != null) {
       backStack.push(this);
       if (backStack.size() > MAX_HISTORY) backStack.removeLast();
