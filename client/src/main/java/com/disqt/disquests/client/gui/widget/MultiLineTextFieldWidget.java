@@ -89,13 +89,16 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
   protected List<Integer> displayToOffset = new ArrayList<>();
 
   // Wiki-link syntax highlighting
-  private static final Pattern WIKI_LINK_EDIT_PATTERN = Pattern.compile("\\[\\[[^\\]]*\\]\\]");
+  private static final Pattern WIKI_LINK_EDIT_PATTERN = Pattern.compile("\\[\\[([^\\]]*)\\]\\]");
   private static final int WIKI_LINK_COLOR = 0xFFe8a86d; // amber
+  private static final int WIKI_LINK_BROKEN_COLOR = 0xFFe86d6d; // red
   private List<List<int[]>> displayLineWikiLinks = new ArrayList<>();
 
   // Markdown link syntax highlighting [text](url)
   private static final Pattern MD_LINK_EDIT_PATTERN =
       Pattern.compile("\\[([^\\]]+)\\]\\(([^)]+)\\)");
+  private static final Pattern BARE_URL_PATTERN =
+      Pattern.compile("(?<![\\[(])https?://[^\\s)\\]]+");
   private static final int MD_LINK_COLOR = 0xFF55FFFF; // aqua
   private List<List<int[]>> displayLineMdLinks = new ArrayList<>();
 
@@ -212,7 +215,15 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
         String remaining = line.substring(offset);
         String trimmed = textRenderer.trimToWidth(remaining, maxWidth);
         if (trimmed.isEmpty() && !remaining.isEmpty()) {
-          trimmed = remaining.substring(0, 1); // at least 1 char to avoid infinite loop
+          trimmed = remaining.substring(0, 1);
+        }
+        // Break at word boundary if we're mid-line and the trimmed text doesn't
+        // consume the rest of the line (i.e., there's more text after this chunk)
+        if (trimmed.length() < remaining.length() && !trimmed.isEmpty()) {
+          int lastSpace = trimmed.lastIndexOf(' ');
+          if (lastSpace > 0) {
+            trimmed = trimmed.substring(0, lastSpace + 1);
+          }
         }
         displayLines.add(trimmed);
         displayToLogical.add(i);
@@ -238,24 +249,37 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
       int dispLen = displayLines.get(di).length();
       int dispEnd = dispOffset + dispLen;
 
-      // Find all [[...]] in the logical line
+      // Find all [[...]] in the logical line, check if title resolves
       List<int[]> wikiSegs = new ArrayList<>();
       Matcher wm = WIKI_LINK_EDIT_PATTERN.matcher(fullLogical);
       while (wm.find()) {
         int segStart = Math.max(wm.start(), dispOffset) - dispOffset;
         int segEnd = Math.min(wm.end(), dispEnd) - dispOffset;
         if (segStart < segEnd && segStart < dispLen) {
-          wikiSegs.add(new int[] {segStart, segEnd});
+          String linkText = wm.group(1);
+          boolean resolved =
+              Stream.concat(
+                      ClientCache.getMyQuests().stream(), ClientCache.getServerQuests().stream())
+                  .anyMatch(q -> linkText.equals(q.getTitle()));
+          wikiSegs.add(new int[] {segStart, segEnd, resolved ? 1 : 0});
         }
       }
       displayLineWikiLinks.add(wikiSegs);
 
-      // Find all [text](url) in the logical line
+      // Find all [text](url) and bare URLs in the logical line
       List<int[]> mdSegs = new ArrayList<>();
       Matcher mm = MD_LINK_EDIT_PATTERN.matcher(fullLogical);
       while (mm.find()) {
         int segStart = Math.max(mm.start(), dispOffset) - dispOffset;
         int segEnd = Math.min(mm.end(), dispEnd) - dispOffset;
+        if (segStart < segEnd && segStart < dispLen) {
+          mdSegs.add(new int[] {segStart, segEnd});
+        }
+      }
+      Matcher um = BARE_URL_PATTERN.matcher(fullLogical);
+      while (um.find()) {
+        int segStart = Math.max(um.start(), dispOffset) - dispOffset;
+        int segEnd = Math.min(um.end(), dispEnd) - dispOffset;
         if (segStart < segEnd && segStart < dispLen) {
           mdSegs.add(new int[] {segStart, segEnd});
         }
@@ -642,9 +666,9 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
               this.textRenderer, dispLine, drawX, lineYPos, Colors.TEXT_PRIMARY, false);
         } else {
           // Merge both segment lists sorted by start position, tagged with type
-          // type 0 = wiki-link, type 1 = markdown link
+          // type 0 = wiki-link (resolved), type 1 = markdown link, type 2 = wiki-link (broken)
           List<int[]> allSegs = new ArrayList<>();
-          for (int[] seg : wikiLinks) allSegs.add(new int[] {seg[0], seg[1], 0});
+          for (int[] seg : wikiLinks) allSegs.add(new int[] {seg[0], seg[1], seg[2] == 1 ? 0 : 2});
           for (int[] seg : mdLinks) allSegs.add(new int[] {seg[0], seg[1], 1});
           allSegs.sort((a, b) -> Integer.compare(a[0], b[0]));
 
@@ -661,11 +685,15 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
             String segText = dispLine.substring(seg[0], seg[1]);
             Style segStyle;
             if (seg[2] == 0) {
-              // Wiki-link: amber + italics + underline
               segStyle =
                   Style.EMPTY.withColor(WIKI_LINK_COLOR).withItalic(true).withUnderline(true);
+            } else if (seg[2] == 2) {
+              segStyle =
+                  Style.EMPTY
+                      .withColor(WIKI_LINK_BROKEN_COLOR)
+                      .withItalic(true)
+                      .withStrikethrough(true);
             } else {
-              // Markdown link: aqua + underline
               segStyle = Style.EMPTY.withColor(MD_LINK_COLOR).withUnderline(true);
             }
             Text styledText = Text.literal(segText).setStyle(segStyle);
