@@ -23,8 +23,14 @@ Build all modules, deploy the Paper plugin to the Minecraft server, and update t
    ```
 
 3. **Deploy client mod to Prism instance**
+   Detect the Prism Launcher instances directory at runtime:
+   - **Windows**: `$APPDATA/PrismLauncher/instances/`
+   - **Linux**: `~/.local/share/PrismLauncher/instances/`
+   - **macOS**: `~/Library/Application Support/PrismLauncher/instances/`
+
+   Find the latest `1.21.* v*` instance, then copy:
    ```bash
-   cp client/build/libs/client.jar "C:/Users/leole/AppData/Roaming/PrismLauncher/instances/1.21.11 v2.7/.minecraft/mods/disquests-client-0.2.4.jar"
+   cp client/build/libs/client.jar "<instances>/<latest>/.minecraft/mods/disquests-client.jar"
    ```
 
 4. **Verify owo-lib is present in Prism mods**
