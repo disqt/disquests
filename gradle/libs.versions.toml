@@ -9,7 +9,7 @@ sqlite-jdbc = "3.51.2.0"
 
 # Client libs
 lwjgl-tinyfd = "3.3.3"
-commonmark = "0.27.1"
+commonmark = "0.28.0"
 autolink = "0.12.0"
 
 # Build quality
