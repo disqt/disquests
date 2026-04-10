@@ -1,3 +1,5 @@
+import net.ltgt.gradle.errorprone.errorprone
+
 plugins {
     java
     alias(libs.plugins.spotless) apply false

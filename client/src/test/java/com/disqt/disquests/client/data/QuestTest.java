@@ -128,10 +128,22 @@ class QuestTest {
 
   @Test
   void getTags_nullSafe() {
-    Quest q = Quest.fromNetwork(
-        new QuestData(
-            UUID.randomUUID(), "t", "c", OWNER, "o", Visibility.OPEN,
-            List.of(), 0, null, false, null, null, List.of()));
+    Quest q =
+        Quest.fromNetwork(
+            new QuestData(
+                UUID.randomUUID(),
+                "t",
+                "c",
+                OWNER,
+                "o",
+                Visibility.OPEN,
+                List.of(),
+                0,
+                null,
+                false,
+                null,
+                null,
+                List.of()));
     assertNotNull(q.getTags());
     assertTrue(q.getTags().isEmpty());
   }
