@@ -46,13 +46,14 @@ dependencies {
     implementation(project(":common"))
     include(project(":common"))
 
-    implementation("org.lwjgl:lwjgl-tinyfd:3.3.3")
-    include("org.lwjgl:lwjgl-tinyfd:3.3.3")
+    implementation(libs.lwjgl.tinyfd)
+    include(libs.lwjgl.tinyfd)
 
     // Native libraries for file dialogs
+    val tinyfdVersion = libs.versions.lwjgl.tinyfd.get()
     listOf("natives-linux", "natives-windows", "natives-macos", "natives-macos-arm64").forEach { classifier ->
-        runtimeOnly("org.lwjgl:lwjgl-tinyfd:3.3.3:$classifier")
-        include("org.lwjgl:lwjgl-tinyfd:3.3.3:$classifier")
+        runtimeOnly("org.lwjgl:lwjgl-tinyfd:$tinyfdVersion:$classifier")
+        include("org.lwjgl:lwjgl-tinyfd:$tinyfdVersion:$classifier")
     }
 
     // Mod Menu (optional at runtime)
@@ -66,15 +67,15 @@ dependencies {
     include("io.wispforest:owo-sentinel:$owo_version")
 
     // Markdown rendering
-    implementation("org.commonmark:commonmark:0.27.1")
-    implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.27.1")
-    implementation("org.commonmark:commonmark-ext-task-list-items:0.27.1")
-    implementation("org.commonmark:commonmark-ext-autolink:0.27.1")
-    include("org.commonmark:commonmark:0.27.1")
-    include("org.commonmark:commonmark-ext-gfm-strikethrough:0.27.1")
-    include("org.commonmark:commonmark-ext-task-list-items:0.27.1")
-    include("org.commonmark:commonmark-ext-autolink:0.27.1")
-    include("org.nibor.autolink:autolink:0.12.0")
+    implementation(libs.commonmark)
+    implementation(libs.commonmark.strikethrough)
+    implementation(libs.commonmark.tasklist)
+    implementation(libs.commonmark.autolink)
+    include(libs.commonmark)
+    include(libs.commonmark.strikethrough)
+    include(libs.commonmark.tasklist)
+    include(libs.commonmark.autolink)
+    include(libs.autolink)
 
 }
 
@@ -88,9 +89,17 @@ sourceSets {
 }
 
 dependencies {
+    // Unit tests (standard test source set, no Minecraft deps)
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
+
     // JUnit 5 for integration test harness (programmatic launcher inside MC client)
-    "testmodImplementation"("org.junit.jupiter:junit-jupiter:5.11.4")
-    "testmodImplementation"("org.junit.platform:junit-platform-launcher:1.11.4")
+    "testmodImplementation"(libs.junit.jupiter)
+    "testmodImplementation"(libs.junit.platform.launcher)
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 val testServerPort = providers.gradleProperty("testServerPort").getOrElse("25565")

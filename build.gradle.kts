@@ -1,7 +1,9 @@
 plugins {
     java
-    id("com.diffplug.spotless") version "7.0.3" apply false
-    id("com.fizzpod.lefthook") version "0.4.0"
+    alias(libs.plugins.spotless) apply false
+    alias(libs.plugins.lefthook)
+    alias(libs.plugins.errorprone) apply false
+    alias(libs.plugins.cyclonedx)
 }
 
 fun requireFreeRam(taskName: String, requiredMb: Long = 4096L) {
@@ -66,6 +68,23 @@ subprojects {
         java {
             googleJavaFormat()
             targetExclude("build/**")
+        }
+    }
+
+    // Error Prone static analysis (common + server; client handled by Fabric Loom separately)
+    if (name != "client") {
+        apply(plugin = "net.ltgt.errorprone")
+
+        dependencies {
+            "errorprone"(rootProject.libs.errorprone.core)
+            "errorprone"(rootProject.libs.nullaway)
+        }
+
+        tasks.withType<JavaCompile>().configureEach {
+            options.errorprone {
+                disableWarningsInGeneratedCode.set(true)
+                option("NullAway:AnnotatedPackages", "com.disqt.disquests")
+            }
         }
     }
 
