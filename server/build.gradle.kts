@@ -1,7 +1,7 @@
 plugins {
     java
     jacoco
-    id("xyz.jpenilla.run-paper") version "3.0.2"
+    alias(libs.plugins.run.paper)
 }
 
 repositories {
@@ -13,13 +13,13 @@ val paper_api_version: String by project
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:$paper_api_version")
-    implementation("org.xerial:sqlite-jdbc:3.51.2.0")
-    testImplementation("org.xerial:sqlite-jdbc:3.51.2.0")
+    implementation(libs.sqlite.jdbc)
+    testImplementation(libs.sqlite.jdbc)
     implementation(project(":common"))
     testImplementation("io.papermc.paper:paper-api:$paper_api_version")
-    testImplementation("org.mockito:mockito-core:5.14.2")
-    testImplementation("org.junit.jupiter:junit-jupiter:5.14.2")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.14.2")
+    testImplementation(libs.mockito.core)
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 tasks.test {
