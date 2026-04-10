@@ -35,7 +35,7 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: gradle/actions/setup-gradle@4c125117fe7c5aed11272ec4213f602f012f89f2 # v5
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
 
       # --- Build ---
       - name: Build all JARs
@@ -108,12 +108,12 @@ jobs:
 
       # --- Attest build provenance (sigstore) ---
       - name: Attest client JAR
-        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-path: disquests-client-${{ steps.changelog.outputs.VERSION }}.jar
 
       - name: Attest server JAR
-        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-path: disquests-paper-${{ steps.changelog.outputs.VERSION }}.jar
 
