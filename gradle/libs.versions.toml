@@ -1,6 +1,6 @@
 [versions]
 # Testing
-junit = "5.14.2"
+junit = "6.0.3"
 junit-platform = "1.14.2"
 mockito = "5.14.2"
 
