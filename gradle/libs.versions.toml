@@ -23,7 +23,7 @@ spotless = "7.0.3"
 lefthook = "0.4.0"
 run-paper = "3.0.2"
 errorprone-plugin = "5.1.0"
-cyclonedx = "3.2.3"
+cyclonedx = "3.2.4"
 
 [libraries]
 # Testing
