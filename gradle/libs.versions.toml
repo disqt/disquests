@@ -19,7 +19,7 @@ jacoco = "0.8.14"
 
 # Gradle plugins
 fabric-loom = "1.15.5"
-spotless = "7.0.3"
+spotless = "8.4.0"
 lefthook = "0.4.0"
 run-paper = "3.0.2"
 errorprone-plugin = "5.1.0"
