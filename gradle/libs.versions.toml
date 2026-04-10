@@ -2,7 +2,7 @@
 # Testing
 junit = "5.14.2"
 junit-platform = "1.14.2"
-mockito = "5.14.2"
+mockito = "5.23.0"
 
 # Server
 sqlite-jdbc = "3.51.2.0"
