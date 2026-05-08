@@ -14,7 +14,7 @@ autolink = "0.12.0"
 
 # Build quality
 errorprone-core = "2.49.0"
-nullaway = "0.13.1"
+nullaway = "0.13.4"
 jacoco = "0.8.14"
 
 # Gradle plugins
