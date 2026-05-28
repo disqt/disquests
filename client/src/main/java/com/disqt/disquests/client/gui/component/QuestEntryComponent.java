@@ -16,38 +16,38 @@ import io.wispforest.owo.ui.core.Sizing;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.gui.Click;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.OrderedText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
+import net.minecraft.resources.Identifier;
 
 public class QuestEntryComponent extends BaseUIComponent {
 
   public static final int ENTRY_HEIGHT = 38;
-  private static final Identifier PIN_ICON = Identifier.of("disquests", "icon/pin");
-  private static final Identifier PIN_ACTIVE_ICON = Identifier.of("disquests", "icon/pin_active");
+  private static final Identifier PIN_ICON = Identifier.fromNamespaceAndPath("disquests", "icon/pin");
+  private static final Identifier PIN_ACTIVE_ICON = Identifier.fromNamespaceAndPath("disquests", "icon/pin_active");
 
   // Static constants cached once across all instances
-  private static final Text HIDDEN_CONTENT_TEXT =
-      Text.translatable("gui.disquests.label.request_access").formatted(Formatting.ITALIC);
+  private static final Component HIDDEN_CONTENT_TEXT =
+      Component.translatable("gui.disquests.label.request_access").withStyle(ChatFormatting.ITALIC);
 
   private final Quest quest;
-  private final MutableText styledFirstLine;
+  private final MutableComponent styledFirstLine;
   private final boolean isOwnedByPlayer;
   private final boolean isContributor;
   private final boolean hideContent;
 
   // Cached visibility badge (fix 1)
-  private final Text cachedVisibilityText;
+  private final Component cachedVisibilityText;
   private final int cachedVisibilityWidth;
 
   // Cached owner text (fix 2)
-  private final Text cachedOwnerText;
+  private final Component cachedOwnerText;
   private final int cachedOwnerWidth;
 
   // Cached truncated title (fix 6) — depends on width known at draw time
@@ -56,7 +56,7 @@ public class QuestEntryComponent extends BaseUIComponent {
 
   // Cached pending badge (fix 8)
   private int lastPendingCount = -1;
-  private Text cachedPendingText;
+  private Component cachedPendingText;
   private int cachedPendingWidth;
 
   // Cached theme (fix: avoid CONFIG.theme() call per-entry per-frame)
@@ -88,22 +88,22 @@ public class QuestEntryComponent extends BaseUIComponent {
     }
 
     // Cache visibility text + width (fix 1)
-    Text visText = null;
+    Component visText = null;
     if (quest.getVisibility() != null) {
       visText =
           switch (quest.getVisibility()) {
             case PRIVATE ->
-                Text.translatable("gui.disquests.visibility.private")
-                    .formatted(Formatting.LIGHT_PURPLE);
+                Component.translatable("gui.disquests.visibility.private")
+                    .withStyle(ChatFormatting.LIGHT_PURPLE);
             case CLOSED ->
-                Text.translatable("gui.disquests.visibility.closed").formatted(Formatting.YELLOW);
+                Component.translatable("gui.disquests.visibility.closed").withStyle(ChatFormatting.YELLOW);
             case OPEN ->
-                Text.translatable("gui.disquests.visibility.open").formatted(Formatting.GREEN);
+                Component.translatable("gui.disquests.visibility.open").withStyle(ChatFormatting.GREEN);
           };
     }
     this.cachedVisibilityText = visText;
     if (visText != null) {
-      this.cachedVisibilityWidth = MinecraftClient.getInstance().textRenderer.getWidth(visText);
+      this.cachedVisibilityWidth = Minecraft.getInstance().font.width(visText);
     } else {
       this.cachedVisibilityWidth = 0;
     }
@@ -112,8 +112,8 @@ public class QuestEntryComponent extends BaseUIComponent {
 
     // Cache owner text + width (fix 2)
     if (!isOwnedByPlayer && quest.getOwnerName() != null) {
-      this.cachedOwnerText = Text.literal(" by " + quest.getOwnerName()).formatted(Formatting.GRAY);
-      this.cachedOwnerWidth = MinecraftClient.getInstance().textRenderer.getWidth(cachedOwnerText);
+      this.cachedOwnerText = Component.literal(" by " + quest.getOwnerName()).withStyle(ChatFormatting.GRAY);
+      this.cachedOwnerWidth = Minecraft.getInstance().font.width(cachedOwnerText);
     } else {
       this.cachedOwnerText = null;
       this.cachedOwnerWidth = 0;
@@ -195,8 +195,8 @@ public class QuestEntryComponent extends BaseUIComponent {
 
   @Override
   public void draw(OwoUIGraphics context, int mouseX, int mouseY, float partialTicks, float delta) {
-    MinecraftClient client = MinecraftClient.getInstance();
-    TextRenderer textRenderer = client.textRenderer;
+    Minecraft client = Minecraft.getInstance();
+    Font textRenderer = client.font;
 
     int entryX = this.x();
     int entryY = this.y();
@@ -248,48 +248,48 @@ public class QuestEntryComponent extends BaseUIComponent {
 
     // Cache truncated title (fix 6): recompute only when available width changes
     if (availableTitleWidth != cachedTitleAvailableWidth) {
-      cachedTruncatedTitle = textRenderer.trimToWidth(quest.getTitle(), availableTitleWidth);
+      cachedTruncatedTitle = textRenderer.plainSubstrByWidth(quest.getTitle(), availableTitleWidth);
       cachedTitleAvailableWidth = availableTitleWidth;
     }
-    context.drawText(
+    context.text(
         textRenderer, cachedTruncatedTitle, entryX + 4, entryY + 4, Colors.TEXT_PRIMARY, false);
 
     int rightX = entryX + entryWidth - 4;
     if (cachedOwnerText != null) {
       rightX -= cachedOwnerWidth;
-      context.drawText(textRenderer, cachedOwnerText, rightX, entryY + 4, Colors.TEXT_MUTED, false);
+      context.text(textRenderer, cachedOwnerText, rightX, entryY + 4, Colors.TEXT_MUTED, false);
     }
     if (isOwnedByPlayer) {
       int pendingCount = ClientCache.getPendingCount(quest.getId());
       if (pendingCount > 0) {
         // Cache pending text (fix 8): rebuild only when count changes
         if (pendingCount != lastPendingCount) {
-          cachedPendingText = Text.literal(" (" + pendingCount + " pending)");
-          cachedPendingWidth = textRenderer.getWidth(cachedPendingText);
+          cachedPendingText = Component.literal(" (" + pendingCount + " pending)");
+          cachedPendingWidth = textRenderer.width(cachedPendingText);
           lastPendingCount = pendingCount;
         }
         rightX -= cachedPendingWidth;
-        context.drawText(textRenderer, cachedPendingText, rightX, entryY + 4, Colors.AMBER, false);
+        context.text(textRenderer, cachedPendingText, rightX, entryY + 4, Colors.AMBER, false);
       }
     }
     if (cachedVisibilityText != null) {
       rightX -= cachedVisibilityWidth;
-      context.drawText(
+      context.text(
           textRenderer, cachedVisibilityText, rightX, entryY + 4, Colors.TEXT_PRIMARY, false);
     }
 
     // --- Row 2: Content preview + pin icon ---
     if (hideContent) {
       // Static constant (fix 3)
-      context.drawText(
+      context.text(
           textRenderer, HIDDEN_CONTENT_TEXT, entryX + 4, entryY + 14, Colors.TEXT_MUTED, false);
     } else if (styledFirstLine != null) {
       // Reserve space for pin icon if player can pin this quest
       int pinReserve = (isOwnedByPlayer || isContributor) ? 18 : 0;
       int maxPreviewWidth = entryWidth - 8 - pinReserve;
-      List<OrderedText> trimmed = textRenderer.wrapLines(styledFirstLine, maxPreviewWidth);
+      List<FormattedCharSequence> trimmed = textRenderer.split(styledFirstLine, maxPreviewWidth);
       if (!trimmed.isEmpty()) {
-        context.drawText(
+        context.text(
             textRenderer, trimmed.getFirst(), entryX + 4, entryY + 14, Colors.TEXT_MUTED, false);
       }
     }
@@ -301,7 +301,7 @@ public class QuestEntryComponent extends BaseUIComponent {
       int pinIconY = entryY + 14;
       boolean pinned = ClientSession.isPinned(quest.getId());
       Identifier pinIcon = pinned ? PIN_ACTIVE_ICON : PIN_ICON;
-      context.drawGuiTexture(
+      context.blitSprite(
           RenderPipelines.GUI_TEXTURED, pinIcon, pinIconX, pinIconY, pinIconSize, pinIconSize);
     }
 
@@ -314,10 +314,10 @@ public class QuestEntryComponent extends BaseUIComponent {
       for (String tag : tags) {
         int bg = TagColors.getBackground(tag);
         int fg = TagColors.getForeground(tag);
-        int tagWidth = textRenderer.getWidth(tag) + hPad * 2;
+        int tagWidth = textRenderer.width(tag) + hPad * 2;
         if (tagX + tagWidth > entryX + entryWidth - 4) break;
         RoundedRect.draw(context, tagX, entryY + 24, tagWidth, tagH, bg);
-        context.drawText(textRenderer, Text.literal(tag), tagX + hPad, entryY + 25, fg, false);
+        context.text(textRenderer, Component.literal(tag), tagX + hPad, entryY + 25, fg, false);
         tagX += tagWidth + 3;
       }
     }
@@ -333,7 +333,7 @@ public class QuestEntryComponent extends BaseUIComponent {
   private static long lastClickTime;
 
   @Override
-  public boolean onMouseDown(Click click, boolean doubled) {
+  public boolean onMouseDown(MouseButtonEvent click, boolean doubled) {
     LOGGER.debug(
         "onMouseDown called: click=({}, {}), button={}, quest={}",
         click.x(),
@@ -342,7 +342,7 @@ public class QuestEntryComponent extends BaseUIComponent {
         quest.getTitle());
     if (click.button() != 0) return false;
 
-    // owo-ui passes component-relative coordinates in Click
+    // owo-ui passes component-relative coordinates in MouseButtonEvent
     double relX = click.x();
     double relY = click.y();
     LOGGER.debug(

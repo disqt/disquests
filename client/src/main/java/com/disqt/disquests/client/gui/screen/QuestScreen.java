@@ -31,10 +31,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -92,7 +92,7 @@ public class QuestScreen extends DisquestsBaseScreen {
       @Nullable String originalContent) {
     super(
         DataSource.asset(
-            Identifier.of("disquests", editing ? "quest_screen_edit" : "quest_screen_view")),
+            Identifier.fromNamespaceAndPath("disquests", editing ? "quest_screen_edit" : "quest_screen_view")),
         parent);
     this.quest = quest;
     this.editing = editing;
@@ -159,10 +159,10 @@ public class QuestScreen extends DisquestsBaseScreen {
   private void buildViewMode(FlowLayout root) {
     // Title
     root.childById(LabelComponent.class, "title-label")
-        .text(Text.literal(quest.getTitle() != null ? quest.getTitle() : "Untitled"));
+        .text(Component.literal(quest.getTitle() != null ? quest.getTitle() : "Untitled"));
 
     // Owner + visibility info (built programmatically so content sizing measures real text)
-    MutableText ownerText = Text.literal("by " + quest.getOwnerName()).withColor(Colors.TEXT_MUTED);
+    MutableComponent ownerText = Component.literal("by " + quest.getOwnerName()).withColor(Colors.TEXT_MUTED);
     if (quest.getVisibility() != null) {
       int visColor =
           switch (quest.getVisibility()) {
@@ -171,7 +171,7 @@ public class QuestScreen extends DisquestsBaseScreen {
             case OPEN -> 0x55FF55; // green
           };
       ownerText.append(
-          Text.literal("  [" + quest.getVisibility().name() + "]").withColor(visColor));
+          Component.literal("  [" + quest.getVisibility().name() + "]").withColor(visColor));
     }
     LabelComponent ownerLabel = UIComponents.label(ownerText);
     ownerLabel.shadow(true);
@@ -231,11 +231,11 @@ public class QuestScreen extends DisquestsBaseScreen {
     FlowLayout metadataRow = root.childById(FlowLayout.class, "metadata-row");
     if (hasCoords) {
       root.childById(LabelComponent.class, "coords-label")
-          .text(Text.literal(buildCoordsText()).withColor(Colors.TEXT_MUTED));
+          .text(Component.literal(buildCoordsText()).withColor(Colors.TEXT_MUTED));
 
       if (quest.getMap() != null) {
         root.childById(LabelComponent.class, "map-label")
-            .text(Text.literal("Map: " + quest.getMap()).withColor(Colors.TEXT_MUTED));
+            .text(Component.literal("Map: " + quest.getMap()).withColor(Colors.TEXT_MUTED));
       }
 
       // BlueMap button
@@ -244,7 +244,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         final String url = bluemapUrl;
         ButtonComponent bmBtn =
             UIComponents.button(
-                Text.translatable("gui.disquests.btn.view_bluemap"),
+                Component.translatable("gui.disquests.btn.view_bluemap"),
                 ignored -> UrlOpener.open(url));
         bmBtn.sizing(Sizing.content(), Sizing.fixed(14));
         metadataRow.child(bmBtn);
@@ -260,7 +260,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         UIContainers.collapsible(
             Sizing.fill(85),
             Sizing.content(),
-            Text.translatable("gui.disquests.section.contributors", contribCount),
+            Component.translatable("gui.disquests.section.contributors", contribCount),
             contribExpanded && contribCount > 0);
     contributorsCollapse.id("contributors-collapse");
     contributorsCollapse.margins(Insets.top(2));
@@ -269,7 +269,7 @@ public class QuestScreen extends DisquestsBaseScreen {
       String contribNames =
           quest.getContributors().stream().map(c -> c.getName()).collect(Collectors.joining(", "));
       LabelComponent contribLabel =
-          UIComponents.label(Text.literal(contribNames).withColor(Colors.TEXT_MUTED));
+          UIComponents.label(Component.literal(contribNames).withColor(Colors.TEXT_MUTED));
       contribLabel.id("contributors-label");
       contribLabel.shadow(true);
       FlowLayout contributorsRow = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
@@ -289,15 +289,15 @@ public class QuestScreen extends DisquestsBaseScreen {
     ButtonComponent interactBtn = root.childById(ButtonComponent.class, "btn-interact");
     if (canJoinOrRequest) {
       if (quest.getVisibility() == Visibility.OPEN) {
-        interactBtn.setMessage(Text.translatable("gui.disquests.btn.join"));
+        interactBtn.setMessage(Component.translatable("gui.disquests.btn.join"));
         interactBtn.onPress(ignored -> joinQuest());
       } else if (quest.getVisibility() == Visibility.CLOSED) {
         if (ClientSession.isRequested(quest.getId())) {
-          interactBtn.setMessage(Text.translatable("gui.disquests.btn.requested"));
+          interactBtn.setMessage(Component.translatable("gui.disquests.btn.requested"));
           interactBtn.active(false);
-          interactBtn.tooltip(Text.translatable("gui.disquests.tooltip.already_requested"));
+          interactBtn.tooltip(Component.translatable("gui.disquests.tooltip.already_requested"));
         } else {
-          interactBtn.setMessage(Text.translatable("gui.disquests.btn.request"));
+          interactBtn.setMessage(Component.translatable("gui.disquests.btn.request"));
           interactBtn.onPress(ignored -> requestAccess());
         }
       } else {
@@ -319,7 +319,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         editBtn.active(true);
       } else {
         editBtn.active(false);
-        editBtn.tooltip(Text.translatable("gui.disquests.tooltip.view_only"));
+        editBtn.tooltip(Component.translatable("gui.disquests.tooltip.view_only"));
       }
     }
 
@@ -359,13 +359,13 @@ public class QuestScreen extends DisquestsBaseScreen {
     FlowLayout titleRow = root.childById(FlowLayout.class, "title-row");
     MultiLineTextFieldWidget titleField =
         new MultiLineTextFieldWidget(
-            client.textRenderer,
+            minecraft.font,
             0,
             0,
             300,
             16,
             quest.getTitle(),
-            Text.translatable("gui.disquests.placeholder.title").getString(),
+            Component.translatable("gui.disquests.placeholder.title").getString(),
             1,
             false);
     titleFieldComponent = new TextFieldComponent(titleField);
@@ -382,13 +382,13 @@ public class QuestScreen extends DisquestsBaseScreen {
     FlowLayout editorPanel = root.childById(FlowLayout.class, "editor-panel");
     MultiLineTextFieldWidget contentField =
         new MultiLineTextFieldWidget(
-            client.textRenderer,
+            minecraft.font,
             0,
             0,
             400,
             200,
             editableContent,
-            Text.translatable("gui.disquests.placeholder.content").getString(),
+            Component.translatable("gui.disquests.placeholder.content").getString(),
             Integer.MAX_VALUE,
             true,
             true);
@@ -422,16 +422,16 @@ public class QuestScreen extends DisquestsBaseScreen {
     if (isOwner) {
       ButtonComponent visBtn = root.childById(ButtonComponent.class, "btn-visibility");
       visBtn.setMessage(
-          Text.literal("Visibility: ")
+          Component.literal("Visibility: ")
               .append(
-                  Text.translatable(
+                  Component.translatable(
                       switch (quest.getVisibility()) {
                         case PRIVATE -> "gui.disquests.visibility.private";
                         case CLOSED -> "gui.disquests.visibility.closed";
                         case OPEN -> "gui.disquests.visibility.open";
                       })));
       visBtn.tooltip(
-          Text.translatable(
+          Component.translatable(
               switch (quest.getVisibility()) {
                 case PRIVATE -> "gui.disquests.tooltip.private";
                 case CLOSED -> "gui.disquests.tooltip.closed";
@@ -441,14 +441,14 @@ public class QuestScreen extends DisquestsBaseScreen {
 
       int contribCount = quest.getContributors().size();
       int pendingReqCount = ClientCache.getPendingCount(quest.getId());
-      Text contribText;
+      Component contribText;
       if (pendingReqCount > 0) {
         contribText =
-            Text.translatable("gui.disquests.section.contributors", contribCount)
-                .append(Text.literal(" "))
-                .append(Text.literal("+ " + pendingReqCount).withColor(Colors.AMBER));
+            Component.translatable("gui.disquests.section.contributors", contribCount)
+                .append(Component.literal(" "))
+                .append(Component.literal("+ " + pendingReqCount).withColor(Colors.AMBER));
       } else {
-        contribText = Text.translatable("gui.disquests.section.contributors", contribCount);
+        contribText = Component.translatable("gui.disquests.section.contributors", contribCount);
       }
       ButtonComponent contribBtn = root.childById(ButtonComponent.class, "btn-contributors");
       contribBtn.setMessage(contribText);
@@ -465,43 +465,43 @@ public class QuestScreen extends DisquestsBaseScreen {
     LabelComponent fmtBold = root.childById(LabelComponent.class, "fmt-bold");
     if (fmtBold != null)
       fmtBold.text(
-          Text.literal("**text**: ").append(Text.literal("text").styled(s -> s.withBold(true))));
+          Component.literal("**text**: ").append(Component.literal("text").styled(s -> s.withBold(true))));
     LabelComponent fmtItalic = root.childById(LabelComponent.class, "fmt-italic");
     if (fmtItalic != null)
       fmtItalic.text(
-          Text.literal("*text*: ").append(Text.literal("text").styled(s -> s.withItalic(true))));
+          Component.literal("*text*: ").append(Component.literal("text").styled(s -> s.withItalic(true))));
     LabelComponent fmtStrike = root.childById(LabelComponent.class, "fmt-strike");
     if (fmtStrike != null)
       fmtStrike.text(
-          Text.literal("~~text~~: ")
-              .append(Text.literal("text").styled(s -> s.withStrikethrough(true))));
+          Component.literal("~~text~~: ")
+              .append(Component.literal("text").styled(s -> s.withStrikethrough(true))));
     LabelComponent fmtHeading = root.childById(LabelComponent.class, "fmt-heading");
     if (fmtHeading != null)
       fmtHeading.text(
-          Text.literal("# ").append(Text.literal("Heading").styled(s -> s.withBold(true))));
+          Component.literal("# ").append(Component.literal("Heading").styled(s -> s.withBold(true))));
     LabelComponent fmtCheckbox = root.childById(LabelComponent.class, "fmt-checkbox");
     if (fmtCheckbox != null)
       fmtCheckbox.text(
-          Text.literal("- [ ] todo  - [x] ")
+          Component.literal("- [ ] todo  - [x] ")
               .append(
-                  Text.literal("done").styled(s -> s.withStrikethrough(true).withColor(0x55FF55))));
+                  Component.literal("done").styled(s -> s.withStrikethrough(true).withColor(0x55FF55))));
     LabelComponent fmtQuote = root.childById(LabelComponent.class, "fmt-quote");
     if (fmtQuote != null)
       fmtQuote.text(
-          Text.literal("> ")
-              .append(Text.literal("quote").styled(s -> s.withItalic(true).withColor(0xAAAAAA))));
+          Component.literal("> ")
+              .append(Component.literal("quote").styled(s -> s.withItalic(true).withColor(0xAAAAAA))));
     LabelComponent fmtLink = root.childById(LabelComponent.class, "fmt-link");
     if (fmtLink != null)
       fmtLink.text(
-          Text.literal("[text](url): ")
-              .append(Text.literal("link").styled(s -> s.withUnderline(true).withColor(0x5555FF))));
+          Component.literal("[text](url): ")
+              .append(Component.literal("link").styled(s -> s.withUnderlined(true).withColor(0x5555FF))));
     LabelComponent fmtWikiLink = root.childById(LabelComponent.class, "fmt-wikilink");
     if (fmtWikiLink != null)
       fmtWikiLink.text(
-          Text.literal("[[Quest Name]]: ")
+          Component.literal("[[Quest Name]]: ")
               .append(
-                  Text.literal("quest link")
-                      .styled(s -> s.withUnderline(true).withColor(0xe8a86d))));
+                  Component.literal("quest link")
+                      .styled(s -> s.withUnderlined(true).withColor(0xe8a86d))));
   }
 
   private void buildCoordsSection(FlowLayout root) {
@@ -527,16 +527,16 @@ public class QuestScreen extends DisquestsBaseScreen {
     // Set Pos button
     ButtonComponent setPosBtn =
         UIComponents.button(
-            Text.translatable("gui.disquests.btn.set_pos"), b -> setPlayerPosition());
+            Component.translatable("gui.disquests.btn.set_pos"), b -> setPlayerPosition());
     setPosBtn.sizing(Sizing.fixed(50), Sizing.fixed(14));
     setPosBtn.id("btn-set-pos");
     coordsRow.child(setPosBtn);
 
     // Region toggle
-    Text regionText =
+    Component regionText =
         regionEnabled
-            ? Text.translatable("gui.disquests.btn.region_on")
-            : Text.translatable("gui.disquests.btn.region_off");
+            ? Component.translatable("gui.disquests.btn.region_on")
+            : Component.translatable("gui.disquests.btn.region_off");
     ButtonComponent regionBtn = UIComponents.button(regionText, b -> toggleRegion());
     regionBtn.sizing(Sizing.content(), Sizing.fixed(14));
     regionBtn.id("btn-region");
@@ -544,7 +544,7 @@ public class QuestScreen extends DisquestsBaseScreen {
 
     // Clear button
     ButtonComponent clearBtn =
-        UIComponents.button(Text.translatable("gui.disquests.btn.clear"), b -> clearCoords());
+        UIComponents.button(Component.translatable("gui.disquests.btn.clear"), b -> clearCoords());
     clearBtn.sizing(Sizing.fixed(50), Sizing.fixed(14));
     clearBtn.id("btn-clear");
     coordsRow.child(clearBtn);
@@ -570,7 +570,7 @@ public class QuestScreen extends DisquestsBaseScreen {
 
       ButtonComponent setPos2Btn =
           UIComponents.button(
-              Text.translatable("gui.disquests.btn.set_pos"), b -> setCorner2Position());
+              Component.translatable("gui.disquests.btn.set_pos"), b -> setCorner2Position());
       setPos2Btn.sizing(Sizing.fixed(50), Sizing.fixed(14));
       corner2Row.child(setPos2Btn);
     } else {
@@ -581,7 +581,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     FlowLayout mapRow = root.childById(FlowLayout.class, "map-row");
     String mapDisplay = quest.getMap() != null ? quest.getMap() : "any";
     ButtonComponent mapBtn =
-        UIComponents.button(Text.literal("Map: " + mapDisplay), b -> cycleMap());
+        UIComponents.button(Component.literal("Map: " + mapDisplay), b -> cycleMap());
     mapBtn.sizing(Sizing.content(), Sizing.fixed(14));
     mapBtn.id("btn-map");
     mapRow.child(mapBtn);
@@ -612,7 +612,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     if (tags.size() < TagConstraints.MAX_TAGS) {
       ButtonComponent addTagBtn =
           UIComponents.button(
-              Text.translatable("gui.disquests.btn.add_tag"),
+              Component.translatable("gui.disquests.btn.add_tag"),
               b -> {
                 persistFieldValues();
                 QuestScreen returnScreen =
@@ -629,14 +629,14 @@ public class QuestScreen extends DisquestsBaseScreen {
   private TextFieldComponent createCoordField(String value, String placeholder) {
     MultiLineTextFieldWidget field =
         new MultiLineTextFieldWidget(
-            client.textRenderer, 0, 0, 50, 14, value, placeholder, 1, false);
+            minecraft.font, 0, 0, 50, 14, value, placeholder, 1, false);
     TextFieldComponent component = new TextFieldComponent(field);
     component.sizing(Sizing.fixed(50), Sizing.fixed(14));
     return component;
   }
 
   private LabelComponent labelFor(String text) {
-    LabelComponent label = UIComponents.label(Text.literal(text).withColor(Colors.TEXT_MUTED));
+    LabelComponent label = UIComponents.label(Component.literal(text).withColor(Colors.TEXT_MUTED));
     label.shadow(true);
     return label;
   }
@@ -657,7 +657,7 @@ public class QuestScreen extends DisquestsBaseScreen {
   private void cancelEdit() {
     if (isDirty()) {
       showConfirmOverlay(
-          Text.translatable("gui.disquests.confirm.discard"),
+          Component.translatable("gui.disquests.confirm.discard"),
           () -> {
             quest.setTitle(originalTitle);
             quest.setContent(originalContent);
@@ -701,7 +701,7 @@ public class QuestScreen extends DisquestsBaseScreen {
 
   private void confirmDelete() {
     showConfirmOverlay(
-        Text.translatable("gui.disquests.confirm.delete", quest.getTitle()),
+        Component.translatable("gui.disquests.confirm.delete", quest.getTitle()),
         () -> {
           ClientCache.removeQuestById(quest.getId());
           PacketSender.deleteQuest(quest.getId());
@@ -711,7 +711,7 @@ public class QuestScreen extends DisquestsBaseScreen {
 
   private void leaveQuest() {
     showConfirmOverlay(
-        Text.translatable("gui.disquests.confirm.leave"),
+        Component.translatable("gui.disquests.confirm.leave"),
         () -> {
           ClientCache.removeFromMyQuests(quest.getId());
           PacketSender.leaveQuest(quest.getId());
@@ -736,22 +736,22 @@ public class QuestScreen extends DisquestsBaseScreen {
   // ===================== EDIT MODE ACTIONS =====================
 
   private void setPlayerPosition() {
-    if (client != null && client.player != null) {
+    if (minecraft != null && minecraft.player != null) {
       persistFieldValues();
       quest.setCoordinates(
-          new CoordinatesData(client.player.getX(), client.player.getY(), client.player.getZ()));
-      if (quest.getMap() == null && client.world != null) {
-        quest.setMap(client.world.getRegistryKey().getValue().getPath());
+          new CoordinatesData(minecraft.player.getX(), minecraft.player.getY(), minecraft.player.getZ()));
+      if (quest.getMap() == null && minecraft.level != null) {
+        quest.setMap(minecraft.level.dimension().location().getPath());
       }
       rebuildEditMode();
     }
   }
 
   private void setCorner2Position() {
-    if (client != null && client.player != null) {
+    if (minecraft != null && minecraft.player != null) {
       persistFieldValues();
       quest.setCoordinates2(
-          new CoordinatesData(client.player.getX(), client.player.getY(), client.player.getZ()));
+          new CoordinatesData(minecraft.player.getX(), minecraft.player.getY(), minecraft.player.getZ()));
       rebuildEditMode();
     }
   }

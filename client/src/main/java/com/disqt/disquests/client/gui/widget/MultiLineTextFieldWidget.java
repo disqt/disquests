@@ -15,19 +15,23 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.*;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.client.input.CharInput;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.components.Renderable;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.narration.NarratableEntry;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
-public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
+public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, NarratableEntry {
 
-  private final TextRenderer textRenderer;
+  private final Font textRenderer;
   public final int x;
   public final int y;
   public int width;
@@ -106,7 +110,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
   private boolean previewVisible = false;
 
   public MultiLineTextFieldWidget(
-      TextRenderer textRenderer,
+      Font textRenderer,
       int x,
       int y,
       int width,
@@ -129,7 +133,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
   }
 
   public MultiLineTextFieldWidget(
-      TextRenderer textRenderer,
+      Font textRenderer,
       int x,
       int y,
       int width,
@@ -213,7 +217,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
       int offset = 0;
       while (offset < line.length()) {
         String remaining = line.substring(offset);
-        String trimmed = textRenderer.trimToWidth(remaining, maxWidth);
+        String trimmed = textRenderer.plainSubstrByWidth(remaining, maxWidth);
         if (trimmed.isEmpty() && !remaining.isEmpty()) {
           trimmed = remaining.substring(0, 1);
         }
@@ -389,7 +393,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
       displayLine = cursorY;
     }
     int padding = 5;
-    return displayLine * textRenderer.fontHeight - (int) scrollY + padding;
+    return displayLine * textRenderer.lineHeight - (int) scrollY + padding;
   }
 
   /** Returns the X offset of the cursor relative to the widget's left, accounting for scroll. */
@@ -399,12 +403,12 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
     String dispLineStr = displayLines.get(displayLine);
     String beforeCursor = dispLineStr.substring(0, Math.min(displayCursorX, dispLineStr.length()));
     int padding = 5;
-    return padding + (int) Math.round(textRenderer.getWidth(beforeCursor) - scrollX);
+    return padding + (int) Math.round(textRenderer.width(beforeCursor) - scrollX);
   }
 
   /** Returns the height of a single text line. */
   public int getLineHeight() {
-    return textRenderer.fontHeight;
+    return textRenderer.lineHeight;
   }
 
   /** Returns true if a wiki-link hover preview is currently being drawn. For E2E testing. */
@@ -574,7 +578,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
 
   // ---------- Rendering ----------
   @Override
-  public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+  public void render(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
     // Focus is managed by TextFieldComponent via setFocused() -- don't override it here.
     // (Previously checked screen.getFocused() == this, but that fails when wrapped in owo-ui.)
 
@@ -600,7 +604,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
         && !this.placeholderText.isEmpty()) {
       // Draw placeholder text, respecting horizontal scroll
       int drawX = contentX - (int) Math.round(scrollX);
-      context.drawText(
+      context.text(
           textRenderer,
           this.placeholderText,
           drawX,
@@ -609,11 +613,11 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
           false); // Gray color
     }
 
-    int firstVisibleLine = (int) (scrollY / textRenderer.fontHeight);
+    int firstVisibleLine = (int) (scrollY / textRenderer.lineHeight);
     int lastVisibleLine =
         Math.min(
             displayLines.size() - 1,
-            firstVisibleLine + (contentHeight / textRenderer.fontHeight) + 1);
+            firstVisibleLine + (contentHeight / textRenderer.lineHeight) + 1);
 
     // Draw selection background (per display-line)
     if (hasSelection() && this.focused) {
@@ -636,14 +640,14 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
               contentX
                   + (int)
                       Math.round(
-                          textRenderer.getWidth(dispLineStr.substring(0, startCol)) - scrollX);
+                          textRenderer.width(dispLineStr.substring(0, startCol)) - scrollX);
           int ex =
               contentX
                   + (int)
-                      Math.round(textRenderer.getWidth(dispLineStr.substring(0, endCol)) - scrollX);
-          int lineYPos = contentY + (di * textRenderer.fontHeight) - (int) scrollY;
+                      Math.round(textRenderer.width(dispLineStr.substring(0, endCol)) - scrollX);
+          int lineYPos = contentY + (di * textRenderer.lineHeight) - (int) scrollY;
           context.fill(
-              sx, lineYPos, ex, lineYPos + textRenderer.fontHeight, Colors.SELECTION_BACKGROUND);
+              sx, lineYPos, ex, lineYPos + textRenderer.lineHeight, Colors.SELECTION_BACKGROUND);
         }
       }
     }
@@ -651,8 +655,8 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
     // Draw lines with syntax highlighting (wiki-links + markdown links)
     if (syntaxSegmentsDirty) rebuildSyntaxSegments();
     for (int di = firstVisibleLine; di <= lastVisibleLine; di++) {
-      int lineYPos = contentY + (di * textRenderer.fontHeight) - (int) scrollY;
-      if (lineYPos > this.y - textRenderer.fontHeight && lineYPos < this.y + this.height) {
+      int lineYPos = contentY + (di * textRenderer.lineHeight) - (int) scrollY;
+      if (lineYPos > this.y - textRenderer.lineHeight && lineYPos < this.y + this.height) {
         int drawX = contentX - (int) Math.round(scrollX);
         String dispLine = displayLines.get(di);
         List<int[]> wikiLinks =
@@ -662,7 +666,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
 
         if (wikiLinks.isEmpty() && mdLinks.isEmpty()) {
           // Fast path: no styled segments on this line
-          context.drawText(
+          context.text(
               this.textRenderer, dispLine, drawX, lineYPos, Colors.TEXT_PRIMARY, false);
         } else {
           // Merge both segment lists sorted by start position, tagged with type
@@ -678,15 +682,15 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
             // Normal segment before this styled segment
             if (pos < seg[0]) {
               String normal = dispLine.substring(pos, seg[0]);
-              context.drawText(
+              context.text(
                   this.textRenderer, normal, currentX, lineYPos, Colors.TEXT_PRIMARY, false);
-              currentX += this.textRenderer.getWidth(normal);
+              currentX += this.textRenderer.width(normal);
             }
             String segText = dispLine.substring(seg[0], seg[1]);
             Style segStyle;
             if (seg[2] == 0) {
               segStyle =
-                  Style.EMPTY.withColor(WIKI_LINK_COLOR).withItalic(true).withUnderline(true);
+                  Style.EMPTY.withColor(WIKI_LINK_COLOR).withItalic(true).withUnderlined(true);
             } else if (seg[2] == 2) {
               segStyle =
                   Style.EMPTY
@@ -694,18 +698,18 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
                       .withItalic(true)
                       .withStrikethrough(true);
             } else {
-              segStyle = Style.EMPTY.withColor(MD_LINK_COLOR).withUnderline(true);
+              segStyle = Style.EMPTY.withColor(MD_LINK_COLOR).withUnderlined(true);
             }
-            Text styledText = Text.literal(segText).setStyle(segStyle);
-            context.drawText(
-                this.textRenderer, styledText.asOrderedText(), currentX, lineYPos, -1, false);
-            currentX += this.textRenderer.getWidth(segText);
+            Component styledText = Component.literal(segText).setStyle(segStyle);
+            context.text(
+                this.textRenderer, styledText.getVisualOrderText(), currentX, lineYPos, -1, false);
+            currentX += this.textRenderer.width(segText);
             pos = seg[1];
           }
           // Remaining normal text
           if (pos < dispLine.length()) {
             String remaining = dispLine.substring(pos);
-            context.drawText(
+            context.text(
                 this.textRenderer, remaining, currentX, lineYPos, Colors.TEXT_PRIMARY, false);
           }
         }
@@ -719,7 +723,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
       int hoverAbsIndex = absoluteIndexFromMouse(mouseX, mouseY);
       // Find which display line the mouse is on
       int hoverDisplayLine =
-          (int) ((mouseY - (this.y + padding) + scrollY) / textRenderer.fontHeight);
+          (int) ((mouseY - (this.y + padding) + scrollY) / textRenderer.lineHeight);
       // Don't clamp to last line -- if mouse is below all text, no hover
       if (hoverDisplayLine >= 0
           && hoverDisplayLine < displayLines.size()
@@ -739,14 +743,14 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
               String title = wikiText.substring(2, wikiText.length() - 2);
               Quest quest = findQuestByTitle(title);
               if (quest != null) {
-                MinecraftClient mc = MinecraftClient.getInstance();
+                Minecraft mc = Minecraft.getInstance();
                 HoverPreviewRenderer.draw(
                     context,
                     quest,
                     mouseX,
                     mouseY,
-                    mc.getWindow().getScaledWidth(),
-                    mc.getWindow().getScaledHeight());
+                    mc.getWindow().getGuiScaledWidth(),
+                    mc.getWindow().getGuiScaledHeight());
                 previewVisible = true;
               }
             }
@@ -774,10 +778,10 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
         String beforeCursor =
             dispLineStr.substring(0, Math.min(displayCursorX, dispLineStr.length()));
         int caretPixelX =
-            contentX + (int) Math.round(textRenderer.getWidth(beforeCursor) - scrollX);
-        int caretYPos = contentY + (displayLine * textRenderer.fontHeight) - (int) scrollY;
+            contentX + (int) Math.round(textRenderer.width(beforeCursor) - scrollX);
+        int caretYPos = contentY + (displayLine * textRenderer.lineHeight) - (int) scrollY;
         int top = caretYPos - paddingTop;
-        int bottom = caretYPos + textRenderer.fontHeight + paddingBottom;
+        int bottom = caretYPos + textRenderer.lineHeight + paddingBottom;
         // draw 2px wide vertical caret
         context.fill(caretPixelX, top, caretPixelX + 2, bottom, Colors.CARET_PRIMARY);
       }
@@ -792,11 +796,11 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
     if (this.scrollingEnabled && hNeeded) renderHScrollbar(context, contentX, contentWidth);
   }
 
-  protected void renderVScrollbar(DrawContext context, int contentHeight) {
+  protected void renderVScrollbar(GuiGraphicsExtractor context, int contentHeight) {
     int scrollbarX = this.x + this.width - SCROLLBAR_THICKNESS - 2;
     int maxScroll = getMaxScrollV();
     int lineCount = getEffectiveLineCount();
-    float contentPixelHeight = lineCount * textRenderer.fontHeight;
+    float contentPixelHeight = lineCount * textRenderer.lineHeight;
     float thumbHeight = Math.max(10, (contentHeight / contentPixelHeight) * contentHeight);
     float thumbY =
         (float) ((scrollY / (double) Math.max(1, maxScroll)) * (contentHeight - thumbHeight));
@@ -810,7 +814,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
         thumbColor);
   }
 
-  protected void renderHScrollbar(DrawContext context, int contentX, int contentWidth) {
+  protected void renderHScrollbar(GuiGraphicsExtractor context, int contentX, int contentWidth) {
     int scrollbarY = this.y + this.height - SCROLLBAR_THICKNESS - 2;
     // compute max horizontal content width
     int maxLinePixel = getMaxLinePixelWidth();
@@ -831,7 +835,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
 
   // ---------- Mouse handling ----------
   @Override
-  public boolean mouseClicked(Click click, boolean simulated) {
+  public boolean mouseClicked(MouseButtonEvent click, boolean simulated) {
     double mouseX = click.x();
     double mouseY = click.y();
     int button = click.button();
@@ -905,7 +909,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
   }
 
   @Override
-  public boolean mouseReleased(Click click) {
+  public boolean mouseReleased(MouseButtonEvent click) {
     isDraggingVScrollbar = false;
     isDraggingHScrollbar = false;
     isDraggingText = false;
@@ -913,7 +917,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
   }
 
   @Override
-  public boolean mouseDragged(Click click, double deltaX, double deltaY) {
+  public boolean mouseDragged(MouseButtonEvent click, double deltaX, double deltaY) {
     double mouseX = click.x();
     double mouseY = click.y();
     if (this.scrollingEnabled && isDraggingVScrollbar) {
@@ -922,7 +926,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
 
       double maxScroll = Math.max(1, getMaxScrollV());
       int lineCount = getEffectiveLineCount();
-      double contentPixelHeight = lineCount * textRenderer.fontHeight;
+      double contentPixelHeight = lineCount * textRenderer.lineHeight;
       double thumbHeight = Math.max(10, (trackHeight / contentPixelHeight) * trackHeight);
       double toTrack = (trackHeight - thumbHeight);
 
@@ -992,30 +996,30 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
 
     if (wordWrap) {
       int clickedDisplayLine =
-          (int) ((mouseY - (this.y + padding) + scrollY) / textRenderer.fontHeight);
+          (int) ((mouseY - (this.y + padding) + scrollY) / textRenderer.lineHeight);
       clickedDisplayLine = Math.max(0, Math.min(clickedDisplayLine, displayLines.size() - 1));
       int relX = (int) Math.round(mouseX - contentX);
       if (relX < 0) relX = 0;
       String dispLine = displayLines.get(clickedDisplayLine);
-      int charInDisplayLine = textRenderer.trimToWidth(dispLine, relX).length();
+      int charInDisplayLine = textRenderer.plainSubstrByWidth(dispLine, relX).length();
       int logicalLine = displayToLogical.get(clickedDisplayLine);
       int logicalCol = displayToOffset.get(clickedDisplayLine) + charInDisplayLine;
       logicalCol = Math.min(logicalCol, lines.get(logicalLine).length());
       return getAbsoluteIndex(logicalLine, logicalCol);
     }
 
-    int clickedLine = (int) ((mouseY - (this.y + padding) + scrollY) / textRenderer.fontHeight);
+    int clickedLine = (int) ((mouseY - (this.y + padding) + scrollY) / textRenderer.lineHeight);
     clickedLine = Math.max(0, Math.min(clickedLine, this.lines.size() - 1));
     int relX = (int) Math.round(mouseX - (contentX) + scrollX);
     if (relX < 0) relX = 0;
     String line = this.lines.get(clickedLine);
-    int charIndex = this.textRenderer.trimToWidth(line, relX).length();
+    int charIndex = this.textRenderer.plainSubstrByWidth(line, relX).length();
     return getAbsoluteIndex(clickedLine, charIndex);
   }
 
   // ---------- Keyboard ----------
   @Override
-  public boolean keyPressed(KeyInput keyInput) {
+  public boolean keyPressed(KeyEvent keyInput) {
     int keyCode = keyInput.key();
     int scanCode = keyInput.scancode();
     int modifiers = keyInput.modifiers();
@@ -1064,19 +1068,19 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
     }
     // Copy: Ctrl+C
     if (hasCtrl && keyCode == GLFW.GLFW_KEY_C) {
-      if (hasSelection()) MinecraftClient.getInstance().keyboard.setClipboard(getSelectedText());
+      if (hasSelection()) Minecraft.getInstance().keyboardHandler.setClipboard(getSelectedText());
       return true;
     }
     // Paste: Ctrl+V
     if (hasCtrl && keyCode == GLFW.GLFW_KEY_V) {
-      String clip = MinecraftClient.getInstance().keyboard.getClipboard();
+      String clip = Minecraft.getInstance().keyboardHandler.getClipboard();
       if (clip != null && !clip.isEmpty()) insertText(clip);
       return true;
     }
     // Cut: Ctrl+X
     if (hasCtrl && keyCode == GLFW.GLFW_KEY_X) {
       if (hasSelection()) {
-        MinecraftClient.getInstance().keyboard.setClipboard(getSelectedText());
+        Minecraft.getInstance().keyboardHandler.setClipboard(getSelectedText());
         deleteSelection();
       }
       return true;
@@ -1205,7 +1209,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
   }
 
   @Override
-  public boolean keyReleased(KeyInput keyInput) {
+  public boolean keyReleased(KeyEvent keyInput) {
     int keyCode = keyInput.key();
     if (keyCode == GLFW.GLFW_KEY_LEFT_SHIFT || keyCode == GLFW.GLFW_KEY_RIGHT_SHIFT) {
       this.shiftDown = false;
@@ -1217,7 +1221,7 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
   }
 
   @Override
-  public boolean charTyped(CharInput charInput) {
+  public boolean charTyped(CharacterEvent charInput) {
     if (this.focused) {
       if (charInput.isValidChar()) {
         insertText(charInput.asString());
@@ -1237,23 +1241,23 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
     if (wordWrap) {
       // Use display-line index for vertical scroll
       int displayLine = getDisplayLineForCursor();
-      int topVisibleLine = (int) (scrollY / textRenderer.fontHeight);
-      int linesOnScreen = contentHeight / textRenderer.fontHeight;
-      if (displayLine < topVisibleLine) scrollY = displayLine * textRenderer.fontHeight;
+      int topVisibleLine = (int) (scrollY / textRenderer.lineHeight);
+      int linesOnScreen = contentHeight / textRenderer.lineHeight;
+      if (displayLine < topVisibleLine) scrollY = displayLine * textRenderer.lineHeight;
       if (displayLine >= topVisibleLine + linesOnScreen)
-        scrollY = (displayLine - linesOnScreen + 1) * textRenderer.fontHeight;
+        scrollY = (displayLine - linesOnScreen + 1) * textRenderer.lineHeight;
       // scrollX stays 0 in word-wrap mode
     } else {
       // vertical
-      int topVisibleLine = (int) (scrollY / textRenderer.fontHeight);
-      if (cursorY < topVisibleLine) scrollY = cursorY * textRenderer.fontHeight;
-      int linesOnScreen = contentHeight / textRenderer.fontHeight;
+      int topVisibleLine = (int) (scrollY / textRenderer.lineHeight);
+      if (cursorY < topVisibleLine) scrollY = cursorY * textRenderer.lineHeight;
+      int linesOnScreen = contentHeight / textRenderer.lineHeight;
       if (cursorY >= topVisibleLine + linesOnScreen)
-        scrollY = (cursorY - linesOnScreen + 1) * textRenderer.fontHeight;
+        scrollY = (cursorY - linesOnScreen + 1) * textRenderer.lineHeight;
 
       // horizontal - ensure the caret's pixel location (within the line) is visible
       String line = lines.get(cursorY);
-      int caretPixel = textRenderer.getWidth(line.substring(0, cursorX));
+      int caretPixel = textRenderer.width(line.substring(0, cursorX));
       if (caretPixel - scrollX < 0) {
         scrollX = caretPixel;
       } else if (caretPixel - scrollX > contentWidth - 4) {
@@ -1268,19 +1272,19 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
     int lineCount = getEffectiveLineCount();
     return Math.max(
         0,
-        (lineCount * textRenderer.fontHeight)
+        (lineCount * textRenderer.lineHeight)
             - (height - 10 - (isScrollbarNeededH() ? (SCROLLBAR_THICKNESS + 2) : 0)));
   }
 
   protected boolean isScrollbarNeededV() {
     int lineCount = getEffectiveLineCount();
-    return (lineCount * textRenderer.fontHeight) > (height - 10);
+    return (lineCount * textRenderer.lineHeight) > (height - 10);
   }
 
   protected int getMaxLinePixelWidth() {
     int max = 0;
     for (String s : lines) {
-      int w = textRenderer.getWidth(s);
+      int w = textRenderer.width(s);
       if (w > max) max = w;
     }
     return max;
@@ -1450,12 +1454,12 @@ public class MultiLineTextFieldWidget implements Drawable, Element, Selectable {
   }
 
   @Override
-  public SelectionType getType() {
-    return this.focused ? SelectionType.FOCUSED : SelectionType.NONE;
+  public NarratableEntry.NarrationPriority getType() {
+    return this.focused ? NarratableEntry.NarrationPriority.FOCUSED : NarratableEntry.NarrationPriority.NONE;
   }
 
   @Override
-  public void appendNarrations(NarrationMessageBuilder builder) {
+  public void appendNarrations(NarrationElementOutput builder) {
     /* Not needed */
   }
 }

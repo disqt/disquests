@@ -1,8 +1,8 @@
 package com.disqt.disquests.client.gui.widget;
 
 import com.disqt.disquests.client.gui.helper.Colors;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 public class ToastOverlay {
 
@@ -28,15 +28,15 @@ public class ToastOverlay {
     return ticksRemaining > 0 && message != null;
   }
 
-  public void render(DrawContext context, TextRenderer textRenderer, int screenWidth, int bottomY) {
+  public void render(GuiGraphicsExtractor context, Font textRenderer, int screenWidth, int bottomY) {
     if (!isVisible()) return;
 
     float alpha = ticksRemaining <= FADE_TICKS ? (float) ticksRemaining / FADE_TICKS : 1.0f;
     int alphaInt = (int) (alpha * 255);
 
-    int textWidth = textRenderer.getWidth(message);
+    int textWidth = textRenderer.width(message);
     int boxWidth = textWidth + PADDING_X * 2;
-    int boxHeight = textRenderer.fontHeight + PADDING_Y * 2;
+    int boxHeight = textRenderer.lineHeight + PADDING_Y * 2;
     int x = (screenWidth - boxWidth) / 2;
     int y = bottomY - boxHeight - 4;
 
@@ -45,6 +45,6 @@ public class ToastOverlay {
     context.fill(x, y, x + boxWidth, y + boxHeight, bg);
 
     int textColor = (alphaInt << 24) | (Colors.TEXT_PRIMARY & 0x00FFFFFF);
-    context.drawText(textRenderer, message, x + PADDING_X, y + PADDING_Y, textColor, false);
+    context.text(textRenderer, message, x + PADDING_X, y + PADDING_Y, textColor, false);
   }
 }

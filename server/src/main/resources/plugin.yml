@@ -1,7 +1,7 @@
 name: Disquests
 version: '${version}'
 main: com.disqt.disquests.server.papermc.DisquestsPlugin
-api-version: '1.21'
+api-version: '26.1'
 commands:
   disquests:
     description: Disquests admin commands

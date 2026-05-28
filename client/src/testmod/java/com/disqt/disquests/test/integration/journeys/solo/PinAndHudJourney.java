@@ -13,7 +13,7 @@ import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
 import java.util.UUID;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
-import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.screens.Screen;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Order;
@@ -71,7 +71,7 @@ class PinAndHudJourney {
     firstQuestId =
         context.computeOnClient(
             c -> {
-              var entries = ((MainScreen) c.currentScreen).getQuestEntries();
+              var entries = ((MainScreen) c.screen).getQuestEntries();
               // Pinned-sorted: no pinned yet, so sorted by lastModified desc.
               // "Second" was created last -> index 0, "First" -> index 1
               return entries.size() >= 2 ? entries.get(1).getQuest().getId() : null;
@@ -79,7 +79,7 @@ class PinAndHudJourney {
     secondQuestId =
         context.computeOnClient(
             c -> {
-              var entries = ((MainScreen) c.currentScreen).getQuestEntries();
+              var entries = ((MainScreen) c.screen).getQuestEntries();
               return entries.size() >= 1 ? entries.get(0).getQuest().getId() : null;
             });
     assertNotNull(firstQuestId, "firstQuestId should not be null");
@@ -116,7 +116,7 @@ class PinAndHudJourney {
     String firstName =
         context.computeOnClient(
             c -> {
-              Screen screen = c.currentScreen;
+              Screen screen = c.screen;
               if (screen instanceof MainScreen ms) {
                 var entries = ms.getQuestEntries();
                 return entries.isEmpty() ? null : entries.get(0).getQuest().getTitle();
@@ -129,7 +129,7 @@ class PinAndHudJourney {
     String secondName =
         context.computeOnClient(
             c -> {
-              Screen screen = c.currentScreen;
+              Screen screen = c.screen;
               if (screen instanceof MainScreen ms) {
                 var entries = ms.getQuestEntries();
                 return entries.size() >= 2 ? entries.get(1).getQuest().getTitle() : null;
@@ -192,7 +192,7 @@ class PinAndHudJourney {
     String firstName =
         context.computeOnClient(
             c -> {
-              Screen screen = c.currentScreen;
+              Screen screen = c.screen;
               if (screen instanceof MainScreen ms) {
                 var entries = ms.getQuestEntries();
                 return entries.isEmpty() ? null : entries.get(0).getQuest().getTitle();

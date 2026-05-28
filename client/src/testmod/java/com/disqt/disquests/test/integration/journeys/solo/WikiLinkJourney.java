@@ -47,7 +47,7 @@ class WikiLinkJourney {
   private void waitForViewMode(ClientGameTestContext context) {
     context.waitFor(
         client -> {
-          if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+          if (!(client.screen instanceof DisquestsBaseScreen dScreen)) return false;
           var root = dScreen.getRootComponent();
           if (root == null) return false;
           return root.childById(FlowLayout.class, "tag-display") != null;
@@ -60,7 +60,7 @@ class WikiLinkJourney {
   private void waitForEditMode(ClientGameTestContext context) {
     context.waitFor(
         client -> {
-          if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+          if (!(client.screen instanceof DisquestsBaseScreen dScreen)) return false;
           var root = dScreen.getRootComponent();
           if (root == null) return false;
           return root.childById(FlowLayout.class, "tag-editor") != null;
@@ -73,7 +73,7 @@ class WikiLinkJourney {
   private String readContentField(ClientGameTestContext context) {
     return context.computeOnClient(
         c -> {
-          if (!(c.currentScreen instanceof DisquestsBaseScreen dScreen)) return null;
+          if (!(c.screen instanceof DisquestsBaseScreen dScreen)) return null;
           var root = dScreen.getRootComponent();
           if (root == null) return null;
           var field =
@@ -155,7 +155,7 @@ class WikiLinkJourney {
     then("autocomplete overlay appears");
     context.waitFor(
         client -> {
-          if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+          if (!(client.screen instanceof DisquestsBaseScreen dScreen)) return false;
           var root = dScreen.getRootComponent();
           if (root == null) return false;
           return root.childById(FlowLayout.class, "autocomplete-overlay") != null;
@@ -177,7 +177,7 @@ class WikiLinkJourney {
     then("autocomplete overlay is dismissed");
     context.waitFor(
         client -> {
-          if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+          if (!(client.screen instanceof DisquestsBaseScreen dScreen)) return false;
           var root = dScreen.getRootComponent();
           if (root == null) return false;
           return root.childById(FlowLayout.class, "autocomplete-overlay") == null;
@@ -340,7 +340,7 @@ class WikiLinkJourney {
     boolean previewShown =
         context.computeOnClient(
             c -> {
-              if (!(c.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+              if (!(c.screen instanceof DisquestsBaseScreen dScreen)) return false;
               var root = dScreen.getRootComponent();
               if (root == null) return false;
               var area =
@@ -359,7 +359,7 @@ class WikiLinkJourney {
   @Test
   @Order(11)
   @PlayerA
-  @DisplayName("Click wiki-link in view mode navigates to linked quest")
+  ("Click wiki-link in view mode navigates to linked quest")
   void clickWikiLinkNavigatesToQuest(ClientGameTestContext context) {
     given("'Link Source' is in view mode with a resolved wiki-link");
     assertScreenIs(context, QuestScreen.class);

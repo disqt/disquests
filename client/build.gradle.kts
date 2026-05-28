@@ -8,7 +8,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 plugins {
-    id("fabric-loom") version "1.15.5"
+    id("net.fabricmc.fabric-loom") version "1.16-SNAPSHOT"
     jacoco
     eclipse
 }
@@ -33,15 +33,13 @@ repositories {
 }
 
 val minecraft_version: String by project
-val yarn_mappings: String by project
 val fabric_loader_version: String by project
 val fabric_api_version: String by project
 
 dependencies {
     minecraft("com.mojang:minecraft:$minecraft_version")
-    mappings("net.fabricmc:yarn:$yarn_mappings:v2")
-    modImplementation("net.fabricmc:fabric-loader:$fabric_loader_version")
-    modImplementation("net.fabricmc.fabric-api:fabric-api:$fabric_api_version")
+    implementation("net.fabricmc:fabric-loader:$fabric_loader_version")
+    implementation("net.fabricmc.fabric-api:fabric-api:$fabric_api_version")
 
     implementation(project(":common"))
     include(project(":common"))
@@ -58,11 +56,11 @@ dependencies {
 
     // Mod Menu (optional at runtime)
     val modmenu_version: String by project
-    modCompileOnly("com.terraformersmc:modmenu:$modmenu_version")
+    compileOnly("com.terraformersmc:modmenu:$modmenu_version")
 
     // owo-lib UI framework
     val owo_version: String by project
-    modImplementation("io.wispforest:owo-lib:$owo_version")
+    implementation("io.wispforest:owo-lib:$owo_version")
     annotationProcessor("io.wispforest:owo-lib:$owo_version")
     include("io.wispforest:owo-sentinel:$owo_version")
 
@@ -769,12 +767,12 @@ tasks.register("runIntegrationTest") {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    options.release.set(21)
+    options.release.set(25)
 }
 
 tasks.processResources {

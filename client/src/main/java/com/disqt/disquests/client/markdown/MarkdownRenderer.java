@@ -5,11 +5,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
 import org.commonmark.ext.autolink.AutolinkExtension;
 import org.commonmark.ext.gfm.strikethrough.Strikethrough;
 import org.commonmark.ext.gfm.strikethrough.StrikethroughExtension;
@@ -100,11 +100,11 @@ public class MarkdownRenderer {
   }
 
   /**
-   * Returns the first non-heading content line as a styled MutableText with muted colors. Headings
+   * Returns the first non-heading content line as a styled MutableComponent with muted colors. Headings
    * (scale != 1.0) and empty lines are skipped. Wiki-links are resolved to display titles. Returns
    * null if no content line is found.
    */
-  public static MutableText renderPreviewLine(String markdown) {
+  public static MutableComponent renderPreviewLine(String markdown) {
     if (markdown == null || markdown.isEmpty()) return null;
     List<RenderedLine> lines = render(markdown);
     for (RenderedLine line : lines) {
@@ -116,8 +116,8 @@ public class MarkdownRenderer {
     return null;
   }
 
-  /** Copies a MutableText tree, dimming all colors for use as a content preview. */
-  private static MutableText muteColors(MutableText original) {
+  /** Copies a MutableComponent tree, dimming all colors for use as a content preview. */
+  private static MutableComponent muteColors(MutableComponent original) {
     Style style = original.getStyle();
     if (style.getColor() != null) {
       int rgb = style.getColor().getRgb();
@@ -126,13 +126,13 @@ public class MarkdownRenderer {
       int b = (rgb & 0xFF) * 6 / 10;
       style = style.withColor((r << 16) | (g << 8) | b);
     } else {
-      style = style.withColor(Formatting.GRAY);
+      style = style.withColor(ChatFormatting.GRAY);
     }
     style = style.withClickEvent(null);
     // Use copy() to preserve only this node's literal content, then restyle
-    MutableText result = original.copyContentOnly().setStyle(style);
-    for (Text sibling : original.getSiblings()) {
-      if (sibling instanceof MutableText mt) {
+    MutableComponent result = original.copyContentOnly().setStyle(style);
+    for (Component sibling : original.getSiblings()) {
+      if (sibling instanceof MutableComponent mt) {
         result.append(muteColors(mt));
       }
     }
@@ -202,7 +202,7 @@ public class MarkdownRenderer {
 
   private static void renderBlock(Node node, List<RenderedLine> lines, int indent, Style style) {
     if (node instanceof Heading heading) {
-      MutableText text = collectInlineText(heading, Style.EMPTY.withBold(true));
+      MutableComponent text = collectInlineText(heading, Style.EMPTY.withBold(true));
       float scale =
           switch (heading.getLevel()) {
             case 1 -> 1.5f;
@@ -212,7 +212,7 @@ public class MarkdownRenderer {
       if (!lines.isEmpty()) lines.add(RenderedLine.empty());
       lines.add(RenderedLine.heading(text, scale));
     } else if (node instanceof Paragraph) {
-      MutableText text = collectInlineText(node, style);
+      MutableComponent text = collectInlineText(node, style);
       lines.add(RenderedLine.normal(text, indent));
     } else if (node instanceof BulletList) {
       renderChildren(node, lines, indent, style);
@@ -237,15 +237,15 @@ public class MarkdownRenderer {
         Node secondChild = firstChild.getNext();
         if (secondChild instanceof Paragraph para) {
           String checkbox = marker.isChecked() ? "[x] " : "[ ] ";
-          MutableText prefix =
-              Text.literal(checkbox)
+          MutableComponent prefix =
+              Component.literal(checkbox)
                   .setStyle(
                       marker.isChecked()
-                          ? Style.EMPTY.withColor(Formatting.GREEN)
-                          : Style.EMPTY.withColor(Formatting.GRAY));
-          MutableText content = collectInlineText(para, style);
+                          ? Style.EMPTY.withColor(ChatFormatting.GREEN)
+                          : Style.EMPTY.withColor(ChatFormatting.GRAY));
+          MutableComponent content = collectInlineText(para, style);
           if (marker.isChecked()) {
-            content = content.formatted(Formatting.STRIKETHROUGH, Formatting.GRAY);
+            content = content.withStyle(ChatFormatting.STRIKETHROUGH, ChatFormatting.GRAY);
           }
           lines.add(RenderedLine.normal(prefix.append(content), indent));
         }
@@ -262,11 +262,11 @@ public class MarkdownRenderer {
       }
     } else if (node instanceof BlockQuote) {
       List<RenderedLine> inner = new ArrayList<>();
-      renderChildren(node, inner, 0, style.withColor(Formatting.GRAY));
+      renderChildren(node, inner, 0, style.withColor(ChatFormatting.GRAY));
       for (RenderedLine line : inner) {
-        MutableText prefixed =
-            Text.literal("| ")
-                .setStyle(Style.EMPTY.withColor(Formatting.DARK_GRAY))
+        MutableComponent prefixed =
+            Component.literal("| ")
+                .setStyle(Style.EMPTY.withColor(ChatFormatting.DARK_GRAY))
                 .append(line.text());
         lines.add(RenderedLine.normal(prefixed, indent));
       }
@@ -277,7 +277,7 @@ public class MarkdownRenderer {
     } else if (node instanceof ThematicBreak) {
       lines.add(
           RenderedLine.normal(
-              Text.literal("---").setStyle(Style.EMPTY.withColor(Formatting.DARK_GRAY)), indent));
+              Component.literal("---").setStyle(Style.EMPTY.withColor(ChatFormatting.DARK_GRAY)), indent));
     } else if (node instanceof org.commonmark.node.HtmlBlock htmlBlock) {
       // HtmlBlock occurs when <dqlink .../> is on its own line after a blank line.
       // Scan for dqlink tags and render them the same way as inline wiki-links.
@@ -293,12 +293,12 @@ public class MarkdownRenderer {
                 .replace("&quot;", "\"");
         boolean isValid = isWikiLinkResolvable(uuid);
         int color = isValid ? 0xe8a86d : 0xe86d6d;
-        Style wikiStyle = style.withColor(color).withUnderline(true);
+        Style wikiStyle = style.withColor(color).withUnderlined(true);
         if (!isValid) wikiStyle = wikiStyle.withStrikethrough(true);
         String command =
             isValid ? WIKI_LINK_COMMAND_PREFIX + uuid : WIKI_LINK_COMMAND_PREFIX + WIKI_LINK_BROKEN;
         wikiStyle = wikiStyle.withClickEvent(new ClickEvent.RunCommand(command));
-        lines.add(RenderedLine.normal(Text.literal(title).setStyle(wikiStyle), indent));
+        lines.add(RenderedLine.normal(Component.literal(title).setStyle(wikiStyle), indent));
       }
     } else {
       // Fallback: try to render children
@@ -311,7 +311,7 @@ public class MarkdownRenderer {
     for (String cl : codeLines) {
       lines.add(
           RenderedLine.normal(
-              Text.literal(cl).setStyle(Style.EMPTY.withColor(Formatting.GRAY)), indent + 8));
+              Component.literal(cl).setStyle(Style.EMPTY.withColor(ChatFormatting.GRAY)), indent + 8));
     }
   }
 
@@ -319,19 +319,19 @@ public class MarkdownRenderer {
       Node item, List<RenderedLine> lines, int indent, Style style, String bullet) {
     Node firstChild = item.getFirstChild();
     if (firstChild instanceof Paragraph) {
-      MutableText bulletText =
-          Text.literal(bullet).setStyle(Style.EMPTY.withColor(Formatting.GRAY));
-      MutableText content = collectInlineText(firstChild, style);
+      MutableComponent bulletText =
+          Component.literal(bullet).setStyle(Style.EMPTY.withColor(ChatFormatting.GRAY));
+      MutableComponent content = collectInlineText(firstChild, style);
       lines.add(RenderedLine.normal(bulletText.append(content), indent));
     }
   }
 
-  private static MutableText collectInlineText(Node parent, Style style) {
+  private static MutableComponent collectInlineText(Node parent, Style style) {
     return collectInlineText(parent, style, parent.getFirstChild());
   }
 
-  private static MutableText collectInlineText(Node parent, Style style, Node startFrom) {
-    MutableText result = Text.empty().copy();
+  private static MutableComponent collectInlineText(Node parent, Style style, Node startFrom) {
+    MutableComponent result = Component.empty().copy();
     Node child = startFrom;
     while (child != null) {
       appendInline(child, result, style);
@@ -340,23 +340,23 @@ public class MarkdownRenderer {
     return result;
   }
 
-  private static void appendInline(Node node, MutableText target, Style style) {
+  private static void appendInline(Node node, MutableComponent target, Style style) {
     if (node instanceof org.commonmark.node.Text textNode) {
-      target.append(Text.literal(textNode.getLiteral()).setStyle(style));
+      target.append(Component.literal(textNode.getLiteral()).setStyle(style));
     } else if (node instanceof Emphasis) {
-      MutableText inner = collectInlineText(node, style.withItalic(true));
+      MutableComponent inner = collectInlineText(node, style.withItalic(true));
       target.append(inner);
     } else if (node instanceof StrongEmphasis) {
-      MutableText inner = collectInlineText(node, style.withBold(true));
+      MutableComponent inner = collectInlineText(node, style.withBold(true));
       target.append(inner);
     } else if (node instanceof Strikethrough) {
-      MutableText inner = collectInlineText(node, style.withStrikethrough(true));
+      MutableComponent inner = collectInlineText(node, style.withStrikethrough(true));
       target.append(inner);
     } else if (node instanceof Code code) {
-      target.append(Text.literal(code.getLiteral()).setStyle(style.withColor(Formatting.GRAY)));
+      target.append(Component.literal(code.getLiteral()).setStyle(style.withColor(ChatFormatting.GRAY)));
     } else if (node instanceof Link link) {
-      MutableText inner =
-          collectInlineText(node, style.withColor(Formatting.AQUA).withUnderline(true));
+      MutableComponent inner =
+          collectInlineText(node, style.withColor(ChatFormatting.AQUA).withUnderlined(true));
       try {
         inner.setStyle(
             inner
@@ -379,21 +379,21 @@ public class MarkdownRenderer {
                 .replace("&quot;", "\"");
         boolean isValid = isWikiLinkResolvable(uuid);
         int color = isValid ? 0xe8a86d : 0xe86d6d; // amber or red
-        Style wikiStyle = style.withColor(color).withUnderline(true);
+        Style wikiStyle = style.withColor(color).withUnderlined(true);
         if (!isValid) wikiStyle = wikiStyle.withStrikethrough(true);
         // Use RunCommand as a marker for MarkdownWidget click handling
         String command =
             isValid ? WIKI_LINK_COMMAND_PREFIX + uuid : WIKI_LINK_COMMAND_PREFIX + WIKI_LINK_BROKEN;
         wikiStyle = wikiStyle.withClickEvent(new ClickEvent.RunCommand(command));
-        target.append(Text.literal(title).setStyle(wikiStyle));
+        target.append(Component.literal(title).setStyle(wikiStyle));
       }
     } else if (node instanceof SoftLineBreak) {
-      target.append(Text.literal(" "));
+      target.append(Component.literal(" "));
     } else if (node instanceof HardLineBreak) {
-      target.append(Text.literal(" "));
+      target.append(Component.literal(" "));
     } else {
       // Unknown inline -- try children
-      MutableText inner = collectInlineText(node, style);
+      MutableComponent inner = collectInlineText(node, style);
       target.append(inner);
     }
   }

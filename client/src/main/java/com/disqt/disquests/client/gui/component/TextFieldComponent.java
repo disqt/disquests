@@ -5,10 +5,10 @@ import io.wispforest.owo.ui.base.BaseUIComponent;
 import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.input.CharInput;
-import net.minecraft.client.input.KeyInput;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
 
 /**
  * Thin owo-ui wrapper around MultiLineTextFieldWidget. Delegates all rendering and input to the
@@ -67,19 +67,19 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
 
     computeOffset();
     // Translate graphics so delegate renders at owo-ui position
-    context.getMatrices().pushMatrix();
-    context.getMatrices().translate(offsetX, offsetY);
-    delegate.render((DrawContext) context, mouseX - offsetX, mouseY - offsetY, delta);
-    context.getMatrices().popMatrix();
+    context.pose().pushMatrix();
+    context.pose().translate(offsetX, offsetY);
+    delegate.render((GuiGraphicsExtractor) context, mouseX - offsetX, mouseY - offsetY, delta);
+    context.pose().popMatrix();
   }
 
   @Override
-  public boolean onMouseDown(Click click, boolean doubled) {
+  public boolean onMouseDown(MouseButtonEvent click, boolean doubled) {
     computeOffset();
     // Click is component-relative, delegate expects absolute coords
     double absX = click.x() + this.x() - offsetX;
     double absY = click.y() + this.y() - offsetY;
-    Click delegateClick = new Click(absX, absY, click.buttonInfo());
+    MouseButtonEvent delegateClick = new MouseButtonEvent(absX, absY, click.buttonInfo());
     boolean result = delegate.mouseClicked(delegateClick, false);
     // Always force focus when clicked -- delegate.mouseClicked may not set it
     // if coordinate translation causes isMouseOver to fail
@@ -88,20 +88,20 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
   }
 
   @Override
-  public boolean onMouseUp(Click click) {
+  public boolean onMouseUp(MouseButtonEvent click) {
     computeOffset();
     double absX = click.x() + this.x() - offsetX;
     double absY = click.y() + this.y() - offsetY;
-    Click delegateClick = new Click(absX, absY, click.buttonInfo());
+    MouseButtonEvent delegateClick = new MouseButtonEvent(absX, absY, click.buttonInfo());
     return delegate.mouseReleased(delegateClick) || super.onMouseUp(click);
   }
 
   @Override
-  public boolean onMouseDrag(Click click, double deltaX, double deltaY) {
+  public boolean onMouseDrag(MouseButtonEvent click, double deltaX, double deltaY) {
     computeOffset();
     double absX = click.x() + this.x() - offsetX;
     double absY = click.y() + this.y() - offsetY;
-    Click delegateClick = new Click(absX, absY, click.buttonInfo());
+    MouseButtonEvent delegateClick = new MouseButtonEvent(absX, absY, click.buttonInfo());
     return delegate.mouseDragged(delegateClick, deltaX, deltaY);
   }
 
@@ -114,7 +114,7 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
   }
 
   @Override
-  public boolean onKeyPress(KeyInput keyInput) {
+  public boolean onKeyPress(KeyEvent keyInput) {
     // Intercept navigation keys for autocomplete dropdown before forwarding to delegate
     if (dropdown != null && dropdown.isVisible()) {
       if (dropdown.onKeyDown(keyInput.key())) {
@@ -128,7 +128,7 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
   }
 
   @Override
-  public boolean onCharTyped(CharInput charInput) {
+  public boolean onCharTyped(CharacterEvent charInput) {
     delegate.setFocused(true);
     boolean result = delegate.charTyped(charInput);
     updateAutocomplete();

@@ -48,7 +48,7 @@ class TagJourney {
   private void waitForViewMode(ClientGameTestContext context) {
     context.waitFor(
         client -> {
-          if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+          if (!(client.screen instanceof DisquestsBaseScreen dScreen)) return false;
           var root = dScreen.getRootComponent();
           if (root == null) return false;
           return root.childById(FlowLayout.class, "tag-display") != null;
@@ -61,7 +61,7 @@ class TagJourney {
   private void waitForEditMode(ClientGameTestContext context) {
     context.waitFor(
         client -> {
-          if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+          if (!(client.screen instanceof DisquestsBaseScreen dScreen)) return false;
           var root = dScreen.getRootComponent();
           if (root == null) return false;
           return root.childById(FlowLayout.class, "tag-editor") != null;
@@ -77,7 +77,7 @@ class TagJourney {
   private int tagEditorTagCount(ClientGameTestContext context) {
     return context.computeOnClient(
         c -> {
-          if (!(c.currentScreen instanceof DisquestsBaseScreen dScreen)) return 0;
+          if (!(c.screen instanceof DisquestsBaseScreen dScreen)) return 0;
           var root = dScreen.getRootComponent();
           if (root == null) return 0;
           FlowLayout tagEditor = root.childById(FlowLayout.class, "tag-editor");
@@ -93,7 +93,7 @@ class TagJourney {
   private int tagDisplayTagCount(ClientGameTestContext context) {
     return context.computeOnClient(
         c -> {
-          if (!(c.currentScreen instanceof DisquestsBaseScreen dScreen)) return 0;
+          if (!(c.screen instanceof DisquestsBaseScreen dScreen)) return 0;
           var root = dScreen.getRootComponent();
           if (root == null) return 0;
           FlowLayout tagDisplay = root.childById(FlowLayout.class, "tag-display");
@@ -112,7 +112,7 @@ class TagJourney {
     double[] pos =
         context.computeOnClient(
             c -> {
-              if (!(c.currentScreen instanceof DisquestsBaseScreen dScreen)) return null;
+              if (!(c.screen instanceof DisquestsBaseScreen dScreen)) return null;
               var root = dScreen.getRootComponent();
               if (root == null) return null;
               FlowLayout chipCloud = root.childById(FlowLayout.class, "chip-cloud");
@@ -190,7 +190,7 @@ class TagJourney {
     waitForViewMode(context);
     context.waitFor(
         client -> {
-          if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+          if (!(client.screen instanceof DisquestsBaseScreen dScreen)) return false;
           var root = dScreen.getRootComponent();
           if (root == null) return false;
           FlowLayout tagDisplay = root.childById(FlowLayout.class, "tag-display");
@@ -277,7 +277,7 @@ class TagJourney {
     waitForEditMode(context);
     context.waitFor(
         client -> {
-          if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+          if (!(client.screen instanceof DisquestsBaseScreen dScreen)) return false;
           var root = dScreen.getRootComponent();
           if (root == null) return false;
           FlowLayout tagEditor = root.childById(FlowLayout.class, "tag-editor");
@@ -326,7 +326,7 @@ class TagJourney {
     double[] pos =
         context.computeOnClient(
             c -> {
-              if (!(c.currentScreen instanceof DisquestsBaseScreen dScreen)) return null;
+              if (!(c.screen instanceof DisquestsBaseScreen dScreen)) return null;
               var root = dScreen.getRootComponent();
               if (root == null) return null;
               FlowLayout tagEditor = root.childById(FlowLayout.class, "tag-editor");
@@ -407,7 +407,7 @@ class TagJourney {
     waitForEditMode(context);
     context.waitFor(
         client -> {
-          if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+          if (!(client.screen instanceof DisquestsBaseScreen dScreen)) return false;
           var root = dScreen.getRootComponent();
           if (root == null) return false;
           FlowLayout tagEditor = root.childById(FlowLayout.class, "tag-editor");
@@ -438,7 +438,7 @@ class TagJourney {
     boolean found =
         context.computeOnClient(
             c -> {
-              if (!(c.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+              if (!(c.screen instanceof DisquestsBaseScreen dScreen)) return false;
               var root = dScreen.getRootComponent();
               if (root == null) return false;
               FlowLayout chipCloud = root.childById(FlowLayout.class, "chip-cloud");
@@ -485,7 +485,7 @@ class TagJourney {
     then("'piwigord' appears as a chip in the picker");
     context.waitFor(
         client -> {
-          if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+          if (!(client.screen instanceof DisquestsBaseScreen dScreen)) return false;
           var root = dScreen.getRootComponent();
           if (root == null) return false;
           FlowLayout chipCloud = root.childById(FlowLayout.class, "chip-cloud");
@@ -549,7 +549,7 @@ class TagJourney {
     then("tag autocomplete overlay appears");
     context.waitFor(
         client -> {
-          if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return false;
+          if (!(client.screen instanceof DisquestsBaseScreen dScreen)) return false;
           var root = dScreen.getRootComponent();
           if (root == null) return false;
           return root.childById(OverlayContainer.class, "tag-autocomplete-overlay") != null;
@@ -571,7 +571,7 @@ class TagJourney {
     double[] pos =
         context.computeOnClient(
             c -> {
-              if (!(c.currentScreen instanceof DisquestsBaseScreen dScreen)) return null;
+              if (!(c.screen instanceof DisquestsBaseScreen dScreen)) return null;
               var root = dScreen.getRootComponent();
               if (root == null) return null;
               FlowLayout chipCloud = root.childById(FlowLayout.class, "chip-cloud");
@@ -597,8 +597,8 @@ class TagJourney {
   }
 
   // Helper to make the context.waitFor lambda cleaner for screen-type checks
-  private int tagEditorTagCount(net.minecraft.client.MinecraftClient client) {
-    if (!(client.currentScreen instanceof DisquestsBaseScreen dScreen)) return -1;
+  private int tagEditorTagCount(net.minecraft.client.Minecraft client) {
+    if (!(client.screen instanceof DisquestsBaseScreen dScreen)) return -1;
     var root = dScreen.getRootComponent();
     if (root == null) return -1;
     FlowLayout tagEditor = root.childById(FlowLayout.class, "tag-editor");

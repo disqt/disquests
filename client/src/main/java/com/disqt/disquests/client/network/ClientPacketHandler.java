@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 public class ClientPacketHandler {
 
@@ -56,8 +56,8 @@ public class ClientPacketHandler {
   }
 
   private static void showOrDeferToast(String message) {
-    MinecraftClient client = MinecraftClient.getInstance();
-    if (client.currentScreen instanceof MainScreen mainScreen) {
+    Minecraft client = Minecraft.getInstance();
+    if (client.screen instanceof MainScreen mainScreen) {
       mainScreen.refreshListContents();
       mainScreen.showToast(message);
     } else {
@@ -118,10 +118,10 @@ public class ClientPacketHandler {
     }
 
     // Refresh the current screen if it shows the updated quest
-    MinecraftClient client = MinecraftClient.getInstance();
-    if (client.currentScreen instanceof MainScreen mainScreen) {
+    Minecraft client = Minecraft.getInstance();
+    if (client.screen instanceof MainScreen mainScreen) {
       mainScreen.refreshListContents();
-    } else if (client.currentScreen instanceof QuestScreen questScreen
+    } else if (client.screen instanceof QuestScreen questScreen
         && !questScreen.isEditing()
         && questScreen.getQuest().getId().equals(quest.getId())
         && !java.util.Objects.equals(questScreen.getQuest().getContent(), quest.getContent())) {

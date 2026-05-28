@@ -1,34 +1,34 @@
 package com.disqt.disquests.client.network;
 
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 /**
  * A single custom payload wrapper that carries raw bytes. All Disquests packet types are
  * multiplexed through this one channel using the common module's PacketCodec for encode/decode.
  */
-public record RawPayload(byte[] data) implements CustomPayload {
+public record RawPayload(byte[] data) implements CustomPacketPayload {
 
-  public static final CustomPayload.Id<RawPayload> ID =
-      new CustomPayload.Id<>(Identifier.of("disquests", "main"));
+  public static final CustomPacketPayload.Type<RawPayload> ID =
+      CustomPacketPayload.createType("disquests:main");
 
-  public static final PacketCodec<PacketByteBuf, RawPayload> CODEC =
-      CustomPayload.codecOf(RawPayload::write, RawPayload::read);
+  public static final StreamCodec<FriendlyByteBuf, RawPayload> CODEC =
+      CustomPacketPayload.codec(RawPayload::write, RawPayload::read);
 
-  private void write(PacketByteBuf buf) {
+  private void write(FriendlyByteBuf buf) {
     buf.writeBytes(data);
   }
 
-  private static RawPayload read(PacketByteBuf buf) {
+  private static RawPayload read(FriendlyByteBuf buf) {
     byte[] bytes = new byte[buf.readableBytes()];
     buf.readBytes(bytes);
     return new RawPayload(bytes);
   }
 
   @Override
-  public Id<? extends CustomPayload> getId() {
+  public Type<? extends CustomPacketPayload> type() {
     return ID;
   }
 }

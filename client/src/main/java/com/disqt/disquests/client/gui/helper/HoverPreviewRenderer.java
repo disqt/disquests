@@ -4,11 +4,11 @@ import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.client.markdown.RenderedLine;
 import java.util.List;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.Component;
 
 public final class HoverPreviewRenderer {
 
@@ -36,9 +36,9 @@ public final class HoverPreviewRenderer {
    * @param screenHeight total screen height (for edge clamping)
    */
   public static void draw(
-      DrawContext context, Quest quest, int mouseX, int mouseY, int screenWidth, int screenHeight) {
-    TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
-    int lineHeight = textRenderer.fontHeight;
+      GuiGraphicsExtractor context, Quest quest, int mouseX, int mouseY, int screenWidth, int screenHeight) {
+    Font textRenderer = Minecraft.getInstance().font;
+    int lineHeight = textRenderer.lineHeight;
 
     // Render content lines (up to MAX_LINES)
     String content = quest.getContent();
@@ -58,10 +58,10 @@ public final class HoverPreviewRenderer {
     // Compute width to fit content (clamped between MIN_WIDTH and MAX_WIDTH)
     String title = quest.getTitle() != null ? quest.getTitle() : "Untitled";
     int contentArea = PADDING * 2;
-    int neededWidth = textRenderer.getWidth(title) + contentArea;
+    int neededWidth = textRenderer.width(title) + contentArea;
     for (RenderedLine line : renderedLines) {
       neededWidth =
-          Math.max(neededWidth, textRenderer.getWidth(line.text().getString()) + contentArea);
+          Math.max(neededWidth, textRenderer.width(line.text().getString()) + contentArea);
     }
     int width = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, neededWidth));
 
@@ -93,25 +93,25 @@ public final class HoverPreviewRenderer {
     int drawY = y + PADDING;
 
     // Title (bold)
-    String rawTitle = textRenderer.trimToWidth(title, width - PADDING * 2);
+    String rawTitle = textRenderer.plainSubstrByWidth(title, width - PADDING * 2);
     if (rawTitle.length() < title.length()) rawTitle = rawTitle + "...";
-    Text titleText =
-        Text.literal(rawTitle).setStyle(Style.EMPTY.withBold(true).withColor(TITLE_COLOR));
-    context.drawText(textRenderer, titleText, x + PADDING, drawY, TITLE_COLOR, false);
+    Component titleText =
+        Component.literal(rawTitle).setStyle(Style.EMPTY.withBold(true).withColor(TITLE_COLOR));
+    context.text(textRenderer, titleText, x + PADDING, drawY, TITLE_COLOR, false);
     drawY += lineHeight + 2;
 
     // Content lines. Scale and indent from RenderedLine are intentionally ignored -- this is a
     // compact tooltip preview, not a full markdown renderer. Headings and bullet indentation are
     // deliberately flattened.
     for (RenderedLine line : renderedLines) {
-      String rawLine = textRenderer.trimToWidth(line.text().getString(), width - PADDING * 2);
-      context.drawText(
-          textRenderer, Text.literal(rawLine), x + PADDING, drawY, Colors.TEXT_MUTED, false);
+      String rawLine = textRenderer.plainSubstrByWidth(line.text().getString(), width - PADDING * 2);
+      context.text(
+          textRenderer, Component.literal(rawLine), x + PADDING, drawY, Colors.TEXT_MUTED, false);
       drawY += lineHeight;
     }
     if (truncated) {
-      context.drawText(
-          textRenderer, Text.literal("..."), x + PADDING, drawY, ELLIPSIS_COLOR, false);
+      context.text(
+          textRenderer, Component.literal("..."), x + PADDING, drawY, ELLIPSIS_COLOR, false);
       drawY += lineHeight;
     }
 
@@ -122,10 +122,10 @@ public final class HoverPreviewRenderer {
       for (String tag : tags) {
         int tagColor = TagColors.getForeground(tag);
         int tagBg = TagColors.getBackground(tag);
-        int tagWidth = textRenderer.getWidth(tag) + 6; // 3px padding each side
+        int tagWidth = textRenderer.width(tag) + 6; // 3px padding each side
         if (tagX + tagWidth > x + width - PADDING) break; // don't overflow
         context.fill(tagX, drawY, tagX + tagWidth, drawY + lineHeight, tagBg);
-        context.drawText(textRenderer, Text.literal(tag), tagX + 3, drawY + 1, tagColor, false);
+        context.text(textRenderer, Component.literal(tag), tagX + 3, drawY + 1, tagColor, false);
         tagX += tagWidth + 2;
       }
     }

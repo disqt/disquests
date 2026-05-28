@@ -8,10 +8,10 @@ import com.disqt.disquests.client.markdown.RenderedLine;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.OrderedText;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.util.FormattedCharSequence;
 
 public class HudPinRenderer {
 
@@ -32,7 +32,7 @@ public class HudPinRenderer {
 
   // --- Cache ---
   private record CachedPin(
-      Quest quest, List<String> titleLines, List<OrderedText> contentLines, boolean truncated) {}
+      Quest quest, List<String> titleLines, List<FormattedCharSequence> contentLines, boolean truncated) {}
 
   private static List<UUID> lastPinnedIds = List.of();
   private static long lastContentHash = 0;
@@ -66,12 +66,12 @@ public class HudPinRenderer {
     return configY;
   }
 
-  public static void render(DrawContext context) {
+  public static void render(GuiGraphicsExtractor context) {
     if (!DisquestsClient.CONFIG.pinnedVisible()) return;
 
     // Don't render pins over Disquests screens (they have their own UI)
-    MinecraftClient client = MinecraftClient.getInstance();
-    if (client.currentScreen instanceof DisquestsBaseScreen) return;
+    Minecraft client = Minecraft.getInstance();
+    if (client.screen instanceof DisquestsBaseScreen) return;
 
     List<Quest> quests = HudPinManager.getPinnedQuests();
     if (quests.isEmpty()) {
@@ -92,22 +92,22 @@ public class HudPinRenderer {
     if (!currentIds.equals(lastPinnedIds)
         || contentHash != lastContentHash
         || currentWidth != lastWidth) {
-      rebuildCache(client.textRenderer, quests);
+      rebuildCache(client.font, quests);
       lastPinnedIds = currentIds;
       lastContentHash = contentHash;
       lastWidth = currentWidth;
     }
 
     // Resolve position from config
-    int screenWidth = client.getWindow().getScaledWidth();
+    int screenWidth = client.getWindow().getGuiScaledWidth();
     int configX = DisquestsClient.CONFIG.pinnedX();
     int configY = DisquestsClient.CONFIG.pinnedY();
     int originX = resolveX(screenWidth, currentWidth, configX);
     int originY = resolveY(configY);
 
     // Render from cache
-    TextRenderer tr = client.textRenderer;
-    int lineHeight = tr.fontHeight + 1;
+    Font tr = client.font;
+    int lineHeight = tr.lineHeight + 1;
     int y = originY;
     for (CachedPin pin : cachedPins) {
       y = renderCachedPin(context, tr, pin, originX, y, lineHeight, currentWidth);
@@ -115,7 +115,7 @@ public class HudPinRenderer {
     }
   }
 
-  private static void rebuildCache(TextRenderer tr, List<Quest> quests) {
+  private static void rebuildCache(Font tr, List<Quest> quests) {
     int maxWidth = getMaxWidth() - PADDING * 2;
     List<CachedPin> pins = new ArrayList<>(quests.size());
     for (Quest quest : quests) {
@@ -125,10 +125,10 @@ public class HudPinRenderer {
       // Render content with markdown formatting
       List<RenderedLine> rendered =
           MarkdownRenderer.render(quest.getContent() != null ? quest.getContent() : "");
-      List<OrderedText> contentLines = new ArrayList<>();
+      List<FormattedCharSequence> contentLines = new ArrayList<>();
       for (RenderedLine line : rendered) {
         // Wrap each rendered line to fit the HUD width
-        List<OrderedText> wrapped = tr.wrapLines(line.text(), maxWidth);
+        List<FormattedCharSequence> wrapped = tr.split(line.text(), maxWidth);
         contentLines.addAll(wrapped);
       }
 
@@ -145,8 +145,8 @@ public class HudPinRenderer {
   }
 
   private static int renderCachedPin(
-      DrawContext context,
-      TextRenderer tr,
+      GuiGraphicsExtractor context,
+      Font tr,
       CachedPin pin,
       int originX,
       int y,
@@ -161,24 +161,24 @@ public class HudPinRenderer {
     // Title (white)
     int textY = y + PADDING;
     for (String line : pin.titleLines) {
-      context.drawText(tr, line, originX + PADDING, textY, TITLE_COLOR, true);
+      context.text(tr, line, originX + PADDING, textY, TITLE_COLOR, true);
       textY += lineHeight;
     }
 
     // Content (formatted)
-    for (OrderedText line : pin.contentLines) {
-      context.drawText(tr, line, originX + PADDING, textY, CONTENT_COLOR, true);
+    for (FormattedCharSequence line : pin.contentLines) {
+      context.text(tr, line, originX + PADDING, textY, CONTENT_COLOR, true);
       textY += lineHeight;
     }
 
     if (pin.truncated) {
-      context.drawText(tr, "...", originX + PADDING, textY, CONTENT_COLOR, true);
+      context.text(tr, "...", originX + PADDING, textY, CONTENT_COLOR, true);
     }
 
     return y + boxHeight;
   }
 
-  private static List<String> wrapText(TextRenderer tr, String text, int maxWidth) {
+  private static List<String> wrapText(Font tr, String text, int maxWidth) {
     List<String> result = new ArrayList<>();
     if (text == null || text.isEmpty()) return result;
     for (String paragraph : text.split("\n", -1)) {
@@ -188,7 +188,7 @@ public class HudPinRenderer {
       }
       String remaining = paragraph;
       while (!remaining.isEmpty()) {
-        String trimmed = tr.trimToWidth(remaining, maxWidth);
+        String trimmed = tr.plainSubstrByWidth(remaining, maxWidth);
         if (trimmed.isEmpty()) {
           trimmed = remaining.substring(0, 1);
         }

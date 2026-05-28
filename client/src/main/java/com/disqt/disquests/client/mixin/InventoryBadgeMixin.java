@@ -3,12 +3,12 @@ package com.disqt.disquests.client.mixin;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.screen.MainScreen;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,7 +16,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(HandledScreen.class)
+@Mixin(AbstractContainerScreen.class)
 public abstract class InventoryBadgeMixin extends Screen {
 
   @Unique private static final int BADGE_SIZE = 16;
@@ -28,7 +28,7 @@ public abstract class InventoryBadgeMixin extends Screen {
 
   @Inject(method = "render", at = @At("TAIL"))
   private void renderQuestBadge(
-      DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+      GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
     if (!ClientSession.isOnServer()) return;
 
     int badgeX = this.width - BADGE_SIZE - BADGE_MARGIN;
@@ -38,31 +38,31 @@ public abstract class InventoryBadgeMixin extends Screen {
     context.fill(badgeX, badgeY, badgeX + BADGE_SIZE, badgeY + BADGE_SIZE, 0xCC222222);
 
     // Draw "Q" centered in badge
-    TextRenderer tr = MinecraftClient.getInstance().textRenderer;
+    Font tr = Minecraft.getInstance().font;
     String label = "Q";
-    int textWidth = tr.getWidth(label);
+    int textWidth = tr.width(label);
     int textX = badgeX + (BADGE_SIZE - textWidth) / 2;
-    int textY = badgeY + (BADGE_SIZE - tr.fontHeight) / 2;
-    context.drawText(tr, label, textX, textY, 0xFFFFFFFF, false);
+    int textY = badgeY + (BADGE_SIZE - tr.lineHeight) / 2;
+    context.text(tr, label, textX, textY, 0xFFFFFFFF, false);
 
     // Draw notification count if pending requests
     int pendingCount = ClientSession.getPendingRequestCount();
     if (pendingCount > 0) {
       String countStr = pendingCount > 99 ? "99+" : String.valueOf(pendingCount);
-      int countWidth = tr.getWidth(countStr);
+      int countWidth = tr.width(countStr);
       int dotSize = Math.max(countWidth + 4, 10);
       int dotX = badgeX + BADGE_SIZE - dotSize / 2;
       int dotY = badgeY - dotSize / 2 + 2;
 
       context.fill(dotX, dotY, dotX + dotSize, dotY + dotSize, Colors.BADGE_RED);
       int countTextX = dotX + (dotSize - countWidth) / 2;
-      int countTextY = dotY + (dotSize - tr.fontHeight) / 2;
-      context.drawText(tr, countStr, countTextX, countTextY, 0xFFFFFFFF, false);
+      int countTextY = dotY + (dotSize - tr.lineHeight) / 2;
+      context.text(tr, countStr, countTextX, countTextY, 0xFFFFFFFF, false);
     }
   }
 
   @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
-  private void onMouseClicked(Click click, boolean simulated, CallbackInfoReturnable<Boolean> cir) {
+  private void onMouseClicked(MouseButtonEvent click, boolean simulated, CallbackInfoReturnable<Boolean> cir) {
     if (!ClientSession.isOnServer()) return;
 
     double mouseX = click.x();
@@ -74,7 +74,7 @@ public abstract class InventoryBadgeMixin extends Screen {
         && mouseX < badgeX + BADGE_SIZE
         && mouseY >= badgeY
         && mouseY < badgeY + BADGE_SIZE) {
-      MinecraftClient.getInstance().setScreen(new MainScreen());
+      Minecraft.getInstance().setScreen(new MainScreen());
       cir.setReturnValue(true);
     }
   }

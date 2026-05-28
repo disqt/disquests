@@ -60,15 +60,15 @@ subprojects {
         apply(plugin = "java")
 
         java {
-            sourceCompatibility = JavaVersion.VERSION_21
-            targetCompatibility = JavaVersion.VERSION_21
+            sourceCompatibility = JavaVersion.VERSION_25
+            targetCompatibility = JavaVersion.VERSION_25
         }
     }
 
     apply(plugin = "com.diffplug.spotless")
     configure<com.diffplug.gradle.spotless.SpotlessExtension> {
         java {
-            googleJavaFormat()
+            googleJavaFormat("1.34.0")
             targetExclude("build/**")
         }
     }

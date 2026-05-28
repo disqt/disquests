@@ -17,14 +17,14 @@ public class UrlOpener {
 
   public static void open(String url) {
     try {
-      if (Util.getOperatingSystem() == Util.OperatingSystem.WINDOWS) {
+      if (Util.getPlatform() == Util.OS.WINDOWS) {
         String safeUrl = url.replace("'", "''");
         new ProcessBuilder(
                 "powershell", "-NoProfile", "-Command", "Start-Process '" + safeUrl + "'")
             .redirectErrorStream(true)
             .start();
       } else {
-        Util.getOperatingSystem().open(URI.create(url));
+        Util.getPlatform().open(URI.create(url));
       }
     } catch (Exception e) {
       LOGGER.error("Failed to open URL: {}", url, e);
