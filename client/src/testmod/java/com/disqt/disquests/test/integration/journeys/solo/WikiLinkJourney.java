@@ -359,7 +359,7 @@ class WikiLinkJourney {
   @Test
   @Order(11)
   @PlayerA
-  ("Click wiki-link in view mode navigates to linked quest")
+  @DisplayName("Click wiki-link in view mode navigates to linked quest")
   void clickWikiLinkNavigatesToQuest(ClientGameTestContext context) {
     given("'Link Source' is in view mode with a resolved wiki-link");
     assertScreenIs(context, QuestScreen.class);

@@ -45,7 +45,9 @@ class ConfigJourney {
     when("we resolve a known translation key");
     String resolved =
         context.computeOnClient(
-            c -> net.minecraft.network.chat.Component.translatable("key.category.disquests.main").getString());
+            c ->
+                net.minecraft.network.chat.Component.translatable("key.category.disquests.main")
+                    .getString());
     then("the translation resolves to the expected value");
     assertEquals(
         "Disquests",

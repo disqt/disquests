@@ -32,7 +32,9 @@ public class TagPickerScreen extends DisquestsBaseScreen {
   private LabelComponent hintLabel;
 
   public TagPickerScreen(@Nullable Screen parent, Quest quest, Screen returnScreen) {
-    super(DataSource.asset(Identifier.fromNamespaceAndPath("disquests", "tag_picker_screen")), parent);
+    super(
+        DataSource.asset(Identifier.fromNamespaceAndPath("disquests", "tag_picker_screen")),
+        parent);
     this.quest = quest;
     this.returnScreen = returnScreen;
   }
@@ -77,7 +79,8 @@ public class TagPickerScreen extends DisquestsBaseScreen {
     hintLabel = root.childById(LabelComponent.class, "hint-label");
     if (hintLabel != null) {
       hintLabel.text(
-          Component.translatable("gui.disquests.label.enter_to_create").withColor(Colors.TEXT_MUTED));
+          Component.translatable("gui.disquests.label.enter_to_create")
+              .withColor(Colors.TEXT_MUTED));
       hintLabel.shadow(true);
     }
 
@@ -157,7 +160,8 @@ public class TagPickerScreen extends DisquestsBaseScreen {
           && !hasExactMatch
           && TagConstraints.TAG_PATTERN.matcher(normalizedFilter).matches()) {
         hintLabel.text(
-            Component.translatable("gui.disquests.label.enter_to_create").withColor(Colors.TEXT_MUTED));
+            Component.translatable("gui.disquests.label.enter_to_create")
+                .withColor(Colors.TEXT_MUTED));
       } else {
         hintLabel.text(Component.empty());
       }

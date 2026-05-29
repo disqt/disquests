@@ -10,11 +10,11 @@ import com.disqt.disquests.test.integration.harness.TestContext;
 import io.wispforest.owo.ui.core.UIComponent;
 import java.util.UUID;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screen.TitleScreen;
-import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
-import net.minecraft.client.network.ServerAddress;
-import net.minecraft.client.network.ServerInfo;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,7 +87,7 @@ public final class UIActions {
 
   /** Get the window scale factor. */
   public static double scaleFactor(ClientGameTestContext context) {
-    return context.computeOnClient(c -> (double) c.getWindow().getScaleFactor());
+    return context.computeOnClient(c -> (double) c.getWindow().getGuiScale());
   }
 
   // --- Server reset ---
@@ -132,10 +132,10 @@ public final class UIActions {
 
     context.runOnClient(
         client -> {
-          ServerAddress serverAddress = ServerAddress.parse(address);
-          ServerInfo serverInfo = new ServerInfo("Test", address, ServerInfo.ServerType.OTHER);
-          ConnectScreen.connect(
-              client.screen, client, serverAddress, serverInfo, false, null);
+          ServerAddress serverAddress = ServerAddress.parseString(address);
+          ServerData serverData = new ServerData("Test", address, ServerData.Type.OTHER);
+          ConnectScreen.startConnecting(
+              client.screen, client, serverAddress, serverData, false, null);
         });
 
     // Wait for player entity

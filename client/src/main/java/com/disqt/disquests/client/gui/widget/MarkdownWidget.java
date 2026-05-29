@@ -17,11 +17,11 @@ import java.util.List;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 
 /**
  * An owo-ui component that renders pre-parsed markdown as styled text lines. Word-wraps lines,
@@ -61,7 +61,8 @@ public class MarkdownWidget extends BaseUIComponent {
   private record CheckboxHitbox(
       int x, int y, int width, int height, int checkboxIndex, boolean checked) {}
 
-  private record LinkHitbox(int x, int y, int width, int height, String url, Component displayText) {}
+  private record LinkHitbox(
+      int x, int y, int width, int height, String url, Component displayText) {}
 
   private record WikiLinkHitbox(int x, int y, int width, int height, String uuid) {}
 
@@ -70,8 +71,8 @@ public class MarkdownWidget extends BaseUIComponent {
   }
 
   /**
-   * Walks an FormattedCharSequence character-by-character, computing pixel offsets for each styled segment
-   * (links and wiki-links), and creates tight hitboxes only around the actual link text.
+   * Walks an FormattedCharSequence character-by-character, computing pixel offsets for each styled
+   * segment (links and wiki-links), and creates tight hitboxes only around the actual link text.
    */
   private void collectStyledHitboxes(
       FormattedCharSequence text, int lineX, int lineY, Font textRenderer) {
@@ -292,7 +293,7 @@ public class MarkdownWidget extends BaseUIComponent {
     // Link hover tooltip
     for (LinkHitbox lh : linkHitboxes) {
       if (hitTest(mouseX, mouseY, lh.x(), lh.y(), lh.width(), lh.height())) {
-        context.drawTooltip(textRenderer, lh.displayText(), mouseX, mouseY);
+        context.setTooltipForNextFrame(lh.displayText(), mouseX, mouseY);
         break;
       }
     }

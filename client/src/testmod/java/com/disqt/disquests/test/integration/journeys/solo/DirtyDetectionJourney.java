@@ -71,7 +71,7 @@ class DirtyDetectionJourney {
   @Test
   @Order(3)
   @PlayerA
-  ("Click No on confirm overlay -> returns to edit with title still 'Modified'")
+  @DisplayName("Click No on confirm overlay -> returns to edit with title still 'Modified'")
   void clickNoReturnsToEdit(ClientGameTestContext context) {
     given("confirm overlay is showing");
     assertComponentExists(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
@@ -112,7 +112,7 @@ class DirtyDetectionJourney {
   @Test
   @Order(4)
   @PlayerA
-  ("Click Cancel again -> confirm overlay appears again")
+  @DisplayName("Click Cancel again -> confirm overlay appears again")
   void cancelAgainShowsConfirmAgain(ClientGameTestContext context) {
     given("player is back in edit mode with title 'Modified'");
     boolean isEditing =
@@ -129,7 +129,7 @@ class DirtyDetectionJourney {
   @Test
   @Order(5)
   @PlayerA
-  ("Click Yes on confirm overlay -> view mode shows original title 'Original'")
+  @DisplayName("Click Yes on confirm overlay -> view mode shows original title 'Original'")
   void clickYesDiscardsChanges(ClientGameTestContext context) {
     given("confirm overlay is showing");
     assertComponentExists(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);

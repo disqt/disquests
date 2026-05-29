@@ -1,7 +1,7 @@
 package com.disqt.disquests.client.markdown;
 
-import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 
 public record RenderedLine(MutableComponent text, int indent, float scale) {
   public static RenderedLine normal(MutableComponent text, int indent) {

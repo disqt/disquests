@@ -28,7 +28,8 @@ public class ToastOverlay {
     return ticksRemaining > 0 && message != null;
   }
 
-  public void render(GuiGraphicsExtractor context, Font textRenderer, int screenWidth, int bottomY) {
+  public void render(
+      GuiGraphicsExtractor context, Font textRenderer, int screenWidth, int bottomY) {
     if (!isVisible()) return;
 
     float alpha = ticksRemaining <= FADE_TICKS ? (float) ticksRemaining / FADE_TICKS : 1.0f;

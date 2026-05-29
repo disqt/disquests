@@ -5,11 +5,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.Component;
-import net.minecraft.ChatFormatting;
 import org.commonmark.ext.autolink.AutolinkExtension;
 import org.commonmark.ext.gfm.strikethrough.Strikethrough;
 import org.commonmark.ext.gfm.strikethrough.StrikethroughExtension;
@@ -100,9 +100,9 @@ public class MarkdownRenderer {
   }
 
   /**
-   * Returns the first non-heading content line as a styled MutableComponent with muted colors. Headings
-   * (scale != 1.0) and empty lines are skipped. Wiki-links are resolved to display titles. Returns
-   * null if no content line is found.
+   * Returns the first non-heading content line as a styled MutableComponent with muted colors.
+   * Headings (scale != 1.0) and empty lines are skipped. Wiki-links are resolved to display titles.
+   * Returns null if no content line is found.
    */
   public static MutableComponent renderPreviewLine(String markdown) {
     if (markdown == null || markdown.isEmpty()) return null;
@@ -120,7 +120,7 @@ public class MarkdownRenderer {
   private static MutableComponent muteColors(MutableComponent original) {
     Style style = original.getStyle();
     if (style.getColor() != null) {
-      int rgb = style.getColor().getRgb();
+      int rgb = style.getColor().getValue();
       int r = ((rgb >> 16) & 0xFF) * 6 / 10;
       int g = ((rgb >> 8) & 0xFF) * 6 / 10;
       int b = (rgb & 0xFF) * 6 / 10;
@@ -130,7 +130,7 @@ public class MarkdownRenderer {
     }
     style = style.withClickEvent(null);
     // Use copy() to preserve only this node's literal content, then restyle
-    MutableComponent result = original.copyContentOnly().setStyle(style);
+    MutableComponent result = original.plainCopy().setStyle(style);
     for (Component sibling : original.getSiblings()) {
       if (sibling instanceof MutableComponent mt) {
         result.append(muteColors(mt));
@@ -277,7 +277,8 @@ public class MarkdownRenderer {
     } else if (node instanceof ThematicBreak) {
       lines.add(
           RenderedLine.normal(
-              Component.literal("---").setStyle(Style.EMPTY.withColor(ChatFormatting.DARK_GRAY)), indent));
+              Component.literal("---").setStyle(Style.EMPTY.withColor(ChatFormatting.DARK_GRAY)),
+              indent));
     } else if (node instanceof org.commonmark.node.HtmlBlock htmlBlock) {
       // HtmlBlock occurs when <dqlink .../> is on its own line after a blank line.
       // Scan for dqlink tags and render them the same way as inline wiki-links.
@@ -311,7 +312,8 @@ public class MarkdownRenderer {
     for (String cl : codeLines) {
       lines.add(
           RenderedLine.normal(
-              Component.literal(cl).setStyle(Style.EMPTY.withColor(ChatFormatting.GRAY)), indent + 8));
+              Component.literal(cl).setStyle(Style.EMPTY.withColor(ChatFormatting.GRAY)),
+              indent + 8));
     }
   }
 
@@ -353,7 +355,8 @@ public class MarkdownRenderer {
       MutableComponent inner = collectInlineText(node, style.withStrikethrough(true));
       target.append(inner);
     } else if (node instanceof Code code) {
-      target.append(Component.literal(code.getLiteral()).setStyle(style.withColor(ChatFormatting.GRAY)));
+      target.append(
+          Component.literal(code.getLiteral()).setStyle(style.withColor(ChatFormatting.GRAY)));
     } else if (node instanceof Link link) {
       MutableComponent inner =
           collectInlineText(node, style.withColor(ChatFormatting.AQUA).withUnderlined(true));

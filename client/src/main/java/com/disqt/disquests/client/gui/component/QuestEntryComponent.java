@@ -16,21 +16,23 @@ import io.wispforest.owo.ui.core.Sizing;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.FormattedCharSequence;
 
 public class QuestEntryComponent extends BaseUIComponent {
 
   public static final int ENTRY_HEIGHT = 38;
-  private static final Identifier PIN_ICON = Identifier.fromNamespaceAndPath("disquests", "icon/pin");
-  private static final Identifier PIN_ACTIVE_ICON = Identifier.fromNamespaceAndPath("disquests", "icon/pin_active");
+  private static final Identifier PIN_ICON =
+      Identifier.fromNamespaceAndPath("disquests", "icon/pin");
+  private static final Identifier PIN_ACTIVE_ICON =
+      Identifier.fromNamespaceAndPath("disquests", "icon/pin_active");
 
   // Static constants cached once across all instances
   private static final Component HIDDEN_CONTENT_TEXT =
@@ -96,9 +98,11 @@ public class QuestEntryComponent extends BaseUIComponent {
                 Component.translatable("gui.disquests.visibility.private")
                     .withStyle(ChatFormatting.LIGHT_PURPLE);
             case CLOSED ->
-                Component.translatable("gui.disquests.visibility.closed").withStyle(ChatFormatting.YELLOW);
+                Component.translatable("gui.disquests.visibility.closed")
+                    .withStyle(ChatFormatting.YELLOW);
             case OPEN ->
-                Component.translatable("gui.disquests.visibility.open").withStyle(ChatFormatting.GREEN);
+                Component.translatable("gui.disquests.visibility.open")
+                    .withStyle(ChatFormatting.GREEN);
           };
     }
     this.cachedVisibilityText = visText;
@@ -112,7 +116,8 @@ public class QuestEntryComponent extends BaseUIComponent {
 
     // Cache owner text + width (fix 2)
     if (!isOwnedByPlayer && quest.getOwnerName() != null) {
-      this.cachedOwnerText = Component.literal(" by " + quest.getOwnerName()).withStyle(ChatFormatting.GRAY);
+      this.cachedOwnerText =
+          Component.literal(" by " + quest.getOwnerName()).withStyle(ChatFormatting.GRAY);
       this.cachedOwnerWidth = Minecraft.getInstance().font.width(cachedOwnerText);
     } else {
       this.cachedOwnerText = null;

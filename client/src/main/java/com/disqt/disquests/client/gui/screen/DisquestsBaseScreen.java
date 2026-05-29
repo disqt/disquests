@@ -15,10 +15,10 @@ import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
 import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
 import java.util.UUID;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
@@ -68,7 +68,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   }
 
   @Override
-  public void close() {
+  public void onClose() {
     if (this.minecraft != null) {
       if (parent == null) {
         clearHistory();
@@ -169,7 +169,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   protected void wireBackButton(FlowLayout root) {
     ButtonComponent backBtn = root.childById(ButtonComponent.class, "btn-back");
     if (backBtn != null) {
-      backBtn.onPress(ignored -> this.close());
+      backBtn.onPress(ignored -> this.onClose());
     }
   }
 
@@ -195,7 +195,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   }
 
   @Override
-  public boolean shouldPause() {
+  public boolean isPauseScreen() {
     return false;
   }
 

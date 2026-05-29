@@ -30,7 +30,9 @@ public class ContributorScreen extends DisquestsBaseScreen {
   private final Quest quest;
 
   public ContributorScreen(@Nullable Screen parent, Quest quest) {
-    super(DataSource.asset(Identifier.fromNamespaceAndPath("disquests", "contributor_screen")), parent);
+    super(
+        DataSource.asset(Identifier.fromNamespaceAndPath("disquests", "contributor_screen")),
+        parent);
     this.quest = quest;
   }
 

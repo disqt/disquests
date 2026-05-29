@@ -7,8 +7,8 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
 
 public final class HoverPreviewRenderer {
 
@@ -36,7 +36,12 @@ public final class HoverPreviewRenderer {
    * @param screenHeight total screen height (for edge clamping)
    */
   public static void draw(
-      GuiGraphicsExtractor context, Quest quest, int mouseX, int mouseY, int screenWidth, int screenHeight) {
+      GuiGraphicsExtractor context,
+      Quest quest,
+      int mouseX,
+      int mouseY,
+      int screenWidth,
+      int screenHeight) {
     Font textRenderer = Minecraft.getInstance().font;
     int lineHeight = textRenderer.lineHeight;
 
@@ -104,7 +109,8 @@ public final class HoverPreviewRenderer {
     // compact tooltip preview, not a full markdown renderer. Headings and bullet indentation are
     // deliberately flattened.
     for (RenderedLine line : renderedLines) {
-      String rawLine = textRenderer.plainSubstrByWidth(line.text().getString(), width - PADDING * 2);
+      String rawLine =
+          textRenderer.plainSubstrByWidth(line.text().getString(), width - PADDING * 2);
       context.text(
           textRenderer, Component.literal(rawLine), x + PADDING, drawY, Colors.TEXT_MUTED, false);
       drawY += lineHeight;

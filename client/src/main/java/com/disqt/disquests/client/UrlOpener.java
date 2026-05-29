@@ -24,7 +24,7 @@ public class UrlOpener {
             .redirectErrorStream(true)
             .start();
       } else {
-        Util.getPlatform().open(URI.create(url));
+        Util.getPlatform().openUri(URI.create(url));
       }
     } catch (Exception e) {
       LOGGER.error("Failed to open URL: {}", url, e);

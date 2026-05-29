@@ -3,7 +3,6 @@ package com.disqt.disquests.client.network;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
 
 /**
  * A single custom payload wrapper that carries raw bytes. All Disquests packet types are

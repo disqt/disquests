@@ -5,10 +5,10 @@ import io.wispforest.owo.ui.base.BaseUIComponent;
 import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 
 /**
  * Thin owo-ui wrapper around MultiLineTextFieldWidget. Delegates all rendering and input to the
@@ -69,7 +69,8 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
     // Translate graphics so delegate renders at owo-ui position
     context.pose().pushMatrix();
     context.pose().translate(offsetX, offsetY);
-    delegate.render((GuiGraphicsExtractor) context, mouseX - offsetX, mouseY - offsetY, delta);
+    delegate.extractRenderState(
+        (GuiGraphicsExtractor) context, mouseX - offsetX, mouseY - offsetY, delta);
     context.pose().popMatrix();
   }
 

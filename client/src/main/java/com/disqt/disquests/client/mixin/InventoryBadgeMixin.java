@@ -5,10 +5,10 @@ import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.input.MouseButtonEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -62,7 +62,8 @@ public abstract class InventoryBadgeMixin extends Screen {
   }
 
   @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
-  private void onMouseClicked(MouseButtonEvent click, boolean simulated, CallbackInfoReturnable<Boolean> cir) {
+  private void onMouseClicked(
+      MouseButtonEvent click, boolean simulated, CallbackInfoReturnable<Boolean> cir) {
     if (!ClientSession.isOnServer()) return;
 
     double mouseX = click.x();

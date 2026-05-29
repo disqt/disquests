@@ -32,7 +32,10 @@ public class HudPinRenderer {
 
   // --- Cache ---
   private record CachedPin(
-      Quest quest, List<String> titleLines, List<FormattedCharSequence> contentLines, boolean truncated) {}
+      Quest quest,
+      List<String> titleLines,
+      List<FormattedCharSequence> contentLines,
+      boolean truncated) {}
 
   private static List<UUID> lastPinnedIds = List.of();
   private static long lastContentHash = 0;
@@ -82,7 +85,7 @@ public class HudPinRenderer {
       return;
     }
 
-    if (client.inGameHud.getDebugHud().shouldShowDebugHud()) return;
+    if (client.gui.getDebugOverlay().showDebugScreen()) return;
 
     // Rebuild cache if pin list or quest content changed
     List<UUID> currentIds = quests.stream().map(Quest::getId).toList();

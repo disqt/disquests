@@ -16,8 +16,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.*;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
@@ -25,8 +25,8 @@ import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
 import org.lwjgl.glfw.GLFW;
 
 public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, NarratableEntry {
@@ -578,7 +578,8 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
 
   // ---------- Rendering ----------
   @Override
-  public void render(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+  public void extractRenderState(
+      GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
     // Focus is managed by TextFieldComponent via setFocused() -- don't override it here.
     // (Previously checked screen.getFocused() == this, but that fails when wrapped in owo-ui.)
 
@@ -639,8 +640,7 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
           int sx =
               contentX
                   + (int)
-                      Math.round(
-                          textRenderer.width(dispLineStr.substring(0, startCol)) - scrollX);
+                      Math.round(textRenderer.width(dispLineStr.substring(0, startCol)) - scrollX);
           int ex =
               contentX
                   + (int)
@@ -666,8 +666,7 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
 
         if (wikiLinks.isEmpty() && mdLinks.isEmpty()) {
           // Fast path: no styled segments on this line
-          context.text(
-              this.textRenderer, dispLine, drawX, lineYPos, Colors.TEXT_PRIMARY, false);
+          context.text(this.textRenderer, dispLine, drawX, lineYPos, Colors.TEXT_PRIMARY, false);
         } else {
           // Merge both segment lists sorted by start position, tagged with type
           // type 0 = wiki-link (resolved), type 1 = markdown link, type 2 = wiki-link (broken)
@@ -777,8 +776,7 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
         String dispLineStr = displayLines.get(displayLine);
         String beforeCursor =
             dispLineStr.substring(0, Math.min(displayCursorX, dispLineStr.length()));
-        int caretPixelX =
-            contentX + (int) Math.round(textRenderer.width(beforeCursor) - scrollX);
+        int caretPixelX = contentX + (int) Math.round(textRenderer.width(beforeCursor) - scrollX);
         int caretYPos = contentY + (displayLine * textRenderer.lineHeight) - (int) scrollY;
         int top = caretYPos - paddingTop;
         int bottom = caretYPos + textRenderer.lineHeight + paddingBottom;
@@ -913,7 +911,7 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
     isDraggingVScrollbar = false;
     isDraggingHScrollbar = false;
     isDraggingText = false;
-    return Element.super.mouseReleased(click);
+    return GuiEventListener.super.mouseReleased(click);
   }
 
   @Override
@@ -1223,8 +1221,8 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
   @Override
   public boolean charTyped(CharacterEvent charInput) {
     if (this.focused) {
-      if (charInput.isValidChar()) {
-        insertText(charInput.asString());
+      if (charInput.isAllowedChatCharacter()) {
+        insertText(charInput.codepointAsString());
         return true;
       }
     }
@@ -1454,12 +1452,14 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
   }
 
   @Override
-  public NarratableEntry.NarrationPriority getType() {
-    return this.focused ? NarratableEntry.NarrationPriority.FOCUSED : NarratableEntry.NarrationPriority.NONE;
+  public NarratableEntry.NarrationPriority narrationPriority() {
+    return this.focused
+        ? NarratableEntry.NarrationPriority.FOCUSED
+        : NarratableEntry.NarrationPriority.NONE;
   }
 
   @Override
-  public void appendNarrations(NarrationElementOutput builder) {
+  public void updateNarration(NarrationElementOutput builder) {
     /* Not needed */
   }
 }

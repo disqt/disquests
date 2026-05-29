@@ -166,7 +166,7 @@ class TwoPlayerJourneys {
               }
               throw new AssertionError("Not a Disquests screen");
             });
-    double scale = context.computeOnClient(c -> (double) c.getWindow().getScaleFactor());
+    double scale = context.computeOnClient(c -> (double) c.getWindow().getGuiScale());
     context.getInput().setCursorPos(acceptPos[0] * scale, acceptPos[1] * scale);
     context.getInput().pressMouse(org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT);
     context.waitTicks(2);
@@ -242,7 +242,7 @@ class TwoPlayerJourneys {
               }
               throw new AssertionError("Not a Disquests screen");
             });
-    double scale = context.computeOnClient(c -> (double) c.getWindow().getScaleFactor());
+    double scale = context.computeOnClient(c -> (double) c.getWindow().getGuiScale());
     context.getInput().setCursorPos(permPos[0] * scale, permPos[1] * scale);
     context.getInput().pressMouse(org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT);
     context.waitTicks(4);
@@ -277,7 +277,7 @@ class TwoPlayerJourneys {
               }
               throw new AssertionError("Not a Disquests screen");
             });
-    double scale2 = context.computeOnClient(c -> (double) c.getWindow().getScaleFactor());
+    double scale2 = context.computeOnClient(c -> (double) c.getWindow().getGuiScale());
     context.getInput().setCursorPos(removePos[0] * scale2, removePos[1] * scale2);
     context.getInput().pressMouse(org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT);
     context.waitTicks(2);

@@ -131,7 +131,7 @@ public class MainScreen extends DisquestsBaseScreen {
     // --- Create search text box programmatically ---
     this.searchField = UIComponents.textBox(Sizing.fixed(200));
     this.searchField.text(this.searchTerm);
-    this.searchField.setPlaceholder(Component.translatable("gui.disquests.placeholder.search"));
+    this.searchField.setHint(Component.translatable("gui.disquests.placeholder.search"));
     this.searchField.onChanged().subscribe(this::onSearchTermChanged);
     this.searchField.id("search-box");
     this.searchRow.child(this.searchField);
@@ -142,7 +142,7 @@ public class MainScreen extends DisquestsBaseScreen {
     tagDropdown.setOnSelect(
         tag -> {
           // Replace the current #partial with #tagname
-          String current = searchField.getText();
+          String current = searchField.getValue();
           int hashIndex = current.lastIndexOf('#');
           String before = hashIndex >= 0 ? current.substring(0, hashIndex) : current;
           searchField.text(before + "#" + tag + " ");
@@ -520,9 +520,10 @@ public class MainScreen extends DisquestsBaseScreen {
   // --- RENDERING ---
 
   @Override
-  public void render(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+  public void extractRenderState(
+      GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
     // Let owo-ui render the component tree
-    super.render(context, mouseX, mouseY, delta);
+    super.extractRenderState(context, mouseX, mouseY, delta);
 
     // Rainbow title on hover
     if (titleLabel != null) {
