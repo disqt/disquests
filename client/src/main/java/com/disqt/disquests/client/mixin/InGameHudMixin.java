@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(Gui.class)
 public class InGameHudMixin {
-  @Inject(method = "render", at = @At("TAIL"))
+  @Inject(method = "extractRenderState", at = @At("TAIL"))
   private void renderPinnedQuest(
       GuiGraphicsExtractor context, DeltaTracker tickCounter, CallbackInfo ci) {
     HudPinRenderer.render(context);

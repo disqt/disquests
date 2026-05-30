@@ -26,7 +26,7 @@ public abstract class InventoryBadgeMixin extends Screen {
     super(null);
   }
 
-  @Inject(method = "render", at = @At("TAIL"))
+  @Inject(method = "extractRenderState", at = @At("TAIL"))
   private void renderQuestBadge(
       GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
     if (!ClientSession.isOnServer()) return;
