@@ -104,7 +104,7 @@ jobs:
           VERSION="${{ steps.changelog.outputs.VERSION }}"
           cp client/build/libs/client.jar "disquests-client-${VERSION}.jar"
           cp server/build/libs/server.jar "disquests-paper-${VERSION}.jar"
-          cp build/reports/bom.json "disquests-sbom-${VERSION}.json"
+          cp build/reports/cyclonedx/bom.json "disquests-sbom-${VERSION}.json"
 
       # --- Attest build provenance (sigstore) ---
       - name: Attest client JAR
