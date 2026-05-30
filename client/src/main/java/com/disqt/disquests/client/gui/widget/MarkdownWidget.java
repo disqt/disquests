@@ -15,13 +15,13 @@ import io.wispforest.owo.ui.core.Sizing;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.OrderedText;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 
 /**
  * An owo-ui component that renders pre-parsed markdown as styled text lines. Word-wraps lines,
@@ -61,7 +61,8 @@ public class MarkdownWidget extends BaseUIComponent {
   private record CheckboxHitbox(
       int x, int y, int width, int height, int checkboxIndex, boolean checked) {}
 
-  private record LinkHitbox(int x, int y, int width, int height, String url, Text displayText) {}
+  private record LinkHitbox(
+      int x, int y, int width, int height, String url, Component displayText) {}
 
   private record WikiLinkHitbox(int x, int y, int width, int height, String uuid) {}
 
@@ -70,11 +71,11 @@ public class MarkdownWidget extends BaseUIComponent {
   }
 
   /**
-   * Walks an OrderedText character-by-character, computing pixel offsets for each styled segment
-   * (links and wiki-links), and creates tight hitboxes only around the actual link text.
+   * Walks an FormattedCharSequence character-by-character, computing pixel offsets for each styled
+   * segment (links and wiki-links), and creates tight hitboxes only around the actual link text.
    */
   private void collectStyledHitboxes(
-      OrderedText text, int lineX, int lineY, TextRenderer textRenderer) {
+      FormattedCharSequence text, int lineX, int lineY, Font textRenderer) {
     // Track current segment state
     final int[] pixelX = {0}; // running pixel offset
     final String[] currentUrl = {null};
@@ -83,7 +84,7 @@ public class MarkdownWidget extends BaseUIComponent {
 
     text.accept(
         (index, style, codepoint) -> {
-          int charWidth = textRenderer.getWidth(String.valueOf(Character.toChars(codepoint)));
+          int charWidth = textRenderer.width(String.valueOf(Character.toChars(codepoint)));
 
           // Determine what this character belongs to
           String url = null;
@@ -106,9 +107,9 @@ public class MarkdownWidget extends BaseUIComponent {
                       lineX + segStartX[0],
                       lineY,
                       w,
-                      textRenderer.fontHeight,
+                      textRenderer.lineHeight,
                       currentUrl[0],
-                      Text.literal(currentUrl[0])));
+                      Component.literal(currentUrl[0])));
             }
             currentUrl[0] = null;
           }
@@ -119,7 +120,7 @@ public class MarkdownWidget extends BaseUIComponent {
             if (w > 0) {
               wikiLinkHitboxes.add(
                   new WikiLinkHitbox(
-                      lineX + segStartX[0], lineY, w, textRenderer.fontHeight, currentWikiUuid[0]));
+                      lineX + segStartX[0], lineY, w, textRenderer.lineHeight, currentWikiUuid[0]));
             }
             currentWikiUuid[0] = null;
           }
@@ -147,9 +148,9 @@ public class MarkdownWidget extends BaseUIComponent {
                 lineX + segStartX[0],
                 lineY,
                 w,
-                textRenderer.fontHeight,
+                textRenderer.lineHeight,
                 currentUrl[0],
-                Text.literal(currentUrl[0])));
+                Component.literal(currentUrl[0])));
       }
     }
     if (currentWikiUuid[0] != null) {
@@ -157,15 +158,15 @@ public class MarkdownWidget extends BaseUIComponent {
       if (w > 0) {
         wikiLinkHitboxes.add(
             new WikiLinkHitbox(
-                lineX + segStartX[0], lineY, w, textRenderer.fontHeight, currentWikiUuid[0]));
+                lineX + segStartX[0], lineY, w, textRenderer.lineHeight, currentWikiUuid[0]));
       }
     }
   }
 
   private record WrappedEntry(
-      OrderedText text, int indent, float scale, int checkboxIndex, boolean checked) {
-    int height(TextRenderer tr) {
-      return Math.round(tr.fontHeight * scale);
+      FormattedCharSequence text, int indent, float scale, int checkboxIndex, boolean checked) {
+    int height(Font tr) {
+      return Math.round(tr.lineHeight * scale);
     }
   }
 
@@ -180,7 +181,7 @@ public class MarkdownWidget extends BaseUIComponent {
   }
 
   private void rebuildWrappedLines(List<RenderedLine> lines, int componentWidth) {
-    TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
+    Font textRenderer = Minecraft.getInstance().font;
     wrappedLines.clear();
     checkboxHitboxes.clear();
     totalContentHeight = 0;
@@ -201,21 +202,21 @@ public class MarkdownWidget extends BaseUIComponent {
       int cbIdx = isCheckbox ? checkboxIndex++ : -1;
 
       if (lineStr.isEmpty()) {
-        wrappedLines.add(new WrappedEntry(OrderedText.EMPTY, indent, 1.0f, -1, false));
-        totalContentHeight += textRenderer.fontHeight;
+        wrappedLines.add(new WrappedEntry(FormattedCharSequence.EMPTY, indent, 1.0f, -1, false));
+        totalContentHeight += textRenderer.lineHeight;
         continue;
       }
 
-      List<OrderedText> wrapped = textRenderer.wrapLines(line.text(), lineAvailWidth);
+      List<FormattedCharSequence> wrapped = textRenderer.split(line.text(), lineAvailWidth);
       if (wrapped.isEmpty()) {
-        wrappedLines.add(new WrappedEntry(OrderedText.EMPTY, indent, scale, -1, false));
-        totalContentHeight += Math.round(textRenderer.fontHeight * scale);
+        wrappedLines.add(new WrappedEntry(FormattedCharSequence.EMPTY, indent, scale, -1, false));
+        totalContentHeight += Math.round(textRenderer.lineHeight * scale);
       } else {
         boolean first = true;
-        for (OrderedText ot : wrapped) {
+        for (FormattedCharSequence ot : wrapped) {
           wrappedLines.add(
               new WrappedEntry(ot, indent, scale, first ? cbIdx : -1, first && checked));
-          totalContentHeight += Math.round(textRenderer.fontHeight * scale);
+          totalContentHeight += Math.round(textRenderer.lineHeight * scale);
           first = false;
         }
       }
@@ -236,7 +237,7 @@ public class MarkdownWidget extends BaseUIComponent {
 
   @Override
   public void draw(OwoUIGraphics context, int mouseX, int mouseY, float partialTicks, float delta) {
-    TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
+    Font textRenderer = Minecraft.getInstance().font;
 
     // Rebuild wrapped lines if width changed
     if (this.width() != lastKnownWidth && currentLines != null) {
@@ -265,17 +266,17 @@ public class MarkdownWidget extends BaseUIComponent {
         int drawX = contentX + entry.indent;
 
         if (entry.scale != 1.0f) {
-          context.getMatrices().pushMatrix();
-          context.getMatrices().translate(drawX, drawY);
-          context.getMatrices().scale(entry.scale, entry.scale);
-          context.drawText(textRenderer, entry.text, 0, 0, Colors.TEXT_PRIMARY, false);
-          context.getMatrices().popMatrix();
+          context.pose().pushMatrix();
+          context.pose().translate(drawX, drawY);
+          context.pose().scale(entry.scale, entry.scale);
+          context.text(textRenderer, entry.text, 0, 0, Colors.TEXT_PRIMARY, false);
+          context.pose().popMatrix();
         } else {
-          context.drawText(textRenderer, entry.text, drawX, drawY, Colors.TEXT_PRIMARY, false);
+          context.text(textRenderer, entry.text, drawX, drawY, Colors.TEXT_PRIMARY, false);
         }
 
         if (entry.checkboxIndex >= 0) {
-          int cbWidth = textRenderer.getWidth("[x] ");
+          int cbWidth = textRenderer.width("[x] ");
           checkboxHitboxes.add(
               new CheckboxHitbox(
                   drawX, drawY, cbWidth, lineHeight, entry.checkboxIndex, entry.checked));
@@ -292,7 +293,7 @@ public class MarkdownWidget extends BaseUIComponent {
     // Link hover tooltip
     for (LinkHitbox lh : linkHitboxes) {
       if (hitTest(mouseX, mouseY, lh.x(), lh.y(), lh.width(), lh.height())) {
-        context.drawTooltip(textRenderer, lh.displayText(), mouseX, mouseY);
+        context.setTooltipForNextFrame(lh.displayText(), mouseX, mouseY);
         break;
       }
     }
@@ -306,14 +307,14 @@ public class MarkdownWidget extends BaseUIComponent {
             UUID questId = UUID.fromString(wh.uuid());
             Quest quest = ClientCache.getQuestById(questId);
             if (quest != null) {
-              MinecraftClient mc = MinecraftClient.getInstance();
+              Minecraft mc = Minecraft.getInstance();
               HoverPreviewRenderer.draw(
-                  (net.minecraft.client.gui.DrawContext) context,
+                  (net.minecraft.client.gui.GuiGraphicsExtractor) context,
                   quest,
                   mouseX,
                   mouseY,
-                  mc.getWindow().getScaledWidth(),
-                  mc.getWindow().getScaledHeight());
+                  mc.getWindow().getGuiScaledWidth(),
+                  mc.getWindow().getGuiScaledHeight());
               previewVisible = true;
             }
           } catch (IllegalArgumentException ignored) {
@@ -370,7 +371,7 @@ public class MarkdownWidget extends BaseUIComponent {
   }
 
   @Override
-  public boolean onMouseDown(Click click, boolean doubled) {
+  public boolean onMouseDown(MouseButtonEvent click, boolean doubled) {
     // Click coordinates are component-relative in owo-ui
     double mx = click.x() + this.x();
     double my = click.y() + this.y();
@@ -399,11 +400,11 @@ public class MarkdownWidget extends BaseUIComponent {
           UUID questId = UUID.fromString(wh.uuid());
           var quest = ClientCache.getQuestById(questId);
           if (quest != null) {
-            Screen currentScreen = MinecraftClient.getInstance().currentScreen;
+            Screen currentScreen = Minecraft.getInstance().screen;
             if (currentScreen instanceof DisquestsBaseScreen baseScreen) {
               baseScreen.navigateToScreen(new QuestScreen(baseScreen.getParentScreen(), quest));
             } else {
-              MinecraftClient.getInstance().setScreen(new QuestScreen(currentScreen, quest));
+              Minecraft.getInstance().setScreen(new QuestScreen(currentScreen, quest));
             }
           } else {
             ClientSession.setPendingToast(QUEST_INACCESSIBLE_MSG);

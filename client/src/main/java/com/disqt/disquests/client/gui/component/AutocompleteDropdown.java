@@ -10,7 +10,7 @@ import io.wispforest.owo.ui.core.*;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 public class AutocompleteDropdown {
 
@@ -120,7 +120,7 @@ public class AutocompleteDropdown {
 
     for (int i = 0; i < results.size(); i++) {
       Quest q = results.get(i);
-      LabelComponent label = UIComponents.label(Text.literal(q.getTitle()));
+      LabelComponent label = UIComponents.label(Component.literal(q.getTitle()));
       label.color(Color.ofArgb(TEXT_COLOR));
       label.shadow(true);
       label.sizing(Sizing.content(), Sizing.content());

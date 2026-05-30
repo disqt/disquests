@@ -1,37 +1,43 @@
 package com.disqt.disquests.client;
 
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.util.InputUtil;
-import net.minecraft.util.Identifier;
+import com.mojang.blaze3d.platform.InputConstants;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 public class KeyBinds {
 
-  public static KeyBinding openGuiKey;
-  public static KeyBinding pinKey;
-  public static KeyBinding openConfigKey;
+  public static KeyMapping openGuiKey;
+  public static KeyMapping pinKey;
+  public static KeyMapping openConfigKey;
 
-  private static final KeyBinding.Category MOD_CATEGORY =
-      KeyBinding.Category.create(Identifier.of("disquests", "main"));
+  private static final KeyMapping.Category MOD_CATEGORY =
+      KeyMapping.Category.register(Identifier.fromNamespaceAndPath("disquests", "main"));
 
   public static void register() {
     openGuiKey =
-        KeyBindingHelper.registerKeyBinding(
-            new KeyBinding(
-                "key.disquests.opengui", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_N, MOD_CATEGORY));
+        KeyMappingHelper.registerKeyMapping(
+            new KeyMapping(
+                "key.disquests.opengui",
+                InputConstants.Type.KEYSYM,
+                GLFW.GLFW_KEY_N,
+                MOD_CATEGORY));
 
     pinKey =
-        KeyBindingHelper.registerKeyBinding(
-            new KeyBinding(
+        KeyMappingHelper.registerKeyMapping(
+            new KeyMapping(
                 "key.disquests.togglepin",
-                InputUtil.Type.KEYSYM,
+                InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_UNKNOWN, // unbound by default
                 MOD_CATEGORY));
 
     openConfigKey =
-        KeyBindingHelper.registerKeyBinding(
-            new KeyBinding(
-                "key.disquests.openconfig", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_F6, MOD_CATEGORY));
+        KeyMappingHelper.registerKeyMapping(
+            new KeyMapping(
+                "key.disquests.openconfig",
+                InputConstants.Type.KEYSYM,
+                GLFW.GLFW_KEY_F6,
+                MOD_CATEGORY));
   }
 }

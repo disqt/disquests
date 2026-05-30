@@ -39,6 +39,6 @@ class KeybindToggleJourney {
     context.waitTicks(5);
 
     then("screen closes and returns to gameplay");
-    context.waitFor(client -> client.currentScreen == null, TIMEOUT);
+    context.waitFor(client -> client.screen == null, TIMEOUT);
   }
 }

@@ -9,7 +9,7 @@ import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
 import java.util.List;
 import java.util.function.Consumer;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 public class TagAutocompleteDropdown {
 
@@ -122,7 +122,7 @@ public class TagAutocompleteDropdown {
 
     for (int i = 0; i < results.size(); i++) {
       String tag = results.get(i);
-      LabelComponent label = UIComponents.label(Text.literal("#" + tag));
+      LabelComponent label = UIComponents.label(Component.literal("#" + tag));
       label.color(Color.ofArgb(TEXT_COLOR));
       label.shadow(true);
       label.sizing(Sizing.content(), Sizing.content());

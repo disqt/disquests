@@ -28,21 +28,21 @@ public class DisquestsClient implements ClientModInitializer {
     DebugScreenEvents.register();
 
     // Register payload types before registering receivers
-    PayloadTypeRegistry.playS2C().register(RawPayload.ID, RawPayload.CODEC);
-    PayloadTypeRegistry.playC2S().register(RawPayload.ID, RawPayload.CODEC);
+    PayloadTypeRegistry.clientboundPlay().register(RawPayload.ID, RawPayload.CODEC);
+    PayloadTypeRegistry.serverboundPlay().register(RawPayload.ID, RawPayload.CODEC);
 
     ClientTickEvents.END_CLIENT_TICK.register(
         client -> {
-          while (KeyBinds.openGuiKey.wasPressed()) {
-            if (client.currentScreen == null && ClientSession.isOnServer()) {
+          while (KeyBinds.openGuiKey.consumeClick()) {
+            if (client.screen == null && ClientSession.isOnServer()) {
               client.setScreen(new MainScreen());
             }
           }
-          while (KeyBinds.pinKey.wasPressed()) {
+          while (KeyBinds.pinKey.consumeClick()) {
             HudPinRenderer.toggleVisibility();
           }
-          while (KeyBinds.openConfigKey.wasPressed()) {
-            if (client.currentScreen == null) {
+          while (KeyBinds.openConfigKey.consumeClick()) {
+            if (client.screen == null) {
               client.setScreen(ConfigScreen.create(CONFIG, null));
             }
           }

@@ -10,11 +10,11 @@ import com.disqt.disquests.test.integration.harness.TestContext;
 import io.wispforest.owo.ui.core.UIComponent;
 import java.util.UUID;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.TitleScreen;
-import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
-import net.minecraft.client.network.ServerAddress;
-import net.minecraft.client.network.ServerInfo;
+import net.minecraft.client.gui.screens.ConnectScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,10 +48,10 @@ public final class UIActions {
   public static <T extends UIComponent> T findComponent(
       ClientGameTestContext context, Class<T> type, String id) {
     // Wait for a Disquests screen to be active (handles brief screen transitions on CI)
-    context.waitFor(client -> client.currentScreen instanceof DisquestsBaseScreen, TIMEOUT);
+    context.waitFor(client -> client.screen instanceof DisquestsBaseScreen, TIMEOUT);
     return context.computeOnClient(
         c -> {
-          if (c.currentScreen instanceof DisquestsBaseScreen dScreen) {
+          if (c.screen instanceof DisquestsBaseScreen dScreen) {
             var root = dScreen.getRootComponent();
             if (root == null) throw new AssertionError("Screen root not initialized");
             T component = root.childById(type, id);
@@ -67,7 +67,7 @@ public final class UIActions {
       ClientGameTestContext context, Class<T> type, String id) {
     return context.computeOnClient(
         c -> {
-          if (c.currentScreen instanceof DisquestsBaseScreen dScreen) {
+          if (c.screen instanceof DisquestsBaseScreen dScreen) {
             var root = dScreen.getRootComponent();
             if (root == null) return null;
             return root.childById(type, id);
@@ -87,7 +87,7 @@ public final class UIActions {
 
   /** Get the window scale factor. */
   public static double scaleFactor(ClientGameTestContext context) {
-    return context.computeOnClient(c -> (double) c.getWindow().getScaleFactor());
+    return context.computeOnClient(c -> (double) c.getWindow().getGuiScale());
   }
 
   // --- Server reset ---
@@ -110,7 +110,7 @@ public final class UIActions {
     context.runOnClient(
         c -> {
           ClientCache.clear();
-          if (c.currentScreen != null) c.setScreen(null);
+          if (c.screen != null) c.setScreen(null);
         });
 
     // Request sync and wait for cache to update (version bumps when SYNC packets arrive)
@@ -132,10 +132,10 @@ public final class UIActions {
 
     context.runOnClient(
         client -> {
-          ServerAddress serverAddress = ServerAddress.parse(address);
-          ServerInfo serverInfo = new ServerInfo("Test", address, ServerInfo.ServerType.OTHER);
-          ConnectScreen.connect(
-              client.currentScreen, client, serverAddress, serverInfo, false, null);
+          ServerAddress serverAddress = ServerAddress.parseString(address);
+          ServerData serverData = new ServerData("Test", address, ServerData.Type.OTHER);
+          ConnectScreen.startConnecting(
+              client.screen, client, serverAddress, serverData, false, null);
         });
 
     // Wait for player entity
@@ -160,7 +160,7 @@ public final class UIActions {
 
   public static <T extends Screen> void waitForScreen(
       ClientGameTestContext context, Class<T> screenClass) {
-    context.waitFor(client -> screenClass.isInstance(client.currentScreen), TIMEOUT);
+    context.waitFor(client -> screenClass.isInstance(client.screen), TIMEOUT);
     context.waitTicks(2);
   }
 
@@ -274,7 +274,7 @@ public final class UIActions {
     // so we clear via runOnClient for robustness.
     context.runOnClient(
         c -> {
-          if (c.currentScreen instanceof DisquestsBaseScreen dScreen) {
+          if (c.screen instanceof DisquestsBaseScreen dScreen) {
             var root = dScreen.getRootComponent();
             if (root != null) {
               // Find component by ID as generic UIComponent, then check type
@@ -406,7 +406,7 @@ public final class UIActions {
   public static void waitForEntryCount(ClientGameTestContext context, int count) {
     context.waitFor(
         client -> {
-          Screen screen = client.currentScreen;
+          Screen screen = client.screen;
           if (screen instanceof DisquestsBaseScreen dScreen) {
             var root = dScreen.getRootComponent();
             var questList =
@@ -427,7 +427,7 @@ public final class UIActions {
   public static void waitForComponent(ClientGameTestContext context, String componentId) {
     context.waitFor(
         client -> {
-          if (client.currentScreen instanceof DisquestsBaseScreen screen) {
+          if (client.screen instanceof DisquestsBaseScreen screen) {
             return screen
                     .getRootComponent()
                     .childById(io.wispforest.owo.ui.core.UIComponent.class, componentId)

@@ -86,14 +86,14 @@ class DirtyDetectionJourney {
     // Verify the screen is editing (not view mode) by checking that title-field exists
     // and checking via the screen's isEditing state
     boolean isEditing =
-        context.computeOnClient(c -> c.currentScreen instanceof QuestScreen qs && qs.isEditing());
+        context.computeOnClient(c -> c.screen instanceof QuestScreen qs && qs.isEditing());
     assertTrue(isEditing, "Should be back in edit mode after clicking No");
 
     // The title field should still contain 'Modified' (dirty state preserved)
     String titleText =
         context.computeOnClient(
             c -> {
-              if (c.currentScreen
+              if (c.screen
                   instanceof com.disqt.disquests.client.gui.screen.DisquestsBaseScreen dScreen) {
                 var root = dScreen.getRootComponent();
                 if (root == null) return null;
@@ -116,7 +116,7 @@ class DirtyDetectionJourney {
   void cancelAgainShowsConfirmAgain(ClientGameTestContext context) {
     given("player is back in edit mode with title 'Modified'");
     boolean isEditing =
-        context.computeOnClient(c -> c.currentScreen instanceof QuestScreen qs && qs.isEditing());
+        context.computeOnClient(c -> c.screen instanceof QuestScreen qs && qs.isEditing());
     assertTrue(isEditing, "Should be in edit mode");
 
     when("player clicks Cancel again");
@@ -140,7 +140,7 @@ class DirtyDetectionJourney {
     then("returns to QuestScreen in view mode");
     waitForScreen(context, QuestScreen.class);
     boolean isViewing =
-        context.computeOnClient(c -> c.currentScreen instanceof QuestScreen qs && !qs.isEditing());
+        context.computeOnClient(c -> c.screen instanceof QuestScreen qs && !qs.isEditing());
     assertTrue(isViewing, "Should be in view mode after discarding");
 
     and("title label shows original value 'Original'");
@@ -155,7 +155,7 @@ class DirtyDetectionJourney {
     given("quest 'Original' is shown in view mode");
     assertScreenIs(context, QuestScreen.class);
     boolean isViewing =
-        context.computeOnClient(c -> c.currentScreen instanceof QuestScreen qs && !qs.isEditing());
+        context.computeOnClient(c -> c.screen instanceof QuestScreen qs && !qs.isEditing());
     assertTrue(isViewing, "Should be in view mode");
 
     when("player clicks Edit");
@@ -171,7 +171,7 @@ class DirtyDetectionJourney {
     and("QuestScreen shows in view mode");
     assertScreenIs(context, QuestScreen.class);
     boolean isViewMode =
-        context.computeOnClient(c -> c.currentScreen instanceof QuestScreen qs && !qs.isEditing());
+        context.computeOnClient(c -> c.screen instanceof QuestScreen qs && !qs.isEditing());
     assertTrue(isViewMode, "Should be in view mode after cancelling with no changes");
 
     and("title label still shows 'Original'");

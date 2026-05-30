@@ -6,10 +6,10 @@ import io.wispforest.owo.ui.base.BaseUIComponent;
 import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.Sizing;
 import java.util.function.Consumer;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.Click;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
 
 /**
  * A rounded-rectangle tag chip component. Renders the tag name on a coloured background with
@@ -70,8 +70,8 @@ public class TagChipComponent extends BaseUIComponent {
 
   @Override
   protected int determineHorizontalContentSize(Sizing sizing) {
-    TextRenderer tr = MinecraftClient.getInstance().textRenderer;
-    int textWidth = tr.getWidth(tag);
+    Font tr = Minecraft.getInstance().font;
+    int textWidth = tr.width(tag);
     int width = H_PADDING + textWidth + H_PADDING;
     if (showRemove) {
       width += REMOVE_AREA_WIDTH;
@@ -81,7 +81,7 @@ public class TagChipComponent extends BaseUIComponent {
 
   @Override
   protected int determineVerticalContentSize(Sizing sizing) {
-    return MinecraftClient.getInstance().textRenderer.fontHeight + V_PADDING * 2;
+    return Minecraft.getInstance().font.lineHeight + V_PADDING * 2;
   }
 
   @Override
@@ -90,7 +90,7 @@ public class TagChipComponent extends BaseUIComponent {
     int y = this.y();
     int w = this.width();
     int h = this.height();
-    TextRenderer tr = MinecraftClient.getInstance().textRenderer;
+    Font tr = Minecraft.getInstance().font;
 
     // Update hover state from mouse position
     this.hovered = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h;
@@ -112,18 +112,18 @@ public class TagChipComponent extends BaseUIComponent {
     RoundedRect.draw(context, x, y, w, h, effectiveBg);
 
     // Tag text
-    context.drawText(tr, Text.literal(tag), x + H_PADDING, y + V_PADDING, fgColor, false);
+    context.text(tr, Component.literal(tag), x + H_PADDING, y + V_PADDING, fgColor, false);
 
     // Remove "x" indicator
     if (showRemove) {
       int xBtnColor = removeHovered ? brightenColor(fgColor, 0x30) : fgColor;
-      int xBtnX = x + w - REMOVE_AREA_WIDTH + (REMOVE_AREA_WIDTH - tr.getWidth("x")) / 2;
-      context.drawText(tr, Text.literal("x"), xBtnX, y + V_PADDING, xBtnColor, false);
+      int xBtnX = x + w - REMOVE_AREA_WIDTH + (REMOVE_AREA_WIDTH - tr.width("x")) / 2;
+      context.text(tr, Component.literal("x"), xBtnX, y + V_PADDING, xBtnColor, false);
     }
   }
 
   @Override
-  public boolean onMouseDown(Click click, boolean doubled) {
+  public boolean onMouseDown(MouseButtonEvent click, boolean doubled) {
     if (click.button() != 0) return false;
 
     pressFlashRemaining = PRESS_FLASH_TICKS;

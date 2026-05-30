@@ -183,7 +183,7 @@ public class ClientSession {
   public static UUID getEffectivePlayerUuid() {
     UUID uuid = playerUuid;
     if (uuid == null) {
-      uuid = net.minecraft.client.MinecraftClient.getInstance().getSession().getUuidOrNull();
+      uuid = net.minecraft.client.Minecraft.getInstance().getUser().getProfileId();
     }
     return uuid;
   }

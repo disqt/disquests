@@ -8,7 +8,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 plugins {
-    id("fabric-loom") version "1.15.5"
+    id("net.fabricmc.fabric-loom") version "1.16-SNAPSHOT"
     jacoco
     eclipse
 }
@@ -33,15 +33,13 @@ repositories {
 }
 
 val minecraft_version: String by project
-val yarn_mappings: String by project
 val fabric_loader_version: String by project
 val fabric_api_version: String by project
 
 dependencies {
     minecraft("com.mojang:minecraft:$minecraft_version")
-    mappings("net.fabricmc:yarn:$yarn_mappings:v2")
-    modImplementation("net.fabricmc:fabric-loader:$fabric_loader_version")
-    modImplementation("net.fabricmc.fabric-api:fabric-api:$fabric_api_version")
+    implementation("net.fabricmc:fabric-loader:$fabric_loader_version")
+    implementation("net.fabricmc.fabric-api:fabric-api:$fabric_api_version")
 
     implementation(project(":common"))
     include(project(":common"))
@@ -58,11 +56,11 @@ dependencies {
 
     // Mod Menu (optional at runtime)
     val modmenu_version: String by project
-    modCompileOnly("com.terraformersmc:modmenu:$modmenu_version")
+    compileOnly("com.terraformersmc:modmenu:$modmenu_version")
 
     // owo-lib UI framework
     val owo_version: String by project
-    modImplementation("io.wispforest:owo-lib:$owo_version")
+    implementation("io.wispforest:owo-lib:$owo_version")
     annotationProcessor("io.wispforest:owo-lib:$owo_version")
     include("io.wispforest:owo-sentinel:$owo_version")
 
@@ -166,7 +164,7 @@ dependencies {
     jacocoRuntime("org.jacoco:org.jacoco.agent:0.8.14:runtime")
 }
 
-tasks.named<JavaExec>("runClientGameTest") {
+tasks.named<net.fabricmc.loom.task.RunGameTask>("runClientGameTest") {
     doFirst {
         val requireFreeRam = rootProject.extra["requireFreeRam"] as (String, Long) -> Unit
         requireFreeRam("runClientGameTest", 4096L)
@@ -308,24 +306,26 @@ fun bootstrapServerDir(serverDir: File, mcVersion: String, logger: org.gradle.ap
     File(serverDir, "plugins").mkdirs()
     File(serverDir, "logs").mkdirs()
 
-    // Download paper.jar from Paper API
+    // Download paper.jar from Paper API (v3 at fill.papermc.io)
     logger.lifecycle("Downloading Paper $mcVersion...")
     val client = HttpClient.newBuilder()
         .followRedirects(HttpClient.Redirect.NORMAL).build()
-    val versionResp = client.send(
+    val buildsResp = client.send(
         HttpRequest.newBuilder()
-            .uri(URI("https://api.papermc.io/v2/projects/paper/versions/$mcVersion"))
+            .uri(URI("https://fill.papermc.io/v3/projects/paper/versions/$mcVersion/builds"))
+            .header("User-Agent", "disquests/${project.version} (github.com/disqt/disquests)")
             .GET().build(),
         HttpResponse.BodyHandlers.ofString()
     )
-    val buildsMatch = Regex("""\"builds"\s*:\s*\[([^\]]+)\]""").find(versionResp.body())
+    val urlMatch = Regex(""""url"\s*:\s*"([^"]+)"""").find(buildsResp.body())
         ?: throw RuntimeException("Could not parse Paper API response for MC $mcVersion")
-    val latestBuild = buildsMatch.groupValues[1].split(",").last().trim()
-    val downloadName = "paper-$mcVersion-$latestBuild.jar"
-    val downloadUrl = "https://api.papermc.io/v2/projects/paper/versions/$mcVersion/builds/$latestBuild/downloads/$downloadName"
+    val downloadUrl = urlMatch.groupValues[1]
     logger.lifecycle("Downloading $downloadUrl")
     client.send(
-        HttpRequest.newBuilder().uri(URI(downloadUrl)).GET().build(),
+        HttpRequest.newBuilder()
+            .uri(URI(downloadUrl))
+            .header("User-Agent", "disquests/${project.version} (github.com/disqt/disquests)")
+            .GET().build(),
         HttpResponse.BodyHandlers.ofFile(File(serverDir, "paper.jar").toPath())
     )
     logger.lifecycle("Downloaded paper.jar (${File(serverDir, "paper.jar").length() / 1024 / 1024}MB)")
@@ -769,12 +769,12 @@ tasks.register("runIntegrationTest") {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    options.release.set(21)
+    options.release.set(25)
 }
 
 tasks.processResources {

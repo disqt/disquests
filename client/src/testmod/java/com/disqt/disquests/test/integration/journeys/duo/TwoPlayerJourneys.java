@@ -18,7 +18,7 @@ import com.disqt.disquests.test.integration.harness.PlayerB;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.container.FlowLayout;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
-import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.screens.Screen;
 import org.junit.jupiter.api.*;
 
 /** All two-player journeys in one flat class. Order ranges: Collaboration 1-5, OpenQuest 10-12. */
@@ -127,7 +127,7 @@ class TwoPlayerJourneys {
     boolean hasPending =
         context.computeOnClient(
             c -> {
-              Screen screen = c.currentScreen;
+              Screen screen = c.screen;
               if (screen
                   instanceof com.disqt.disquests.client.gui.screen.DisquestsBaseScreen dScreen) {
                 var root = dScreen.getRootComponent();
@@ -143,7 +143,7 @@ class TwoPlayerJourneys {
     double[] acceptPos =
         context.computeOnClient(
             c -> {
-              Screen screen = c.currentScreen;
+              Screen screen = c.screen;
               if (screen
                   instanceof com.disqt.disquests.client.gui.screen.DisquestsBaseScreen dScreen) {
                 var root = dScreen.getRootComponent();
@@ -166,7 +166,7 @@ class TwoPlayerJourneys {
               }
               throw new AssertionError("Not a Disquests screen");
             });
-    double scale = context.computeOnClient(c -> (double) c.getWindow().getScaleFactor());
+    double scale = context.computeOnClient(c -> (double) c.getWindow().getGuiScale());
     context.getInput().setCursorPos(acceptPos[0] * scale, acceptPos[1] * scale);
     context.getInput().pressMouse(org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT);
     context.waitTicks(2);
@@ -219,7 +219,7 @@ class TwoPlayerJourneys {
     double[] permPos =
         context.computeOnClient(
             c -> {
-              Screen screen = c.currentScreen;
+              Screen screen = c.screen;
               if (screen
                   instanceof com.disqt.disquests.client.gui.screen.DisquestsBaseScreen dScreen) {
                 var root = dScreen.getRootComponent();
@@ -242,7 +242,7 @@ class TwoPlayerJourneys {
               }
               throw new AssertionError("Not a Disquests screen");
             });
-    double scale = context.computeOnClient(c -> (double) c.getWindow().getScaleFactor());
+    double scale = context.computeOnClient(c -> (double) c.getWindow().getGuiScale());
     context.getInput().setCursorPos(permPos[0] * scale, permPos[1] * scale);
     context.getInput().pressMouse(org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT);
     context.waitTicks(4);
@@ -252,7 +252,7 @@ class TwoPlayerJourneys {
     double[] removePos =
         context.computeOnClient(
             c -> {
-              Screen screen = c.currentScreen;
+              Screen screen = c.screen;
               if (screen
                   instanceof com.disqt.disquests.client.gui.screen.DisquestsBaseScreen dScreen) {
                 var root = dScreen.getRootComponent();
@@ -277,7 +277,7 @@ class TwoPlayerJourneys {
               }
               throw new AssertionError("Not a Disquests screen");
             });
-    double scale2 = context.computeOnClient(c -> (double) c.getWindow().getScaleFactor());
+    double scale2 = context.computeOnClient(c -> (double) c.getWindow().getGuiScale());
     context.getInput().setCursorPos(removePos[0] * scale2, removePos[1] * scale2);
     context.getInput().pressMouse(org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT);
     context.waitTicks(2);

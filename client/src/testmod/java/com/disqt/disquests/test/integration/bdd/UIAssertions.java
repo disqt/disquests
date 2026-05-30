@@ -7,7 +7,7 @@ import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.core.UIComponent;
 import java.util.function.Predicate;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
-import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.screens.Screen;
 
 /**
  * UI assertion helpers. All assertions run on the client thread via computeOnClient to ensure
@@ -68,7 +68,7 @@ public final class UIAssertions {
   /** Assert the current screen is the expected type. */
   public static void assertScreenIs(
       ClientGameTestContext context, Class<? extends Screen> screenClass) {
-    boolean match = context.computeOnClient(c -> screenClass.isInstance(c.currentScreen));
+    boolean match = context.computeOnClient(c -> screenClass.isInstance(c.screen));
     assertTrue(
         match, "Expected screen " + screenClass.getSimpleName() + " but got different screen");
   }
@@ -86,7 +86,7 @@ public final class UIAssertions {
   public static void waitAndAssert(
       ClientGameTestContext context,
       String description,
-      java.util.function.Predicate<net.minecraft.client.MinecraftClient> condition) {
+      java.util.function.Predicate<net.minecraft.client.Minecraft> condition) {
     context.waitFor(condition::test, UIActions.TIMEOUT);
   }
 }

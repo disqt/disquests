@@ -15,11 +15,11 @@ import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
 import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
 import java.util.UUID;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.input.CharInput;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> {
@@ -68,17 +68,17 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   }
 
   @Override
-  public void close() {
-    if (this.client != null) {
+  public void onClose() {
+    if (this.minecraft != null) {
       if (parent == null) {
         clearHistory();
       }
-      this.client.setScreen(parent);
+      this.minecraft.setScreen(parent);
     }
   }
 
   @Override
-  public boolean mouseClicked(Click click, boolean simulated) {
+  public boolean mouseClicked(MouseButtonEvent click, boolean simulated) {
     if (click.button() == org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_4) {
       goBack();
       return true;
@@ -90,46 +90,46 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   }
 
   private void goBack() {
-    if (this.client == null) return;
+    if (this.minecraft == null) return;
     while (!backStack.isEmpty()) {
       NavEntry entry = backStack.pop();
       Screen screen = rebuildFromEntry(entry);
       if (screen != null) {
         forwardStack.push(this.toNavEntry());
         if (forwardStack.size() > MAX_HISTORY) forwardStack.removeLast();
-        this.client.setScreen(screen);
+        this.minecraft.setScreen(screen);
         return;
       }
     }
   }
 
   private void goForward() {
-    if (this.client == null) return;
+    if (this.minecraft == null) return;
     while (!forwardStack.isEmpty()) {
       NavEntry entry = forwardStack.pop();
       Screen screen = rebuildFromEntry(entry);
       if (screen != null) {
         backStack.push(this.toNavEntry());
         if (backStack.size() > MAX_HISTORY) backStack.removeLast();
-        this.client.setScreen(screen);
+        this.minecraft.setScreen(screen);
         return;
       }
     }
   }
 
   @Override
-  public boolean keyPressed(KeyInput keyInput) {
+  public boolean keyPressed(KeyEvent keyInput) {
     // Toggle: pressing the open-GUI key while a Disquests screen is open closes it.
     // Check that no text field is focused (avoid closing while typing).
-    if (KeyBinds.openGuiKey.matchesKey(keyInput)) {
+    if (KeyBinds.openGuiKey.matches(keyInput)) {
       boolean textFieldFocused = false;
       if (this.uiAdapter != null) {
         var focused = this.uiAdapter.rootComponent.focusHandler().focused();
         textFieldFocused = focused instanceof GreedyInputUIComponent;
       }
       if (!textFieldFocused) {
-        if (this.client != null) {
-          this.client.setScreen(null);
+        if (this.minecraft != null) {
+          this.minecraft.setScreen(null);
         }
         return true;
       }
@@ -150,7 +150,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   }
 
   @Override
-  public boolean charTyped(CharInput charInput) {
+  public boolean charTyped(CharacterEvent charInput) {
     if (this.uiAdapter != null) {
       var focused = this.uiAdapter.rootComponent.focusHandler().focused();
       if (focused instanceof GreedyInputUIComponent inputComponent) {
@@ -169,7 +169,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   protected void wireBackButton(FlowLayout root) {
     ButtonComponent backBtn = root.childById(ButtonComponent.class, "btn-back");
     if (backBtn != null) {
-      backBtn.onPress(ignored -> this.close());
+      backBtn.onPress(ignored -> this.onClose());
     }
   }
 
@@ -195,26 +195,26 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   }
 
   @Override
-  public boolean shouldPause() {
+  public boolean isPauseScreen() {
     return false;
   }
 
   public void navigateToScreen(Screen screen) {
-    if (this.client != null) {
+    if (this.minecraft != null) {
       backStack.push(this.toNavEntry());
       if (backStack.size() > MAX_HISTORY) backStack.removeLast();
       forwardStack.clear();
-      this.client.setScreen(screen);
+      this.minecraft.setScreen(screen);
     }
   }
 
   // ===================== CONFIRM OVERLAY =====================
 
-  protected void showConfirmOverlay(Text message, Runnable onConfirm) {
+  protected void showConfirmOverlay(Component message, Runnable onConfirm) {
     showConfirmOverlay(message, onConfirm, () -> {});
   }
 
-  protected void showConfirmOverlay(Text message, Runnable onConfirm, Runnable onCancel) {
+  protected void showConfirmOverlay(Component message, Runnable onConfirm, Runnable onCancel) {
     if (this.uiAdapter == null) return;
 
     dismissOverlay();
@@ -226,7 +226,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
 
     ButtonComponent yesBtn =
         UIComponents.button(
-            Text.translatable("gui.disquests.btn.yes"),
+            Component.translatable("gui.disquests.btn.yes"),
             b -> {
               dismissOverlay();
               onConfirm.run();
@@ -236,7 +236,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
 
     ButtonComponent noBtn =
         UIComponents.button(
-            Text.translatable("gui.disquests.btn.no"),
+            Component.translatable("gui.disquests.btn.no"),
             b -> {
               dismissOverlay();
               onCancel.run();

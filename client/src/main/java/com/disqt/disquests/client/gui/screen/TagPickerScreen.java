@@ -15,10 +15,10 @@ import io.wispforest.owo.ui.core.Sizing;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
@@ -32,7 +32,9 @@ public class TagPickerScreen extends DisquestsBaseScreen {
   private LabelComponent hintLabel;
 
   public TagPickerScreen(@Nullable Screen parent, Quest quest, Screen returnScreen) {
-    super(DataSource.asset(Identifier.of("disquests", "tag_picker_screen")), parent);
+    super(
+        DataSource.asset(Identifier.fromNamespaceAndPath("disquests", "tag_picker_screen")),
+        parent);
     this.quest = quest;
     this.returnScreen = returnScreen;
   }
@@ -54,13 +56,13 @@ public class TagPickerScreen extends DisquestsBaseScreen {
     if (filterRow != null) {
       MultiLineTextFieldWidget filterWidget =
           new MultiLineTextFieldWidget(
-              client.textRenderer,
+              minecraft.font,
               0,
               0,
               160,
               14,
               "",
-              Text.translatable("gui.disquests.placeholder.filter_or_create").getString(),
+              Component.translatable("gui.disquests.placeholder.filter_or_create").getString(),
               1,
               false);
       filterField = new TextFieldComponent(filterWidget);
@@ -77,7 +79,8 @@ public class TagPickerScreen extends DisquestsBaseScreen {
     hintLabel = root.childById(LabelComponent.class, "hint-label");
     if (hintLabel != null) {
       hintLabel.text(
-          Text.translatable("gui.disquests.label.enter_to_create").withColor(Colors.TEXT_MUTED));
+          Component.translatable("gui.disquests.label.enter_to_create")
+              .withColor(Colors.TEXT_MUTED));
       hintLabel.shadow(true);
     }
 
@@ -89,7 +92,7 @@ public class TagPickerScreen extends DisquestsBaseScreen {
   }
 
   @Override
-  public boolean keyPressed(KeyInput keyInput) {
+  public boolean keyPressed(KeyEvent keyInput) {
     // Intercept Enter to create a custom tag from the current filter text
     if (keyInput.key() == GLFW.GLFW_KEY_ENTER || keyInput.key() == GLFW.GLFW_KEY_KP_ENTER) {
       if (filterField != null) {
@@ -139,7 +142,7 @@ public class TagPickerScreen extends DisquestsBaseScreen {
     if (available.isEmpty()) {
       LabelComponent none =
           UIComponents.label(
-              Text.translatable("gui.disquests.label.no_matching_tags")
+              Component.translatable("gui.disquests.label.no_matching_tags")
                   .withColor(Colors.TEXT_MUTED));
       none.shadow(true);
       chipCloud.child(none);
@@ -157,9 +160,10 @@ public class TagPickerScreen extends DisquestsBaseScreen {
           && !hasExactMatch
           && TagConstraints.TAG_PATTERN.matcher(normalizedFilter).matches()) {
         hintLabel.text(
-            Text.translatable("gui.disquests.label.enter_to_create").withColor(Colors.TEXT_MUTED));
+            Component.translatable("gui.disquests.label.enter_to_create")
+                .withColor(Colors.TEXT_MUTED));
       } else {
-        hintLabel.text(Text.empty());
+        hintLabel.text(Component.empty());
       }
     }
   }

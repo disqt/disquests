@@ -75,4 +75,5 @@ lefthook-local.yml
 # Claude Code
 .claude/.lsp.json
 .claude/worktrees/
+.claude.local.md
 integration-sync/

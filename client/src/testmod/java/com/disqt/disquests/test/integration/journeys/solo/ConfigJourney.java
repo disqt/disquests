@@ -45,7 +45,9 @@ class ConfigJourney {
     when("we resolve a known translation key");
     String resolved =
         context.computeOnClient(
-            c -> net.minecraft.text.Text.translatable("key.category.disquests.main").getString());
+            c ->
+                net.minecraft.network.chat.Component.translatable("key.category.disquests.main")
+                    .getString());
     then("the translation resolves to the expected value");
     assertEquals(
         "Disquests",
@@ -63,7 +65,7 @@ class ConfigJourney {
     context.runOnClient(c -> c.setScreen(ConfigScreen.create(DisquestsClient.CONFIG, null)));
     waitForScreen(context, ConfigScreen.class);
     then("owo-config ConfigScreen is displayed");
-    boolean isConfigScreen = context.computeOnClient(c -> c.currentScreen instanceof ConfigScreen);
+    boolean isConfigScreen = context.computeOnClient(c -> c.screen instanceof ConfigScreen);
     assertTrue(isConfigScreen, "Expected owo-config ConfigScreen to be open");
   }
 

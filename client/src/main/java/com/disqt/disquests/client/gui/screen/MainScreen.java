@@ -22,20 +22,20 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.tooltip.TooltipComponent;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 public class MainScreen extends DisquestsBaseScreen {
 
   private static final org.slf4j.Logger LOGGER =
       org.slf4j.LoggerFactory.getLogger("Disquests.MainScreen");
-  private static final List<TooltipComponent> NO_TOOLTIP = Collections.emptyList();
+  private static final List<ClientTooltipComponent> NO_TOOLTIP = Collections.emptyList();
 
   // Component references (looked up by ID from XML model)
   private FlowLayout rootLayout;
@@ -76,7 +76,7 @@ public class MainScreen extends DisquestsBaseScreen {
   }
 
   public MainScreen(Screen parent) {
-    super(DataSource.asset(Identifier.of("disquests", "main_screen")), parent);
+    super(DataSource.asset(Identifier.fromNamespaceAndPath("disquests", "main_screen")), parent);
     this.currentTab = ClientSession.getActiveTab();
     this.searchTerm = ClientSession.getSearchTerm();
     this.serverFilter = ClientSession.getServerQuestsFilter();
@@ -118,9 +118,9 @@ public class MainScreen extends DisquestsBaseScreen {
     this.filterOpen.onPress(ignored -> selectServerFilter(ClientSession.QuestFilter.OPEN));
     this.filterClosed.onPress(ignored -> selectServerFilter(ClientSession.QuestFilter.CLOSED));
 
-    this.filterAll.tooltip(Text.translatable("gui.disquests.filter.all"));
-    this.filterOpen.tooltip(Text.translatable("gui.disquests.filter.open"));
-    this.filterClosed.tooltip(Text.translatable("gui.disquests.filter.closed"));
+    this.filterAll.tooltip(Component.translatable("gui.disquests.filter.all"));
+    this.filterOpen.tooltip(Component.translatable("gui.disquests.filter.open"));
+    this.filterClosed.tooltip(Component.translatable("gui.disquests.filter.closed"));
 
     // --- Wire action button handlers ---
     this.btnNewQuest.onPress(ignored -> createNewQuest());
@@ -131,7 +131,7 @@ public class MainScreen extends DisquestsBaseScreen {
     // --- Create search text box programmatically ---
     this.searchField = UIComponents.textBox(Sizing.fixed(200));
     this.searchField.text(this.searchTerm);
-    this.searchField.setPlaceholder(Text.translatable("gui.disquests.placeholder.search"));
+    this.searchField.setHint(Component.translatable("gui.disquests.placeholder.search"));
     this.searchField.onChanged().subscribe(this::onSearchTermChanged);
     this.searchField.id("search-box");
     this.searchRow.child(this.searchField);
@@ -142,14 +142,14 @@ public class MainScreen extends DisquestsBaseScreen {
     tagDropdown.setOnSelect(
         tag -> {
           // Replace the current #partial with #tagname
-          String current = searchField.getText();
+          String current = searchField.getValue();
           int hashIndex = current.lastIndexOf('#');
           String before = hashIndex >= 0 ? current.substring(0, hashIndex) : current;
           searchField.text(before + "#" + tag + " ");
         });
 
     // Cache title width
-    this.titleWidth = MinecraftClient.getInstance().textRenderer.getWidth("Disquests");
+    this.titleWidth = Minecraft.getInstance().font.width("Disquests");
 
     // --- Apply saved state ---
     LOGGER.debug(
@@ -285,7 +285,7 @@ public class MainScreen extends DisquestsBaseScreen {
   }
 
   @Override
-  public boolean keyPressed(KeyInput keyInput) {
+  public boolean keyPressed(KeyEvent keyInput) {
     // Intercept arrow/enter/tab/escape for the tag autocomplete dropdown
     if (tagDropdown != null && tagDropdown.isVisible()) {
       if (tagDropdown.onKeyDown(keyInput.key())) {
@@ -420,20 +420,20 @@ public class MainScreen extends DisquestsBaseScreen {
   private void updateInteractButton(Quest selected) {
     if (selected == null) {
       btnInteract.active(false);
-      btnInteract.setMessage(Text.translatable("gui.disquests.btn.join"));
+      btnInteract.setMessage(Component.translatable("gui.disquests.btn.join"));
       btnInteract.tooltip(NO_TOOLTIP);
       return;
     }
     if (ClientSession.isRequested(selected.getId())) {
-      btnInteract.setMessage(Text.translatable("gui.disquests.btn.requested"));
+      btnInteract.setMessage(Component.translatable("gui.disquests.btn.requested"));
       btnInteract.active(false);
-      btnInteract.tooltip(Text.translatable("gui.disquests.tooltip.already_requested"));
+      btnInteract.tooltip(Component.translatable("gui.disquests.tooltip.already_requested"));
     } else if (selected.getVisibility() == Visibility.OPEN) {
-      btnInteract.setMessage(Text.translatable("gui.disquests.btn.join"));
+      btnInteract.setMessage(Component.translatable("gui.disquests.btn.join"));
       btnInteract.active(true);
       btnInteract.tooltip(NO_TOOLTIP);
     } else if (selected.getVisibility() == Visibility.CLOSED) {
-      btnInteract.setMessage(Text.translatable("gui.disquests.btn.request"));
+      btnInteract.setMessage(Component.translatable("gui.disquests.btn.request"));
       btnInteract.active(true);
       btnInteract.tooltip(NO_TOOLTIP);
     } else {
@@ -451,7 +451,7 @@ public class MainScreen extends DisquestsBaseScreen {
     newQuest.setContent("");
     newQuest.setVisibility(Visibility.PRIVATE);
     newQuest.setOwnerUuid(ClientSession.getEffectivePlayerUuid());
-    newQuest.setOwnerName(MinecraftClient.getInstance().getSession().getUsername());
+    newQuest.setOwnerName(Minecraft.getInstance().getUser().getName());
     newQuest.setLastModified(System.currentTimeMillis() / 1000);
     newQuest.setContributors(new ArrayList<>());
     navigateToScreen(new QuestScreen(this, newQuest, true));
@@ -520,9 +520,10 @@ public class MainScreen extends DisquestsBaseScreen {
   // --- RENDERING ---
 
   @Override
-  public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+  public void extractRenderState(
+      GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
     // Let owo-ui render the component tree
-    super.render(context, mouseX, mouseY, delta);
+    super.extractRenderState(context, mouseX, mouseY, delta);
 
     // Rainbow title on hover
     if (titleLabel != null) {
@@ -534,7 +535,7 @@ public class MainScreen extends DisquestsBaseScreen {
           mouseX >= titleX
               && mouseX <= titleX + titleWidth
               && mouseY >= titleY
-              && mouseY <= titleY + this.textRenderer.fontHeight;
+              && mouseY <= titleY + this.font.lineHeight;
 
       if (hovering) {
         // Draw rainbow characters over the label
@@ -543,8 +544,8 @@ public class MainScreen extends DisquestsBaseScreen {
           float hue = ((tickCounter * 3 + i * 30) % 360) / 360.0f;
           int color = hsbToRgb(hue, 0.8f, 1.0f);
           String ch = String.valueOf(titleStr.charAt(i));
-          context.drawTextWithShadow(this.textRenderer, ch, charX, titleY, color);
-          charX += this.textRenderer.getWidth(ch);
+          context.text(this.font, ch, charX, titleY, color, true);
+          charX += this.font.width(ch);
         }
       }
     }
@@ -558,7 +559,7 @@ public class MainScreen extends DisquestsBaseScreen {
     }
 
     // Toast overlay (renders on top of everything)
-    toast.render(context, this.textRenderer, this.width, this.height - 40);
+    toast.render(context, this.font, this.width, this.height - 40);
   }
 
   // --- HELPERS ---
@@ -605,9 +606,9 @@ public class MainScreen extends DisquestsBaseScreen {
     return 0xFF000000 | (r << 16) | (g << 8) | b;
   }
 
-  private void renderNotificationBadge(DrawContext context, int count) {
+  private void renderNotificationBadge(GuiGraphicsExtractor context, int count) {
     String countStr = count > 99 ? "99+" : String.valueOf(count);
-    int textWidth = this.textRenderer.getWidth(countStr);
+    int textWidth = this.font.width(countStr);
     int badgeWidth = Math.max(textWidth + 4, 10);
     int badgeHeight = 10;
 
@@ -621,6 +622,6 @@ public class MainScreen extends DisquestsBaseScreen {
     // Draw count text centered in badge
     int textX = badgeX + (badgeWidth - textWidth) / 2;
     int textY = badgeY + 1;
-    context.drawText(this.textRenderer, countStr, textX, textY, Colors.TEXT_PRIMARY, false);
+    context.text(this.font, countStr, textX, textY, Colors.TEXT_PRIMARY, false);
   }
 }

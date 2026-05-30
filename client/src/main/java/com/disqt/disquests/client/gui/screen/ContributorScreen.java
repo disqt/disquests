@@ -20,9 +20,9 @@ import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.VerticalAlignment;
 import java.util.List;
 import java.util.UUID;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 public class ContributorScreen extends DisquestsBaseScreen {
@@ -30,7 +30,9 @@ public class ContributorScreen extends DisquestsBaseScreen {
   private final Quest quest;
 
   public ContributorScreen(@Nullable Screen parent, Quest quest) {
-    super(DataSource.asset(Identifier.of("disquests", "contributor_screen")), parent);
+    super(
+        DataSource.asset(Identifier.fromNamespaceAndPath("disquests", "contributor_screen")),
+        parent);
     this.quest = quest;
   }
 
@@ -65,7 +67,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
         row.verticalAlignment(VerticalAlignment.CENTER);
         row.gap(4);
 
-        LabelComponent nameLabel = UIComponents.label(Text.literal(name));
+        LabelComponent nameLabel = UIComponents.label(Component.literal(name));
         nameLabel.shadow(true);
         nameLabel.sizing(Sizing.fill(40), Sizing.content());
         row.child(nameLabel);
@@ -76,14 +78,14 @@ public class ContributorScreen extends DisquestsBaseScreen {
 
         ButtonComponent acceptBtn =
             UIComponents.button(
-                Text.translatable("gui.disquests.btn.accept").withColor(0xFF55CC55),
+                Component.translatable("gui.disquests.btn.accept").withColor(0xFF55CC55),
                 b -> respondToRequest(questId, requestId, true));
         acceptBtn.sizing(Sizing.fixed(60), Sizing.fixed(14));
         row.child(acceptBtn);
 
         ButtonComponent denyBtn =
             UIComponents.button(
-                Text.translatable("gui.disquests.btn.deny").withColor(0xFFCC5555),
+                Component.translatable("gui.disquests.btn.deny").withColor(0xFFCC5555),
                 b -> respondToRequest(questId, requestId, false));
         denyBtn.sizing(Sizing.fixed(60), Sizing.fixed(14));
         row.child(denyBtn);
@@ -111,7 +113,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
         row.verticalAlignment(VerticalAlignment.CENTER);
         row.gap(4);
 
-        LabelComponent nameLabel = UIComponents.label(Text.literal(contrib.getName()));
+        LabelComponent nameLabel = UIComponents.label(Component.literal(contrib.getName()));
         nameLabel.shadow(true);
         nameLabel.sizing(Sizing.fill(40), Sizing.content());
         row.child(nameLabel);
@@ -121,10 +123,10 @@ public class ContributorScreen extends DisquestsBaseScreen {
         row.child(spacer);
 
         // Permission toggle
-        Text permText =
+        Component permText =
             contrib.canEdit()
-                ? Text.translatable("gui.disquests.contributor.can_edit")
-                : Text.translatable("gui.disquests.contributor.view_only");
+                ? Component.translatable("gui.disquests.contributor.can_edit")
+                : Component.translatable("gui.disquests.contributor.view_only");
         ButtonComponent permBtn = UIComponents.button(permText, b -> togglePermission(idx));
         permBtn.sizing(Sizing.fixed(60), Sizing.fixed(14));
         row.child(permBtn);
@@ -132,7 +134,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
         // Remove button
         ButtonComponent removeBtn =
             UIComponents.button(
-                Text.translatable("gui.disquests.btn.remove"), b -> removeContributor(idx));
+                Component.translatable("gui.disquests.btn.remove"), b -> removeContributor(idx));
         removeBtn.sizing(Sizing.fixed(60), Sizing.fixed(14));
         row.child(removeBtn);
 
@@ -177,7 +179,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
     Contributor contrib = quest.getContributors().get(index);
 
     showConfirmOverlay(
-        Text.translatable("gui.disquests.confirm.remove_contributor", contrib.getName()),
+        Component.translatable("gui.disquests.confirm.remove_contributor", contrib.getName()),
         () -> {
           PacketSender.updateContributors(
               quest.getId(),
