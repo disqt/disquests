@@ -306,24 +306,26 @@ fun bootstrapServerDir(serverDir: File, mcVersion: String, logger: org.gradle.ap
     File(serverDir, "plugins").mkdirs()
     File(serverDir, "logs").mkdirs()
 
-    // Download paper.jar from Paper API
+    // Download paper.jar from Paper API (v3 at fill.papermc.io)
     logger.lifecycle("Downloading Paper $mcVersion...")
     val client = HttpClient.newBuilder()
         .followRedirects(HttpClient.Redirect.NORMAL).build()
-    val versionResp = client.send(
+    val buildsResp = client.send(
         HttpRequest.newBuilder()
-            .uri(URI("https://api.papermc.io/v2/projects/paper/versions/$mcVersion"))
+            .uri(URI("https://fill.papermc.io/v3/projects/paper/versions/$mcVersion/builds"))
+            .header("User-Agent", "disquests/${project.version} (github.com/disqt/disquests)")
             .GET().build(),
         HttpResponse.BodyHandlers.ofString()
     )
-    val buildsMatch = Regex("""\"builds"\s*:\s*\[([^\]]+)\]""").find(versionResp.body())
+    val urlMatch = Regex(""""url"\s*:\s*"([^"]+)"""").find(buildsResp.body())
         ?: throw RuntimeException("Could not parse Paper API response for MC $mcVersion")
-    val latestBuild = buildsMatch.groupValues[1].split(",").last().trim()
-    val downloadName = "paper-$mcVersion-$latestBuild.jar"
-    val downloadUrl = "https://api.papermc.io/v2/projects/paper/versions/$mcVersion/builds/$latestBuild/downloads/$downloadName"
+    val downloadUrl = urlMatch.groupValues[1]
     logger.lifecycle("Downloading $downloadUrl")
     client.send(
-        HttpRequest.newBuilder().uri(URI(downloadUrl)).GET().build(),
+        HttpRequest.newBuilder()
+            .uri(URI(downloadUrl))
+            .header("User-Agent", "disquests/${project.version} (github.com/disqt/disquests)")
+            .GET().build(),
         HttpResponse.BodyHandlers.ofFile(File(serverDir, "paper.jar").toPath())
     )
     logger.lifecycle("Downloaded paper.jar (${File(serverDir, "paper.jar").length() / 1024 / 1024}MB)")
