@@ -3,6 +3,7 @@ package com.disqt.disquests.client.network;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 /**
  * A single custom payload wrapper that carries raw bytes. All Disquests packet types are
@@ -11,7 +12,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 public record RawPayload(byte[] data) implements CustomPacketPayload {
 
   public static final CustomPacketPayload.Type<RawPayload> ID =
-      CustomPacketPayload.createType("disquests:main");
+      new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath("disquests", "main"));
 
   public static final StreamCodec<FriendlyByteBuf, RawPayload> CODEC =
       CustomPacketPayload.codec(RawPayload::write, RawPayload::read);
