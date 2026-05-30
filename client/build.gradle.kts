@@ -164,7 +164,7 @@ dependencies {
     jacocoRuntime("org.jacoco:org.jacoco.agent:0.8.14:runtime")
 }
 
-tasks.named<JavaExec>("runClientGameTest") {
+tasks.named<net.fabricmc.loom.task.RunGameTask>("runClientGameTest") {
     doFirst {
         val requireFreeRam = rootProject.extra["requireFreeRam"] as (String, Long) -> Unit
         requireFreeRam("runClientGameTest", 4096L)
