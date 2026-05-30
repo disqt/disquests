@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**This is a public repo.** Only include information relevant to the disquests project itself. Personal setup, deploy credentials, local paths, and references to other private projects belong in `.claude.local.md` (gitignored).
+
 ## Project
 
 **Disquests** — a Fabric client mod + PaperMC server plugin for tracking in-game quests. Communicates via vanilla plugin messages on `disquests:main`.
@@ -130,12 +132,13 @@ Channel: `disquests:main`. First byte = PacketType ID.
 
 - **commonmark-java** (`org.commonmark:commonmark:0.27.1` + ext-gfm-strikethrough + ext-task-list-items): Markdown rendering in the client. Bundled via Loom `include`.
 - **sqlite-jdbc** (`org.xerial:sqlite-jdbc:3.51.2.0`): Paper-side SQLite. `compileOnly` (bundled in Paper env).
-- **owo-lib** (`io.wispforest:owo-lib:0.13.0+1.21.11`): UI framework + config (`@Config` annotations) + lang extensions (JSON5, nested lang, rich translations) for client. Fabric-only -- cannot be used in `common/` or `server/` modules. Runtime dependency (users install separately). owo-sentinel bundled as jar-in-jar for graceful fallback. Config uses `annotationProcessor` to generate `DisquestsConfigWrapper`.
+- **owo-lib** (`io.wispforest:owo-lib:0.13.0+26.1`): UI framework + config (`@Config` annotations) + lang extensions (JSON5, nested lang, rich translations) for client. Fabric-only -- cannot be used in `common/` or `server/` modules. Runtime dependency (users install separately). owo-sentinel bundled as jar-in-jar for graceful fallback. Config uses `annotationProcessor` to generate `DisquestsConfigWrapper`.
 - **Lang files** — JSON5 with owo nested lang syntax in `client/src/main/resources/assets/disquests/lang/`. `en_us.json5` (English) and `fr_fr.json5` (French). French uses informal "tu", requires all accents (é, è, ê, ç, à), gaming terms stay English.
 
 ## Gotchas
 
 ### Build & Deploy
+- **Java 25 required for MC 26.1.2** — set `JAVA_HOME` to a JDK 25 installation before running Gradle.
 - **CI uses `gradle/actions/setup-gradle@v5`** — not manual `actions/cache`. Build cache enabled (`org.gradle.caching=true`). Cache is write-only on `main`, read-only on PR branches.
 - **`./gradlew build` includes all unit tests** — don't add separate `:common:test :server:test` invocations.
 - **`project.version` changes jar filenames** — The root `build.gradle.kts` clears `archiveVersion` in `afterEvaluate` to keep names stable. Don't remove this.
@@ -150,9 +153,16 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **Never push to main** — always create a branch and PR. Exception: non-code changes (docs, CLAUDE.md, plans) can go directly to main to avoid unnecessary CI runs.
 - **PR target** — origin is `disqt/disquests`. No upstream remote.
 
-### Minecraft API (1.21.11)
+### Minecraft API (26.1.2)
 - **ClickEvent API** — sealed classes, not enum. Use `new ClickEvent.OpenUrl(URI)` and `instanceof ClickEvent.OpenUrl openUrl` for pattern matching.
-- **`Click` record** — `Click(double x, double y, MouseInput buttonInfo)` where `MouseInput(int button, int modifiers)`. Not `(double, double, int)`.
+- **`MouseButtonEvent` record** — `MouseButtonEvent(double x, double y, MouseButtonInfo buttonInfo)` where `MouseButtonInfo(int button, int modifiers)`.
+- **`CustomPacketPayload.createType("ns:path")` is broken** — prepends `minecraft:` namespace, creating `minecraft:ns:path`. Use `new Type<>(Identifier.fromNamespaceAndPath("ns", "path"))` instead.
+- **`Identifier.of()` removed** — use `Identifier.fromNamespaceAndPath()`.
+- **`render()` -> `extractRenderState()`** — applies to Screen overrides, Renderable implementations, AND mixin `@Inject(method=...)` targets.
+- **`Screen.close()` -> `onClose()`**, **`shouldPause()` -> `isPauseScreen()`** — no `close()` method exists on Screen anymore.
+- **`MutableComponent.styled()` -> `withStyle()`**, **`copyContentOnly()` -> `plainCopy()`**, **`TextColor.getRgb()` -> `getValue()`**.
+- **`fabric.mod.json` dependency ID** — `"fabric"` no longer resolves; use `"fabric-api"`.
+- **`PayloadTypeRegistry.playS2C()`/`playC2S()`** — renamed to `clientboundPlay()`/`serverboundPlay()`.
 - **Contributor is immutable** — `canEdit` is final. To update, replace with `new Contributor(new ContributorData(...))`.
 - **`ClientCache.getQuestById` searches both lists** — returns quests from myQuests AND serverQuests. Use `getMyQuests().stream()` to check membership specifically.
 
@@ -186,12 +196,6 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **`javax.annotation` not on testmod classpath** — Don't use `@Nullable` etc. in testmod code. JUnit is also unresolvable in IDE (cosmetic, compiles fine via Gradle).
 - **`childById(Class, id)` is type-strict** — changing a component's container type (e.g., `OverlayContainer` to `FlowLayout`) breaks any test using `childById(OverlayContainer.class, id)`. Search testmod for the component ID before changing container types.
 
-## Deploy
-
-- **Paper plugin**: `scp server/build/libs/server.jar minecraft:~/serverfiles/plugins/Disquests.jar` then `ssh minecraft "tmux -S /tmp/tmux-1000/pmcserver-bb664df1 send-keys -t pmcserver 'plugman reload Disquests' Enter"`
-- **Client mod**: Copy `client/build/libs/client.jar` to Prism Launcher's `mods/` folder, renaming to match the current version
-- **owo-lib (Prism)**: Must be in Prism mods folder alongside client mod. Find in `~/.gradle/caches/modules-2/files-2.1/io.wispforest/owo-lib/`.
-
 ## Release
 
 Tag-triggered via GitHub Actions (`.github/workflows/release.yml`). Pushes a `v*` tag, runs E2E tests, generates changelog from conventional commits, creates GitHub release with `disquests-client-{version}.jar` and `disquests-paper-{version}.jar`.
@@ -211,6 +215,12 @@ Library docs and design specs live in the repo, not in memory or CLAUDE.md:
 | `docs/superpowers/specs/` | Design specs for features |
 | `docs/superpowers/plans/` | Implementation plans |
 | `docs/feedback/` | Playtest feedback logs with issue tracking |
+
+For MC version migrations, consult:
+- [Fabric porting guide](https://docs.fabricmc.net/develop/porting/)
+- [Fabric API renames](https://docs.fabricmc.net/develop/porting/fabric-api)
+- [NeoForge primer (vanilla changes)](https://github.com/neoforged/.github/blob/main/primers/26.1/index.md)
+- Verify method names against the decompiled MC jar: `javap -p -cp ~/.gradle/caches/fabric-loom/minecraftMaven/net/minecraft/minecraft-merged-deobf/<version>/minecraft-merged-deobf-<version>.jar <class>`
 
 Read these on-demand when working on the relevant area. For owo-ui, Context7 MCP can also fetch live docs (`resolve-library-id` for "owo-lib").
 
