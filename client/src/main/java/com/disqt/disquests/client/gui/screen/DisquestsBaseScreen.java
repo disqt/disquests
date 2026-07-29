@@ -73,7 +73,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
       if (parent == null) {
         clearHistory();
       }
-      this.minecraft.setScreen(parent);
+      this.minecraft.gui.setScreen(parent);
     }
   }
 
@@ -97,7 +97,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
       if (screen != null) {
         forwardStack.push(this.toNavEntry());
         if (forwardStack.size() > MAX_HISTORY) forwardStack.removeLast();
-        this.minecraft.setScreen(screen);
+        this.minecraft.gui.setScreen(screen);
         return;
       }
     }
@@ -111,7 +111,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
       if (screen != null) {
         backStack.push(this.toNavEntry());
         if (backStack.size() > MAX_HISTORY) backStack.removeLast();
-        this.minecraft.setScreen(screen);
+        this.minecraft.gui.setScreen(screen);
         return;
       }
     }
@@ -129,7 +129,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
       }
       if (!textFieldFocused) {
         if (this.minecraft != null) {
-          this.minecraft.setScreen(null);
+          this.minecraft.gui.setScreen(null);
         }
         return true;
       }
@@ -204,7 +204,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
       backStack.push(this.toNavEntry());
       if (backStack.size() > MAX_HISTORY) backStack.removeLast();
       forwardStack.clear();
-      this.minecraft.setScreen(screen);
+      this.minecraft.gui.setScreen(screen);
     }
   }
 

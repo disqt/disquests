@@ -31,7 +31,7 @@ class ConfigJourney {
             c -> {
               DisquestsClient.CONFIG.theme(Theme.FROSTED);
               DisquestsClient.CONFIG.save();
-              c.setScreen(null);
+              c.gui.setScreen(null);
             });
     TestContext.get().waitTicks(2);
   }
@@ -62,10 +62,10 @@ class ConfigJourney {
   void openOwoConfigScreen(ClientGameTestContext context) {
     given("player is connected");
     when("player opens the owo-config screen");
-    context.runOnClient(c -> c.setScreen(ConfigScreen.create(DisquestsClient.CONFIG, null)));
+    context.runOnClient(c -> c.gui.setScreen(ConfigScreen.create(DisquestsClient.CONFIG, null)));
     waitForScreen(context, ConfigScreen.class);
     then("owo-config ConfigScreen is displayed");
-    boolean isConfigScreen = context.computeOnClient(c -> c.screen instanceof ConfigScreen);
+    boolean isConfigScreen = context.computeOnClient(c -> c.gui.screen() instanceof ConfigScreen);
     assertTrue(isConfigScreen, "Expected owo-config ConfigScreen to be open");
   }
 
@@ -76,7 +76,7 @@ class ConfigJourney {
   void closeAndVerifyConfig(ClientGameTestContext context) {
     given("owo-config screen is open");
     when("player closes the config screen");
-    context.runOnClient(c -> c.setScreen(null));
+    context.runOnClient(c -> c.gui.setScreen(null));
     context.waitTicks(2);
     then("config values are accessible via the wrapper API");
     Theme currentTheme = context.computeOnClient(c -> DisquestsClient.CONFIG.theme());
@@ -113,7 +113,7 @@ class ConfigJourney {
         c -> {
           DisquestsClient.CONFIG.theme(Theme.FROSTED);
           DisquestsClient.CONFIG.save();
-          c.setScreen(null);
+          c.gui.setScreen(null);
         });
     context.waitTicks(2);
   }

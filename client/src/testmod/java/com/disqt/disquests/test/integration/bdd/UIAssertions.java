@@ -68,7 +68,7 @@ public final class UIAssertions {
   /** Assert the current screen is the expected type. */
   public static void assertScreenIs(
       ClientGameTestContext context, Class<? extends Screen> screenClass) {
-    boolean match = context.computeOnClient(c -> screenClass.isInstance(c.screen));
+    boolean match = context.computeOnClient(c -> screenClass.isInstance(c.gui.screen()));
     assertTrue(
         match, "Expected screen " + screenClass.getSimpleName() + " but got different screen");
   }

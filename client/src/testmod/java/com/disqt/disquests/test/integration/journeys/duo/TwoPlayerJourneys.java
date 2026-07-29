@@ -127,7 +127,7 @@ class TwoPlayerJourneys {
     boolean hasPending =
         context.computeOnClient(
             c -> {
-              Screen screen = c.screen;
+              Screen screen = c.gui.screen();
               if (screen
                   instanceof com.disqt.disquests.client.gui.screen.DisquestsBaseScreen dScreen) {
                 var root = dScreen.getRootComponent();
@@ -143,7 +143,7 @@ class TwoPlayerJourneys {
     double[] acceptPos =
         context.computeOnClient(
             c -> {
-              Screen screen = c.screen;
+              Screen screen = c.gui.screen();
               if (screen
                   instanceof com.disqt.disquests.client.gui.screen.DisquestsBaseScreen dScreen) {
                 var root = dScreen.getRootComponent();
@@ -219,7 +219,7 @@ class TwoPlayerJourneys {
     double[] permPos =
         context.computeOnClient(
             c -> {
-              Screen screen = c.screen;
+              Screen screen = c.gui.screen();
               if (screen
                   instanceof com.disqt.disquests.client.gui.screen.DisquestsBaseScreen dScreen) {
                 var root = dScreen.getRootComponent();
@@ -252,7 +252,7 @@ class TwoPlayerJourneys {
     double[] removePos =
         context.computeOnClient(
             c -> {
-              Screen screen = c.screen;
+              Screen screen = c.gui.screen();
               if (screen
                   instanceof com.disqt.disquests.client.gui.screen.DisquestsBaseScreen dScreen) {
                 var root = dScreen.getRootComponent();

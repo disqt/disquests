@@ -400,11 +400,11 @@ public class MarkdownWidget extends BaseUIComponent {
           UUID questId = UUID.fromString(wh.uuid());
           var quest = ClientCache.getQuestById(questId);
           if (quest != null) {
-            Screen currentScreen = Minecraft.getInstance().screen;
+            Screen currentScreen = Minecraft.getInstance().gui.screen();
             if (currentScreen instanceof DisquestsBaseScreen baseScreen) {
               baseScreen.navigateToScreen(new QuestScreen(baseScreen.getParentScreen(), quest));
             } else {
-              Minecraft.getInstance().setScreen(new QuestScreen(currentScreen, quest));
+              Minecraft.getInstance().gui.setScreen(new QuestScreen(currentScreen, quest));
             }
           } else {
             ClientSession.setPendingToast(QUEST_INACCESSIBLE_MSG);

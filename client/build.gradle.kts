@@ -27,6 +27,10 @@ eclipse {
 }
 
 repositories {
+    // owo-lib 0.13.0+26.2 is not published yet -- it is built locally from the upstream 26.2
+    // port (wisp-forest/owo-lib PR #490, still a draft) and installed via publishToMavenLocal.
+    // Remove this once an official 0.13.x+26.2 lands on maven.wispforest.io.
+    mavenLocal()
     maven("https://maven.terraformersmc.com/releases/")
     maven("https://maven.wispforest.io/releases/")
     maven("https://jitpack.io")
