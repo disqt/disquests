@@ -135,7 +135,10 @@ jobs:
           generate-branches-badge: true
           coverage-label: coverage
 
+      # The pull_request rule on main forbids direct pushes, which is what this step
+      # does. Badges are cosmetic, so a blocked push must not turn main's CI red.
       - name: Commit coverage badges
+        continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
