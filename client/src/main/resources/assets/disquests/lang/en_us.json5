@@ -95,8 +95,16 @@
   // owo-config
   "text.config.disquests-config.{}": {
     "title": "Disquests Config",
+    "option.pinnedVisible": "Show Pinned Quests",
     "option.pinnedWidth": "Pinned Width",
     "option.theme": "Theme",
+    // owo builds enum keys as text.config.<config>.enum.<enumName>.<value>,
+    // with enumName uncapitalised and value lowercased (ConfigEnumButton#updateMessage).
+    "enum.theme.vanilla": "Vanilla",
+    "enum.theme.flat": "Flat",
+    "enum.theme.inset": "Inset",
+    "enum.theme.frosted": "Frosted",
+    "enum.theme.accent_line": "Accent Line",
     "option.pinnedX": "Pin X Position",
     "option.pinnedY": "Pin Y Position",
     "category.hud": "HUD",

@@ -95,8 +95,14 @@
   // owo-config
   "text.config.disquests-config.{}": {
     "title": "Configuration Disquests",
+    "option.pinnedVisible": "Afficher les quêtes épinglées",
     "option.pinnedWidth": "Largeur des quêtes épinglées",
     "option.theme": "Thème",
+    "enum.theme.vanilla": "Vanilla",
+    "enum.theme.flat": "Plat",
+    "enum.theme.inset": "Encastré",
+    "enum.theme.frosted": "Givré",
+    "enum.theme.accent_line": "Ligne d'accent",
     "option.pinnedX": "Position X des quêtes épinglées",
     "option.pinnedY": "Position Y des quêtes épinglées",
     "category.hud": "HUD",
