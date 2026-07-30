@@ -415,7 +415,26 @@ fun ensureServer(serverDir: File, logger: org.gradle.api.logging.Logger, pluginJ
         } catch (e: Exception) {
             throw RuntimeException("Paper server not accepting connections on port $serverPort after 120s")
         }
-        logger.lifecycle("Paper server ready")
+
+        // The game port binds before the RCON listener starts, so waiting only on
+        // $serverPort returns while RCON is still down. Callers immediately issue an
+        // RCON reset, which then fails. Wait for RCON explicitly.
+        val rconPort = testRconPort.toInt()
+        val rconDeadline = System.currentTimeMillis() + 60_000L
+        var rconUp = false
+        while (System.currentTimeMillis() < rconDeadline) {
+            try {
+                Socket("localhost", rconPort).close()
+                rconUp = true
+                break
+            } catch (e: Exception) {
+                Thread.sleep(500)
+            }
+        }
+        if (!rconUp) {
+            throw RuntimeException("Paper server RCON not accepting connections on port $rconPort after 60s")
+        }
+        logger.lifecycle("Paper server ready (game port $serverPort, RCON $rconPort)")
         return serverProcess
     } else {
         logger.lifecycle("Server already running on port $testServerPort")
@@ -424,13 +443,23 @@ fun ensureServer(serverDir: File, logger: org.gradle.api.logging.Logger, pluginJ
 }
 
 fun rconReset(logger: org.gradle.api.logging.Logger) {
-    try {
-        sendRconCommand("localhost", testRconPort.toInt(), "testpassword", "disquests reset")
-        logger.lifecycle("Sent RCON reset")
-        Thread.sleep(1000)
-    } catch (e: Exception) {
-        logger.warn("RCON reset failed: ${e.message}")
+    // A silently-skipped reset leaves quests from the previous journey in the DB, which
+    // surfaces later as confusing entry-count assertion failures rather than as the real
+    // cause. Retry briefly, then fail loudly.
+    val deadline = System.currentTimeMillis() + 30_000L
+    var lastError: Exception? = null
+    while (System.currentTimeMillis() < deadline) {
+        try {
+            sendRconCommand("localhost", testRconPort.toInt(), "testpassword", "disquests reset")
+            logger.lifecycle("Sent RCON reset")
+            Thread.sleep(1000)
+            return
+        } catch (e: Exception) {
+            lastError = e
+            Thread.sleep(1000)
+        }
     }
+    throw RuntimeException("RCON reset failed after 30s: ${lastError?.message}")
 }
 
 fun ensureClientOptions(runDir: File) {
