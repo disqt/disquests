@@ -8,7 +8,12 @@ mockito = "5.23.0"
 sqlite-jdbc = "3.53.2.1"
 
 # Client libs
-lwjgl-tinyfd = "3.4.2"
+# Pinned to match the LWJGL version Minecraft 26.2 ships (3.4.1). Bumping this alone
+# drags lwjgl-core up via Gradle conflict resolution while lwjgl-glfw stays on MC's
+# 3.4.1, and glfw then dies at class-init with:
+#   NoSuchMethodError: org.lwjgl.system.Callback$Descriptor.<init>(...FFICIF)
+# Keep in lockstep with Minecraft's LWJGL, not with upstream releases.
+lwjgl-tinyfd = "3.4.1"
 commonmark = "0.29.0"
 autolink = "0.12.0"
 
