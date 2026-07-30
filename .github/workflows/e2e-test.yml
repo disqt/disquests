@@ -135,9 +135,20 @@ jobs:
           generate-branches-badge: true
           coverage-label: coverage
 
-      - name: Commit coverage badges
+      # Publish badges to a dedicated `badges` branch rather than pushing to main.
+      # main is PR-only via the repository ruleset, so a direct push is rejected with
+      # GH013. The branch holds only generated SVGs and is force-replaced each run;
+      # README references them by raw URL.
+      - name: Publish coverage badges
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .github/badges/
-          git diff --staged --quiet || (git commit -m "ci: update coverage badges [skip ci]" && git push)
+          mkdir -p /tmp/badges
+          cp .github/badges/*.svg /tmp/badges/
+          git checkout --orphan badges
+          git rm -rf --cached . > /dev/null
+          mkdir -p .github/badges
+          cp /tmp/badges/*.svg .github/badges/
+          git add -f .github/badges/*.svg
+          git commit -m "ci: update coverage badges [skip ci]"
+          git push -f origin badges
