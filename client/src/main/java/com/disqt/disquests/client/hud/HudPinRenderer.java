@@ -74,7 +74,7 @@ public class HudPinRenderer {
 
     // Don't render pins over Disquests screens (they have their own UI)
     Minecraft client = Minecraft.getInstance();
-    if (client.screen instanceof DisquestsBaseScreen) return;
+    if (client.gui.screen() instanceof DisquestsBaseScreen) return;
 
     List<Quest> quests = HudPinManager.getPinnedQuests();
     if (quests.isEmpty()) {
@@ -85,7 +85,7 @@ public class HudPinRenderer {
       return;
     }
 
-    if (client.gui.getDebugOverlay().showDebugScreen()) return;
+    if (client.getDebugOverlay().showDebugScreen()) return;
 
     // Rebuild cache if pin list or quest content changed
     List<UUID> currentIds = quests.stream().map(Quest::getId).toList();

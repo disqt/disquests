@@ -77,3 +77,6 @@ lefthook-local.yml
 .claude/worktrees/
 .claude.local.md
 integration-sync/
+
+# Vendored owo-lib 26.2 (upstream PR #490 not published) -- see client/build.gradle.kts
+!libs/maven/**/*.jar

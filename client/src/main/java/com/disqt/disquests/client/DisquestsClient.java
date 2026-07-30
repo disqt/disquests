@@ -34,16 +34,16 @@ public class DisquestsClient implements ClientModInitializer {
     ClientTickEvents.END_CLIENT_TICK.register(
         client -> {
           while (KeyBinds.openGuiKey.consumeClick()) {
-            if (client.screen == null && ClientSession.isOnServer()) {
-              client.setScreen(new MainScreen());
+            if (client.gui.screen() == null && ClientSession.isOnServer()) {
+              client.gui.setScreen(new MainScreen());
             }
           }
           while (KeyBinds.pinKey.consumeClick()) {
             HudPinRenderer.toggleVisibility();
           }
           while (KeyBinds.openConfigKey.consumeClick()) {
-            if (client.screen == null) {
-              client.setScreen(ConfigScreen.create(CONFIG, null));
+            if (client.gui.screen() == null) {
+              client.gui.setScreen(ConfigScreen.create(CONFIG, null));
             }
           }
         });

@@ -57,7 +57,7 @@ public class ClientPacketHandler {
 
   private static void showOrDeferToast(String message) {
     Minecraft client = Minecraft.getInstance();
-    if (client.screen instanceof MainScreen mainScreen) {
+    if (client.gui.screen() instanceof MainScreen mainScreen) {
       mainScreen.refreshListContents();
       mainScreen.showToast(message);
     } else {
@@ -119,14 +119,14 @@ public class ClientPacketHandler {
 
     // Refresh the current screen if it shows the updated quest
     Minecraft client = Minecraft.getInstance();
-    if (client.screen instanceof MainScreen mainScreen) {
+    if (client.gui.screen() instanceof MainScreen mainScreen) {
       mainScreen.refreshListContents();
-    } else if (client.screen instanceof QuestScreen questScreen
+    } else if (client.gui.screen() instanceof QuestScreen questScreen
         && !questScreen.isEditing()
         && questScreen.getQuest().getId().equals(quest.getId())
         && !java.util.Objects.equals(questScreen.getQuest().getContent(), quest.getContent())) {
       // Re-open view mode when content changed (e.g. server resolved wiki-link UUIDs)
-      client.setScreen(new QuestScreen(questScreen.getParentScreen(), quest));
+      client.gui.setScreen(new QuestScreen(questScreen.getParentScreen(), quest));
     }
     if (justJoined) {
       showOrDeferToast("Joined \"" + quest.getTitle() + "\" \u2014 see My Quests");

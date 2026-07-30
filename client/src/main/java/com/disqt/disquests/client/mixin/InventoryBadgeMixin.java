@@ -75,7 +75,7 @@ public abstract class InventoryBadgeMixin extends Screen {
         && mouseX < badgeX + BADGE_SIZE
         && mouseY >= badgeY
         && mouseY < badgeY + BADGE_SIZE) {
-      Minecraft.getInstance().setScreen(new MainScreen());
+      Minecraft.getInstance().gui.setScreen(new MainScreen());
       cir.setReturnValue(true);
     }
   }

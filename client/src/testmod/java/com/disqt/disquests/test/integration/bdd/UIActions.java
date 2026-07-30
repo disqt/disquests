@@ -48,10 +48,10 @@ public final class UIActions {
   public static <T extends UIComponent> T findComponent(
       ClientGameTestContext context, Class<T> type, String id) {
     // Wait for a Disquests screen to be active (handles brief screen transitions on CI)
-    context.waitFor(client -> client.screen instanceof DisquestsBaseScreen, TIMEOUT);
+    context.waitFor(client -> client.gui.screen() instanceof DisquestsBaseScreen, TIMEOUT);
     return context.computeOnClient(
         c -> {
-          if (c.screen instanceof DisquestsBaseScreen dScreen) {
+          if (c.gui.screen() instanceof DisquestsBaseScreen dScreen) {
             var root = dScreen.getRootComponent();
             if (root == null) throw new AssertionError("Screen root not initialized");
             T component = root.childById(type, id);
@@ -67,7 +67,7 @@ public final class UIActions {
       ClientGameTestContext context, Class<T> type, String id) {
     return context.computeOnClient(
         c -> {
-          if (c.screen instanceof DisquestsBaseScreen dScreen) {
+          if (c.gui.screen() instanceof DisquestsBaseScreen dScreen) {
             var root = dScreen.getRootComponent();
             if (root == null) return null;
             return root.childById(type, id);
@@ -110,7 +110,7 @@ public final class UIActions {
     context.runOnClient(
         c -> {
           ClientCache.clear();
-          if (c.screen != null) c.setScreen(null);
+          if (c.gui.screen() != null) c.gui.setScreen(null);
         });
 
     // Request sync and wait for cache to update (version bumps when SYNC packets arrive)
@@ -135,7 +135,7 @@ public final class UIActions {
           ServerAddress serverAddress = ServerAddress.parseString(address);
           ServerData serverData = new ServerData("Test", address, ServerData.Type.OTHER);
           ConnectScreen.startConnecting(
-              client.screen, client, serverAddress, serverData, false, null);
+              client.gui.screen(), client, serverAddress, serverData, false, null);
         });
 
     // Wait for player entity
@@ -153,14 +153,14 @@ public final class UIActions {
   // --- Screen navigation ---
 
   public static void openMainScreen(ClientGameTestContext context) {
-    context.runOnClient(client -> client.setScreen(new MainScreen(null)));
+    context.runOnClient(client -> client.gui.setScreen(new MainScreen(null)));
     context.waitForScreen(MainScreen.class);
     context.waitTicks(2);
   }
 
   public static <T extends Screen> void waitForScreen(
       ClientGameTestContext context, Class<T> screenClass) {
-    context.waitFor(client -> screenClass.isInstance(client.screen), TIMEOUT);
+    context.waitFor(client -> screenClass.isInstance(client.gui.screen()), TIMEOUT);
     context.waitTicks(2);
   }
 
@@ -274,7 +274,7 @@ public final class UIActions {
     // so we clear via runOnClient for robustness.
     context.runOnClient(
         c -> {
-          if (c.screen instanceof DisquestsBaseScreen dScreen) {
+          if (c.gui.screen() instanceof DisquestsBaseScreen dScreen) {
             var root = dScreen.getRootComponent();
             if (root != null) {
               // Find component by ID as generic UIComponent, then check type
@@ -406,7 +406,7 @@ public final class UIActions {
   public static void waitForEntryCount(ClientGameTestContext context, int count) {
     context.waitFor(
         client -> {
-          Screen screen = client.screen;
+          Screen screen = client.gui.screen();
           if (screen instanceof DisquestsBaseScreen dScreen) {
             var root = dScreen.getRootComponent();
             var questList =
@@ -427,7 +427,7 @@ public final class UIActions {
   public static void waitForComponent(ClientGameTestContext context, String componentId) {
     context.waitFor(
         client -> {
-          if (client.screen instanceof DisquestsBaseScreen screen) {
+          if (client.gui.screen() instanceof DisquestsBaseScreen screen) {
             return screen
                     .getRootComponent()
                     .childById(io.wispforest.owo.ui.core.UIComponent.class, componentId)

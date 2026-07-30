@@ -71,7 +71,7 @@ class PinAndHudJourney {
     firstQuestId =
         context.computeOnClient(
             c -> {
-              var entries = ((MainScreen) c.screen).getQuestEntries();
+              var entries = ((MainScreen) c.gui.screen()).getQuestEntries();
               // Pinned-sorted: no pinned yet, so sorted by lastModified desc.
               // "Second" was created last -> index 0, "First" -> index 1
               return entries.size() >= 2 ? entries.get(1).getQuest().getId() : null;
@@ -79,7 +79,7 @@ class PinAndHudJourney {
     secondQuestId =
         context.computeOnClient(
             c -> {
-              var entries = ((MainScreen) c.screen).getQuestEntries();
+              var entries = ((MainScreen) c.gui.screen()).getQuestEntries();
               return entries.size() >= 1 ? entries.get(0).getQuest().getId() : null;
             });
     assertNotNull(firstQuestId, "firstQuestId should not be null");
@@ -116,7 +116,7 @@ class PinAndHudJourney {
     String firstName =
         context.computeOnClient(
             c -> {
-              Screen screen = c.screen;
+              Screen screen = c.gui.screen();
               if (screen instanceof MainScreen ms) {
                 var entries = ms.getQuestEntries();
                 return entries.isEmpty() ? null : entries.get(0).getQuest().getTitle();
@@ -129,7 +129,7 @@ class PinAndHudJourney {
     String secondName =
         context.computeOnClient(
             c -> {
-              Screen screen = c.screen;
+              Screen screen = c.gui.screen();
               if (screen instanceof MainScreen ms) {
                 var entries = ms.getQuestEntries();
                 return entries.size() >= 2 ? entries.get(1).getQuest().getTitle() : null;
@@ -192,7 +192,7 @@ class PinAndHudJourney {
     String firstName =
         context.computeOnClient(
             c -> {
-              Screen screen = c.screen;
+              Screen screen = c.gui.screen();
               if (screen instanceof MainScreen ms) {
                 var entries = ms.getQuestEntries();
                 return entries.isEmpty() ? null : entries.get(0).getQuest().getTitle();
