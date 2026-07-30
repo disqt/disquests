@@ -1,7 +1,7 @@
 # Disquests
 
-![Coverage](.github/badges/jacoco.svg)
-![Branches](.github/badges/branches.svg)
+![Coverage](https://raw.githubusercontent.com/disqt/disquests/badges/.github/badges/jacoco.svg)
+![Branches](https://raw.githubusercontent.com/disqt/disquests/badges/.github/badges/branches.svg)
 
 A Minecraft mod for creating, sharing, and collaborating on in-game quests. Fabric client mod + PaperMC server plugin.
 
