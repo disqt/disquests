@@ -7,6 +7,10 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - dependencies
+    ignore:
+      # LWJGL must match the version Minecraft ships, not the latest release.
+      # Bumping it alone splits the LWJGL stack and breaks GLFW at class-init.
+      - dependency-name: "org.lwjgl:*"
     groups:
       patch-updates:
         update-types:
