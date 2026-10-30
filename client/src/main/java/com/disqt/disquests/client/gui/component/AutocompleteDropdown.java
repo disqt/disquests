@@ -78,19 +78,19 @@ public class AutocompleteDropdown {
 
   public boolean onKeyDown(int keyCode) {
     if (!visible) return false;
-    if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_DOWN) {
+    if (keyCode == com.mojang.blaze3d.platform.InputConstants.KEY_DOWN) {
       selectedIndex = Math.min(selectedIndex + 1, results.size() - 1);
       rebuildOverlay();
       return true;
-    } else if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_UP) {
+    } else if (keyCode == com.mojang.blaze3d.platform.InputConstants.KEY_UP) {
       selectedIndex = Math.max(selectedIndex - 1, 0);
       rebuildOverlay();
       return true;
-    } else if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER
-        || keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER) {
+    } else if (keyCode == com.mojang.blaze3d.platform.InputConstants.KEY_RETURN
+        || keyCode == com.mojang.blaze3d.platform.InputConstants.KEY_NUMPADENTER) {
       selectCurrent();
       return true;
-    } else if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+    } else if (keyCode == com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE) {
       hide();
       return true;
     }

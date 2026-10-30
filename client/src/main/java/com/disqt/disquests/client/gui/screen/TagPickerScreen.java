@@ -7,6 +7,7 @@ import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.common.TagConstraints;
+import com.mojang.blaze3d.platform.InputConstants;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
@@ -20,7 +21,6 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
 
 public class TagPickerScreen extends DisquestsBaseScreen {
 
@@ -94,7 +94,8 @@ public class TagPickerScreen extends DisquestsBaseScreen {
   @Override
   public boolean keyPressed(KeyEvent keyInput) {
     // Intercept Enter to create a custom tag from the current filter text
-    if (keyInput.key() == GLFW.GLFW_KEY_ENTER || keyInput.key() == GLFW.GLFW_KEY_KP_ENTER) {
+    if (keyInput.key() == InputConstants.KEY_RETURN
+        || keyInput.key() == InputConstants.KEY_NUMPADENTER) {
       if (filterField != null) {
         String raw = filterField.getText().trim().toLowerCase();
         if (!raw.isEmpty()) {

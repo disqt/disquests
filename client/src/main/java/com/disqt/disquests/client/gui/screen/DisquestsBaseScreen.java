@@ -79,10 +79,10 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
 
   @Override
   public boolean mouseClicked(MouseButtonEvent click, boolean simulated) {
-    if (click.button() == org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_4) {
+    if (click.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_4) {
       goBack();
       return true;
-    } else if (click.button() == org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_5) {
+    } else if (click.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_5) {
       goForward();
       return true;
     }

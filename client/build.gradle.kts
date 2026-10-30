@@ -27,12 +27,12 @@ eclipse {
 }
 
 repositories {
-    // owo-lib 0.13.0+26.2 is not published upstream yet. It is built from
-    // wisp-forest/owo-lib PR #490 (draft) at kouhe3/owo-lib commit
-    // 54f6a7c19ad24c1f94284845afc58e7b20f13297 and vendored into libs/maven as a
-    // repository (jar + pom) so its 8 transitive deps still resolve normally and CI
-    // does not need a populated ~/.m2.
-    // Remove this block and the libs/maven tree once an official 0.13.x+26.2 lands
+    // owo-lib 0.13.1+26.3 is not published upstream (wisp-forest/owo-lib has no 26.3
+    // branch; tracking issue #503). It is built from the community port
+    // Raghav314/owo-lib branch 26.3 (PR #501, commit of 2026-10-03) and vendored into
+    // libs/maven as a repository (jar + pom + module) so its transitive deps still
+    // resolve normally and CI does not need a populated ~/.m2.
+    // Remove this block and the libs/maven tree once an official 0.13.x+26.3 lands
     // on maven.wispforest.io.
     maven("${rootProject.projectDir}/libs/maven")
     maven("https://maven.terraformersmc.com/releases/")

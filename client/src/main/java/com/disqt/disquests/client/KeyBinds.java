@@ -4,7 +4,6 @@ import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.resources.Identifier;
-import org.lwjgl.glfw.GLFW;
 
 public class KeyBinds {
 
@@ -20,24 +19,24 @@ public class KeyBinds {
         KeyMappingHelper.registerKeyMapping(
             new KeyMapping(
                 "key.disquests.opengui",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_N,
+                InputConstants.Type.KEYBOARD,
+                InputConstants.KEY_N,
                 MOD_CATEGORY));
 
     pinKey =
         KeyMappingHelper.registerKeyMapping(
             new KeyMapping(
                 "key.disquests.togglepin",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_UNKNOWN, // unbound by default
+                InputConstants.Type.KEYBOARD,
+                InputConstants.UNKNOWN.getValue(), // unbound by default
                 MOD_CATEGORY));
 
     openConfigKey =
         KeyMappingHelper.registerKeyMapping(
             new KeyMapping(
                 "key.disquests.openconfig",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_F6,
+                InputConstants.Type.KEYBOARD,
+                InputConstants.KEY_F6,
                 MOD_CATEGORY));
   }
 }

@@ -7,6 +7,7 @@ import com.disqt.disquests.client.gui.helper.HoverPreviewRenderer;
 import com.disqt.disquests.client.gui.widget.undoredo.TextAction;
 import com.disqt.disquests.client.gui.widget.undoredo.UndoManager;
 import com.google.common.collect.Lists;
+import com.mojang.blaze3d.platform.InputConstants;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -27,7 +28,6 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
-import org.lwjgl.glfw.GLFW;
 
 public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, NarratableEntry {
 
@@ -1019,39 +1019,38 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
   @Override
   public boolean keyPressed(KeyEvent keyInput) {
     int keyCode = keyInput.key();
-    int scanCode = keyInput.scancode();
     int modifiers = keyInput.modifiers();
-    boolean hasShift = (modifiers & GLFW.GLFW_MOD_SHIFT) != 0;
-    boolean hasCtrl = (modifiers & GLFW.GLFW_MOD_CONTROL) != 0;
+    boolean hasShift = (modifiers & InputConstants.MOD_SHIFT) != 0;
+    boolean hasCtrl = (modifiers & InputConstants.MOD_CONTROL) != 0;
 
-    if (keyCode == GLFW.GLFW_KEY_LEFT_SHIFT || keyCode == GLFW.GLFW_KEY_RIGHT_SHIFT) {
+    if (keyCode == InputConstants.KEY_LSHIFT || keyCode == InputConstants.KEY_RSHIFT) {
       this.shiftDown = true;
     }
-    if (keyCode == GLFW.GLFW_KEY_LEFT_CONTROL || keyCode == GLFW.GLFW_KEY_RIGHT_CONTROL) {
+    if (keyCode == InputConstants.KEY_LCONTROL || keyCode == InputConstants.KEY_RCONTROL) {
       this.ctrlDown = true;
     }
 
     if (!this.focused) return false;
 
-    if (hasCtrl && keyCode == GLFW.GLFW_KEY_Z) {
+    if (hasCtrl && keyCode == InputConstants.KEY_Z) {
       undoManager.undo();
       onChanged();
       return true;
     }
-    if (hasCtrl && keyCode == GLFW.GLFW_KEY_Y) {
+    if (hasCtrl && keyCode == InputConstants.KEY_Y) {
       undoManager.redo();
       onChanged();
       return true;
     }
 
     // ctrl+word moves (absolute space)
-    if (hasCtrl && keyCode == GLFW.GLFW_KEY_LEFT) {
+    if (hasCtrl && keyCode == InputConstants.KEY_LEFT) {
       int oldAbs = getAbsoluteIndex(cursorY, cursorX);
       int newAbs = moveWordBackAbsolute(oldAbs);
       moveCursorToAbsolute(newAbs, hasShift);
       return true;
     }
-    if (hasCtrl && keyCode == GLFW.GLFW_KEY_RIGHT) {
+    if (hasCtrl && keyCode == InputConstants.KEY_RIGHT) {
       int oldAbs = getAbsoluteIndex(cursorY, cursorX);
       int newAbs = moveWordForwardAbsolute(oldAbs);
       moveCursorToAbsolute(newAbs, hasShift);
@@ -1059,24 +1058,24 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
     }
 
     // Select all: Ctrl+A
-    if (hasCtrl && keyCode == GLFW.GLFW_KEY_A) {
+    if (hasCtrl && keyCode == InputConstants.KEY_A) {
       setSelectionAbsolute(0, getTotalLength());
       setCursorFromAbsolute(getTotalLength());
       return true;
     }
     // Copy: Ctrl+C
-    if (hasCtrl && keyCode == GLFW.GLFW_KEY_C) {
+    if (hasCtrl && keyCode == InputConstants.KEY_C) {
       if (hasSelection()) Minecraft.getInstance().keyboardHandler.setClipboard(getSelectedText());
       return true;
     }
     // Paste: Ctrl+V
-    if (hasCtrl && keyCode == GLFW.GLFW_KEY_V) {
+    if (hasCtrl && keyCode == InputConstants.KEY_V) {
       String clip = Minecraft.getInstance().keyboardHandler.getClipboard();
       if (clip != null && !clip.isEmpty()) insertText(clip);
       return true;
     }
     // Cut: Ctrl+X
-    if (hasCtrl && keyCode == GLFW.GLFW_KEY_X) {
+    if (hasCtrl && keyCode == InputConstants.KEY_X) {
       if (hasSelection()) {
         Minecraft.getInstance().keyboardHandler.setClipboard(getSelectedText());
         deleteSelection();
@@ -1085,17 +1084,17 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
     }
 
     switch (keyCode) {
-      case GLFW.GLFW_KEY_TAB -> {
+      case InputConstants.KEY_TAB -> {
         insertText("    ");
         return true;
       }
-      case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> {
+      case InputConstants.KEY_RETURN, InputConstants.KEY_NUMPADENTER -> {
         if (this.lines.size() < this.maxLines) {
           insertText("\n");
         }
         return true;
       }
-      case GLFW.GLFW_KEY_BACKSPACE -> {
+      case InputConstants.KEY_BACKSPACE -> {
         if (hasSelection()) {
           deleteSelection();
           return true;
@@ -1137,7 +1136,7 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
         onChanged();
         return true;
       }
-      case GLFW.GLFW_KEY_DELETE -> {
+      case InputConstants.KEY_DELETE -> {
         if (hasSelection()) {
           deleteSelection();
           return true;
@@ -1163,40 +1162,40 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
         onChanged();
         return true;
       }
-      case GLFW.GLFW_KEY_UP -> {
+      case InputConstants.KEY_UP -> {
         int newLine = Math.max(0, cursorY - 1);
         int newCol = Math.min(cursorX, lines.get(newLine).length());
         int newAbs = getAbsoluteIndex(newLine, newCol);
         moveCursorToAbsolute(newAbs, hasShift);
         return true;
       }
-      case GLFW.GLFW_KEY_DOWN -> {
+      case InputConstants.KEY_DOWN -> {
         int newLine = Math.min(lines.size() - 1, cursorY + 1);
         int newCol = Math.min(cursorX, lines.get(newLine).length());
         int newAbs = getAbsoluteIndex(newLine, newCol);
         moveCursorToAbsolute(newAbs, hasShift);
         return true;
       }
-      case GLFW.GLFW_KEY_LEFT -> {
+      case InputConstants.KEY_LEFT -> {
         int oldAbs = getAbsoluteIndex(cursorY, cursorX);
         if (oldAbs == 0) return true;
         int newAbs = oldAbs - 1;
         moveCursorToAbsolute(newAbs, hasShift);
         return true;
       }
-      case GLFW.GLFW_KEY_RIGHT -> {
+      case InputConstants.KEY_RIGHT -> {
         int oldAbs = getAbsoluteIndex(cursorY, cursorX);
         if (oldAbs >= getTotalLength()) return true;
         int newAbs = oldAbs + 1;
         moveCursorToAbsolute(newAbs, hasShift);
         return true;
       }
-      case GLFW.GLFW_KEY_HOME -> {
+      case InputConstants.KEY_HOME -> {
         int newAbs = getAbsoluteIndex(cursorY, 0);
         moveCursorToAbsolute(newAbs, hasShift);
         return true;
       }
-      case GLFW.GLFW_KEY_END -> {
+      case InputConstants.KEY_END -> {
         int newAbs = getAbsoluteIndex(cursorY, lines.get(cursorY).length());
         moveCursorToAbsolute(newAbs, hasShift);
         return true;
@@ -1209,10 +1208,10 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
   @Override
   public boolean keyReleased(KeyEvent keyInput) {
     int keyCode = keyInput.key();
-    if (keyCode == GLFW.GLFW_KEY_LEFT_SHIFT || keyCode == GLFW.GLFW_KEY_RIGHT_SHIFT) {
+    if (keyCode == InputConstants.KEY_LSHIFT || keyCode == InputConstants.KEY_RSHIFT) {
       this.shiftDown = false;
     }
-    if (keyCode == GLFW.GLFW_KEY_LEFT_CONTROL || keyCode == GLFW.GLFW_KEY_RIGHT_CONTROL) {
+    if (keyCode == InputConstants.KEY_LCONTROL || keyCode == InputConstants.KEY_RCONTROL) {
       this.ctrlDown = false;
     }
     return false;
