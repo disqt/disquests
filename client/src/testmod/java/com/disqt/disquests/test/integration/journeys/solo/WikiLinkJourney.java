@@ -18,7 +18,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.lwjgl.glfw.GLFW;
 
 @IntegrationTest
 @DisplayName("Wiki-Link Journey")
@@ -171,7 +170,7 @@ class WikiLinkJourney {
     given("player is still on edit mode with autocomplete open from previous test");
 
     when("player presses Enter to select the first suggestion");
-    context.getInput().pressKey(GLFW.GLFW_KEY_ENTER);
+    context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN);
     context.waitTicks(10);
 
     then("autocomplete overlay is dismissed");
@@ -371,7 +370,7 @@ class WikiLinkJourney {
     double[] pos =
         context.computeOnClient(c -> new double[] {contentArea.x() + 20.0, contentArea.y() + 12.0});
     context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT);
     context.waitTicks(5);
 
     then("screen navigates to the 'Link Target' quest");

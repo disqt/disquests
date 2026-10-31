@@ -13,7 +13,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.lwjgl.glfw.GLFW;
 
 @IntegrationTest
 @DisplayName("Keybind Toggle Journey")
@@ -35,7 +34,7 @@ class KeybindToggleJourney {
     assertScreenIs(context, MainScreen.class);
 
     when("player presses N");
-    context.getInput().pressKey(GLFW.GLFW_KEY_N);
+    context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_N);
     context.waitTicks(5);
 
     then("screen closes and returns to gameplay");

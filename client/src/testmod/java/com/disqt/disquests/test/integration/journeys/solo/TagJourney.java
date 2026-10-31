@@ -21,7 +21,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.lwjgl.glfw.GLFW;
 
 @IntegrationTest
 @DisplayName("Tag Journey")
@@ -133,7 +132,7 @@ class TagJourney {
 
     double scale = scaleFactor(context);
     context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT);
     context.waitTicks(2);
   }
 
@@ -271,7 +270,7 @@ class TagJourney {
     waitForScreen(context, TagPickerScreen.class);
     and("types 'piwigord' in the unified input and presses Enter");
     type(context, "filter-field", "piwigord");
-    context.getInput().pressKey(GLFW.GLFW_KEY_ENTER);
+    context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN);
     context.waitTicks(2);
     then("edit mode shows the custom tag as a chip");
     waitForEditMode(context);
@@ -348,7 +347,7 @@ class TagJourney {
 
     double scale = scaleFactor(context);
     context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT);
     context.waitTicks(2);
   }
 
@@ -400,7 +399,7 @@ class TagJourney {
 
     when("player types 'mynewtag' and presses Enter");
     type(context, "filter-field", "mynewtag");
-    context.getInput().pressKey(GLFW.GLFW_KEY_ENTER);
+    context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN);
     context.waitTicks(2);
 
     then("returns to edit mode with the new custom tag");
@@ -557,7 +556,7 @@ class TagJourney {
         TIMEOUT);
 
     and("player presses Escape to dismiss");
-    context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+    context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE);
     context.waitTicks(2);
 
     when("player clears search");
@@ -592,7 +591,7 @@ class TagJourney {
 
     double scale = scaleFactor(context);
     context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT);
     context.waitTicks(2);
   }
 

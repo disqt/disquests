@@ -15,7 +15,6 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
-import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -175,7 +174,7 @@ public final class UIActions {
     double[] pos = componentCenter(context, component);
     double scale = scaleFactor(context);
     context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT);
     context.waitTicks(2);
   }
 
@@ -200,7 +199,7 @@ public final class UIActions {
             });
     double scale = scaleFactor(context);
     context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT);
     context.waitTicks(2);
   }
 
@@ -228,7 +227,7 @@ public final class UIActions {
             });
     double scale = scaleFactor(context);
     context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT);
     context.waitTicks(2);
   }
 
@@ -256,7 +255,7 @@ public final class UIActions {
             });
     double scale = scaleFactor(context);
     context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT);
     context.waitTicks(2);
   }
 
@@ -306,7 +305,7 @@ public final class UIActions {
     context.waitTicks(1);
     // Move to end (Ctrl+End)
     context.getInput().holdControl();
-    context.getInput().pressKey(GLFW.GLFW_KEY_END);
+    context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_END);
     context.getInput().releaseControl();
     context.getInput().typeChars(text);
     context.waitTicks(2);
@@ -315,7 +314,7 @@ public final class UIActions {
   /** Press Ctrl+Z (undo) on the currently focused field. */
   public static void undo(ClientGameTestContext context) {
     context.getInput().holdControl();
-    context.getInput().pressKey(GLFW.GLFW_KEY_Z);
+    context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_Z);
     context.getInput().releaseControl();
     context.waitTicks(2);
   }
@@ -327,7 +326,7 @@ public final class UIActions {
   public static void undoN(ClientGameTestContext context, int count) {
     for (int i = 0; i < count; i++) {
       context.getInput().holdControl();
-      context.getInput().pressKey(GLFW.GLFW_KEY_Z);
+      context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_Z);
       context.getInput().releaseControl();
     }
     context.waitTicks(2);
@@ -336,7 +335,7 @@ public final class UIActions {
   /** Press Ctrl+Y (redo) on the currently focused field. */
   public static void redo(ClientGameTestContext context) {
     context.getInput().holdControl();
-    context.getInput().pressKey(GLFW.GLFW_KEY_Y);
+    context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_Y);
     context.getInput().releaseControl();
     context.waitTicks(2);
   }
@@ -345,7 +344,7 @@ public final class UIActions {
   public static void redoN(ClientGameTestContext context, int count) {
     for (int i = 0; i < count; i++) {
       context.getInput().holdControl();
-      context.getInput().pressKey(GLFW.GLFW_KEY_Y);
+      context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_Y);
       context.getInput().releaseControl();
     }
     context.waitTicks(2);
