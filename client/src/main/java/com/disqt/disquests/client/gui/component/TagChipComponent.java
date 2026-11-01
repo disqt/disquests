@@ -2,6 +2,7 @@ package com.disqt.disquests.client.gui.component;
 
 import com.disqt.disquests.client.gui.helper.RoundedRect;
 import com.disqt.disquests.client.gui.helper.TagColors;
+import com.mojang.blaze3d.platform.InputConstants;
 import io.wispforest.owo.ui.base.BaseUIComponent;
 import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.Sizing;
@@ -124,7 +125,7 @@ public class TagChipComponent extends BaseUIComponent {
 
   @Override
   public boolean onMouseDown(MouseButtonEvent click, boolean doubled) {
-    if (click.button() != 0) return false;
+    if (click.button() != InputConstants.MOUSE_BUTTON_LEFT) return false;
 
     pressFlashRemaining = PRESS_FLASH_TICKS;
 

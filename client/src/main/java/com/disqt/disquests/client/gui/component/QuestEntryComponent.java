@@ -10,6 +10,7 @@ import com.disqt.disquests.client.gui.helper.TagColors;
 import com.disqt.disquests.client.gui.helper.Theme;
 import com.disqt.disquests.client.hud.HudPinManager;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
+import com.mojang.blaze3d.platform.InputConstants;
 import io.wispforest.owo.ui.base.BaseUIComponent;
 import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.Sizing;
@@ -345,7 +346,7 @@ public class QuestEntryComponent extends BaseUIComponent {
         click.y(),
         click.button(),
         quest.getTitle());
-    if (click.button() != 0) return false;
+    if (click.button() != InputConstants.MOUSE_BUTTON_LEFT) return false;
 
     // owo-ui passes component-relative coordinates in MouseButtonEvent
     double relX = click.x();
