@@ -50,6 +50,7 @@ All versions (MC, Fabric, Paper, Java) are in `gradle.properties` — that is th
 - Java 25 toolchain requires **Gradle 9.x** (8.x fails with a bare `25.0.3` error)
 - Use plugin id `net.fabricmc.fabric-loom` `1.16-SNAPSHOT`; the short `fabric-loom` id resolves 1.16.3 and fails with "Failed to find official mojang mappings". Loom 1.16 removes `modImplementation` -- use `implementation`
 - LWJGL must match the version MC ships -- bumping `lwjgl-*` alone splits the stack and kills GLFW at class-init (dependabot ignores `org.lwjgl:*`)
+- 26.3 switched input to SDL3: `InputConstants.MOUSE_BUTTON_LEFT` is **1** (GLFW had 0) and right is 3. Never compare `MouseButtonEvent.button()` to a literal -- 0.5.1 shipped with `!= 0` checks and no quest entry was clickable
 - `fabric.mod.json`'s `minecraft` range is hand-maintained -- bump it separately from `gradle.properties`
 - owo config enum lang keys are `text.config.<cfg>.enum.<enumName>.<value>` -- enumName uncapitalised, value **lowercased**
 - owo-lib 0.13.0+26.2 is vendored in `libs/maven` from upstream PR #490 (draft) -- remove it and the repo entry once published
