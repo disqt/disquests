@@ -69,7 +69,6 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
   private static final long DOUBLE_CLICK_INTERVAL_MS = 300;
 
   private boolean shiftDown = false;
-  private boolean ctrlDown = false;
 
   // dragging selection by mouse
   protected boolean isDraggingText = false;
@@ -836,7 +835,6 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
   public boolean mouseClicked(MouseButtonEvent click, boolean simulated) {
     double mouseX = click.x();
     double mouseY = click.y();
-    int button = click.button();
     if (isMouseOver(mouseX, mouseY)) {
       boolean vNeeded = this.scrollingEnabled && isScrollbarNeededV();
       boolean hNeeded = this.scrollingEnabled && isScrollbarNeededH();
@@ -1019,15 +1017,11 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
   @Override
   public boolean keyPressed(KeyEvent keyInput) {
     int keyCode = keyInput.key();
-    int modifiers = keyInput.modifiers();
-    boolean hasShift = (modifiers & InputConstants.MOD_SHIFT) != 0;
-    boolean hasCtrl = (modifiers & InputConstants.MOD_CONTROL) != 0;
+    boolean hasShift = keyInput.hasShiftDown();
+    boolean hasCtrl = keyInput.hasControlDown();
 
     if (keyCode == InputConstants.KEY_LSHIFT || keyCode == InputConstants.KEY_RSHIFT) {
       this.shiftDown = true;
-    }
-    if (keyCode == InputConstants.KEY_LCONTROL || keyCode == InputConstants.KEY_RCONTROL) {
-      this.ctrlDown = true;
     }
 
     if (!this.focused) return false;
@@ -1210,9 +1204,6 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
     int keyCode = keyInput.key();
     if (keyCode == InputConstants.KEY_LSHIFT || keyCode == InputConstants.KEY_RSHIFT) {
       this.shiftDown = false;
-    }
-    if (keyCode == InputConstants.KEY_LCONTROL || keyCode == InputConstants.KEY_RCONTROL) {
-      this.ctrlDown = false;
     }
     return false;
   }

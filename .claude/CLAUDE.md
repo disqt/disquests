@@ -82,7 +82,7 @@ UX-driven journey tests in `client/src/testmod/java/com/disqt/disquests/test/int
 
 **CI status:** The `e2e-test.yml` workflow runs on every PR and push to main. `ensureServer()` auto-downloads paper.jar from the Paper API and bootstraps `server/run/` (eula, server.properties) on first run.
 
-Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with GLFW physical input via `TestInput`. All tests connect to a live Paper server -- no mocking.
+Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with physical input via `TestInput`. All tests connect to a live Paper server -- no mocking.
 
 - **`UIActions`** -- click, type, undo/redo, waitForScreen, openMainScreen, findComponent, waitForQuestCondition, etc.
 - **`UIAssertions`** -- assertLabelText, assertButtonText, assertEntryCount, assertScreenIs, etc.

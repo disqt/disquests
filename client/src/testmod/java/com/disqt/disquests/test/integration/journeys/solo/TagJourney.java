@@ -13,6 +13,7 @@ import com.disqt.disquests.client.gui.screen.TagPickerScreen;
 import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
 import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
+import com.mojang.blaze3d.platform.InputConstants;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.core.UIComponent;
@@ -130,10 +131,7 @@ class TagJourney {
       throw new AssertionError("No tag chips found in chip-cloud");
     }
 
-    double scale = scaleFactor(context);
-    context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-    context.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT);
-    context.waitTicks(2);
+    clickAt(context, pos);
   }
 
   // --- tests ---
@@ -270,7 +268,7 @@ class TagJourney {
     waitForScreen(context, TagPickerScreen.class);
     and("types 'piwigord' in the unified input and presses Enter");
     type(context, "filter-field", "piwigord");
-    context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN);
+    context.getInput().pressKey(InputConstants.KEY_RETURN);
     context.waitTicks(2);
     then("edit mode shows the custom tag as a chip");
     waitForEditMode(context);
@@ -345,10 +343,7 @@ class TagJourney {
       throw new AssertionError("Could not find TagChipComponent in tag-editor");
     }
 
-    double scale = scaleFactor(context);
-    context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-    context.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT);
-    context.waitTicks(2);
+    clickAt(context, pos);
   }
 
   @Test
@@ -399,7 +394,7 @@ class TagJourney {
 
     when("player types 'mynewtag' and presses Enter");
     type(context, "filter-field", "mynewtag");
-    context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN);
+    context.getInput().pressKey(InputConstants.KEY_RETURN);
     context.waitTicks(2);
 
     then("returns to edit mode with the new custom tag");
@@ -556,7 +551,7 @@ class TagJourney {
         TIMEOUT);
 
     and("player presses Escape to dismiss");
-    context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE);
+    context.getInput().pressKey(InputConstants.KEY_ESCAPE);
     context.waitTicks(2);
 
     when("player clears search");
@@ -589,10 +584,7 @@ class TagJourney {
       throw new AssertionError("Tag chip '" + tagName + "' not found in chip-cloud");
     }
 
-    double scale = scaleFactor(context);
-    context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-    context.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT);
-    context.waitTicks(2);
+    clickAt(context, pos);
   }
 
   // Helper to make the context.waitFor lambda cleaner for screen-type checks

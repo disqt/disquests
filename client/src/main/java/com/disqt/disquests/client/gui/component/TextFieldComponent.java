@@ -118,7 +118,7 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
   public boolean onKeyPress(KeyEvent keyInput) {
     // Intercept navigation keys for autocomplete dropdown before forwarding to delegate
     if (dropdown != null && dropdown.isVisible()) {
-      if (dropdown.onKeyDown(keyInput.key())) {
+      if (dropdown.onKeyDown(keyInput)) {
         return true;
       }
     }

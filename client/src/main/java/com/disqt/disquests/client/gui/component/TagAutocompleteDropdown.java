@@ -9,6 +9,7 @@ import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
 import java.util.List;
 import java.util.function.Consumer;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 
 public class TagAutocompleteDropdown {
@@ -78,22 +79,20 @@ public class TagAutocompleteDropdown {
     return visible;
   }
 
-  public boolean onKeyDown(int keyCode) {
+  public boolean onKeyDown(KeyEvent keyInput) {
     if (!visible) return false;
-    if (keyCode == com.mojang.blaze3d.platform.InputConstants.KEY_DOWN) {
+    if (keyInput.isDown()) {
       selectedIndex = Math.min(selectedIndex + 1, results.size() - 1);
       rebuildOverlay();
       return true;
-    } else if (keyCode == com.mojang.blaze3d.platform.InputConstants.KEY_UP) {
+    } else if (keyInput.isUp()) {
       selectedIndex = Math.max(selectedIndex - 1, 0);
       rebuildOverlay();
       return true;
-    } else if (keyCode == com.mojang.blaze3d.platform.InputConstants.KEY_RETURN
-        || keyCode == com.mojang.blaze3d.platform.InputConstants.KEY_NUMPADENTER
-        || keyCode == com.mojang.blaze3d.platform.InputConstants.KEY_TAB) {
+    } else if (keyInput.isConfirmation() || keyInput.isCycleFocus()) {
       selectCurrent();
       return true;
-    } else if (keyCode == com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE) {
+    } else if (keyInput.isEscape()) {
       hide();
       return true;
     }

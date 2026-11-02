@@ -9,6 +9,7 @@ import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
 import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -67,8 +68,8 @@ class NavigationJourney {
   void mouseBackToMainScreen(ClientGameTestContext context) {
     given("player is on QuestScreen after navigating from MainScreen");
     assertScreenIs(context, QuestScreen.class);
-    when("player presses mouse back button (GLFW button 4)");
-    context.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_4);
+    when("player presses mouse back button");
+    context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_4);
     context.waitTicks(5);
     then("MainScreen is shown");
     waitForScreen(context, MainScreen.class);
@@ -82,8 +83,8 @@ class NavigationJourney {
   void mouseForwardToQuestScreen(ClientGameTestContext context) {
     given("player is on MainScreen after pressing mouse back");
     assertScreenIs(context, MainScreen.class);
-    when("player presses mouse forward button (GLFW button 5)");
-    context.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_5);
+    when("player presses mouse forward button");
+    context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_5);
     context.waitTicks(5);
     then("QuestScreen is shown");
     waitForScreen(context, QuestScreen.class);
@@ -110,9 +111,9 @@ class NavigationJourney {
     assertLabelText(context, "title-label", "Nav Test Edited");
 
     when("player presses mouse back twice (past edit screen to original view)");
-    context.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_4);
+    context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_4);
     context.waitTicks(5);
-    context.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_4);
+    context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_4);
     context.waitTicks(5);
 
     then("original view shows the updated title (rebuilt from cache, not stale)");
