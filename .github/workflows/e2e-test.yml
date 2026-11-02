@@ -79,11 +79,16 @@ jobs:
         run: ./gradlew build
 
       - name: Run integration tests
+        # 26.3 creates its OpenGL context through SDL3, which asks GLX for an 8-bit alpha, sRGB-capable
+        # visual that Xvfb's 24-bit screen cannot provide ("Couldn't find matching GLX visual"; GLFW
+        # tolerated the bare Xvfb). Going through Mesa EGL instead (SDL_VIDEO_FORCE_EGL) lets a 24-bit
+        # X visual pair with an RGBA config, so the window comes up on llvmpipe.
         run: |
-          sudo apt-get install -y xvfb
-          Xvfb :99 -ac -screen 0 854x480x24 &
+          sudo apt-get install -y xvfb libgl1-mesa-dri libglx-mesa0 libegl1 libegl-mesa0 mesa-utils
+          Xvfb :99 -ac -screen 0 854x480x24 +extension GLX +render -noreset &
           sleep 2
-          DISPLAY=:99 ./gradlew :client:runIntegrationTest -Pcoverage
+          DISPLAY=:99 glxinfo -B || true
+          DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 SDL_VIDEODRIVER=x11 SDL_VIDEO_FORCE_EGL=1 ./gradlew :client:runIntegrationTest -Pcoverage
         timeout-minutes: 10
 
       - name: Generate coverage report
