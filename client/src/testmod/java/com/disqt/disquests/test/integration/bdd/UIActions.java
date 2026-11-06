@@ -305,8 +305,7 @@ public final class UIActions {
    * multi-line string typed with {@link #type} ends up on one line.
    */
   public static void typeMultiline(ClientGameTestContext context, String componentId, String text) {
-    String[] lines = text.split("
-", -1);
+    String[] lines = text.split("\n", -1);
     type(context, componentId, lines[0]);
     for (int i = 1; i < lines.length; i++) {
       context.getInput().pressKey(InputConstants.KEY_RETURN);

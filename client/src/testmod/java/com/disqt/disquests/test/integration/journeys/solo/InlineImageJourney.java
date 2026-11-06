@@ -103,7 +103,7 @@ class InlineImageJourney {
     click(context, "btn-new-quest");
     waitForScreen(context, QuestScreen.class);
     type(context, "title-field", "Image Test");
-    type(
+    typeMultiline(
         context,
         "content-field",
         "Before\nhttps://example.invalid/not-fetched.txt\n![site]("
