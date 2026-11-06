@@ -104,6 +104,9 @@ Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with physical input via
 - **CI Xvfb** — `854x480x24` with `guiScale:1` via `ensureClientOptions()`. Do NOT increase Xvfb resolution -- 1920x1080 causes 4x software-rendering overhead, making tests 2x slower.
 - **`catch(Throwable)` not `catch(Exception)` for `waitFor`** — Fabric's `waitFor` throws `AssertionError` (extends `Error`). `catch(Exception)` won't catch it.
 - **Server handshake retry** — `ServerPacketHandler.onPlayerJoin` retries every 20 ticks (up to 10 attempts) because client channel registration can be delayed on slow CI.
+- **Tile fixture** — `TileFixtureServer` (harness package) serves one BlueMap lowres tile (`/maps/{id}/tiles/1/x0/z0.png`) plus `settings.json` on `localhost:${disquests.test.tilePort}` (default 25580); everything else 404s. Player A starts it before connecting; a bind failure is logged and ignored.
+- **`disquests.test.allowHttp=true`** — set by both client run configs so `HttpFetcher` accepts the fixture's `http://` URL (production only allows `https://`).
+- **`ensureServer` writes `plugins/Disquests/config.yml`** — the default config with `bluemap-url` pointing at the fixture, before Paper starts (only when no server is already running). Non-default ports: `-PtestServerPort`, `-PtestRconPort`, `-PtestTilePort` (forwarded to the client subprocesses).
 
 ## Networking Protocol
 

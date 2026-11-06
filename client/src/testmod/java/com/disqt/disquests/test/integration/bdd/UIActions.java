@@ -3,6 +3,7 @@ package com.disqt.disquests.test.integration.bdd;
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
+import com.disqt.disquests.client.gui.map.MapView;
 import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.test.integration.harness.RconClient;
@@ -348,6 +349,45 @@ public final class UIActions {
       context.getInput().releaseControl();
     }
     context.waitTicks(2);
+  }
+
+  /** Press a key (InputConstants key code) on the current screen, then wait for it to land. */
+  public static void pressKey(ClientGameTestContext context, int key) {
+    context.getInput().pressKey(key);
+    context.waitTicks(2);
+  }
+
+  /**
+   * Scroll the mouse wheel at a GUI-space position. Positive amounts scroll up (zoom in on the
+   * map), negative amounts scroll down.
+   */
+  public static void scrollAt(ClientGameTestContext context, double[] guiPos, double amount) {
+    double scale = scaleFactor(context);
+    context.getInput().setCursorPos(guiPos[0] * scale, guiPos[1] * scale);
+    context.getInput().scroll(amount);
+    context.waitTicks(2);
+  }
+
+  // --- Map helpers ---
+
+  /** The MainScreen's map component (id "map-view"). */
+  public static MapView mapView(ClientGameTestContext context) {
+    return findComponent(context, MapView.class, "map-view");
+  }
+
+  /** GUI-space screen position of a block on the map, using the map's current camera. */
+  public static double[] mapScreenPos(ClientGameTestContext context, double bx, double bz) {
+    MapView view = mapView(context);
+    return context.computeOnClient(
+        c -> {
+          double[] rel = view.blockToScreen(bx, bz);
+          return new double[] {view.x() + rel[0], view.y() + rel[1]};
+        });
+  }
+
+  /** Left-click the map at a block position through the real input pipeline. */
+  public static void clickMapAtBlock(ClientGameTestContext context, double bx, double bz) {
+    clickAt(context, mapScreenPos(context, bx, bz));
   }
 
   // --- Quest helpers ---
