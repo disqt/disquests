@@ -5,6 +5,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.Identifier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The client's single {@link ImageCache}, wired to HTTP, the texture manager and the render thread.
@@ -13,6 +15,7 @@ public final class Images {
 
   private static final int MAX_ENTRIES = 32;
   private static final long MAX_PIXEL_BYTES = 64L * 1024 * 1024;
+  private static final Logger LOGGER = LoggerFactory.getLogger("Disquests.Images");
   private static volatile ImageCache cache;
 
   private Images() {}
@@ -38,6 +41,7 @@ public final class Images {
                   Minecraft.getInstance()::execute,
                   MAX_ENTRIES,
                   MAX_PIXEL_BYTES);
+          c.setFailureListener((url, reason) -> LOGGER.warn("Image {} failed: {}", url, reason));
           cache = c;
         }
       }

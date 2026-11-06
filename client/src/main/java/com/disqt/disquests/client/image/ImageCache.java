@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.function.BiConsumer;
 import java.util.function.LongSupplier;
 
 /**
@@ -48,6 +49,7 @@ public final class ImageCache {
   private final int maxEntries;
   private final long maxPixelBytes;
   private final LongSupplier clock;
+  private volatile BiConsumer<String, String> failureListener = (url, reason) -> {};
 
   private final LinkedHashMap<String, Entry> loaded = new LinkedHashMap<>(16, 0.75f, true);
   private final Set<String> inFlight = new HashSet<>();
@@ -105,6 +107,11 @@ public final class ImageCache {
       ImageState known = peekAndTouch(url);
       return known != null ? known : new ImageState.Loading();
     }
+  }
+
+  /** Called with (url, reason) whenever a URL settles as failed; used for logging. */
+  public void setFailureListener(BiConsumer<String, String> listener) {
+    this.failureListener = listener;
   }
 
   public synchronized int loadedCount() {
@@ -179,9 +186,12 @@ public final class ImageCache {
     for (String k : evicted) textures.release(k);
   }
 
-  private synchronized void fail(String url, String reason) {
-    inFlight.remove(url);
-    failed.put(url, new ImageState.Failed(reason));
+  private void fail(String url, String reason) {
+    synchronized (this) {
+      inFlight.remove(url);
+      failed.put(url, new ImageState.Failed(reason));
+    }
+    failureListener.accept(url, reason);
   }
 
   private static long pixelBytes(int width, int height) {

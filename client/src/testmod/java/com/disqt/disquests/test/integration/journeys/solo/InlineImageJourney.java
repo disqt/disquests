@@ -122,11 +122,14 @@ class InlineImageJourney {
     context.waitFor(
         client -> {
           MarkdownWidget w = widgetOf(client);
-          return w != null && w.loadedImageCount() == 4;
+          return w != null && w.imageBlockCount() > 0 && !w.imageReport().contains("Loading");
         },
         TIMEOUT);
+    String report = context.computeOnClient(c -> widgetOf(c).imageReport());
     int blocks = context.computeOnClient(c -> widgetOf(c).imageBlockCount());
-    assertEquals(4, blocks, "image blocks");
+    int loaded = context.computeOnClient(c -> widgetOf(c).loadedImageCount());
+    assertEquals(4, blocks, report);
+    assertEquals(4, loaded, report);
 
     and("each image was fetched from the server exactly once");
     assertEquals(1, imageRequests.get(), "requests for /img.png");

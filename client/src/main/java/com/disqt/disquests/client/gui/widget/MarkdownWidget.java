@@ -204,6 +204,17 @@ public class MarkdownWidget extends BaseUIComponent {
     return n;
   }
 
+  /** One line per image block: url and cache state. For E2E failure messages. */
+  public String imageReport() {
+    StringBuilder sb = new StringBuilder("blocks=").append(imageBlockCount());
+    for (WrappedEntry e : wrappedLines) {
+      if (e.imageUrl != null) {
+        sb.append("; ").append(e.imageUrl).append(" -> ").append(Images.cache().get(e.imageUrl));
+      }
+    }
+    return sb.toString();
+  }
+
   /** Number of image blocks whose image is decoded and ready to draw. For E2E testing. */
   public int loadedImageCount() {
     int n = 0;
