@@ -24,7 +24,7 @@ public final class ImageLinkDetector {
     return allowHttp;
   }
 
-  static void setAllowHttpForTests(boolean value) {
+  public static void setAllowHttpForTests(boolean value) {
     allowHttp = value;
   }
 
