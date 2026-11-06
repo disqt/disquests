@@ -1,5 +1,6 @@
 package com.disqt.disquests.client;
 
+import com.disqt.disquests.client.gui.map.SharedTileCache;
 import com.disqt.disquests.common.ProtocolVersion;
 import java.util.Collections;
 import java.util.List;
@@ -78,6 +79,7 @@ public class ClientSession {
     pinnedQuestIds.clear();
     requestedQuestIds.clear();
     pendingToast = null;
+    SharedTileCache.reset();
     playerUuid = null;
     bluemapMapNames = Map.of();
     bluemapDefaultMap = "overworld";
@@ -187,6 +189,7 @@ public class ClientSession {
   public static String consumePendingToast() {
     String msg = pendingToast;
     pendingToast = null;
+    SharedTileCache.reset();
     return msg;
   }
 
