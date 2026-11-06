@@ -100,6 +100,9 @@
     "zoom": "Zoom %d",
     "server_outdated": "The server needs updating to show the map",
     "toggle_list": "List",
+    "edit_hint": "Click to add corners. Enter or click the first corner to finish. Right-click removes the last one.",
+    "self_intersecting": "The outline crosses itself",
+    "too_many_vertices": "At most %d corners",
   },
   "gui.disquests.map.dim.{}": {
     "overworld": "Overworld",
