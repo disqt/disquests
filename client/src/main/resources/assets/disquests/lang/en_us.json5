@@ -30,6 +30,9 @@
     "add": "Add",
     "region_off": "[ ] Region",
     "region_on": "[x] Region",
+    "done": "Done",
+    "cancel_map": "Cancel",
+    "clear_location": "Clear location",
   },
 
   // Contributor permissions

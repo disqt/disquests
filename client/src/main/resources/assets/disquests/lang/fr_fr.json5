@@ -30,6 +30,9 @@
     "add": "Ajouter",
     "region_off": "[ ] Région",
     "region_on": "[x] Région",
+    "done": "Terminer",
+    "cancel_map": "Annuler",
+    "clear_location": "Effacer l'emplacement",
   },
 
   // Permissions des contributeurs

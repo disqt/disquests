@@ -14,8 +14,10 @@ import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.client.markdown.RenderedLine;
 import com.disqt.disquests.client.network.PacketSender;
+import com.disqt.disquests.common.QuestLocation;
 import com.disqt.disquests.common.TagConstraints;
 import com.disqt.disquests.common.model.CoordinatesData;
+import com.disqt.disquests.common.model.PointData;
 import com.disqt.disquests.common.model.Visibility;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
@@ -46,6 +48,7 @@ public class QuestScreen extends DisquestsBaseScreen {
   private static final String MAP_OVERWORLD = "overworld";
   private static final String MAP_NETHER = "the_nether";
   private static final String MAP_END = "the_end";
+  private static final double DEFAULT_Y = 64;
 
   private final Quest quest;
   private final boolean editing;
@@ -827,6 +830,52 @@ public class QuestScreen extends DisquestsBaseScreen {
   private void openContributors() {
     persistFieldValues();
     navigateToScreen(new ContributorScreen(this, quest));
+  }
+
+  /**
+   * Applies a location drawn on the map: no corners clears it, one is a pin, two or more an
+   * outline. Sets the quest's map to {@link #dimensionForEdit()} and rebuilds the editor.
+   */
+  public void applyMapLocation(List<PointData> vertices) {
+    String dimension = dimensionForEdit();
+    if (vertices.isEmpty()) {
+      quest.setCoordinates(null);
+      quest.setCoordinates2(null);
+      quest.setRegion(false);
+      quest.setPolygon(List.of());
+    } else if (vertices.size() == 1) {
+      PointData p = vertices.get(0);
+      double y = DEFAULT_Y;
+      if (minecraft != null
+          && minecraft.player != null
+          && minecraft.player.level().dimension().identifier().getPath().equals(dimension)) {
+        y = minecraft.player.getY();
+      }
+      quest.setCoordinates(new CoordinatesData(p.x(), y, p.z()));
+      quest.setCoordinates2(null);
+      quest.setRegion(false);
+      quest.setPolygon(List.of());
+    } else {
+      CoordinatesData[] box = QuestLocation.boundingBox(vertices, DEFAULT_Y);
+      quest.setPolygon(List.copyOf(vertices));
+      quest.setCoordinates(box[0]);
+      quest.setCoordinates2(box[1]);
+      quest.setRegion(true);
+    }
+    this.regionEnabled = quest.isRegion();
+    quest.setMap(dimension);
+    rebuildEditMode();
+  }
+
+  /** The quest's map, or the player's dimension when the quest has none. */
+  String dimensionForEdit() {
+    if (quest.getMap() != null) {
+      return quest.getMap();
+    }
+    if (minecraft != null && minecraft.level != null) {
+      return minecraft.level.dimension().identifier().getPath();
+    }
+    return MAP_OVERWORLD;
   }
 
   private void rebuildEditMode() {
