@@ -1,8 +1,10 @@
 package com.disqt.disquests.server.papermc;
 
+import com.disqt.disquests.common.QuestLocation;
 import com.disqt.disquests.common.model.CollaborationRequestData;
 import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.CoordinatesData;
+import com.disqt.disquests.common.model.PointData;
 import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.common.model.Visibility;
 import java.io.IOException;
@@ -26,6 +28,10 @@ public class DataManager {
   }
 
   public synchronized void initialize() {
+    initialize("overworld");
+  }
+
+  public synchronized void initialize(String defaultMap) {
     try {
       Files.createDirectories(dataDir);
       String url = "jdbc:sqlite:" + dataDir.resolve("disquests.db");
@@ -34,8 +40,12 @@ public class DataManager {
         stmt.executeUpdate("PRAGMA foreign_keys = ON");
         stmt.executeUpdate("PRAGMA journal_mode = WAL");
       }
+      boolean polygonsTableExisted = tableExists("quest_polygons");
       createTables();
       migratePinnedQuests();
+      if (!polygonsTableExisted) {
+        migrateLocations(defaultMap);
+      }
     } catch (SQLException | IOException e) {
       throw new RuntimeException("Failed to initialize database", e);
     }
@@ -109,6 +119,17 @@ public class DataManager {
                         PRIMARY KEY (quest_id, tag),
                         FOREIGN KEY (quest_id) REFERENCES quests(id) ON DELETE CASCADE
                     )""");
+
+      stmt.executeUpdate(
+          """
+                    CREATE TABLE IF NOT EXISTS quest_polygons (
+                        quest_id TEXT NOT NULL,
+                        idx INTEGER NOT NULL,
+                        x REAL NOT NULL,
+                        z REAL NOT NULL,
+                        PRIMARY KEY (quest_id, idx),
+                        FOREIGN KEY (quest_id) REFERENCES quests(id) ON DELETE CASCADE
+                    )""");
     }
   }
 
@@ -116,7 +137,8 @@ public class DataManager {
   // Quests
   // -------------------------------------------------------------------------
 
-  public synchronized void saveQuest(QuestData quest) {
+  public synchronized void saveQuest(QuestData rawQuest) {
+    QuestData quest = QuestLocation.normalize(rawQuest);
     try (PreparedStatement stmt =
         connection.prepareStatement(
             """
@@ -184,6 +206,27 @@ public class DataManager {
           insTags.executeBatch();
         }
       }
+
+      try (PreparedStatement delPoly =
+          connection.prepareStatement("DELETE FROM quest_polygons WHERE quest_id = ?")) {
+        delPoly.setString(1, quest.id().toString());
+        delPoly.executeUpdate();
+      }
+      if (!quest.polygon().isEmpty()) {
+        try (PreparedStatement insPoly =
+            connection.prepareStatement(
+                "INSERT INTO quest_polygons (quest_id, idx, x, z) VALUES (?, ?, ?, ?)")) {
+          int idx = 0;
+          for (PointData p : quest.polygon()) {
+            insPoly.setString(1, quest.id().toString());
+            insPoly.setInt(2, idx++);
+            insPoly.setDouble(3, p.x());
+            insPoly.setDouble(4, p.z());
+            insPoly.addBatch();
+          }
+          insPoly.executeBatch();
+        }
+      }
     } catch (SQLException e) {
       throw new RuntimeException("Failed to save quest", e);
     }
@@ -206,7 +249,7 @@ public class DataManager {
       ResultSet rs = stmt.executeQuery();
       if (rs.next()) {
         QuestData quest = mapQuestRow(rs);
-        return withTags(withContributors(quest));
+        return withPolygon(withTags(withContributors(quest)));
       }
       return null;
     } catch (SQLException e) {
@@ -233,7 +276,7 @@ public class DataManager {
     } catch (SQLException e) {
       throw new RuntimeException("Failed to get quests for player", e);
     }
-    return withTagsAll(withContributorsAll(quests));
+    return withPolygonsAll(withTagsAll(withContributorsAll(quests)));
   }
 
   public synchronized List<QuestData> getServerQuests(UUID excludePlayerUuid) {
@@ -256,7 +299,7 @@ public class DataManager {
     } catch (SQLException e) {
       throw new RuntimeException("Failed to get server quests", e);
     }
-    return withTagsAll(withContributorsAll(quests));
+    return withPolygonsAll(withTagsAll(withContributorsAll(quests)));
   }
 
   public synchronized Map<String, QuestData> findQuestsByTitlesIgnoreCase(List<String> titles) {
@@ -638,6 +681,7 @@ public class DataManager {
       stmt.executeUpdate("DELETE FROM collaboration_requests");
       stmt.executeUpdate("DELETE FROM contributors");
       stmt.executeUpdate("DELETE FROM quest_tags");
+      stmt.executeUpdate("DELETE FROM quest_polygons");
       stmt.executeUpdate("DELETE FROM quests");
       stmt.executeUpdate("DELETE FROM player_names");
     } catch (SQLException e) {
@@ -684,6 +728,72 @@ public class DataManager {
     }
   }
 
+  private boolean tableExists(String table) throws SQLException {
+    try (Statement stmt = connection.createStatement();
+        ResultSet rs = stmt.executeQuery("PRAGMA table_info(" + table + ")")) {
+      return rs.next();
+    }
+  }
+
+  /** One-off migration to the polygon location model; runs when quest_polygons is first created. */
+  private void migrateLocations(String defaultMap) throws SQLException {
+    boolean previousAutoCommit = connection.getAutoCommit();
+    connection.setAutoCommit(false);
+    try {
+      try (Statement stmt = connection.createStatement()) {
+        stmt.executeUpdate(
+            "UPDATE quests SET coord2_x = NULL, coord2_y = NULL, coord2_z = NULL, is_region = 0"
+                + " WHERE coord_x IS NULL AND coord2_x IS NOT NULL");
+      }
+
+      try (Statement stmt = connection.createStatement();
+          ResultSet rs =
+              stmt.executeQuery(
+                  "SELECT id, coord_x, coord_y, coord_z, coord2_x, coord2_y, coord2_z FROM quests"
+                      + " WHERE is_region = 1 AND coord_x IS NOT NULL AND coord2_x IS NOT NULL");
+          PreparedStatement ins =
+              connection.prepareStatement(
+                  "INSERT INTO quest_polygons (quest_id, idx, x, z) VALUES (?, ?, ?, ?)")) {
+        while (rs.next()) {
+          List<PointData> polygon =
+              QuestLocation.rectangleToPolygon(
+                  new CoordinatesData(
+                      rs.getDouble("coord_x"), rs.getDouble("coord_y"), rs.getDouble("coord_z")),
+                  new CoordinatesData(
+                      rs.getDouble("coord2_x"),
+                      rs.getDouble("coord2_y"),
+                      rs.getDouble("coord2_z")));
+          for (int i = 0; i < polygon.size(); i++) {
+            ins.setString(1, rs.getString("id"));
+            ins.setInt(2, i);
+            ins.setDouble(3, polygon.get(i).x());
+            ins.setDouble(4, polygon.get(i).z());
+            ins.addBatch();
+          }
+        }
+        ins.executeBatch();
+      }
+
+      try (PreparedStatement stmt =
+          connection.prepareStatement(
+              "UPDATE quests SET map = ? WHERE map IS NULL AND coord_x IS NOT NULL")) {
+        stmt.setString(1, defaultMap);
+        stmt.executeUpdate();
+      }
+
+      try (Statement stmt = connection.createStatement()) {
+        stmt.executeUpdate("UPDATE quests SET map = 'the_nether' WHERE map = 'nether'");
+        stmt.executeUpdate("UPDATE quests SET map = 'the_end' WHERE map = 'end'");
+      }
+      connection.commit();
+    } catch (SQLException e) {
+      connection.rollback();
+      throw e;
+    } finally {
+      connection.setAutoCommit(previousAutoCommit);
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------
@@ -720,21 +830,7 @@ public class DataManager {
   }
 
   private QuestData withContributors(QuestData quest) {
-    List<ContributorData> contributors = getContributors(quest.id());
-    return new QuestData(
-        quest.id(),
-        quest.title(),
-        quest.content(),
-        quest.ownerUuid(),
-        quest.ownerName(),
-        quest.visibility(),
-        contributors,
-        quest.lastModified(),
-        quest.coordinates(),
-        quest.isRegion(),
-        quest.coordinates2(),
-        quest.map(),
-        quest.tags());
+    return quest.withContributors(getContributors(quest.id()));
   }
 
   private Map<UUID, List<ContributorData>> getContributorsBatch(List<UUID> questIds) {
@@ -776,22 +872,7 @@ public class DataManager {
     Map<UUID, List<ContributorData>> contributorMap = getContributorsBatch(questIds);
     List<QuestData> result = new ArrayList<>(quests.size());
     for (QuestData quest : quests) {
-      List<ContributorData> contributors = contributorMap.getOrDefault(quest.id(), List.of());
-      result.add(
-          new QuestData(
-              quest.id(),
-              quest.title(),
-              quest.content(),
-              quest.ownerUuid(),
-              quest.ownerName(),
-              quest.visibility(),
-              contributors,
-              quest.lastModified(),
-              quest.coordinates(),
-              quest.isRegion(),
-              quest.coordinates2(),
-              quest.map(),
-              quest.tags()));
+      result.add(quest.withContributors(contributorMap.getOrDefault(quest.id(), List.of())));
     }
     return result;
   }
@@ -835,21 +916,7 @@ public class DataManager {
   }
 
   private QuestData withTags(QuestData quest) {
-    List<String> tags = getTagsForQuest(quest.id());
-    return new QuestData(
-        quest.id(),
-        quest.title(),
-        quest.content(),
-        quest.ownerUuid(),
-        quest.ownerName(),
-        quest.visibility(),
-        quest.contributors(),
-        quest.lastModified(),
-        quest.coordinates(),
-        quest.isRegion(),
-        quest.coordinates2(),
-        quest.map(),
-        tags);
+    return quest.withTags(getTagsForQuest(quest.id()));
   }
 
   private List<QuestData> withTagsAll(List<QuestData> quests) {
@@ -857,24 +924,59 @@ public class DataManager {
     Map<UUID, List<String>> tagMap = getTagsBatch(questIds);
     List<QuestData> result = new ArrayList<>(quests.size());
     for (QuestData quest : quests) {
-      List<String> tags = tagMap.getOrDefault(quest.id(), List.of());
-      result.add(
-          new QuestData(
-              quest.id(),
-              quest.title(),
-              quest.content(),
-              quest.ownerUuid(),
-              quest.ownerName(),
-              quest.visibility(),
-              quest.contributors(),
-              quest.lastModified(),
-              quest.coordinates(),
-              quest.isRegion(),
-              quest.coordinates2(),
-              quest.map(),
-              tags));
+      result.add(quest.withTags(tagMap.getOrDefault(quest.id(), List.of())));
     }
     return result;
+  }
+
+  private Map<UUID, List<PointData>> getPolygonsBatch(List<UUID> questIds) {
+    if (questIds.isEmpty()) return Map.of();
+    Map<UUID, List<PointData>> result = new HashMap<>();
+    String placeholders = String.join(",", questIds.stream().map(id -> "?").toList());
+    String sql =
+        "SELECT quest_id, x, z FROM quest_polygons WHERE quest_id IN ("
+            + placeholders
+            + ") ORDER BY quest_id, idx";
+    try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+      for (int i = 0; i < questIds.size(); i++) {
+        stmt.setString(i + 1, questIds.get(i).toString());
+      }
+      ResultSet rs = stmt.executeQuery();
+      while (rs.next()) {
+        UUID questId = UUID.fromString(rs.getString("quest_id"));
+        result
+            .computeIfAbsent(questId, k -> new ArrayList<>())
+            .add(new PointData(rs.getDouble("x"), rs.getDouble("z")));
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to batch-load polygons", e);
+    }
+    return result;
+  }
+
+  private QuestData withPolygon(QuestData quest) {
+    List<PointData> polygon =
+        getPolygonsBatch(List.of(quest.id())).getOrDefault(quest.id(), List.of());
+    return quest.withPolygon(polygon);
+  }
+
+  private List<QuestData> withPolygonsAll(List<QuestData> quests) {
+    List<UUID> questIds = quests.stream().map(QuestData::id).toList();
+    Map<UUID, List<PointData>> polygonMap = getPolygonsBatch(questIds);
+    List<QuestData> result = new ArrayList<>(quests.size());
+    for (QuestData quest : quests) {
+      result.add(quest.withPolygon(polygonMap.getOrDefault(quest.id(), List.of())));
+    }
+    return result;
+  }
+
+  synchronized int countPolygonRows() {
+    try (Statement stmt = connection.createStatement();
+        ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM quest_polygons")) {
+      return rs.next() ? rs.getInt(1) : 0;
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to count polygon rows", e);
+    }
   }
 
   /** Returns all distinct tags from the DB merged with config seed tags, alphabetically sorted. */

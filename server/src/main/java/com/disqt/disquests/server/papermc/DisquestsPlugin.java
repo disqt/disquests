@@ -15,7 +15,7 @@ public class DisquestsPlugin extends JavaPlugin {
   public void onEnable() {
     disquestsConfig = new Config(this);
     dataManager = new DataManager(getDataFolder().toPath());
-    dataManager.initialize();
+    dataManager.initialize(disquestsConfig.getBluemapDefaultMap());
 
     packetHandler = new ServerPacketHandler(this, dataManager, disquestsConfig);
 

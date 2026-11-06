@@ -4,6 +4,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.disqt.disquests.common.model.*;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -738,7 +742,7 @@ class DataManagerTest {
     assertEquals(2000L, reloaded.lastModified());
     assertNotNull(reloaded.coordinates());
     assertEquals(5.0, reloaded.coordinates().x(), 1e-9);
-    assertEquals("nether", reloaded.map());
+    assertEquals("the_nether", reloaded.map());
   }
 
   @Test
@@ -784,5 +788,273 @@ class DataManagerTest {
 
     assertFalse(dm.isQuestPinned(OWNER, questId));
     assertTrue(dm.getPinnedQuestIds(OWNER).isEmpty());
+  }
+
+  // -------------------------------------------------------------------------
+  // Polygons and location migration
+  // -------------------------------------------------------------------------
+
+  private static final String LEGACY_DDL =
+      """
+      CREATE TABLE IF NOT EXISTS quests (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          content TEXT NOT NULL DEFAULT '',
+          owner_uuid TEXT NOT NULL,
+          visibility TEXT NOT NULL DEFAULT 'PRIVATE',
+          coord_x REAL,
+          coord_y REAL,
+          coord_z REAL,
+          is_region INTEGER NOT NULL DEFAULT 0,
+          coord2_x REAL,
+          coord2_y REAL,
+          coord2_z REAL,
+          map TEXT,
+          last_modified INTEGER NOT NULL
+      )""";
+
+  private static void setNullableDouble(PreparedStatement ps, int idx, Double v) throws Exception {
+    if (v == null) ps.setNull(idx, java.sql.Types.REAL);
+    else ps.setDouble(idx, v);
+  }
+
+  private static void insertLegacyRow(
+      Path dir,
+      UUID id,
+      Double x,
+      Double y,
+      Double z,
+      int isRegion,
+      Double x2,
+      Double y2,
+      Double z2,
+      String map)
+      throws Exception {
+    java.nio.file.Files.createDirectories(dir);
+    try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + dir.resolve("disquests.db"));
+        Statement st = c.createStatement()) {
+      st.executeUpdate(LEGACY_DDL);
+      try (PreparedStatement ps =
+          c.prepareStatement(
+              "INSERT INTO quests (id, title, content, owner_uuid, visibility, coord_x, coord_y,"
+                  + " coord_z, is_region, coord2_x, coord2_y, coord2_z, map, last_modified)"
+                  + " VALUES (?, 'Legacy', '', ?, 'PRIVATE', ?, ?, ?, ?, ?, ?, ?, ?, 1)")) {
+        ps.setString(1, id.toString());
+        ps.setString(2, OWNER.toString());
+        setNullableDouble(ps, 3, x);
+        setNullableDouble(ps, 4, y);
+        setNullableDouble(ps, 5, z);
+        ps.setInt(6, isRegion);
+        setNullableDouble(ps, 7, x2);
+        setNullableDouble(ps, 8, y2);
+        setNullableDouble(ps, 9, z2);
+        ps.setString(10, map);
+        ps.executeUpdate();
+      }
+    }
+  }
+
+  private DataManager migrated(Path dir) {
+    DataManager legacy = new DataManager(dir);
+    legacy.initialize("overworld");
+    return legacy;
+  }
+
+  @Test
+  void migration_rectangleBecomesFourVertexPolygon() throws Exception {
+    Path dir = tempDir.resolve("legacy");
+    UUID id = UUID.randomUUID();
+    insertLegacyRow(dir, id, 10.0, 64.0, 20.0, 1, 30.0, 70.0, 40.0, "overworld");
+    DataManager legacy = migrated(dir);
+    try {
+      QuestData q = legacy.getQuest(id);
+      assertEquals(
+          List.of(
+              new PointData(10, 20),
+              new PointData(30, 20),
+              new PointData(30, 40),
+              new PointData(10, 40)),
+          q.polygon());
+      assertEquals(new CoordinatesData(10, 64, 20), q.coordinates());
+      assertEquals(new CoordinatesData(30, 70, 40), q.coordinates2());
+      assertTrue(q.isRegion());
+    } finally {
+      legacy.close();
+    }
+  }
+
+  @Test
+  void migration_pinStaysPin() throws Exception {
+    Path dir = tempDir.resolve("legacy");
+    UUID id = UUID.randomUUID();
+    insertLegacyRow(dir, id, 5.0, 70.0, 6.0, 0, null, null, null, "overworld");
+    DataManager legacy = migrated(dir);
+    try {
+      QuestData q = legacy.getQuest(id);
+      assertTrue(q.polygon().isEmpty());
+      assertEquals(new CoordinatesData(5, 70, 6), q.coordinates());
+      assertFalse(q.isRegion());
+    } finally {
+      legacy.close();
+    }
+  }
+
+  @Test
+  void migration_unlocatedUntouched() throws Exception {
+    Path dir = tempDir.resolve("legacy");
+    UUID id = UUID.randomUUID();
+    insertLegacyRow(dir, id, null, null, null, 0, null, null, null, null);
+    DataManager legacy = migrated(dir);
+    try {
+      QuestData q = legacy.getQuest(id);
+      assertTrue(q.polygon().isEmpty());
+      assertNull(q.coordinates());
+      assertNull(q.map());
+    } finally {
+      legacy.close();
+    }
+  }
+
+  @Test
+  void migration_orphanCorner2Dropped() throws Exception {
+    Path dir = tempDir.resolve("legacy");
+    UUID id = UUID.randomUUID();
+    insertLegacyRow(dir, id, null, null, null, 1, 30.0, 70.0, 40.0, null);
+    DataManager legacy = migrated(dir);
+    try {
+      QuestData q = legacy.getQuest(id);
+      assertNull(q.coordinates2());
+      assertFalse(q.isRegion());
+      assertTrue(q.polygon().isEmpty());
+    } finally {
+      legacy.close();
+    }
+  }
+
+  @Test
+  void migration_backfillsDefaultMapOnLocatedRows() throws Exception {
+    Path dir = tempDir.resolve("legacy");
+    UUID located = UUID.randomUUID();
+    UUID unlocated = UUID.randomUUID();
+    insertLegacyRow(dir, located, 1.0, 64.0, 2.0, 0, null, null, null, null);
+    insertLegacyRow(dir, unlocated, null, null, null, 0, null, null, null, null);
+    DataManager legacy = migrated(dir);
+    try {
+      assertEquals("overworld", legacy.getQuest(located).map());
+      assertNull(legacy.getQuest(unlocated).map());
+    } finally {
+      legacy.close();
+    }
+  }
+
+  @Test
+  void migration_normalisesNetherKey() throws Exception {
+    Path dir = tempDir.resolve("legacy");
+    UUID nether = UUID.randomUUID();
+    UUID end = UUID.randomUUID();
+    insertLegacyRow(dir, nether, 1.0, 64.0, 2.0, 0, null, null, null, "nether");
+    insertLegacyRow(dir, end, 1.0, 64.0, 2.0, 0, null, null, null, "end");
+    DataManager legacy = migrated(dir);
+    try {
+      assertEquals("the_nether", legacy.getQuest(nether).map());
+      assertEquals("the_end", legacy.getQuest(end).map());
+    } finally {
+      legacy.close();
+    }
+  }
+
+  @Test
+  void migration_isIdempotent() throws Exception {
+    Path dir = tempDir.resolve("legacy");
+    UUID id = UUID.randomUUID();
+    insertLegacyRow(dir, id, 10.0, 64.0, 20.0, 1, 30.0, 70.0, 40.0, "overworld");
+    DataManager first = migrated(dir);
+    assertEquals(4, first.countPolygonRows());
+    first.close();
+    DataManager second = migrated(dir);
+    try {
+      assertEquals(4, second.countPolygonRows());
+      assertEquals(4, second.getQuest(id).polygon().size());
+    } finally {
+      second.close();
+    }
+  }
+
+  @Test
+  void savePolygon_roundTrip_andLegacyColumnsInSync() {
+    UUID id = UUID.randomUUID();
+    dm.upsertPlayerName(OWNER, "Alice");
+    List<PointData> poly = List.of(new PointData(0, 0), new PointData(10, 0), new PointData(10, 8));
+    QuestData withPoly =
+        makeQuest(id, OWNER, "Poly", Visibility.PRIVATE)
+            .withLocation(new CoordinatesData(0, 64, 0), false, null, poly);
+    dm.saveQuest(withPoly);
+
+    QuestData q = dm.getQuest(id);
+    assertEquals(poly, q.polygon());
+    assertEquals(new CoordinatesData(0, 64, 0), q.coordinates());
+    assertEquals(new CoordinatesData(10, 64, 8), q.coordinates2());
+    assertTrue(q.isRegion());
+  }
+
+  @Test
+  void savePolygon_replacesPreviousVertices() {
+    UUID id = UUID.randomUUID();
+    dm.upsertPlayerName(OWNER, "Alice");
+    QuestData base = makeQuest(id, OWNER, "Poly", Visibility.PRIVATE);
+    dm.saveQuest(
+        base.withPolygon(List.of(new PointData(0, 0), new PointData(10, 0), new PointData(10, 8))));
+    assertEquals(3, dm.getQuest(id).polygon().size());
+    dm.saveQuest(
+        base.withPolygon(
+            List.of(
+                new PointData(0, 0),
+                new PointData(10, 0),
+                new PointData(10, 8),
+                new PointData(0, 8))));
+    assertEquals(4, dm.getQuest(id).polygon().size());
+    assertEquals(4, dm.countPolygonRows());
+  }
+
+  @Test
+  void getQuestsForPlayer_includesPolygons() {
+    UUID id = UUID.randomUUID();
+    dm.upsertPlayerName(OWNER, "Alice");
+    List<PointData> poly = List.of(new PointData(0, 0), new PointData(10, 0), new PointData(10, 8));
+    dm.saveQuest(makeQuest(id, OWNER, "Poly", Visibility.OPEN).withPolygon(poly));
+
+    List<QuestData> mine = dm.getQuestsForPlayer(OWNER);
+    assertEquals(1, mine.size());
+    assertEquals(poly, mine.get(0).polygon());
+    List<QuestData> server = dm.getServerQuests(PLAYER2);
+    assertEquals(poly, server.get(0).polygon());
+  }
+
+  @Test
+  void resetDatabase_clearsPolygons() {
+    UUID id = UUID.randomUUID();
+    dm.upsertPlayerName(OWNER, "Alice");
+    dm.saveQuest(
+        makeQuest(id, OWNER, "Poly", Visibility.PRIVATE)
+            .withPolygon(List.of(new PointData(0, 0), new PointData(10, 0), new PointData(10, 8))));
+    assertEquals(3, dm.countPolygonRows());
+
+    dm.resetDatabase();
+
+    assertEquals(0, dm.countPolygonRows());
+  }
+
+  @Test
+  void deleteQuest_cascadesPolygons() {
+    UUID id = UUID.randomUUID();
+    dm.upsertPlayerName(OWNER, "Alice");
+    dm.saveQuest(
+        makeQuest(id, OWNER, "Poly", Visibility.PRIVATE)
+            .withPolygon(List.of(new PointData(0, 0), new PointData(10, 0), new PointData(10, 8))));
+    assertEquals(3, dm.countPolygonRows());
+
+    dm.deleteQuest(id);
+
+    assertEquals(0, dm.countPolygonRows());
   }
 }
