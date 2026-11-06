@@ -1,5 +1,6 @@
 package com.disqt.disquests.server.papermc;
 
+import com.disqt.disquests.common.DimensionKeys;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,14 +23,16 @@ public class Config {
     plugin.reloadConfig();
     FileConfiguration cfg = plugin.getConfig();
     this.bluemapUrl = cfg.getString("bluemap-url", "");
-    this.bluemapMapNames = new HashMap<>();
+    Map<String, String> raw = new HashMap<>();
     if (cfg.isConfigurationSection("bluemap-map-names")) {
       var section = cfg.getConfigurationSection("bluemap-map-names");
       for (String key : section.getKeys(false)) {
-        bluemapMapNames.put(key, section.getString(key));
+        raw.put(key, section.getString(key));
       }
     }
-    this.bluemapDefaultMap = cfg.getString("bluemap-default-map", "overworld");
+    this.bluemapMapNames = normalizeMapNames(raw);
+    this.bluemapDefaultMap =
+        DimensionKeys.normalize(cfg.getString("bluemap-default-map", "overworld"));
     if (!cfg.contains("predefined-tags")) {
       List<String> defaults = List.of("building", "expedition");
       cfg.set("predefined-tags", defaults);
@@ -43,6 +46,13 @@ public class Config {
     if (Boolean.getBoolean("disquests.debug")) {
       this.debug = true;
     }
+  }
+
+  /** Rewrites legacy keys (nether, end, namespaced) to canonical dimension keys. */
+  static Map<String, String> normalizeMapNames(Map<String, String> raw) {
+    Map<String, String> out = new HashMap<>();
+    raw.forEach((k, v) -> out.put(DimensionKeys.normalize(k), v));
+    return out;
   }
 
   public boolean isDebug() {
