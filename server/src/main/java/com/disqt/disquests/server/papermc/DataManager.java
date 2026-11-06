@@ -20,6 +20,17 @@ import java.util.stream.Collectors;
 
 public class DataManager {
 
+  private static final String POLYGONS_DDL =
+      """
+          CREATE TABLE IF NOT EXISTS quest_polygons (
+              quest_id TEXT NOT NULL,
+              idx INTEGER NOT NULL,
+              x REAL NOT NULL,
+              z REAL NOT NULL,
+              PRIMARY KEY (quest_id, idx),
+              FOREIGN KEY (quest_id) REFERENCES quests(id) ON DELETE CASCADE
+          )""";
+
   private Connection connection;
   private final Path dataDir;
 
@@ -40,6 +51,8 @@ public class DataManager {
         stmt.executeUpdate("PRAGMA foreign_keys = ON");
         stmt.executeUpdate("PRAGMA journal_mode = WAL");
       }
+      // The quest_polygons table is the "migrated" marker, so it is only ever created inside the
+      // migration transaction: a failed migration leaves no table and is retried on next start.
       boolean polygonsTableExisted = tableExists("quest_polygons");
       createTables();
       migratePinnedQuests();
@@ -119,17 +132,6 @@ public class DataManager {
                         PRIMARY KEY (quest_id, tag),
                         FOREIGN KEY (quest_id) REFERENCES quests(id) ON DELETE CASCADE
                     )""");
-
-      stmt.executeUpdate(
-          """
-                    CREATE TABLE IF NOT EXISTS quest_polygons (
-                        quest_id TEXT NOT NULL,
-                        idx INTEGER NOT NULL,
-                        x REAL NOT NULL,
-                        z REAL NOT NULL,
-                        PRIMARY KEY (quest_id, idx),
-                        FOREIGN KEY (quest_id) REFERENCES quests(id) ON DELETE CASCADE
-                    )""");
     }
   }
 
@@ -139,6 +141,13 @@ public class DataManager {
 
   public synchronized void saveQuest(QuestData rawQuest) {
     QuestData quest = QuestLocation.normalize(rawQuest);
+    boolean previousAutoCommit = true;
+    try {
+      previousAutoCommit = connection.getAutoCommit();
+      connection.setAutoCommit(false);
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to save quest", e);
+    }
     try (PreparedStatement stmt =
         connection.prepareStatement(
             """
@@ -227,8 +236,20 @@ public class DataManager {
           insPoly.executeBatch();
         }
       }
+      connection.commit();
     } catch (SQLException e) {
+      try {
+        connection.rollback();
+      } catch (SQLException rollbackError) {
+        e.addSuppressed(rollbackError);
+      }
       throw new RuntimeException("Failed to save quest", e);
+    } finally {
+      try {
+        connection.setAutoCommit(previousAutoCommit);
+      } catch (SQLException ignored) {
+        // connection is unusable anyway; the original error (if any) is already propagating
+      }
     }
   }
 
@@ -741,6 +762,7 @@ public class DataManager {
     connection.setAutoCommit(false);
     try {
       try (Statement stmt = connection.createStatement()) {
+        stmt.executeUpdate(POLYGONS_DDL);
         stmt.executeUpdate(
             "UPDATE quests SET coord2_x = NULL, coord2_y = NULL, coord2_z = NULL, is_region = 0"
                 + " WHERE coord_x IS NULL AND coord2_x IS NOT NULL");
@@ -750,7 +772,8 @@ public class DataManager {
           ResultSet rs =
               stmt.executeQuery(
                   "SELECT id, coord_x, coord_y, coord_z, coord2_x, coord2_y, coord2_z FROM quests"
-                      + " WHERE is_region = 1 AND coord_x IS NOT NULL AND coord2_x IS NOT NULL");
+                      + " WHERE is_region = 1 AND coord_x IS NOT NULL AND coord_z IS NOT NULL"
+                      + " AND coord2_x IS NOT NULL AND coord2_z IS NOT NULL");
           PreparedStatement ins =
               connection.prepareStatement(
                   "INSERT INTO quest_polygons (quest_id, idx, x, z) VALUES (?, ?, ?, ?)")) {

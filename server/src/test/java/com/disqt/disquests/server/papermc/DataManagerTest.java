@@ -1057,4 +1057,54 @@ class DataManagerTest {
 
     assertEquals(0, dm.countPolygonRows());
   }
+
+  @Test
+  void migration_failureIsRetriedOnNextStart() throws Exception {
+    Path dir = tempDir.resolve("legacy");
+    UUID id = UUID.randomUUID();
+    insertLegacyRow(dir, id, 10.0, 64.0, 20.0, 1, 30.0, 70.0, 40.0, null);
+    try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + dir.resolve("disquests.db"));
+        Statement st = c.createStatement()) {
+      st.executeUpdate(
+          "CREATE TRIGGER block_update BEFORE UPDATE ON quests"
+              + " BEGIN SELECT RAISE(ABORT, 'boom'); END");
+    }
+
+    DataManager failing = new DataManager(dir);
+    assertThrows(RuntimeException.class, () -> failing.initialize("overworld"));
+    failing.close();
+
+    try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + dir.resolve("disquests.db"));
+        Statement st = c.createStatement()) {
+      st.executeUpdate("DROP TRIGGER block_update");
+    }
+
+    DataManager retry = migrated(dir);
+    try {
+      QuestData q = retry.getQuest(id);
+      assertEquals(4, q.polygon().size());
+      assertEquals("overworld", q.map());
+    } finally {
+      retry.close();
+    }
+  }
+
+  @Test
+  void saveQuest_failedPolygonInsertRollsBackEverything() {
+    UUID id = UUID.randomUUID();
+    dm.upsertPlayerName(OWNER, "Alice");
+    List<PointData> poly = List.of(new PointData(0, 0), new PointData(10, 0), new PointData(10, 8));
+    QuestData base = makeQuest(id, OWNER, "Poly", Visibility.PRIVATE);
+    dm.saveQuest(base.withPolygon(poly));
+    QuestData before = dm.getQuest(id);
+
+    QuestData bad =
+        base.withContent("changed")
+            .withPolygon(
+                List.of(new PointData(0, 0), new PointData(Double.NaN, 5), new PointData(3, 3)));
+    assertThrows(RuntimeException.class, () -> dm.saveQuest(bad));
+
+    assertEquals(before, dm.getQuest(id));
+    assertEquals(3, dm.countPolygonRows());
+  }
 }
