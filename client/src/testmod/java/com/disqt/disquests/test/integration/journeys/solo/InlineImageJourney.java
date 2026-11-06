@@ -15,6 +15,7 @@ import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
 import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
 import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -37,28 +38,36 @@ class InlineImageJourney {
 
   private static HttpServer server;
   private static final AtomicInteger imageRequests = new AtomicInteger();
+  private static final AtomicInteger jpegRequests = new AtomicInteger();
 
   @BeforeAll
   static void setUp() throws Exception {
     resetServerAndSync();
     AbortOnFailureExtension.clearFailures();
-    byte[] png;
-    try (InputStream in = InlineImageJourney.class.getResourceAsStream("/inline-image-test.png")) {
-      if (in == null) throw new IllegalStateException("fixture inline-image-test.png missing");
-      png = in.readAllBytes();
-    }
+    byte[] png = fixture("/inline-image-test.png");
+    byte[] jpg = fixture("/inline-image-test.jpg");
     server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-    server.createContext(
-        "/img.png",
-        ex -> {
-          imageRequests.incrementAndGet();
-          ex.getResponseHeaders().set("Content-Type", "image/png");
-          ex.sendResponseHeaders(200, png.length);
-          try (OutputStream os = ex.getResponseBody()) {
-            os.write(png);
-          }
-        });
+    server.createContext("/img.png", ex -> serve(ex, "image/png", png, imageRequests));
+    server.createContext("/img.jpg", ex -> serve(ex, "image/jpeg", jpg, jpegRequests));
     server.start();
+  }
+
+  private static byte[] fixture(String resource) throws IOException {
+    try (InputStream in = InlineImageJourney.class.getResourceAsStream(resource)) {
+      if (in == null) throw new IllegalStateException("fixture " + resource + " missing");
+      return in.readAllBytes();
+    }
+  }
+
+  private static void serve(
+      com.sun.net.httpserver.HttpExchange ex, String type, byte[] body, AtomicInteger counter)
+      throws IOException {
+    counter.incrementAndGet();
+    ex.getResponseHeaders().set("Content-Type", type);
+    ex.sendResponseHeaders(200, body.length);
+    try (OutputStream os = ex.getResponseBody()) {
+      os.write(body);
+    }
   }
 
   @AfterAll
@@ -68,6 +77,10 @@ class InlineImageJourney {
 
   private static String imageUrl() {
     return "http://127.0.0.1:" + server.getAddress().getPort() + "/img.png";
+  }
+
+  private static String jpegUrl() {
+    return "http://127.0.0.1:" + server.getAddress().getPort() + "/img.jpg";
   }
 
   /** The content widget of the current QuestScreen, or null. Safe to call on the client thread. */
@@ -81,12 +94,12 @@ class InlineImageJourney {
   @Test
   @Order(1)
   @PlayerA
-  @DisplayName("Image link renders as an image block, fetched once")
-  void imageLinkRendersAsImage(ClientGameTestContext context) {
+  @DisplayName("Image links render as image blocks (paragraph, quote, list, jpeg), fetched once")
+  void imageLinksRenderAsImages(ClientGameTestContext context) {
     given("player is on MainScreen");
     openMainScreen(context);
 
-    when("player creates a quest whose content links the same image twice");
+    when("player creates a quest with the png linked three ways and a jpeg in a list item");
     click(context, "btn-new-quest");
     waitForScreen(context, QuestScreen.class);
     type(context, "title-field", "Image Test");
@@ -96,22 +109,28 @@ class InlineImageJourney {
         "Before\nhttps://example.invalid/not-fetched.txt\n![site]("
             + imageUrl()
             + ")\nAfter\n"
-            + imageUrl());
+            + imageUrl()
+            + "\n\n> "
+            + imageUrl()
+            + "\n\n- ![step]("
+            + jpegUrl()
+            + ")\n- plain item");
     click(context, "btn-save");
     waitForScreen(context, QuestScreen.class);
 
-    then("both image blocks load");
+    then("all four image blocks load");
     context.waitFor(
         client -> {
           MarkdownWidget w = widgetOf(client);
-          return w != null && w.loadedImageCount() == 2;
+          return w != null && w.loadedImageCount() == 4;
         },
         TIMEOUT);
     int blocks = context.computeOnClient(c -> widgetOf(c).imageBlockCount());
-    assertEquals(2, blocks, "image blocks");
+    assertEquals(4, blocks, "image blocks");
 
-    and("the image was fetched from the server exactly once");
+    and("each image was fetched from the server exactly once");
     assertEquals(1, imageRequests.get(), "requests for /img.png");
+    assertEquals(1, jpegRequests.get(), "requests for /img.jpg");
   }
 
   @Test

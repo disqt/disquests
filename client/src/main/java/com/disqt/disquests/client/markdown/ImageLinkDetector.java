@@ -14,7 +14,8 @@ import java.util.Set;
  */
 public final class ImageLinkDetector {
 
-  private static final Set<String> IMAGE_EXTENSIONS = Set.of("png", "jpg", "jpeg", "gif", "webp");
+  // webp is left out on purpose: stb_image cannot decode it, so it would always show as failed.
+  private static final Set<String> IMAGE_EXTENSIONS = Set.of("png", "jpg", "jpeg", "gif");
   private static volatile boolean allowHttp = Boolean.getBoolean("disquests.test.allowHttp");
 
   private ImageLinkDetector() {}

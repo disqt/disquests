@@ -3,39 +3,53 @@ package com.disqt.disquests.client.image;
 import com.disqt.disquests.client.markdown.ImageLinkDetector;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.List;
 import java.util.Locale;
-import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Flow;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Fetches image bytes over https (plain http only under the test flag, see {@link
- * ImageLinkDetector#allowHttp()}). Rejects non-200 answers, non-image content types and bodies over
- * {@code maxBytes}. Exception messages start with "scheme", "status", "content-type" or "too large"
- * so the cache can keep a short reason.
+ * ImageLinkDetector#allowHttp()}). One deadline covers headers and body, so a server that trickles
+ * or withholds the body cannot hold an IO thread. Rejects non-200 answers, non-image content types
+ * and bodies over {@code maxBytes} (the body subscriber cancels as soon as the cap is crossed).
+ * Exception messages start with "scheme", "status", "content-type", "too large" or "timeout" so the
+ * cache can keep a short reason.
  */
 public final class HttpImageFetcher implements ImageFetcher {
 
   public static final long DEFAULT_MAX_BYTES = 8L * 1024 * 1024;
-  private static final Duration TIMEOUT = Duration.ofSeconds(10);
+  public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
   private static final HttpClient CLIENT =
       HttpClient.newBuilder()
           .followRedirects(HttpClient.Redirect.NORMAL)
-          .connectTimeout(TIMEOUT)
+          .connectTimeout(DEFAULT_TIMEOUT)
           .build();
 
   private final long maxBytes;
+  private final Duration timeout;
 
   public HttpImageFetcher() {
-    this(DEFAULT_MAX_BYTES);
+    this(DEFAULT_MAX_BYTES, DEFAULT_TIMEOUT);
   }
 
   public HttpImageFetcher(long maxBytes) {
+    this(maxBytes, DEFAULT_TIMEOUT);
+  }
+
+  public HttpImageFetcher(long maxBytes, Duration timeout) {
     this.maxBytes = maxBytes;
+    this.timeout = timeout;
   }
 
   @Override
@@ -47,43 +61,86 @@ public final class HttpImageFetcher implements ImageFetcher {
     }
     HttpRequest request =
         HttpRequest.newBuilder(uri)
-            .timeout(TIMEOUT)
+            .timeout(timeout)
             .header("User-Agent", "Disquests")
             .GET()
             .build();
-    HttpResponse<InputStream> response;
+    CompletableFuture<HttpResponse<byte[]>> future =
+        CLIENT.sendAsync(request, info -> new CappedBodySubscriber(maxBytes));
+    HttpResponse<byte[]> response;
     try {
-      response = CLIENT.send(request, HttpResponse.BodyHandlers.ofInputStream());
+      response = future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+    } catch (TimeoutException e) {
+      future.cancel(true);
+      throw new IOException("timeout after " + timeout.toMillis() + " ms");
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof java.net.http.HttpTimeoutException) {
+        throw new IOException("timeout: " + cause.getMessage());
+      }
+      if (cause instanceof IOException io) throw io;
+      throw new IOException(cause == null ? e.getMessage() : cause.getMessage(), cause);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+      future.cancel(true);
       throw new IOException("interrupted", e);
     }
-    try (InputStream body = response.body()) {
-      if (response.statusCode() != 200) {
-        throw new IOException("status " + response.statusCode());
-      }
-      String type = response.headers().firstValue("Content-Type").orElse("");
-      if (!type.toLowerCase(Locale.ROOT).startsWith("image/")) {
-        throw new IOException("content-type " + type);
-      }
-      OptionalLong length = response.headers().firstValueAsLong("Content-Length");
-      if (length.isPresent() && length.getAsLong() > maxBytes) {
-        throw new IOException("too large: " + length.getAsLong() + " bytes");
-      }
-      return readCapped(body);
+    if (response.statusCode() != 200) {
+      throw new IOException("status " + response.statusCode());
     }
+    String type = response.headers().firstValue("Content-Type").orElse("");
+    if (!type.toLowerCase(Locale.ROOT).startsWith("image/")) {
+      throw new IOException("content-type " + type);
+    }
+    return response.body();
   }
 
-  private byte[] readCapped(InputStream in) throws IOException {
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
-    byte[] buf = new byte[8192];
-    long total = 0;
-    int n;
-    while ((n = in.read(buf)) > 0) {
-      total += n;
-      if (total > maxBytes) throw new IOException("too large: over " + maxBytes + " bytes");
-      out.write(buf, 0, n);
+  /** Accumulates the body and cancels the download the moment it exceeds {@code max} bytes. */
+  static final class CappedBodySubscriber implements HttpResponse.BodySubscriber<byte[]> {
+    private final long max;
+    private final ByteArrayOutputStream out = new ByteArrayOutputStream();
+    private final CompletableFuture<byte[]> result = new CompletableFuture<>();
+    private Flow.Subscription subscription;
+    private long total;
+
+    CappedBodySubscriber(long max) {
+      this.max = max;
     }
-    return out.toByteArray();
+
+    @Override
+    public CompletionStage<byte[]> getBody() {
+      return result;
+    }
+
+    @Override
+    public void onSubscribe(Flow.Subscription subscription) {
+      this.subscription = subscription;
+      subscription.request(Long.MAX_VALUE);
+    }
+
+    @Override
+    public void onNext(List<ByteBuffer> items) {
+      for (ByteBuffer buffer : items) {
+        total += buffer.remaining();
+        if (total > max) {
+          subscription.cancel();
+          result.completeExceptionally(new IOException("too large: over " + max + " bytes"));
+          return;
+        }
+        byte[] chunk = new byte[buffer.remaining()];
+        buffer.get(chunk);
+        out.write(chunk, 0, chunk.length);
+      }
+    }
+
+    @Override
+    public void onError(Throwable throwable) {
+      result.completeExceptionally(throwable);
+    }
+
+    @Override
+    public void onComplete() {
+      result.complete(out.toByteArray());
+    }
   }
 }

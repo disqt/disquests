@@ -26,6 +26,19 @@ class HttpImageFetcherTest {
     server.createContext("/text.png", ex -> respond(ex, 200, "text/html", new byte[10]));
     server.createContext("/big.png", ex -> respond(ex, 200, "image/png", new byte[100]));
     server.createContext("/missing.png", ex -> respond(ex, 404, "text/plain", new byte[0]));
+    server.createContext(
+        "/slow.png",
+        ex -> {
+          ex.getResponseHeaders().set("Content-Type", "image/png");
+          ex.sendResponseHeaders(200, 10);
+          try {
+            Thread.sleep(3000); // headers sent, body withheld
+          } catch (InterruptedException ignored) {
+          }
+          try (OutputStream os = ex.getResponseBody()) {
+            os.write(new byte[10]);
+          }
+        });
     server.start();
   }
 
@@ -83,6 +96,17 @@ class HttpImageFetcherTest {
   @Test
   void rejectsOversizedBody() {
     assertTrue(messageOf("/big.png", 50).startsWith("too large"));
+  }
+
+  @Test
+  void timesOutWhenTheBodyNeverArrives() {
+    IOException e =
+        assertThrows(
+            IOException.class,
+            () ->
+                new HttpImageFetcher(1000, java.time.Duration.ofMillis(500))
+                    .fetch(url("/slow.png")));
+    assertTrue(e.getMessage().startsWith("timeout"), e.getMessage());
   }
 
   @Test

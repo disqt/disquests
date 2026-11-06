@@ -26,10 +26,15 @@ class ImageLinkDetectorTest {
   }
 
   @Test
-  void allFiveExtensions() {
-    for (String ext : List.of("png", "jpg", "jpeg", "gif", "webp")) {
+  void allFourDecodableExtensions() {
+    for (String ext : List.of("png", "jpg", "jpeg", "gif")) {
       assertTrue(ImageLinkDetector.isImageUrl("https://x/a." + ext), ext);
     }
+  }
+
+  @Test
+  void webpIsNotAnImageLinkUntilItCanBeDecoded() {
+    assertFalse(ImageLinkDetector.isImageUrl("https://x/a.webp"));
   }
 
   @Test

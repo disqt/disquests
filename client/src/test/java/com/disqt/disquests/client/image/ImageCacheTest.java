@@ -40,23 +40,57 @@ class ImageCacheTest {
     }
   }
 
-  /** Texture factory that parses "WxH"; "bad" is undecodable. */
+  /** Texture factory that parses "WxH"; "bad" is undecodable. Tracks decoded images not closed. */
   static final class FakeTextures implements TextureFactory {
     final List<String> created = new ArrayList<>();
     final List<String> released = new ArrayList<>();
+    int openDecoded = 0;
 
     @Override
-    public Texture create(String key, byte[] bytes) throws IOException {
+    public Decoded decode(byte[] bytes) throws IOException {
       String s = new String(bytes, StandardCharsets.UTF_8);
       if (!s.contains("x")) throw new IOException("not an image");
       String[] parts = s.split("x");
+      int w = Integer.parseInt(parts[0]);
+      int h = Integer.parseInt(parts[1]);
+      openDecoded++;
+      return new Decoded() {
+        @Override
+        public int width() {
+          return w;
+        }
+
+        @Override
+        public int height() {
+          return h;
+        }
+
+        @Override
+        public void close() {
+          openDecoded--;
+        }
+      };
+    }
+
+    @Override
+    public Texture upload(String key, Decoded decoded) {
       created.add(key);
-      return new Texture(key, Integer.parseInt(parts[0]), Integer.parseInt(parts[1]));
+      decoded.close();
+      return new Texture(key, decoded.width(), decoded.height());
     }
 
     @Override
     public void release(String key) {
       released.add(key);
+    }
+  }
+
+  /** Manual clock in nanoseconds. */
+  static final class FakeClock {
+    long now = 0;
+
+    void advanceSeconds(long s) {
+      now += s * 1_000_000_000L;
     }
   }
 
@@ -81,7 +115,14 @@ class ImageCacheTest {
   static final String C = "https://x/c.png";
 
   private static ImageCache cache(FakeFetcher f, FakeTextures t, Executor io, int max, long px) {
-    return new ImageCache(f, t, io, DIRECT, max, px);
+    FakeClock clock = new FakeClock();
+    clock.advanceSeconds(10); // start well past the pin window
+    return new ImageCache(f, t, io, DIRECT, max, px, () -> clock.now);
+  }
+
+  private static ImageCache cache(
+      FakeFetcher f, FakeTextures t, Executor io, int max, long px, FakeClock clock) {
+    return new ImageCache(f, t, io, DIRECT, max, px, () -> clock.now);
   }
 
   @Test
@@ -138,11 +179,13 @@ class ImageCacheTest {
   void lruEvictsOldestAndReleasesTexture() {
     FakeFetcher f = new FakeFetcher().body(A, "64x32").body(B, "64x32").body(C, "64x32");
     FakeTextures t = new FakeTextures();
-    ImageCache cache = cache(f, t, DIRECT, 2, Long.MAX_VALUE);
+    FakeClock clock = new FakeClock();
+    ImageCache cache = cache(f, t, DIRECT, 2, Long.MAX_VALUE, clock);
 
     cache.get(A);
     cache.get(B);
     cache.get(A); // touch A so B is the least recently used
+    clock.advanceSeconds(3); // both fall out of the pin window
     cache.get(C);
 
     assertEquals(List.of(ImageCache.textureKey(B)), t.released);
@@ -154,10 +197,13 @@ class ImageCacheTest {
     FakeFetcher f = new FakeFetcher().body(A, "64x32").body(B, "64x32").body(C, "64x32");
     FakeTextures t = new FakeTextures();
     long twoImages = 2L * 64 * 32 * 4;
-    ImageCache cache = cache(f, t, DIRECT, 32, twoImages - 1);
+    FakeClock clock = new FakeClock();
+    ImageCache cache = cache(f, t, DIRECT, 32, twoImages - 1, clock);
 
     cache.get(A);
+    clock.advanceSeconds(3);
     cache.get(B);
+    clock.advanceSeconds(3);
     cache.get(C);
 
     assertEquals(List.of(ImageCache.textureKey(A), ImageCache.textureKey(B)), t.released);
@@ -169,12 +215,14 @@ class ImageCacheTest {
     FakeFetcher f = new FakeFetcher().body(A, "64x32").body(B, "64x32").body(C, "64x32");
     FakeTextures t = new FakeTextures();
     QueuedExecutor io = new QueuedExecutor();
-    ImageCache cache = cache(f, t, io, 2, Long.MAX_VALUE);
+    FakeClock clock = new FakeClock();
+    ImageCache cache = cache(f, t, io, 2, Long.MAX_VALUE, clock);
 
     cache.get(A);
     cache.get(B);
     io.drain();
     cache.get(A); // touch A so B is the least recently used
+    clock.advanceSeconds(3);
     cache.get(C);
     io.drain(); // B is evicted here
 
@@ -182,6 +230,65 @@ class ImageCacheTest {
     io.drain();
     assertInstanceOf(ImageState.Loaded.class, cache.get(B));
     assertEquals(2, f.calls(B));
+  }
+
+  @Test
+  void recentlyRequestedEntriesAreNotEvicted() {
+    // A quest whose images exceed the budget must not thrash: entries requested within the
+    // pin window (an open widget asks every frame) stay loaded even over budget.
+    FakeFetcher f = new FakeFetcher().body(A, "64x32").body(B, "64x32").body(C, "64x32");
+    FakeTextures t = new FakeTextures();
+    long oneImage = 64L * 32 * 4;
+    FakeClock clock = new FakeClock();
+    ImageCache cache = cache(f, t, DIRECT, 32, oneImage, clock);
+
+    for (int frame = 0; frame < 5; frame++) {
+      cache.get(A);
+      cache.get(B);
+    }
+
+    assertEquals(1, f.calls(A));
+    assertEquals(1, f.calls(B));
+    assertEquals(2, cache.loadedCount());
+    assertTrue(t.released.isEmpty());
+
+    clock.advanceSeconds(3);
+    cache.get(C);
+
+    assertEquals(List.of(ImageCache.textureKey(A), ImageCache.textureKey(B)), t.released);
+    assertEquals(1, cache.loadedCount());
+  }
+
+  @Test
+  void oversizedDimensionsAreRejectedBeforeUpload() {
+    FakeFetcher f = new FakeFetcher().body(A, "5000x10").body(B, "4000x4001");
+    FakeTextures t = new FakeTextures();
+    ImageCache cache = cache(f, t, DIRECT, 32, Long.MAX_VALUE);
+
+    ImageState.Failed wide = assertInstanceOf(ImageState.Failed.class, cache.get(A));
+    assertTrue(wide.reason().startsWith("decode: too large"), wide.reason());
+    ImageState.Failed many = assertInstanceOf(ImageState.Failed.class, cache.get(B));
+    assertTrue(many.reason().startsWith("decode: too large"), many.reason());
+    assertTrue(t.created.isEmpty());
+    assertEquals(0, t.openDecoded, "rejected images are closed");
+  }
+
+  @Test
+  void decodeHappensOnTheIoExecutorNotTheRenderExecutor() {
+    FakeFetcher f = new FakeFetcher().body(A, "64x32");
+    FakeTextures t = new FakeTextures();
+    QueuedExecutor io = new QueuedExecutor();
+    QueuedExecutor render = new QueuedExecutor();
+    ImageCache cache = new ImageCache(f, t, io, render, 32, Long.MAX_VALUE, () -> 0L);
+
+    cache.get(A);
+    io.drain(); // fetch + decode
+    assertEquals(1, t.openDecoded, "decoded on io, not yet uploaded");
+    assertTrue(t.created.isEmpty());
+    render.drain(); // upload
+    assertEquals(0, t.openDecoded);
+    assertEquals(List.of(ImageCache.textureKey(A)), t.created);
+    assertInstanceOf(ImageState.Loaded.class, cache.get(A));
   }
 
   @Test
