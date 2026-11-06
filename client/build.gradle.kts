@@ -345,6 +345,7 @@ fun bootstrapServerDir(serverDir: File, mcVersion: String, logger: org.gradle.ap
     File(serverDir, "server.properties").writeText(
         """
         |online-mode=false
+        |white-list=false
         |max-players=4
         |enable-rcon=true
         |rcon.password=testpassword
