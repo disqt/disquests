@@ -6,20 +6,29 @@ import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.QuestEntryComponent;
 import com.disqt.disquests.client.gui.component.TagAutocompleteDropdown;
 import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.map.MapView;
+import com.disqt.disquests.client.gui.map.PlayerMarkerLayer;
+import com.disqt.disquests.client.gui.map.QuestPolygonLayer;
+import com.disqt.disquests.client.gui.map.SharedTileCache;
 import com.disqt.disquests.client.gui.widget.ToastOverlay;
 import com.disqt.disquests.client.network.PacketSender;
+import com.disqt.disquests.common.QuestLocation;
+import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.Visibility;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.TextBoxComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.core.Color;
 import io.wispforest.owo.ui.core.ParentUIComponent;
 import io.wispforest.owo.ui.core.Sizing;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import net.minecraft.client.Minecraft;
@@ -27,6 +36,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
@@ -36,6 +46,8 @@ public class MainScreen extends DisquestsBaseScreen {
   private static final org.slf4j.Logger LOGGER =
       org.slf4j.LoggerFactory.getLogger("Disquests.MainScreen");
   private static final List<ClientTooltipComponent> NO_TOOLTIP = Collections.emptyList();
+  private static final List<String> DIMENSIONS = List.of("overworld", "the_nether", "the_end");
+  private static final int INITIAL_ZOOM = 2;
 
   // Component references (looked up by ID from XML model)
   private FlowLayout rootLayout;
@@ -51,6 +63,16 @@ public class MainScreen extends DisquestsBaseScreen {
   private ButtonComponent btnNewQuest;
   private ButtonComponent btnInteract;
   private ButtonComponent btnOpen;
+  private FlowLayout actionRow;
+
+  // Map mode (server protocol >= V2); all null in legacy mode
+  private final boolean mapMode;
+  @Nullable private MapView mapView;
+  @Nullable private QuestPolygonLayer polygonLayer;
+  @Nullable private FlowLayout sidePanel;
+  @Nullable private LabelComponent zoomLabel;
+  private final Map<String, ButtonComponent> dimensionButtons = new LinkedHashMap<>();
+  private int shownZoom = -1;
 
   // Search
   private TextBoxComponent searchField;
@@ -76,7 +98,16 @@ public class MainScreen extends DisquestsBaseScreen {
   }
 
   public MainScreen(Screen parent) {
-    super(DataSource.asset(Identifier.fromNamespaceAndPath("disquests", "main_screen")), parent);
+    this(parent, ClientSession.supportsMap());
+  }
+
+  private MainScreen(Screen parent, boolean mapMode) {
+    super(
+        DataSource.asset(
+            Identifier.fromNamespaceAndPath(
+                "disquests", mapMode ? "main_screen" : "main_screen_legacy")),
+        parent);
+    this.mapMode = mapMode;
     this.currentTab = ClientSession.getActiveTab();
     this.searchTerm = ClientSession.getSearchTerm();
     this.serverFilter = ClientSession.getServerQuestsFilter();
@@ -108,6 +139,7 @@ public class MainScreen extends DisquestsBaseScreen {
     this.btnNewQuest = root.childById(ButtonComponent.class, "btn-new-quest");
     this.btnInteract = root.childById(ButtonComponent.class, "btn-interact");
     this.btnOpen = root.childById(ButtonComponent.class, "btn-open");
+    this.actionRow = root.childById(FlowLayout.class, "action-row");
 
     // --- Wire tab button handlers ---
     this.tabMyQuests.onPress(ignored -> selectTab(ClientSession.Tab.MY_QUESTS));
@@ -129,7 +161,7 @@ public class MainScreen extends DisquestsBaseScreen {
     wireBackButton(root);
 
     // --- Create search text box programmatically ---
-    this.searchField = UIComponents.textBox(Sizing.fixed(200));
+    this.searchField = UIComponents.textBox(Sizing.fixed(168));
     this.searchField.text(this.searchTerm);
     this.searchField.setHint(Component.translatable("gui.disquests.placeholder.search"));
     this.searchField.onChanged().subscribe(this::onSearchTermChanged);
@@ -150,6 +182,12 @@ public class MainScreen extends DisquestsBaseScreen {
 
     // Cache title width
     this.titleWidth = Minecraft.getInstance().font.width("Disquests");
+
+    if (mapMode) {
+      buildMapArea(root);
+    } else {
+      addServerNotice(root);
+    }
 
     // --- Apply saved state ---
     LOGGER.debug(
@@ -187,7 +225,6 @@ public class MainScreen extends DisquestsBaseScreen {
     btnInteract.active(!isMyQuests);
 
     // Hide/show buttons by removing/re-adding to parent flow
-    FlowLayout actionRow = rootLayout.childById(FlowLayout.class, "action-row");
     actionRow.removeChild(btnNewQuest);
     actionRow.removeChild(btnInteract);
     if (isMyQuests) {
@@ -308,6 +345,47 @@ public class MainScreen extends DisquestsBaseScreen {
     questList.clearChildren();
     selectedEntry = null;
 
+    List<Quest> quests = visibleQuests();
+    LOGGER.debug(
+        "refreshListContents: tab={}, {} quests after filtering", currentTab, quests.size());
+
+    // The header only separates the two groups: when every visible quest is unplaced (or
+    // every one is placed) there is nothing to separate, so no header is shown.
+    boolean anyUnplaced = quests.stream().anyMatch(q -> !q.hasLocation());
+    boolean anyPlaced = quests.stream().anyMatch(Quest::hasLocation);
+    if (mapMode && anyUnplaced && anyPlaced) {
+      LabelComponent header =
+          UIComponents.label(Component.translatable("gui.disquests.map.unplaced"));
+      header.color(Color.ofArgb(Colors.TEXT_MUTED));
+      header.id("unplaced-header");
+      questList.child(header);
+    }
+
+    for (Quest quest : quests) {
+      QuestEntryComponent entry = new QuestEntryComponent(quest);
+      entry.sizing(Sizing.fill(100), Sizing.fixed(QuestEntryComponent.ENTRY_HEIGHT));
+      entry.onClick(this::onEntryClicked);
+      entry.onDoubleClick(e -> openSelected());
+      entry.onPinToggle(e -> refreshAfterPinToggle());
+      questList.child(entry);
+      if (previousSelectedId != null && quest.getId().equals(previousSelectedId)) {
+        entry.selected(true);
+        selectedEntry = entry;
+      }
+    }
+    LOGGER.debug("refreshListContents: added {} entries to questList", questList.children().size());
+
+    if (polygonLayer != null) {
+      polygonLayer.setQuests(quests);
+    }
+    updateActionButtons();
+  }
+
+  /**
+   * The quests the current tab, Open/Closed filter and search leave visible, in list order. The
+   * side panel and the map layer both draw from this list. In map mode unplaced quests come first.
+   */
+  public List<Quest> visibleQuests() {
     List<Quest> quests;
 
     SearchQuery query = parseSearch(searchTerm);
@@ -350,23 +428,7 @@ public class MainScreen extends DisquestsBaseScreen {
       quests.sort(Comparator.comparing(Quest::getLastModified, Comparator.reverseOrder()));
     }
 
-    LOGGER.debug(
-        "refreshListContents: tab={}, {} quests after filtering", currentTab, quests.size());
-    for (Quest quest : quests) {
-      QuestEntryComponent entry = new QuestEntryComponent(quest);
-      entry.sizing(Sizing.fill(100), Sizing.fixed(QuestEntryComponent.ENTRY_HEIGHT));
-      entry.onClick(this::onEntryClicked);
-      entry.onDoubleClick(e -> openSelected());
-      entry.onPinToggle(e -> refreshAfterPinToggle());
-      questList.child(entry);
-      if (previousSelectedId != null && quest.getId().equals(previousSelectedId)) {
-        entry.selected(true);
-        selectedEntry = entry;
-      }
-    }
-    LOGGER.debug("refreshListContents: added {} entries to questList", questList.children().size());
-
-    updateActionButtons();
+    return mapMode ? QuestListOrder.orderForList(quests) : quests;
   }
 
   // --- SELECTION ---
@@ -377,6 +439,109 @@ public class MainScreen extends DisquestsBaseScreen {
     entry.selected(true);
     selectedEntry = entry;
     updateActionButtons();
+    Quest quest = entry.getQuest();
+    if (mapView != null && quest.hasLocation()) {
+      if (quest.getMap() != null) {
+        selectDimension(quest.getMap());
+      }
+      double[] centre = mapCentre(quest);
+      mapView.centerOn(centre[0], centre[1]);
+    }
+  }
+
+  // --- MAP ---
+
+  /** The map component, or null when the server is too old for the map (legacy layout). */
+  @Nullable
+  public MapView getMapView() {
+    return mapView;
+  }
+
+  private void buildMapArea(FlowLayout root) {
+    this.sidePanel = root.childById(FlowLayout.class, "side-panel");
+    this.polygonLayer = new QuestPolygonLayer();
+    this.polygonLayer.onQuestClick(quest -> navigateToScreen(new QuestScreen(this, quest)));
+    this.mapView = new MapView(SharedTileCache.get());
+    this.mapView.addLayer(polygonLayer).addLayer(new PlayerMarkerLayer());
+    this.mapView.sizing(Sizing.fill(100), Sizing.fill(100));
+    this.mapView.id("map-view");
+    root.childById(FlowLayout.class, "map-slot").child(mapView);
+
+    wireDimensionButtons(root);
+    ButtonComponent centreMe = root.childById(ButtonComponent.class, "btn-centre-me");
+    centreMe.setMessage(Component.translatable("gui.disquests.map.centre_me"));
+    centreMe.onPress(ignored -> centreOnPlayer());
+    ButtonComponent toggleList = root.childById(ButtonComponent.class, "btn-toggle-list");
+    toggleList.setMessage(Component.translatable("gui.disquests.map.toggle_list"));
+    toggleList.onPress(ignored -> toggleList());
+    this.zoomLabel = root.childById(LabelComponent.class, "zoom-label");
+
+    mapView.setZoom(INITIAL_ZOOM);
+    centreOnPlayer();
+    updateZoomLabel();
+    if (QuestListOrder.shouldCollapseList(this.width)) {
+      root.removeChild(sidePanel);
+    }
+  }
+
+  private void wireDimensionButtons(FlowLayout root) {
+    for (String dimension : DIMENSIONS) {
+      ButtonComponent button = root.childById(ButtonComponent.class, "btn-dim-" + dimension);
+      button.setMessage(Component.translatable("gui.disquests.map.dim." + dimension));
+      button.onPress(ignored -> selectDimension(dimension));
+      dimensionButtons.put(dimension, button);
+    }
+  }
+
+  /** Shows {@code dimension} on the map; its button looks pressed, like the selected tab. */
+  private void selectDimension(String dimension) {
+    mapView.setDimension(dimension);
+    dimensionButtons.forEach((key, button) -> button.active(!key.equals(dimension)));
+  }
+
+  private void centreOnPlayer() {
+    Minecraft minecraft = Minecraft.getInstance();
+    selectDimension(
+        minecraft.level != null ? minecraft.level.dimension().identifier().getPath() : "overworld");
+    LocalPlayer player = minecraft.player;
+    if (player != null) {
+      mapView.centerOn(player.getX(), player.getZ());
+    }
+  }
+
+  private void toggleList() {
+    if (rootLayout.children().contains(sidePanel)) {
+      rootLayout.removeChild(sidePanel);
+    } else {
+      rootLayout.child(sidePanel);
+    }
+  }
+
+  private void updateZoomLabel() {
+    int zoom = mapView.getCamera().zoom();
+    if (zoom != shownZoom) {
+      shownZoom = zoom;
+      zoomLabel.text(Component.translatable("gui.disquests.map.zoom", zoom));
+    }
+  }
+
+  /** Block {x, z} the map centres on: a polygon's bounding-box centre, else the pin. */
+  private static double[] mapCentre(Quest quest) {
+    if (!quest.getPolygon().isEmpty()) {
+      CoordinatesData[] box = QuestLocation.boundingBox(quest.getPolygon(), 0);
+      return new double[] {(box[0].x() + box[1].x()) / 2, (box[0].z() + box[1].z()) / 2};
+    }
+    CoordinatesData pin = quest.getCoordinates();
+    return new double[] {pin.x(), pin.z()};
+  }
+
+  private void addServerNotice(FlowLayout root) {
+    LabelComponent notice =
+        UIComponents.label(Component.translatable("gui.disquests.map.server_outdated"));
+    notice.color(Color.ofArgb(Colors.TEXT_MUTED));
+    notice.id("server-notice");
+    FlowLayout header = root.childById(FlowLayout.class, "header-row");
+    root.child(root.children().indexOf(header) + 1, notice);
   }
 
   private void clearSelection() {
@@ -511,6 +676,9 @@ public class MainScreen extends DisquestsBaseScreen {
       lastCacheVersion = currentVersion;
       refreshListContents();
     }
+    if (mapView != null) {
+      updateZoomLabel();
+    }
   }
 
   public void showToast(String message) {
@@ -525,8 +693,9 @@ public class MainScreen extends DisquestsBaseScreen {
     // Let owo-ui render the component tree
     super.extractRenderState(context, mouseX, mouseY, delta);
 
-    // Rainbow title on hover
-    if (titleLabel != null) {
+    // Rainbow title on hover (the title and tabs live in the side panel, skip when it is hidden)
+    boolean panelShown = sidePanel == null || rootLayout.children().contains(sidePanel);
+    if (titleLabel != null && panelShown) {
       String titleStr = "Disquests";
       int titleX = titleLabel.x();
       int titleY = titleLabel.y();
@@ -551,7 +720,7 @@ public class MainScreen extends DisquestsBaseScreen {
     }
 
     // Notification badge on My Quests tab (fix 13: only query when on My Quests)
-    if (currentTab == ClientSession.Tab.MY_QUESTS && tabMyQuests != null) {
+    if (currentTab == ClientSession.Tab.MY_QUESTS && tabMyQuests != null && panelShown) {
       int pendingCount = ClientSession.getPendingRequestCount();
       if (pendingCount > 0) {
         renderNotificationBadge(context, pendingCount);

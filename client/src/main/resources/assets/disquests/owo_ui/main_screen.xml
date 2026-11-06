@@ -2,8 +2,8 @@
         xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/wisp-forest/owo-lib/1.21/owo-ui.xsd">
 
     <components>
-    <!-- Root: vertical flow, full screen, translucent background -->
-    <flow-layout direction="vertical" id="root">
+    <!-- Root: horizontal flow, map area on the left, quest side panel on the right -->
+    <flow-layout direction="horizontal" id="root">
         <sizing>
             <horizontal method="fill">100</horizontal>
             <vertical method="fill">100</vertical>
@@ -11,164 +11,266 @@
         <surface>
             <vanilla-translucent/>
         </surface>
-        <horizontal-alignment>center</horizontal-alignment>
-        <padding>
-            <all>0</all>
-            <top>4</top>
-        </padding>
 
         <children>
 
-            <!-- Header row: back arrow + title -->
-            <flow-layout direction="horizontal" id="header-row">
+            <!-- Map area: toolbar above the map slot, takes the width left by the panel -->
+            <flow-layout direction="vertical" id="map-area">
                 <sizing>
-                    <horizontal method="fill">85</horizontal>
-                    <vertical method="content"/>
+                    <horizontal method="expand">100</horizontal>
+                    <vertical method="fill">100</vertical>
                 </sizing>
-                <vertical-alignment>center</vertical-alignment>
-                <margins>
-                    <bottom>4</bottom>
-                </margins>
                 <children>
-                    <button id="btn-back">
-                        <text>&lt;</text>
+
+                    <flow-layout direction="horizontal" id="map-toolbar">
                         <sizing>
-                            <horizontal method="fixed">20</horizontal>
-                            <vertical method="fixed">20</vertical>
+                            <horizontal method="content"/>
+                            <vertical method="content"/>
                         </sizing>
-                    </button>
-                    <label id="title-label">
-                        <text>Disquests</text>
-                        <shadow>true</shadow>
+                        <gap>4</gap>
+                        <padding>
+                            <all>4</all>
+                        </padding>
+                        <vertical-alignment>center</vertical-alignment>
+                        <children>
+                            <!-- Button and label texts are set from lang keys in MainScreen -->
+                            <button id="btn-dim-overworld">
+                                <text>Overworld</text>
+                                <sizing>
+                                    <horizontal method="fixed">60</horizontal>
+                                    <vertical method="fixed">14</vertical>
+                                </sizing>
+                            </button>
+                            <button id="btn-dim-the_nether">
+                                <text>Nether</text>
+                                <sizing>
+                                    <horizontal method="fixed">60</horizontal>
+                                    <vertical method="fixed">14</vertical>
+                                </sizing>
+                            </button>
+                            <button id="btn-dim-the_end">
+                                <text>End</text>
+                                <sizing>
+                                    <horizontal method="fixed">60</horizontal>
+                                    <vertical method="fixed">14</vertical>
+                                </sizing>
+                            </button>
+                            <button id="btn-centre-me">
+                                <text>Centre on me</text>
+                                <sizing>
+                                    <horizontal method="content"/>
+                                    <vertical method="fixed">14</vertical>
+                                </sizing>
+                            </button>
+                            <label id="zoom-label">
+                                <text>Zoom</text>
+                                <shadow>true</shadow>
+                                <sizing>
+                                    <horizontal method="content"/>
+                                    <vertical method="content"/>
+                                </sizing>
+                            </label>
+                            <button id="btn-toggle-list">
+                                <text>List</text>
+                                <sizing>
+                                    <horizontal method="fixed">40</horizontal>
+                                    <vertical method="fixed">14</vertical>
+                                </sizing>
+                            </button>
+                        </children>
+                    </flow-layout>
+
+                    <!-- MapView (id map-view) is added here programmatically -->
+                    <flow-layout direction="vertical" id="map-slot">
+                        <sizing>
+                            <horizontal method="fill">100</horizontal>
+                            <vertical method="expand">100</vertical>
+                        </sizing>
+                        <children/>
+                    </flow-layout>
+
+                </children>
+            </flow-layout>
+
+            <!-- Side panel: header, tabs, filters, search, quest list, actions -->
+            <flow-layout direction="vertical" id="side-panel">
+                <sizing>
+                    <horizontal method="fixed">180</horizontal>
+                    <vertical method="fill">100</vertical>
+                </sizing>
+                <surface>
+                    <panel dark="true"/>
+                </surface>
+                <padding>
+                    <all>4</all>
+                </padding>
+
+                <children>
+
+                    <!-- Header row: back arrow + title -->
+                    <flow-layout direction="horizontal" id="header-row">
+                        <sizing>
+                            <horizontal method="fill">100</horizontal>
+                            <vertical method="content"/>
+                        </sizing>
+                        <vertical-alignment>center</vertical-alignment>
+                        <margins>
+                            <bottom>4</bottom>
+                        </margins>
+                        <children>
+                            <button id="btn-back">
+                                <text>&lt;</text>
+                                <sizing>
+                                    <horizontal method="fixed">20</horizontal>
+                                    <vertical method="fixed">20</vertical>
+                                </sizing>
+                            </button>
+                            <label id="title-label">
+                                <text>Disquests</text>
+                                <shadow>true</shadow>
+                                <sizing>
+                                    <horizontal method="content"/>
+                                    <vertical method="content"/>
+                                </sizing>
+                                <margins>
+                                    <left>4</left>
+                                </margins>
+                            </label>
+                        </children>
+                    </flow-layout>
+
+                    <!-- Tab row -->
+                    <flow-layout direction="horizontal" id="tab-row">
+                        <sizing>
+                            <horizontal method="content"/>
+                            <vertical method="content"/>
+                        </sizing>
+                        <gap>4</gap>
+                        <margins>
+                            <bottom>2</bottom>
+                        </margins>
+                        <children>
+                            <button id="tab-my-quests">
+                                <text>My Quests</text>
+                                <sizing>
+                                    <horizontal method="fixed">80</horizontal>
+                                    <vertical method="fixed">20</vertical>
+                                </sizing>
+                            </button>
+                            <button id="tab-quest-board">
+                                <text>Quest Board</text>
+                                <sizing>
+                                    <horizontal method="fixed">80</horizontal>
+                                    <vertical method="fixed">20</vertical>
+                                </sizing>
+                            </button>
+                        </children>
+                    </flow-layout>
+
+                    <!-- Filter row (Server Quests tab only) -->
+                    <flow-layout direction="horizontal" id="filter-row">
+                        <sizing>
+                            <horizontal method="content"/>
+                            <vertical method="content"/>
+                        </sizing>
+                        <gap>4</gap>
+                        <margins>
+                            <bottom>2</bottom>
+                        </margins>
+                        <children>
+                            <button id="filter-all">
+                                <text>All</text>
+                                <sizing>
+                                    <horizontal method="fixed">50</horizontal>
+                                    <vertical method="fixed">14</vertical>
+                                </sizing>
+                            </button>
+                            <button id="filter-open">
+                                <text>Open</text>
+                                <sizing>
+                                    <horizontal method="fixed">50</horizontal>
+                                    <vertical method="fixed">14</vertical>
+                                </sizing>
+                            </button>
+                            <button id="filter-closed">
+                                <text>Closed</text>
+                                <sizing>
+                                    <horizontal method="fixed">50</horizontal>
+                                    <vertical method="fixed">14</vertical>
+                                </sizing>
+                            </button>
+                        </children>
+                    </flow-layout>
+
+                    <!-- Search row: TextBox added programmatically -->
+                    <flow-layout direction="horizontal" id="search-row">
                         <sizing>
                             <horizontal method="content"/>
                             <vertical method="content"/>
                         </sizing>
                         <margins>
-                            <left>4</left>
+                            <bottom>4</bottom>
                         </margins>
-                    </label>
-                </children>
-            </flow-layout>
+                        <children/>
+                    </flow-layout>
 
-            <!-- Tab row -->
-            <flow-layout direction="horizontal" id="tab-row">
-                <sizing>
-                    <horizontal method="content"/>
-                    <vertical method="content"/>
-                </sizing>
-                <gap>4</gap>
-                <margins>
-                    <bottom>2</bottom>
-                </margins>
-                <children>
-                    <button id="tab-my-quests">
-                        <text>My Quests</text>
+                    <!-- Quest list, inline because the template only supports fill heights.
+                         The child MUST be the first element of the scroll container. -->
+                    <scroll direction="vertical" id="quest-scroll">
+                        <flow-layout direction="vertical" id="quest-list">
+                            <sizing>
+                                <horizontal method="fill">100</horizontal>
+                                <vertical method="content"/>
+                            </sizing>
+                            <gap>2</gap>
+                        </flow-layout>
                         <sizing>
-                            <horizontal method="fixed">80</horizontal>
-                            <vertical method="fixed">20</vertical>
+                            <horizontal method="fill">100</horizontal>
+                            <vertical method="expand">100</vertical>
                         </sizing>
-                    </button>
-                    <button id="tab-quest-board">
-                        <text>Quest Board</text>
-                        <sizing>
-                            <horizontal method="fixed">80</horizontal>
-                            <vertical method="fixed">20</vertical>
-                        </sizing>
-                    </button>
-                </children>
-            </flow-layout>
+                        <surface>
+                            <panel dark="true"/>
+                        </surface>
+                        <padding>
+                            <all>4</all>
+                        </padding>
+                    </scroll>
 
-            <!-- Filter row (Server Quests tab only) -->
-            <flow-layout direction="horizontal" id="filter-row">
-                <sizing>
-                    <horizontal method="content"/>
-                    <vertical method="content"/>
-                </sizing>
-                <gap>4</gap>
-                <margins>
-                    <bottom>2</bottom>
-                </margins>
-                <children>
-                    <button id="filter-all">
-                        <text>All</text>
+                    <!-- Action button row -->
+                    <flow-layout direction="horizontal" id="action-row">
                         <sizing>
-                            <horizontal method="fixed">50</horizontal>
-                            <vertical method="fixed">14</vertical>
+                            <horizontal method="content"/>
+                            <vertical method="content"/>
                         </sizing>
-                    </button>
-                    <button id="filter-open">
-                        <text>Open</text>
-                        <sizing>
-                            <horizontal method="fixed">50</horizontal>
-                            <vertical method="fixed">14</vertical>
-                        </sizing>
-                    </button>
-                    <button id="filter-closed">
-                        <text>Closed</text>
-                        <sizing>
-                            <horizontal method="fixed">50</horizontal>
-                            <vertical method="fixed">14</vertical>
-                        </sizing>
-                    </button>
-                </children>
-            </flow-layout>
+                        <gap>4</gap>
+                        <margins>
+                            <top>4</top>
+                        </margins>
+                        <children>
+                            <button id="btn-new-quest">
+                                <text>New Quest</text>
+                                <sizing>
+                                    <horizontal method="fixed">70</horizontal>
+                                    <vertical method="fixed">20</vertical>
+                                </sizing>
+                            </button>
+                            <button id="btn-interact">
+                                <text>Join</text>
+                                <sizing>
+                                    <horizontal method="fixed">70</horizontal>
+                                    <vertical method="fixed">20</vertical>
+                                </sizing>
+                            </button>
+                            <button id="btn-open">
+                                <text>Open</text>
+                                <sizing>
+                                    <horizontal method="fixed">70</horizontal>
+                                    <vertical method="fixed">20</vertical>
+                                </sizing>
+                            </button>
+                        </children>
+                    </flow-layout>
 
-            <!-- Scrollable quest list area -->
-            <template name="scrollable-list@disquests:templates">
-                <scroll-id>quest-scroll</scroll-id>
-                <list-id>quest-list</list-id>
-                <width>85</width>
-                <height>55</height>
-            </template>
-
-            <!-- Search row -->
-            <flow-layout direction="horizontal" id="search-row">
-                <sizing>
-                    <horizontal method="content"/>
-                    <vertical method="content"/>
-                </sizing>
-                <horizontal-alignment>center</horizontal-alignment>
-                <margins>
-                    <top>4</top>
-                    <bottom>4</bottom>
-                </margins>
-                <children/>
-                <!-- TextBox added programmatically for search -->
-            </flow-layout>
-
-            <!-- Action button row -->
-            <flow-layout direction="horizontal" id="action-row">
-                <sizing>
-                    <horizontal method="content"/>
-                    <vertical method="content"/>
-                </sizing>
-                <gap>4</gap>
-                <margins>
-                    <bottom>4</bottom>
-                </margins>
-                <children>
-                    <button id="btn-new-quest">
-                        <text>New Quest</text>
-                        <sizing>
-                            <horizontal method="fixed">70</horizontal>
-                            <vertical method="fixed">20</vertical>
-                        </sizing>
-                    </button>
-                    <button id="btn-interact">
-                        <text>Join</text>
-                        <sizing>
-                            <horizontal method="fixed">70</horizontal>
-                            <vertical method="fixed">20</vertical>
-                        </sizing>
-                    </button>
-                    <button id="btn-open">
-                        <text>Open</text>
-                        <sizing>
-                            <horizontal method="fixed">70</horizontal>
-                            <vertical method="fixed">20</vertical>
-                        </sizing>
-                    </button>
                 </children>
             </flow-layout>
 

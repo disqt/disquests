@@ -189,7 +189,7 @@ public class QuestEntryComponent extends BaseUIComponent {
 
   @Override
   protected int determineHorizontalContentSize(Sizing sizing) {
-    return 200;
+    return 160;
   }
 
   @Override

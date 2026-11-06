@@ -95,6 +95,16 @@
   // World map
   "gui.disquests.map.{}": {
     "tiles_unavailable": "Map tiles unavailable",
+    "unplaced": "Unplaced",
+    "centre_me": "Centre on me",
+    "zoom": "Zoom %d",
+    "server_outdated": "The server needs updating to show the map",
+    "toggle_list": "List",
+  },
+  "gui.disquests.map.dim.{}": {
+    "overworld": "Overworld",
+    "the_nether": "Nether",
+    "the_end": "End",
   },
 
   // owo-config
