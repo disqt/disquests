@@ -92,6 +92,11 @@
     "contributors": "Contributeurs (%d)",
   },
 
+  // World map
+  "gui.disquests.map.{}": {
+    "tiles_unavailable": "Tuiles de la map indisponibles",
+  },
+
   // owo-config
   "text.config.disquests-config.{}": {
     "title": "Configuration Disquests",
