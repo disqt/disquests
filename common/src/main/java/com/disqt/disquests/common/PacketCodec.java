@@ -4,6 +4,7 @@ import com.disqt.disquests.common.model.CollaborationRequestData;
 import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.ContributorOp;
 import com.disqt.disquests.common.model.CoordinatesData;
+import com.disqt.disquests.common.model.PointData;
 import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.common.model.Visibility;
 import java.util.ArrayList;
@@ -53,7 +54,8 @@ public final class PacketCodec {
       boolean isRegion,
       CoordinatesData coords2,
       String map,
-      List<String> tags) {}
+      List<String> tags,
+      List<PointData> polygon) {}
 
   public record RespondCollaborationPayload(UUID requestId, boolean approved) {}
 
@@ -71,7 +73,8 @@ public final class PacketCodec {
       UUID playerUuid,
       Map<String, String> bluemapMapNames,
       List<String> predefinedTags,
-      String bluemapDefaultMap) {}
+      String bluemapDefaultMap,
+      int serverProtocolVersion) {}
 
   public record CollaborationRequestPayload(
       UUID requestId, UUID questId, String questTitle, String requesterName) {}
@@ -102,6 +105,19 @@ public final class PacketCodec {
       CoordinatesData coords2,
       String map,
       List<String> tags) {
+    return writeSaveQuest(questId, title, content, coords, isRegion, coords2, map, tags, List.of());
+  }
+
+  public static byte[] writeSaveQuest(
+      UUID questId,
+      String title,
+      String content,
+      CoordinatesData coords,
+      boolean isRegion,
+      CoordinatesData coords2,
+      String map,
+      List<String> tags,
+      List<PointData> polygon) {
     ByteBufWriter buf = new ByteBufWriter();
     buf.writeByte(PacketType.SAVE_QUEST.getId());
     buf.writeUUID(questId);
@@ -115,6 +131,7 @@ public final class PacketCodec {
     for (String tag : tags) {
       buf.writeString(tag);
     }
+    writePolygon(buf, polygon);
     return buf.toByteArray();
   }
 
@@ -237,6 +254,13 @@ public final class PacketCodec {
         protocolVersion);
   }
 
+  /**
+   * Writes the handshake in its full form: tags, default map, then the server protocol version. The
+   * server sends this at join, before it knows the client's version, so nothing is gated. Older
+   * readers stop after the default map and ignore the trailing bytes.
+   *
+   * @param protocolVersion ignored, kept for source compatibility
+   */
   public static byte[] writeHandshake(
       String bluemapUrl,
       int pendingRequestCount,
@@ -260,13 +284,12 @@ public final class PacketCodec {
       buf.writeString(entry.getKey());
       buf.writeString(entry.getValue());
     }
-    if (protocolVersion >= ProtocolVersion.V1) {
-      buf.writeVarInt(predefinedTags.size());
-      for (String tag : predefinedTags) {
-        buf.writeString(tag);
-      }
-      buf.writeString(defaultMap != null ? defaultMap : "overworld");
+    buf.writeVarInt(predefinedTags.size());
+    for (String tag : predefinedTags) {
+      buf.writeString(tag);
     }
+    buf.writeString(defaultMap != null ? defaultMap : "overworld");
+    buf.writeVarInt(ProtocolVersion.CURRENT);
     return buf.toByteArray();
   }
 
@@ -379,10 +402,14 @@ public final class PacketCodec {
   }
 
   /**
-   * Writes a quest with protocol-version-aware encoding. v0: omits trailing tags list. v1+: full
-   * format including tags.
+   * Writes a quest with protocol-version-aware encoding. v0: omits trailing tags list. v1: adds
+   * tags. v2+: adds the polygon block; below v2 the legacy coordinate fields are derived from the
+   * polygon via {@link QuestLocation#normalize}.
    */
   public static void writeQuest(ByteBufWriter buf, QuestData quest, int protocolVersion) {
+    if (protocolVersion < ProtocolVersion.V2) {
+      quest = QuestLocation.normalize(quest);
+    }
     buf.writeUUID(quest.id());
     buf.writeString(quest.title());
     buf.writeString(quest.content());
@@ -406,9 +433,20 @@ public final class PacketCodec {
         buf.writeString(tag);
       }
     }
+    if (protocolVersion >= ProtocolVersion.V2) {
+      writePolygon(buf, quest.polygon());
+    }
   }
 
   public static QuestData readQuest(ByteBufReader buf) {
+    return readQuest(buf, ProtocolVersion.CURRENT);
+  }
+
+  /**
+   * Reads a quest. The polygon block is read only when {@code protocolVersion >= V2}: inside a list
+   * a remaining() guard cannot tell a missing block from the next quest.
+   */
+  public static QuestData readQuest(ByteBufReader buf, int protocolVersion) {
     UUID id = buf.readUUID();
     String title = buf.readString();
     String content = buf.readString();
@@ -438,6 +476,7 @@ public final class PacketCodec {
     } else {
       tags = List.of();
     }
+    List<PointData> polygon = protocolVersion >= ProtocolVersion.V2 ? readPolygon(buf) : List.of();
     return new QuestData(
         id,
         title,
@@ -451,7 +490,8 @@ public final class PacketCodec {
         isRegion,
         coordinates2,
         map,
-        tags);
+        tags,
+        polygon);
   }
 
   // ---- SYNC_TAGS ----
@@ -501,7 +541,9 @@ public final class PacketCodec {
     for (int i = 0; i < tagCount; i++) {
       tags.add(buf.readString());
     }
-    return new SaveQuestPayload(questId, title, content, coords, isRegion, coords2, map, tags);
+    List<PointData> polygon = buf.remaining() > 0 ? readPolygon(buf) : List.of();
+    return new SaveQuestPayload(
+        questId, title, content, coords, isRegion, coords2, map, tags, polygon);
   }
 
   public static UUID readDeleteQuest(ByteBufReader buf) {
@@ -584,6 +626,7 @@ public final class PacketCodec {
       predefinedTags = List.of();
     }
     String defaultMap = buf.remaining() > 0 ? buf.readString() : "overworld";
+    int serverProtocolVersion = buf.remaining() > 0 ? buf.readVarInt() : ProtocolVersion.V1;
     return new HandshakePayload(
         bluemapUrl,
         pendingRequestCount,
@@ -591,20 +634,25 @@ public final class PacketCodec {
         playerUuid,
         mapNames,
         predefinedTags,
-        defaultMap);
+        defaultMap,
+        serverProtocolVersion);
   }
 
-  private static List<QuestData> readQuestList(ByteBufReader buf) {
+  private static List<QuestData> readQuestList(ByteBufReader buf, int protocolVersion) {
     int count = readCount(buf, MAX_QUEST_LIST, "Quest");
     List<QuestData> quests = new ArrayList<>(count);
     for (int i = 0; i < count; i++) {
-      quests.add(readQuest(buf));
+      quests.add(readQuest(buf, protocolVersion));
     }
     return quests;
   }
 
   public static List<QuestData> readSyncMyQuests(ByteBufReader buf) {
-    return readQuestList(buf);
+    return readSyncMyQuests(buf, ProtocolVersion.CURRENT);
+  }
+
+  public static List<QuestData> readSyncMyQuests(ByteBufReader buf, int protocolVersion) {
+    return readQuestList(buf, protocolVersion);
   }
 
   public static Map<UUID, Integer> readPendingCounts(ByteBufReader r) {
@@ -618,11 +666,19 @@ public final class PacketCodec {
   }
 
   public static List<QuestData> readSyncServerQuests(ByteBufReader buf) {
-    return readQuestList(buf);
+    return readSyncServerQuests(buf, ProtocolVersion.CURRENT);
+  }
+
+  public static List<QuestData> readSyncServerQuests(ByteBufReader buf, int protocolVersion) {
+    return readQuestList(buf, protocolVersion);
   }
 
   public static QuestData readUpdateQuest(ByteBufReader buf) {
-    return readQuest(buf);
+    return readUpdateQuest(buf, ProtocolVersion.CURRENT);
+  }
+
+  public static QuestData readUpdateQuest(ByteBufReader buf, int protocolVersion) {
+    return readQuest(buf, protocolVersion);
   }
 
   public static UUID readDeleteQuestS2C(ByteBufReader buf) {
@@ -638,9 +694,14 @@ public final class PacketCodec {
   }
 
   public static CollaborationResponsePayload readCollaborationResponse(ByteBufReader buf) {
+    return readCollaborationResponse(buf, ProtocolVersion.CURRENT);
+  }
+
+  public static CollaborationResponsePayload readCollaborationResponse(
+      ByteBufReader buf, int protocolVersion) {
     UUID questId = buf.readUUID();
     boolean approved = buf.readBoolean();
-    QuestData quest = readNullableQuest(buf);
+    QuestData quest = readNullableQuest(buf, protocolVersion);
     return new CollaborationResponsePayload(questId, approved, quest);
   }
 
@@ -660,6 +721,25 @@ public final class PacketCodec {
   }
 
   // ---- Private nullable helpers ----
+
+  private static void writePolygon(ByteBufWriter buf, List<PointData> polygon) {
+    buf.writeVarInt(polygon.size());
+    for (PointData p : polygon) {
+      buf.writeLong(Double.doubleToRawLongBits(p.x()));
+      buf.writeLong(Double.doubleToRawLongBits(p.z()));
+    }
+  }
+
+  private static List<PointData> readPolygon(ByteBufReader buf) {
+    int count = readCount(buf, QuestLocation.MAX_VERTICES, "Polygon vertex");
+    List<PointData> polygon = new ArrayList<>(count);
+    for (int i = 0; i < count; i++) {
+      double x = Double.longBitsToDouble(buf.readLong());
+      double z = Double.longBitsToDouble(buf.readLong());
+      polygon.add(new PointData(x, z));
+    }
+    return polygon;
+  }
 
   private static void writeNullableCoords(ByteBufWriter buf, CoordinatesData coords) {
     if (coords != null) {
@@ -723,9 +803,9 @@ public final class PacketCodec {
     }
   }
 
-  private static QuestData readNullableQuest(ByteBufReader buf) {
+  private static QuestData readNullableQuest(ByteBufReader buf, int protocolVersion) {
     if (buf.readBoolean()) {
-      return readQuest(buf);
+      return readQuest(buf, protocolVersion);
     }
     return null;
   }
