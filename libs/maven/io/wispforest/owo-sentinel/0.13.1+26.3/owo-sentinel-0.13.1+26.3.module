@@ -1,0 +1,96 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "io.wispforest",
+    "module": "owo-sentinel",
+    "version": "0.13.1+26.3",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.8.0"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 25,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "files": [
+        {
+          "name": "owo-sentinel-0.13.1+26.3.jar",
+          "url": "owo-sentinel-0.13.1+26.3.jar",
+          "size": 16954,
+          "sha512": "8e5578fc4970656ab0a5f754a13d0b0d3f1acb2656fdc3ef5db51788ffb8601deaa049f9a63328c3e02961311fe735462f780703abdcf0866b6db64fb1872517",
+          "sha256": "680db100b10e3e94370fee095584a2fdb67a8a3b5602de009037966e23f03fa8",
+          "sha1": "477963a7f1d1cf790f307340865ab7919b536746",
+          "md5": "08a6e4645a35d2636cde5e144f47f150"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 25,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "net.fabricmc",
+          "module": "fabric-loader",
+          "version": {
+            "requires": "0.19.5"
+          }
+        },
+        {
+          "group": "net.fabricmc.fabric-api",
+          "module": "fabric-api",
+          "version": {
+            "requires": "0.161.0+26.3"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "owo-sentinel-0.13.1+26.3.jar",
+          "url": "owo-sentinel-0.13.1+26.3.jar",
+          "size": 16954,
+          "sha512": "8e5578fc4970656ab0a5f754a13d0b0d3f1acb2656fdc3ef5db51788ffb8601deaa049f9a63328c3e02961311fe735462f780703abdcf0866b6db64fb1872517",
+          "sha256": "680db100b10e3e94370fee095584a2fdb67a8a3b5602de009037966e23f03fa8",
+          "sha1": "477963a7f1d1cf790f307340865ab7919b536746",
+          "md5": "08a6e4645a35d2636cde5e144f47f150"
+        }
+      ]
+    },
+    {
+      "name": "sourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "owo-sentinel-0.13.1+26.3-sources.jar",
+          "url": "owo-sentinel-0.13.1+26.3-sources.jar",
+          "size": 9024,
+          "sha512": "c40b6488144d01d9ae62ae6d53352f011dc5edf6222fd38816da618e7fa36406f8663557c0fae24ef9e1e66583b0c8ac4de1de37464f16ccc23e1f910907bb98",
+          "sha256": "b30a488052788ec6c4ecc2e2d4d1e6ccaca1cb3d79a62d765e1b4856f2bc9501",
+          "sha1": "8a3799e62adef9e4f9170f4599feaba443b82bc7",
+          "md5": "21322032ad6a9321139af36ecec30c22"
+        }
+      ]
+    }
+  ]
+}

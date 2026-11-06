@@ -288,7 +288,7 @@ public class MainScreen extends DisquestsBaseScreen {
   public boolean keyPressed(KeyEvent keyInput) {
     // Intercept arrow/enter/tab/escape for the tag autocomplete dropdown
     if (tagDropdown != null && tagDropdown.isVisible()) {
-      if (tagDropdown.onKeyDown(keyInput.key())) {
+      if (tagDropdown.onKeyDown(keyInput)) {
         return true;
       }
     }

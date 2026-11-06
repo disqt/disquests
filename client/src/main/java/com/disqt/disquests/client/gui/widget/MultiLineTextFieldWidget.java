@@ -7,6 +7,7 @@ import com.disqt.disquests.client.gui.helper.HoverPreviewRenderer;
 import com.disqt.disquests.client.gui.widget.undoredo.TextAction;
 import com.disqt.disquests.client.gui.widget.undoredo.UndoManager;
 import com.google.common.collect.Lists;
+import com.mojang.blaze3d.platform.InputConstants;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -27,7 +28,6 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
-import org.lwjgl.glfw.GLFW;
 
 public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, NarratableEntry {
 
@@ -69,7 +69,6 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
   private static final long DOUBLE_CLICK_INTERVAL_MS = 300;
 
   private boolean shiftDown = false;
-  private boolean ctrlDown = false;
 
   // dragging selection by mouse
   protected boolean isDraggingText = false;
@@ -317,7 +316,7 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
     if (this.lines.isEmpty()) this.lines.add("");
     this.setCursorToEnd();
     this.clearSelection();
-    this.focused = false;
+    setFocused(false);
     this.scrollX = 0;
     this.scrollY = 0;
 
@@ -588,6 +587,11 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
     int contentY = this.y + padding;
     int contentWidth = this.width - padding * 2;
     int contentHeight = this.height - padding * 2;
+    if (this.focused) {
+      Minecraft.getInstance()
+          .textInputManager()
+          .setTextInputArea(this.x, this.y, this.width, this.height);
+    }
 
     // Reserve space for scrollbars if needed
     boolean vNeeded = isScrollbarNeededV();
@@ -836,7 +840,6 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
   public boolean mouseClicked(MouseButtonEvent click, boolean simulated) {
     double mouseX = click.x();
     double mouseY = click.y();
-    int button = click.button();
     if (isMouseOver(mouseX, mouseY)) {
       boolean vNeeded = this.scrollingEnabled && isScrollbarNeededV();
       boolean hNeeded = this.scrollingEnabled && isScrollbarNeededH();
@@ -850,7 +853,7 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
           this.isDraggingVScrollbar = true;
           this.vScrollbarDragStartY = mouseY;
           this.vScrollbarDragStartScrollY = this.scrollY;
-          this.focused = true;
+          setFocused(true);
           return true;
         }
       }
@@ -863,13 +866,13 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
           this.isDraggingHScrollbar = true;
           this.hScrollbarDragStartX = mouseX;
           this.hScrollbarDragStartScrollX = this.scrollX;
-          this.focused = true;
+          setFocused(true);
           return true;
         }
       }
 
       // normal text area click
-      this.focused = true;
+      setFocused(true);
       int clickedAbs = absoluteIndexFromMouse(mouseX, mouseY);
 
       // --- Double/Triple click detection ---
@@ -902,7 +905,7 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
       }
       return true;
     }
-    this.focused = false;
+    setFocused(false);
     return false;
   }
 
@@ -1019,39 +1022,34 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
   @Override
   public boolean keyPressed(KeyEvent keyInput) {
     int keyCode = keyInput.key();
-    int scanCode = keyInput.scancode();
-    int modifiers = keyInput.modifiers();
-    boolean hasShift = (modifiers & GLFW.GLFW_MOD_SHIFT) != 0;
-    boolean hasCtrl = (modifiers & GLFW.GLFW_MOD_CONTROL) != 0;
+    boolean hasShift = keyInput.hasShiftDown();
+    boolean hasCtrl = keyInput.hasControlDown();
 
-    if (keyCode == GLFW.GLFW_KEY_LEFT_SHIFT || keyCode == GLFW.GLFW_KEY_RIGHT_SHIFT) {
+    if (keyCode == InputConstants.KEY_LSHIFT || keyCode == InputConstants.KEY_RSHIFT) {
       this.shiftDown = true;
-    }
-    if (keyCode == GLFW.GLFW_KEY_LEFT_CONTROL || keyCode == GLFW.GLFW_KEY_RIGHT_CONTROL) {
-      this.ctrlDown = true;
     }
 
     if (!this.focused) return false;
 
-    if (hasCtrl && keyCode == GLFW.GLFW_KEY_Z) {
+    if (hasCtrl && keyCode == InputConstants.KEY_Z) {
       undoManager.undo();
       onChanged();
       return true;
     }
-    if (hasCtrl && keyCode == GLFW.GLFW_KEY_Y) {
+    if (hasCtrl && keyCode == InputConstants.KEY_Y) {
       undoManager.redo();
       onChanged();
       return true;
     }
 
     // ctrl+word moves (absolute space)
-    if (hasCtrl && keyCode == GLFW.GLFW_KEY_LEFT) {
+    if (hasCtrl && keyCode == InputConstants.KEY_LEFT) {
       int oldAbs = getAbsoluteIndex(cursorY, cursorX);
       int newAbs = moveWordBackAbsolute(oldAbs);
       moveCursorToAbsolute(newAbs, hasShift);
       return true;
     }
-    if (hasCtrl && keyCode == GLFW.GLFW_KEY_RIGHT) {
+    if (hasCtrl && keyCode == InputConstants.KEY_RIGHT) {
       int oldAbs = getAbsoluteIndex(cursorY, cursorX);
       int newAbs = moveWordForwardAbsolute(oldAbs);
       moveCursorToAbsolute(newAbs, hasShift);
@@ -1059,24 +1057,24 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
     }
 
     // Select all: Ctrl+A
-    if (hasCtrl && keyCode == GLFW.GLFW_KEY_A) {
+    if (hasCtrl && keyCode == InputConstants.KEY_A) {
       setSelectionAbsolute(0, getTotalLength());
       setCursorFromAbsolute(getTotalLength());
       return true;
     }
     // Copy: Ctrl+C
-    if (hasCtrl && keyCode == GLFW.GLFW_KEY_C) {
+    if (hasCtrl && keyCode == InputConstants.KEY_C) {
       if (hasSelection()) Minecraft.getInstance().keyboardHandler.setClipboard(getSelectedText());
       return true;
     }
     // Paste: Ctrl+V
-    if (hasCtrl && keyCode == GLFW.GLFW_KEY_V) {
+    if (hasCtrl && keyCode == InputConstants.KEY_V) {
       String clip = Minecraft.getInstance().keyboardHandler.getClipboard();
       if (clip != null && !clip.isEmpty()) insertText(clip);
       return true;
     }
     // Cut: Ctrl+X
-    if (hasCtrl && keyCode == GLFW.GLFW_KEY_X) {
+    if (hasCtrl && keyCode == InputConstants.KEY_X) {
       if (hasSelection()) {
         Minecraft.getInstance().keyboardHandler.setClipboard(getSelectedText());
         deleteSelection();
@@ -1085,17 +1083,18 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
     }
 
     switch (keyCode) {
-      case GLFW.GLFW_KEY_TAB -> {
+      case InputConstants.KEY_TAB -> {
+        if (isSingleLine()) return false; // let focus navigation take it
         insertText("    ");
         return true;
       }
-      case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> {
+      case InputConstants.KEY_RETURN, InputConstants.KEY_NUMPADENTER -> {
         if (this.lines.size() < this.maxLines) {
           insertText("\n");
         }
         return true;
       }
-      case GLFW.GLFW_KEY_BACKSPACE -> {
+      case InputConstants.KEY_BACKSPACE -> {
         if (hasSelection()) {
           deleteSelection();
           return true;
@@ -1137,7 +1136,7 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
         onChanged();
         return true;
       }
-      case GLFW.GLFW_KEY_DELETE -> {
+      case InputConstants.KEY_DELETE -> {
         if (hasSelection()) {
           deleteSelection();
           return true;
@@ -1163,40 +1162,40 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
         onChanged();
         return true;
       }
-      case GLFW.GLFW_KEY_UP -> {
+      case InputConstants.KEY_UP -> {
         int newLine = Math.max(0, cursorY - 1);
         int newCol = Math.min(cursorX, lines.get(newLine).length());
         int newAbs = getAbsoluteIndex(newLine, newCol);
         moveCursorToAbsolute(newAbs, hasShift);
         return true;
       }
-      case GLFW.GLFW_KEY_DOWN -> {
+      case InputConstants.KEY_DOWN -> {
         int newLine = Math.min(lines.size() - 1, cursorY + 1);
         int newCol = Math.min(cursorX, lines.get(newLine).length());
         int newAbs = getAbsoluteIndex(newLine, newCol);
         moveCursorToAbsolute(newAbs, hasShift);
         return true;
       }
-      case GLFW.GLFW_KEY_LEFT -> {
+      case InputConstants.KEY_LEFT -> {
         int oldAbs = getAbsoluteIndex(cursorY, cursorX);
         if (oldAbs == 0) return true;
         int newAbs = oldAbs - 1;
         moveCursorToAbsolute(newAbs, hasShift);
         return true;
       }
-      case GLFW.GLFW_KEY_RIGHT -> {
+      case InputConstants.KEY_RIGHT -> {
         int oldAbs = getAbsoluteIndex(cursorY, cursorX);
         if (oldAbs >= getTotalLength()) return true;
         int newAbs = oldAbs + 1;
         moveCursorToAbsolute(newAbs, hasShift);
         return true;
       }
-      case GLFW.GLFW_KEY_HOME -> {
+      case InputConstants.KEY_HOME -> {
         int newAbs = getAbsoluteIndex(cursorY, 0);
         moveCursorToAbsolute(newAbs, hasShift);
         return true;
       }
-      case GLFW.GLFW_KEY_END -> {
+      case InputConstants.KEY_END -> {
         int newAbs = getAbsoluteIndex(cursorY, lines.get(cursorY).length());
         moveCursorToAbsolute(newAbs, hasShift);
         return true;
@@ -1209,11 +1208,8 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
   @Override
   public boolean keyReleased(KeyEvent keyInput) {
     int keyCode = keyInput.key();
-    if (keyCode == GLFW.GLFW_KEY_LEFT_SHIFT || keyCode == GLFW.GLFW_KEY_RIGHT_SHIFT) {
+    if (keyCode == InputConstants.KEY_LSHIFT || keyCode == InputConstants.KEY_RSHIFT) {
       this.shiftDown = false;
-    }
-    if (keyCode == GLFW.GLFW_KEY_LEFT_CONTROL || keyCode == GLFW.GLFW_KEY_RIGHT_CONTROL) {
-      this.ctrlDown = false;
     }
     return false;
   }
@@ -1388,15 +1384,23 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
 
   @Override
   public void setFocused(boolean focused) {
-    // This check prevents redundant logic if the focus state isn't changing.
     if (this.focused != focused) {
       this.focused = focused;
+      // 26.3 (SDL3) only delivers character events while a text-input session is open; vanilla
+      // EditBox opens and closes it from setFocused, so a custom widget must do the same or
+      // charTyped is never called.
+      Minecraft.getInstance().onTextInputFocusChange(this, focused);
     }
   }
 
   @Override
   public boolean isFocused() {
     return this.focused;
+  }
+
+  /** A one-line field: Enter does nothing and Tab moves focus instead of indenting. */
+  public boolean isSingleLine() {
+    return this.maxLines == 1;
   }
 
   public void _deleteTextInternal(int startAbsolute, int endAbsolute) {

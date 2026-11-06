@@ -1,0 +1,182 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "io.wispforest",
+    "module": "owo-lib",
+    "version": "0.13.1+26.3",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.8.0"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 25,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "io.wispforest",
+          "module": "endec",
+          "version": {
+            "requires": "0.1.12"
+          }
+        },
+        {
+          "group": "io.wispforest.endec",
+          "module": "netty",
+          "version": {
+            "requires": "0.1.6"
+          }
+        },
+        {
+          "group": "io.wispforest.endec",
+          "module": "gson",
+          "version": {
+            "requires": "0.1.7"
+          }
+        },
+        {
+          "group": "io.wispforest.endec",
+          "module": "jankson",
+          "version": {
+            "requires": "0.1.7"
+          }
+        },
+        {
+          "group": "blue.endless",
+          "module": "jankson",
+          "version": {
+            "requires": "1.2.2"
+          }
+        },
+        {
+          "group": "com.github.kdl-org",
+          "module": "kdl4j",
+          "version": {
+            "requires": "1.0.1"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "owo-lib-0.13.1+26.3.jar",
+          "url": "owo-lib-0.13.1+26.3.jar",
+          "size": 2276784,
+          "sha512": "22c0e730b8888c55bfeacfa6712838cff964a81f0bf8f2959aa0d48fd75b3ae62c38e0106c9423983e6a6dd6213ecb7fd50ba6e098c316f6e78a9d419a369086",
+          "sha256": "747bb6326de71bbc3cdd6058efb8a4c1cb0761dca40ea0358433c7483adbc807",
+          "sha1": "4cd09dc1c5dca998895245d1e5794ffef7073527",
+          "md5": "c66b1ba4306e7a120f6d097346846794"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 25,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "net.fabricmc",
+          "module": "fabric-loader",
+          "version": {
+            "requires": "0.19.5"
+          }
+        },
+        {
+          "group": "net.fabricmc.fabric-api",
+          "module": "fabric-api",
+          "version": {
+            "requires": "0.161.0+26.3"
+          }
+        },
+        {
+          "group": "io.wispforest",
+          "module": "endec",
+          "version": {
+            "requires": "0.1.12"
+          }
+        },
+        {
+          "group": "io.wispforest.endec",
+          "module": "netty",
+          "version": {
+            "requires": "0.1.6"
+          }
+        },
+        {
+          "group": "io.wispforest.endec",
+          "module": "gson",
+          "version": {
+            "requires": "0.1.7"
+          }
+        },
+        {
+          "group": "io.wispforest.endec",
+          "module": "jankson",
+          "version": {
+            "requires": "0.1.7"
+          }
+        },
+        {
+          "group": "blue.endless",
+          "module": "jankson",
+          "version": {
+            "requires": "1.2.2"
+          }
+        },
+        {
+          "group": "com.github.kdl-org",
+          "module": "kdl4j",
+          "version": {
+            "requires": "1.0.1"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "owo-lib-0.13.1+26.3.jar",
+          "url": "owo-lib-0.13.1+26.3.jar",
+          "size": 2276784,
+          "sha512": "22c0e730b8888c55bfeacfa6712838cff964a81f0bf8f2959aa0d48fd75b3ae62c38e0106c9423983e6a6dd6213ecb7fd50ba6e098c316f6e78a9d419a369086",
+          "sha256": "747bb6326de71bbc3cdd6058efb8a4c1cb0761dca40ea0358433c7483adbc807",
+          "sha1": "4cd09dc1c5dca998895245d1e5794ffef7073527",
+          "md5": "c66b1ba4306e7a120f6d097346846794"
+        }
+      ]
+    },
+    {
+      "name": "sourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "owo-lib-0.13.1+26.3-sources.jar",
+          "url": "owo-lib-0.13.1+26.3-sources.jar",
+          "size": 750429,
+          "sha512": "77d4f9f985947f3169e9d0bc103ff5c3deac9bfff58aadeab218a7390ab572938c37be666a0db50bf2ffc6061f9e9490d9b9d898a1a3dd00ec5246f8781b14f5",
+          "sha256": "04805507f46b01b3cf4a7fbc538b9c8b88b833ae565e753bb02b7611db2174a8",
+          "sha1": "bf4e13ab6fd496d15c16f0c19c292494327cbe66",
+          "md5": "a8b2ce821954f3c8372a1d86854a13da"
+        }
+      ]
+    }
+  ]
+}

@@ -398,6 +398,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     contentFieldComponent.sizing(Sizing.fill(100), Sizing.fill(100));
     contentFieldComponent.id("content-field");
     editorPanel.child(contentFieldComponent);
+    titleFieldComponent.tabTarget(contentFieldComponent);
 
     // Attach autocomplete dropdown for wiki-link syntax ([[Quest Name]])
     AutocompleteDropdown autocomplete = new AutocompleteDropdown();
@@ -525,6 +526,8 @@ public class QuestScreen extends DisquestsBaseScreen {
     coordXComponent.id("coord-x1");
     coordYComponent.id("coord-y1");
     coordZComponent.id("coord-z1");
+    coordXComponent.tabTarget(coordYComponent);
+    coordYComponent.tabTarget(coordZComponent);
 
     coordsRow.child(labelFor("1:"));
     coordsRow.child(labelFor("X:"));
@@ -569,6 +572,9 @@ public class QuestScreen extends DisquestsBaseScreen {
       coord2XComponent.id("coord-x2");
       coord2YComponent.id("coord-y2");
       coord2ZComponent.id("coord-z2");
+      coordZComponent.tabTarget(coord2XComponent);
+      coord2XComponent.tabTarget(coord2YComponent);
+      coord2YComponent.tabTarget(coord2ZComponent);
 
       corner2Row.child(labelFor("2:"));
       corner2Row.child(labelFor("X:"));

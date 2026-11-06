@@ -166,10 +166,7 @@ class TwoPlayerJourneys {
               }
               throw new AssertionError("Not a Disquests screen");
             });
-    double scale = context.computeOnClient(c -> (double) c.getWindow().getGuiScale());
-    context.getInput().setCursorPos(acceptPos[0] * scale, acceptPos[1] * scale);
-    context.getInput().pressMouse(org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT);
-    context.waitTicks(2);
+    clickAt(context, acceptPos);
     waitForScreen(context, ContributorScreen.class);
 
     then("PlayerB appears in the contributor list");
@@ -242,10 +239,7 @@ class TwoPlayerJourneys {
               }
               throw new AssertionError("Not a Disquests screen");
             });
-    double scale = context.computeOnClient(c -> (double) c.getWindow().getGuiScale());
-    context.getInput().setCursorPos(permPos[0] * scale, permPos[1] * scale);
-    context.getInput().pressMouse(org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT);
-    context.waitTicks(4);
+    clickAt(context, permPos, 4);
     waitForScreen(context, ContributorScreen.class);
 
     when("PlayerA clicks Remove on the contributor");
@@ -277,10 +271,7 @@ class TwoPlayerJourneys {
               }
               throw new AssertionError("Not a Disquests screen");
             });
-    double scale2 = context.computeOnClient(c -> (double) c.getWindow().getGuiScale());
-    context.getInput().setCursorPos(removePos[0] * scale2, removePos[1] * scale2);
-    context.getInput().pressMouse(org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT);
-    context.waitTicks(2);
+    clickAt(context, removePos);
 
     then("confirm overlay appears");
     waitForComponent(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);

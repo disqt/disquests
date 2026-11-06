@@ -7,6 +7,7 @@ import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.test.integration.harness.RconClient;
 import com.disqt.disquests.test.integration.harness.TestContext;
+import com.mojang.blaze3d.platform.InputConstants;
 import io.wispforest.owo.ui.core.UIComponent;
 import java.util.UUID;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -15,13 +16,12 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
-import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * UI interaction helpers using GLFW physical input (TestInput). Never call screen methods directly
- * -- always go through the real input pipeline.
+ * UI interaction helpers using physical input (TestInput). Never call screen methods directly --
+ * always go through the real input pipeline.
  */
 public final class UIActions {
   private static final Logger LOG = LoggerFactory.getLogger("Disquests.E2E");
@@ -167,16 +167,25 @@ public final class UIActions {
   // --- Component interaction ---
 
   /**
-   * Click a component by its XML/programmatic ID. Uses GLFW physical input: setCursorPos +
-   * pressMouse.
+   * Left-click at a GUI-space position through the real input pipeline (cursor move + press), then
+   * wait for the click to be processed.
    */
+  public static void clickAt(ClientGameTestContext context, double[] guiPos) {
+    clickAt(context, guiPos, 2);
+  }
+
+  public static void clickAt(ClientGameTestContext context, double[] guiPos, int waitTicks) {
+    double scale = scaleFactor(context);
+    context.getInput().setCursorPos(guiPos[0] * scale, guiPos[1] * scale);
+    context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+    context.waitTicks(waitTicks);
+  }
+
+  /** Click a component by its XML/programmatic ID. */
   public static void click(ClientGameTestContext context, String componentId) {
     var component = findComponent(context, UIComponent.class, componentId);
     double[] pos = componentCenter(context, component);
-    double scale = scaleFactor(context);
-    context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-    context.waitTicks(2);
+    clickAt(context, pos);
   }
 
   /**
@@ -198,10 +207,7 @@ public final class UIActions {
                 entry.x() + entry.width() / 2.0, entry.y() + entry.height() / 2.0
               };
             });
-    double scale = scaleFactor(context);
-    context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-    context.waitTicks(2);
+    clickAt(context, pos);
   }
 
   /**
@@ -226,10 +232,7 @@ public final class UIActions {
               }
               throw new AssertionError("No entry with title '" + title + "' found in quest list");
             });
-    double scale = scaleFactor(context);
-    context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-    context.waitTicks(2);
+    clickAt(context, pos);
   }
 
   /** Double-click a QuestEntryComponent by index. */
@@ -254,23 +257,19 @@ public final class UIActions {
                 entry.x() + entry.width() - PIN_ICON_CLICK_X, entry.y() + PIN_ICON_CLICK_Y
               };
             });
-    double scale = scaleFactor(context);
-    context.getInput().setCursorPos(pos[0] * scale, pos[1] * scale);
-    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-    context.waitTicks(2);
+    clickAt(context, pos);
   }
 
   /**
    * Type text into a focused text field. Must click the field first to focus it. Clears existing
-   * text by directly manipulating the widget, then types the new text via GLFW character input.
-   * Handles both TextFieldComponent (our custom multi-line) and TextBoxComponent (owo-ui
-   * single-line).
+   * text by directly manipulating the widget, then types the new text via character input. Handles
+   * both TextFieldComponent (our custom multi-line) and TextBoxComponent (owo-ui single-line).
    */
   public static void type(ClientGameTestContext context, String componentId, String text) {
     click(context, componentId);
     context.waitTicks(1); // focus desync workaround for GreedyInputUIComponent
     // Clear existing text by directly manipulating the widget.
-    // GLFW Ctrl+A routing can be unreliable through owo-ui layers,
+    // Ctrl+A routing can be unreliable through owo-ui layers,
     // so we clear via runOnClient for robustness.
     context.runOnClient(
         c -> {
@@ -306,7 +305,7 @@ public final class UIActions {
     context.waitTicks(1);
     // Move to end (Ctrl+End)
     context.getInput().holdControl();
-    context.getInput().pressKey(GLFW.GLFW_KEY_END);
+    context.getInput().pressKey(InputConstants.KEY_END);
     context.getInput().releaseControl();
     context.getInput().typeChars(text);
     context.waitTicks(2);
@@ -315,7 +314,7 @@ public final class UIActions {
   /** Press Ctrl+Z (undo) on the currently focused field. */
   public static void undo(ClientGameTestContext context) {
     context.getInput().holdControl();
-    context.getInput().pressKey(GLFW.GLFW_KEY_Z);
+    context.getInput().pressKey(InputConstants.KEY_Z);
     context.getInput().releaseControl();
     context.waitTicks(2);
   }
@@ -327,7 +326,7 @@ public final class UIActions {
   public static void undoN(ClientGameTestContext context, int count) {
     for (int i = 0; i < count; i++) {
       context.getInput().holdControl();
-      context.getInput().pressKey(GLFW.GLFW_KEY_Z);
+      context.getInput().pressKey(InputConstants.KEY_Z);
       context.getInput().releaseControl();
     }
     context.waitTicks(2);
@@ -336,7 +335,7 @@ public final class UIActions {
   /** Press Ctrl+Y (redo) on the currently focused field. */
   public static void redo(ClientGameTestContext context) {
     context.getInput().holdControl();
-    context.getInput().pressKey(GLFW.GLFW_KEY_Y);
+    context.getInput().pressKey(InputConstants.KEY_Y);
     context.getInput().releaseControl();
     context.waitTicks(2);
   }
@@ -345,7 +344,7 @@ public final class UIActions {
   public static void redoN(ClientGameTestContext context, int count) {
     for (int i = 0; i < count; i++) {
       context.getInput().holdControl();
-      context.getInput().pressKey(GLFW.GLFW_KEY_Y);
+      context.getInput().pressKey(InputConstants.KEY_Y);
       context.getInput().releaseControl();
     }
     context.waitTicks(2);

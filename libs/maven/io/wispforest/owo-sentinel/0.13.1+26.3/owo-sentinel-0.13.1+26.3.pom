@@ -9,18 +9,18 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.wispforest</groupId>
   <artifactId>owo-sentinel</artifactId>
-  <version>0.13.0+26.2</version>
+  <version>0.13.1+26.3</version>
   <dependencies>
     <dependency>
       <groupId>net.fabricmc</groupId>
       <artifactId>fabric-loader</artifactId>
-      <version>0.19.3</version>
+      <version>0.19.5</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>net.fabricmc.fabric-api</groupId>
       <artifactId>fabric-api</artifactId>
-      <version>0.154.2+26.2</version>
+      <version>0.161.0+26.3</version>
       <scope>runtime</scope>
     </dependency>
   </dependencies>

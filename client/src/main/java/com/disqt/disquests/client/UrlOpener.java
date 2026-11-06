@@ -1,5 +1,6 @@
 package com.disqt.disquests.client;
 
+import com.mojang.blaze3d.Blaze3D;
 import java.net.URI;
 import net.minecraft.util.Util;
 import org.slf4j.Logger;
@@ -24,7 +25,7 @@ public class UrlOpener {
             .redirectErrorStream(true)
             .start();
       } else {
-        Util.getPlatform().openUri(URI.create(url));
+        Blaze3D.openUri(URI.create(url));
       }
     } catch (Exception e) {
       LOGGER.error("Failed to open URL: {}", url, e);

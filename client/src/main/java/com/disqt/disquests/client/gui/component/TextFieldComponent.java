@@ -4,6 +4,7 @@ import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import io.wispforest.owo.ui.base.BaseUIComponent;
 import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.Sizing;
+import io.wispforest.owo.ui.core.UIComponent;
 import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
@@ -16,6 +17,7 @@ import net.minecraft.client.input.MouseButtonEvent;
  * Implements GreedyInputUIComponent so owo-ui routes key/char events to it.
  */
 public class TextFieldComponent extends BaseUIComponent implements GreedyInputUIComponent {
+  private UIComponent tabTarget;
 
   private final MultiLineTextFieldWidget delegate;
   private final int preferredWidth;
@@ -114,13 +116,27 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
     return delegate.mouseScrolled(absX, absY, 0, amount);
   }
 
+  /** Where Tab sends focus from a single-line field; null falls back to owo-ui's focus cycling. */
+  public TextFieldComponent tabTarget(UIComponent target) {
+    this.tabTarget = target;
+    return this;
+  }
+
   @Override
   public boolean onKeyPress(KeyEvent keyInput) {
     // Intercept navigation keys for autocomplete dropdown before forwarding to delegate
     if (dropdown != null && dropdown.isVisible()) {
-      if (dropdown.onKeyDown(keyInput.key())) {
+      if (dropdown.onKeyDown(keyInput)) {
         return true;
       }
+    }
+    if (keyInput.isCycleFocus() && delegate.isSingleLine()) {
+      var handler = focusHandler();
+      if (tabTarget != null && !keyInput.hasShiftDown() && handler != null) {
+        handler.focus(tabTarget, FocusSource.KEYBOARD_CYCLE);
+        return true;
+      }
+      return false; // unconsumed: the owo-ui root cycles focus in tree order
     }
     delegate.setFocused(true);
     boolean result = delegate.keyPressed(keyInput);

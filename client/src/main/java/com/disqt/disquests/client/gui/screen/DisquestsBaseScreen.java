@@ -5,6 +5,7 @@ import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.DisquestsClient;
 import com.disqt.disquests.client.KeyBinds;
 import com.disqt.disquests.client.data.Quest;
+import com.mojang.blaze3d.platform.InputConstants;
 import io.wispforest.owo.ui.base.BaseUIModelScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
@@ -79,10 +80,10 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
 
   @Override
   public boolean mouseClicked(MouseButtonEvent click, boolean simulated) {
-    if (click.button() == org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_4) {
+    if (click.button() == InputConstants.MOUSE_BUTTON_4) {
       goBack();
       return true;
-    } else if (click.button() == org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_5) {
+    } else if (click.button() == InputConstants.MOUSE_BUTTON_5) {
       goForward();
       return true;
     }
