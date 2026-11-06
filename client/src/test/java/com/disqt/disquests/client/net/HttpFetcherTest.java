@@ -2,8 +2,11 @@ package com.disqt.disquests.client.net;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
 class HttpFetcherTest {
@@ -35,5 +38,13 @@ class HttpFetcherTest {
     assertEquals(86400, HttpFetcher.parseMaxAge(null));
     assertEquals(86400, HttpFetcher.parseMaxAge("no-cache"));
     assertEquals(86400, HttpFetcher.parseMaxAge("max-age=abc"));
+  }
+
+  @Test
+  void readCapped_acceptsMaxBytes_rejectsMore() throws IOException {
+    assertEquals(10, HttpFetcher.readCapped(new ByteArrayInputStream(new byte[10]), 10).length);
+    assertThrows(
+        IOException.class,
+        () -> HttpFetcher.readCapped(new ByteArrayInputStream(new byte[11]), 10));
   }
 }

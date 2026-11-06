@@ -189,7 +189,6 @@ public class ClientSession {
   public static String consumePendingToast() {
     String msg = pendingToast;
     pendingToast = null;
-    SharedTileCache.reset();
     return msg;
   }
 

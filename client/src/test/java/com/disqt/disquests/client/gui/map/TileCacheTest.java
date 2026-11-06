@@ -37,6 +37,9 @@ class TileCacheTest {
       if (r instanceof IOException e) {
         throw e;
       }
+      if (r instanceof RuntimeException e) {
+        throw e;
+      }
       if (r == null) {
         return new FetchResult(404, new byte[0], "text/plain", 0);
       }
@@ -276,5 +279,30 @@ class TileCacheTest {
     assertNotNull(
         new TileCache("https://x/", fetcher, textures, DIRECT, DIRECT, dir, 4)
             .tileUrl(new TileKey("m", 0, 0, 0)));
+  }
+
+  @Test
+  void get_runtimeExceptionFromFetcher_isMissing() {
+    TileCache c = cache(4);
+    TileKey k = key(0);
+    fetcher.responses.put(c.tileUrl(k), new IllegalStateException("oops"));
+    c.get(k);
+    assertEquals(TileStatus.MISSING, c.get(k));
+    assertEquals(1, c.stats().fetches());
+    assertEquals(1, fetcher.calls);
+  }
+
+  @Test
+  void get_rejectedPool_isMissing() {
+    TileCache c =
+        cache(
+            r -> {
+              throw new java.util.concurrent.RejectedExecutionException("shut down");
+            },
+            DIRECT,
+            dir,
+            4);
+    assertEquals(TileStatus.MISSING, c.get(key(0)));
+    assertEquals(0, fetcher.calls);
   }
 }

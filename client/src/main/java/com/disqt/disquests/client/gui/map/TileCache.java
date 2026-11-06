@@ -105,7 +105,13 @@ public final class TileCache {
         return TileStatus.LOADING;
       }
     }
-    fetchPool.execute(() -> loadTile(key));
+    try {
+      fetchPool.execute(() -> loadTile(key));
+    } catch (RuntimeException e) {
+      lastError = String.valueOf(e);
+      markMissing(key);
+      return TileStatus.MISSING;
+    }
     return TileStatus.LOADING;
   }
 
@@ -122,7 +128,11 @@ public final class TileCache {
         return BlueMapSettings.DEFAULT;
       }
     }
-    fetchPool.execute(() -> loadSettings(mapId));
+    try {
+      fetchPool.execute(() -> loadSettings(mapId));
+    } catch (RuntimeException e) {
+      lastError = String.valueOf(e);
+    }
     return BlueMapSettings.DEFAULT;
   }
 
@@ -140,6 +150,14 @@ public final class TileCache {
   }
 
   private void loadSettings(String mapId) {
+    try {
+      loadSettingsUnchecked(mapId);
+    } catch (RuntimeException e) {
+      lastError = String.valueOf(e);
+    }
+  }
+
+  private void loadSettingsUnchecked(String mapId) {
     FetchResult r = fetchTracked(baseUrl + "/maps/" + mapId + "/settings.json");
     if (r == null || r.status() != 200) {
       return;
@@ -151,6 +169,15 @@ public final class TileCache {
   }
 
   private void loadTile(TileKey key) {
+    try {
+      loadTileUnchecked(key);
+    } catch (RuntimeException e) {
+      lastError = String.valueOf(e);
+      markMissing(key);
+    }
+  }
+
+  private void loadTileUnchecked(TileKey key) {
     String url = tileUrl(key);
     byte[] png = readDisk(url);
     if (png == null) {

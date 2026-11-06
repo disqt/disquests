@@ -1,6 +1,7 @@
 package com.disqt.disquests.client.net;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -63,10 +64,15 @@ public final class HttpFetcher implements TileFetcher {
       } catch (IllegalArgumentException e) {
         throw new IOException("Bad URL: " + url, e);
       }
-      HttpResponse<byte[]> response = client.send(request, this::bodyHandler);
-      byte[] body = response.body();
-      if (body == null || body.length > maxBytes) {
-        throw new IOException("Response too large: " + url);
+      HttpResponse<InputStream> response =
+          client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+      byte[] body;
+      try (InputStream in = response.body()) {
+        long length = response.headers().firstValueAsLong("Content-Length").orElse(-1);
+        if (length > maxBytes) {
+          throw new IOException("Response too large: " + url);
+        }
+        body = readCapped(in, maxBytes);
       }
       String contentType = response.headers().firstValue("Content-Type").orElse("");
       long maxAge = parseMaxAge(response.headers().firstValue("Cache-Control").orElse(null));
@@ -77,12 +83,12 @@ public final class HttpFetcher implements TileFetcher {
     }
   }
 
-  /** Rejects oversized responses by Content-Length before reading; a null body marks rejection. */
-  private HttpResponse.BodySubscriber<byte[]> bodyHandler(HttpResponse.ResponseInfo info) {
-    long length = info.headers().firstValueAsLong("Content-Length").orElse(-1);
-    if (length > maxBytes) {
-      return HttpResponse.BodySubscribers.replacing(null);
+  /** Reads at most maxBytes; throws IOException if the stream holds more. */
+  static byte[] readCapped(InputStream in, long maxBytes) throws IOException {
+    byte[] body = in.readNBytes((int) Math.min(maxBytes + 1, Integer.MAX_VALUE - 8));
+    if (body.length > maxBytes) {
+      throw new IOException("Response too large");
     }
-    return HttpResponse.BodySubscribers.ofByteArray();
+    return body;
   }
 }
