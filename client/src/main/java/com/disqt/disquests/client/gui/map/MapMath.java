@@ -69,4 +69,18 @@ public final class MapMath {
     double bpp = blocksPerPixel(c.zoom());
     return new Camera(c.centerX() - dxPixels * bpp, c.centerZ() - dyPixels * bpp, c.zoom());
   }
+
+  /**
+   * The most zoomed-in level at which a {@code blocksW x blocksH} area fits in a {@code viewW x
+   * viewH} view less {@code margin} pixels on each axis; 0 when it fits at none.
+   */
+  public static int fitZoom(double blocksW, double blocksH, int viewW, int viewH, int margin) {
+    for (int zoom = MAX_ZOOM; zoom > 0; zoom--) {
+      double bpp = blocksPerPixel(zoom);
+      if (blocksW / bpp <= viewW - margin && blocksH / bpp <= viewH - margin) {
+        return zoom;
+      }
+    }
+    return 0;
+  }
 }

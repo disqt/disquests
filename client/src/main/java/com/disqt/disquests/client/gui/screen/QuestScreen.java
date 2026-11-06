@@ -1,9 +1,7 @@
 package com.disqt.disquests.client.gui.screen;
 
-import com.disqt.disquests.client.BlueMapHelper;
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
-import com.disqt.disquests.client.UrlOpener;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.AutocompleteDropdown;
 import com.disqt.disquests.client.gui.component.TagChipComponent;
@@ -14,6 +12,7 @@ import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.client.markdown.RenderedLine;
 import com.disqt.disquests.client.network.PacketSender;
+import com.disqt.disquests.common.DimensionKeys;
 import com.disqt.disquests.common.QuestLocation;
 import com.disqt.disquests.common.TagConstraints;
 import com.disqt.disquests.common.model.CoordinatesData;
@@ -45,17 +44,11 @@ import org.jetbrains.annotations.Nullable;
  */
 public class QuestScreen extends DisquestsBaseScreen {
 
-  private static final String MAP_OVERWORLD = "overworld";
-  private static final String MAP_NETHER = "the_nether";
-  private static final String MAP_END = "the_end";
-  private static final double DEFAULT_Y = 64;
-
   private final Quest quest;
   private final boolean editing;
   private final boolean isNewQuest;
 
   // Edit mode state preserved across rebuilds
-  private boolean regionEnabled;
   private String originalTitle;
   private String originalContent;
 
@@ -68,12 +61,7 @@ public class QuestScreen extends DisquestsBaseScreen {
   // Widget references for edit mode
   private TextFieldComponent titleFieldComponent;
   private TextFieldComponent contentFieldComponent;
-  private TextFieldComponent coordXComponent;
-  private TextFieldComponent coordYComponent;
-  private TextFieldComponent coordZComponent;
-  private TextFieldComponent coord2XComponent;
-  private TextFieldComponent coord2YComponent;
-  private TextFieldComponent coord2ZComponent;
+  private List<LocationCard.VertexRow> vertexRows = List.of();
 
   /** Open in view mode for an existing quest. */
   public QuestScreen(@Nullable Screen parent, Quest quest) {
@@ -101,7 +89,6 @@ public class QuestScreen extends DisquestsBaseScreen {
     this.quest = quest;
     this.editing = editing;
     this.isNewQuest = isNewQuest;
-    this.regionEnabled = quest.isRegion();
     this.originalTitle = originalTitle;
     this.originalContent = originalContent;
   }
@@ -132,8 +119,8 @@ public class QuestScreen extends DisquestsBaseScreen {
     // View mode panels
     ParentUIComponent contentScroll = root.childById(ParentUIComponent.class, "content-scroll");
     if (contentScroll != null) applyThemePanel(contentScroll);
-    ParentUIComponent metadataRow = root.childById(ParentUIComponent.class, "metadata-row");
-    if (metadataRow != null) applyThemePanel(metadataRow);
+    ParentUIComponent locationCard = root.childById(ParentUIComponent.class, "location-card");
+    if (locationCard != null) applyThemePanel(locationCard);
 
     // Edit mode panels
     ParentUIComponent titleRow = root.childById(ParentUIComponent.class, "title-row");
@@ -142,8 +129,6 @@ public class QuestScreen extends DisquestsBaseScreen {
     if (editorPanel != null) applyThemePanel(editorPanel);
     ParentUIComponent formattingPanel = root.childById(ParentUIComponent.class, "formatting-panel");
     if (formattingPanel != null) applyThemePanel(formattingPanel);
-    ParentUIComponent coordsSection = root.childById(ParentUIComponent.class, "coords-section");
-    if (coordsSection != null) applyThemePanel(coordsSection);
 
     UUID myUuid = ClientSession.getEffectivePlayerUuid();
     this.isOwner = quest.isOwner(myUuid);
@@ -232,32 +217,8 @@ public class QuestScreen extends DisquestsBaseScreen {
     FlowLayout contentArea = root.childById(FlowLayout.class, "content-area");
     contentArea.child(markdownWidget);
 
-    // Metadata row (coords + BlueMap button)
-    boolean hasCoords = quest.getCoordinates() != null;
-    FlowLayout metadataRow = root.childById(FlowLayout.class, "metadata-row");
-    if (hasCoords) {
-      root.childById(LabelComponent.class, "coords-label")
-          .text(Component.literal(buildCoordsText()).withColor(Colors.TEXT_MUTED));
-
-      if (quest.getMap() != null) {
-        root.childById(LabelComponent.class, "map-label")
-            .text(Component.literal("Map: " + quest.getMap()).withColor(Colors.TEXT_MUTED));
-      }
-
-      // BlueMap button
-      String bluemapUrl = BlueMapHelper.buildUrl(quest);
-      if (bluemapUrl != null) {
-        final String url = bluemapUrl;
-        ButtonComponent bmBtn =
-            UIComponents.button(
-                Component.translatable("gui.disquests.btn.view_bluemap"),
-                ignored -> UrlOpener.open(url));
-        bmBtn.sizing(Sizing.content(), Sizing.fixed(14));
-        metadataRow.child(bmBtn);
-      }
-    } else {
-      metadataRow.sizing(Sizing.fixed(0), Sizing.fixed(0));
-    }
+    // Location card (mini map, coords, map, BlueMap button)
+    LocationCard.buildView(this, root, quest);
 
     // Contributors row -- wrapped in collapsible
     int contribCount = quest.getContributors().size();
@@ -421,8 +382,8 @@ public class QuestScreen extends DisquestsBaseScreen {
     contentFieldComponent.setAutocomplete(autocomplete);
     autocomplete.setRootComponent(root);
 
-    // Coords section
-    buildCoordsSection(root);
+    // Location card
+    vertexRows = LocationCard.buildEdit(this, root, quest);
 
     // Settings row (owner only)
     FlowLayout settingsRow = root.childById(FlowLayout.class, "settings-row");
@@ -519,94 +480,6 @@ public class QuestScreen extends DisquestsBaseScreen {
                       .withStyle(s -> s.withUnderlined(true).withColor(0xe8a86d))));
   }
 
-  private void buildCoordsSection(FlowLayout root) {
-    CoordinatesData c = quest.getCoordinates();
-    FlowLayout coordsRow = root.childById(FlowLayout.class, "coords-row");
-
-    // X/Y/Z fields
-    coordXComponent = createCoordField(c != null ? String.valueOf((int) c.x()) : "", "X");
-    coordYComponent = createCoordField(c != null ? String.valueOf((int) c.y()) : "", "Y");
-    coordZComponent = createCoordField(c != null ? String.valueOf((int) c.z()) : "", "Z");
-    coordXComponent.id("coord-x1");
-    coordYComponent.id("coord-y1");
-    coordZComponent.id("coord-z1");
-    coordXComponent.tabTarget(coordYComponent);
-    coordYComponent.tabTarget(coordZComponent);
-
-    coordsRow.child(labelFor("1:"));
-    coordsRow.child(labelFor("X:"));
-    coordsRow.child(coordXComponent);
-    coordsRow.child(labelFor("Y:"));
-    coordsRow.child(coordYComponent);
-    coordsRow.child(labelFor("Z:"));
-    coordsRow.child(coordZComponent);
-
-    // Set Pos button
-    ButtonComponent setPosBtn =
-        UIComponents.button(
-            Component.translatable("gui.disquests.btn.set_pos"), b -> setPlayerPosition());
-    setPosBtn.sizing(Sizing.fixed(50), Sizing.fixed(14));
-    setPosBtn.id("btn-set-pos");
-    coordsRow.child(setPosBtn);
-
-    // Region toggle
-    Component regionText =
-        regionEnabled
-            ? Component.translatable("gui.disquests.btn.region_on")
-            : Component.translatable("gui.disquests.btn.region_off");
-    ButtonComponent regionBtn = UIComponents.button(regionText, b -> toggleRegion());
-    regionBtn.sizing(Sizing.content(), Sizing.fixed(14));
-    regionBtn.id("btn-region");
-    coordsRow.child(regionBtn);
-
-    // Clear button
-    ButtonComponent clearBtn =
-        UIComponents.button(Component.translatable("gui.disquests.btn.clear"), b -> clearCoords());
-    clearBtn.sizing(Sizing.fixed(50), Sizing.fixed(14));
-    clearBtn.id("btn-clear");
-    coordsRow.child(clearBtn);
-
-    // Corner 2 row
-    FlowLayout corner2Row = root.childById(FlowLayout.class, "corner2-row");
-    if (regionEnabled) {
-      CoordinatesData c2 = quest.getCoordinates2();
-      coord2XComponent = createCoordField(c2 != null ? String.valueOf((int) c2.x()) : "", "X");
-      coord2YComponent = createCoordField(c2 != null ? String.valueOf((int) c2.y()) : "", "Y");
-      coord2ZComponent = createCoordField(c2 != null ? String.valueOf((int) c2.z()) : "", "Z");
-      coord2XComponent.id("coord-x2");
-      coord2YComponent.id("coord-y2");
-      coord2ZComponent.id("coord-z2");
-      coordZComponent.tabTarget(coord2XComponent);
-      coord2XComponent.tabTarget(coord2YComponent);
-      coord2YComponent.tabTarget(coord2ZComponent);
-
-      corner2Row.child(labelFor("2:"));
-      corner2Row.child(labelFor("X:"));
-      corner2Row.child(coord2XComponent);
-      corner2Row.child(labelFor("Y:"));
-      corner2Row.child(coord2YComponent);
-      corner2Row.child(labelFor("Z:"));
-      corner2Row.child(coord2ZComponent);
-
-      ButtonComponent setPos2Btn =
-          UIComponents.button(
-              Component.translatable("gui.disquests.btn.set_pos"), b -> setCorner2Position());
-      setPos2Btn.sizing(Sizing.fixed(50), Sizing.fixed(14));
-      corner2Row.child(setPos2Btn);
-    } else {
-      corner2Row.sizing(Sizing.fixed(0), Sizing.fixed(0));
-    }
-
-    // Map row
-    FlowLayout mapRow = root.childById(FlowLayout.class, "map-row");
-    String mapDisplay = quest.getMap() != null ? quest.getMap() : "any";
-    ButtonComponent mapBtn =
-        UIComponents.button(Component.literal("Map: " + mapDisplay), b -> cycleMap());
-    mapBtn.sizing(Sizing.content(), Sizing.fixed(14));
-    mapBtn.id("btn-map");
-    mapRow.child(mapBtn);
-  }
-
   private void buildTagEditor(FlowLayout root) {
     FlowLayout tagEditor = root.childById(FlowLayout.class, "tag-editor");
     if (tagEditor == null) return;
@@ -644,20 +517,6 @@ public class QuestScreen extends DisquestsBaseScreen {
       addTagBtn.id("btn-add-tag");
       tagEditor.child(addTagBtn);
     }
-  }
-
-  private TextFieldComponent createCoordField(String value, String placeholder) {
-    MultiLineTextFieldWidget field =
-        new MultiLineTextFieldWidget(minecraft.font, 0, 0, 50, 14, value, placeholder, 1, false);
-    TextFieldComponent component = new TextFieldComponent(field);
-    component.sizing(Sizing.fixed(50), Sizing.fixed(14));
-    return component;
-  }
-
-  private LabelComponent labelFor(String text) {
-    LabelComponent label = UIComponents.label(Component.literal(text).withColor(Colors.TEXT_MUTED));
-    label.shadow(true);
-    return label;
   }
 
   // ===================== MODE SWITCHING =====================
@@ -755,62 +614,53 @@ public class QuestScreen extends DisquestsBaseScreen {
 
   // ===================== EDIT MODE ACTIONS =====================
 
-  private void setPlayerPosition() {
+  /** Saves the fields, then opens the full-screen map editor on the current location. */
+  void openMapEditor() {
+    persistFieldValues();
+    List<PointData> initial;
+    if (!quest.getPolygon().isEmpty()) {
+      initial = quest.getPolygon();
+    } else if (quest.getCoordinates() != null) {
+      initial = List.of(new PointData(quest.getCoordinates().x(), quest.getCoordinates().z()));
+    } else {
+      initial = List.of();
+    }
+    if (minecraft != null) {
+      minecraft.gui.setScreen(new MapEditScreen(this, dimensionForEdit(), initial));
+    }
+  }
+
+  /** Pins the quest at the player, dropping any outline; the map becomes the player's. */
+  void setPlayerPosition() {
     if (minecraft != null && minecraft.player != null) {
       persistFieldValues();
       quest.setCoordinates(
           new CoordinatesData(
               minecraft.player.getX(), minecraft.player.getY(), minecraft.player.getZ()));
-      if (quest.getMap() == null && minecraft.level != null) {
-        quest.setMap(minecraft.level.dimension().identifier().getPath());
-      }
-      rebuildEditMode();
-    }
-  }
-
-  private void setCorner2Position() {
-    if (minecraft != null && minecraft.player != null) {
-      persistFieldValues();
-      quest.setCoordinates2(
-          new CoordinatesData(
-              minecraft.player.getX(), minecraft.player.getY(), minecraft.player.getZ()));
-      rebuildEditMode();
-    }
-  }
-
-  private void toggleRegion() {
-    persistFieldValues();
-    this.regionEnabled = !this.regionEnabled;
-    quest.setRegion(this.regionEnabled);
-    if (!this.regionEnabled) {
       quest.setCoordinates2(null);
-    }
-    rebuildEditMode();
-  }
-
-  private void clearCoords() {
-    persistFieldValues();
-    quest.setCoordinates(null);
-    quest.setCoordinates2(null);
-    this.regionEnabled = false;
-    quest.setRegion(false);
-    rebuildEditMode();
-  }
-
-  private void cycleMap() {
-    persistFieldValues();
-    String current = quest.getMap();
-    if (current == null) {
-      quest.setMap(MAP_OVERWORLD);
-    } else {
+      quest.setRegion(false);
+      quest.setPolygon(List.of());
       quest.setMap(
-          switch (current) {
-            case MAP_OVERWORLD -> MAP_NETHER;
-            case MAP_NETHER -> MAP_END;
-            case MAP_END -> null; // cycles back to "any"
-            default -> MAP_OVERWORLD;
-          });
+          DimensionKeys.normalize(minecraft.player.level().dimension().identifier().getPath()));
+      rebuildEditMode();
     }
+  }
+
+  /** Removes the pin or outline; the quest's map goes back to null. */
+  void clearCoords() {
+    persistFieldValues();
+    applyMapLocation(List.of());
+  }
+
+  /** Cycles overworld, the_nether, the_end, starting from the map shown on the button. */
+  void cycleMap() {
+    persistFieldValues();
+    quest.setMap(
+        switch (dimensionForEdit()) {
+          case DimensionKeys.OVERWORLD -> DimensionKeys.THE_NETHER;
+          case DimensionKeys.THE_NETHER -> DimensionKeys.THE_END;
+          default -> DimensionKeys.OVERWORLD;
+        });
     rebuildEditMode();
   }
 
@@ -834,7 +684,8 @@ public class QuestScreen extends DisquestsBaseScreen {
 
   /**
    * Applies a location drawn on the map: no corners clears it, one is a pin, two or more an
-   * outline. Sets the quest's map to {@link #dimensionForEdit()} and rebuilds the editor.
+   * outline. A location sets the quest's map to {@link #dimensionForEdit()}; clearing sets it to
+   * null. Rebuilds the editor.
    */
   public void applyMapLocation(List<PointData> vertices) {
     String dimension = dimensionForEdit();
@@ -843,9 +694,10 @@ public class QuestScreen extends DisquestsBaseScreen {
       quest.setCoordinates2(null);
       quest.setRegion(false);
       quest.setPolygon(List.of());
+      dimension = null;
     } else if (vertices.size() == 1) {
       PointData p = vertices.get(0);
-      double y = DEFAULT_Y;
+      double y = LocationCard.DEFAULT_Y;
       if (minecraft != null
           && minecraft.player != null
           && minecraft.player.level().dimension().identifier().getPath().equals(dimension)) {
@@ -856,13 +708,12 @@ public class QuestScreen extends DisquestsBaseScreen {
       quest.setRegion(false);
       quest.setPolygon(List.of());
     } else {
-      CoordinatesData[] box = QuestLocation.boundingBox(vertices, DEFAULT_Y);
+      CoordinatesData[] box = QuestLocation.boundingBox(vertices, LocationCard.DEFAULT_Y);
       quest.setPolygon(List.copyOf(vertices));
       quest.setCoordinates(box[0]);
       quest.setCoordinates2(box[1]);
       quest.setRegion(true);
     }
-    this.regionEnabled = quest.isRegion();
     quest.setMap(dimension);
     rebuildEditMode();
   }
@@ -875,7 +726,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     if (minecraft != null && minecraft.level != null) {
       return minecraft.level.dimension().identifier().getPath();
     }
-    return MAP_OVERWORLD;
+    return DimensionKeys.OVERWORLD;
   }
 
   private void rebuildEditMode() {
@@ -904,29 +755,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     if (contentFieldComponent != null) {
       quest.setContent(contentFieldComponent.getText());
     }
-    if (coordXComponent != null) {
-      quest.setCoordinates(parseCoordinates(coordXComponent, coordYComponent, coordZComponent));
-    }
-    if (coord2XComponent != null) {
-      quest.setCoordinates2(parseCoordinates(coord2XComponent, coord2YComponent, coord2ZComponent));
-    }
-  }
-
-  private CoordinatesData parseCoordinates(
-      TextFieldComponent xComp, TextFieldComponent yComp, TextFieldComponent zComp) {
-    if (xComp == null || yComp == null || zComp == null) return null;
-    String xText = xComp.getText().trim();
-    String yText = yComp.getText().trim();
-    String zText = zComp.getText().trim();
-    if (xText.isEmpty() && yText.isEmpty() && zText.isEmpty()) {
-      return null;
-    }
-    try {
-      return new CoordinatesData(
-          Double.parseDouble(xText), Double.parseDouble(yText), Double.parseDouble(zText));
-    } catch (NumberFormatException e) {
-      return null;
-    }
+    LocationCard.persistVertexFields(quest, vertexRows);
   }
 
   private boolean isDirty() {
@@ -960,22 +789,6 @@ public class QuestScreen extends DisquestsBaseScreen {
       i = found + 3;
     }
     return content;
-  }
-
-  private String buildCoordsText() {
-    CoordinatesData c = quest.getCoordinates();
-    if (quest.isRegion() && quest.getCoordinates2() != null) {
-      CoordinatesData c2 = quest.getCoordinates2();
-      return String.format(
-          "Region: X:%.0f-%.0f Y:%.0f-%.0f Z:%.0f-%.0f",
-          Math.min(c.x(), c2.x()),
-          Math.max(c.x(), c2.x()),
-          Math.min(c.y(), c2.y()),
-          Math.max(c.y(), c2.y()),
-          Math.min(c.z(), c2.z()),
-          Math.max(c.z(), c2.z()));
-    }
-    return String.format("X:%.0f Y:%.0f Z:%.0f", c.x(), c.y(), c.z());
   }
 
   // ===================== AUTO-CLOSE =====================

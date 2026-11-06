@@ -67,8 +67,8 @@
                 <height>55</height>
             </template>
 
-            <!-- Metadata row (coords, map, BlueMap button, hidden when no coords) -->
-            <flow-layout direction="horizontal" id="metadata-row">
+            <!-- Location card (mini map, coords, map, BlueMap button), zero-sized when unlocated -->
+            <flow-layout direction="vertical" id="location-card">
                 <sizing>
                     <horizontal method="fill">85</horizontal>
                     <vertical method="content"/>
@@ -79,20 +79,36 @@
                 <padding>
                     <all>4</all>
                 </padding>
-                <vertical-alignment>center</vertical-alignment>
-                <gap>8</gap>
+                <gap>2</gap>
                 <margins>
                     <top>2</top>
                 </margins>
                 <children>
-                    <label id="coords-label">
-                        <text></text>
-                        <shadow>true</shadow>
-                    </label>
-                    <label id="map-label">
-                        <text></text>
-                        <shadow>true</shadow>
-                    </label>
+                    <flow-layout direction="vertical" id="mini-map-slot">
+                        <sizing>
+                            <horizontal method="fill">100</horizontal>
+                            <vertical method="fixed">120</vertical>
+                        </sizing>
+                        <children/>
+                    </flow-layout>
+                    <flow-layout direction="horizontal" id="location-labels">
+                        <sizing>
+                            <horizontal method="fill">100</horizontal>
+                            <vertical method="content"/>
+                        </sizing>
+                        <vertical-alignment>center</vertical-alignment>
+                        <gap>8</gap>
+                        <children>
+                            <label id="coords-label">
+                                <text></text>
+                                <shadow>true</shadow>
+                            </label>
+                            <label id="map-label">
+                                <text></text>
+                                <shadow>true</shadow>
+                            </label>
+                        </children>
+                    </flow-layout>
                 </children>
             </flow-layout>
 

@@ -21,18 +21,16 @@
     "deny": "Refuser",
     "remove": "Retirer",
     "set_pos": "Position",
-    "clear": "Effacer",
     "view_bluemap": "Voir sur BlueMap",
     "join": "Rejoindre",
     "request": "Demander",
     "requested": "Demandé",
     "add_tag": "+ Tag",
     "add": "Ajouter",
-    "region_off": "[ ] Région",
-    "region_on": "[x] Région",
     "done": "Terminer",
     "cancel_map": "Annuler",
     "clear_location": "Effacer l'emplacement",
+    "edit_on_map": "Modifier sur la map",
   },
 
   // Permissions des contributeurs
@@ -79,6 +77,8 @@
     "no_matching_tags": "Aucun tag correspondant",
     "request_access": "Demander l'accès pour voir",
     "enter_to_create": "Appuie sur Entrée pour créer un tag",
+    "vertex": "%d:",
+    "region_summary": "Région : %d coins, X : %d à %d Z : %d à %d",
   },
 
   // Dialogues de confirmation

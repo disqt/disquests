@@ -21,18 +21,16 @@
     "deny": "Deny",
     "remove": "Remove",
     "set_pos": "Set Pos",
-    "clear": "Clear",
     "view_bluemap": "View on BlueMap",
     "join": "Join",
     "request": "Request",
     "requested": "Requested",
     "add_tag": "+ Tag",
     "add": "Add",
-    "region_off": "[ ] Region",
-    "region_on": "[x] Region",
     "done": "Done",
     "cancel_map": "Cancel",
     "clear_location": "Clear location",
+    "edit_on_map": "Edit on map",
   },
 
   // Contributor permissions
@@ -79,6 +77,8 @@
     "no_matching_tags": "No matching tags",
     "request_access": "Request access to view",
     "enter_to_create": "Press Enter to create new tag",
+    "vertex": "%d:",
+    "region_summary": "Region: %d corners, X:%d to %d Z:%d to %d",
   },
 
   // Confirm dialogs

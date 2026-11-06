@@ -119,4 +119,18 @@ class MapMathTest {
     assertEquals(5000, MapMath.worldLimit("overworld"));
     assertEquals(5000, MapMath.worldLimit("the_end"));
   }
+
+  @Test
+  void fitZoom_picksMostZoomedInThatFits() {
+    // 150 x 50 blocks in a 200 x 100 view (192 x 92 usable): 0.5 bpp needs 300 px, 1 bpp fits.
+    assertEquals(2, MapMath.fitZoom(150, 50, 200, 100, 8));
+    assertEquals(MapMath.MAX_ZOOM, MapMath.fitZoom(10, 10, 200, 100, 8));
+    // Height decides: 1000 blocks tall is 200 px at 5 bpp, too tall for 92 px; 40 px at 25 bpp.
+    assertEquals(0, MapMath.fitZoom(10, 1000, 200, 100, 8));
+  }
+
+  @Test
+  void fitZoom_fallsBackToMostZoomedOut() {
+    assertEquals(0, MapMath.fitZoom(100000, 100000, 200, 100, 8));
+  }
 }

@@ -146,8 +146,8 @@
                 </children>
             </flow-layout>
 
-            <!-- Coords section -->
-            <flow-layout direction="vertical" id="coords-section">
+            <!-- Location card: mini map, vertex fields, location buttons (built programmatically) -->
+            <flow-layout direction="vertical" id="location-card">
                 <sizing>
                     <horizontal method="fill">85</horizontal>
                     <vertical method="content"/>
@@ -163,38 +163,29 @@
                     <top>2</top>
                 </margins>
                 <children>
-                    <!-- Coords row (built programmatically) -->
-                    <flow-layout direction="horizontal" id="coords-row">
+                    <flow-layout direction="vertical" id="mini-map-slot">
                         <sizing>
                             <horizontal method="fill">100</horizontal>
-                            <vertical method="content"/>
+                            <vertical method="fixed">200</vertical>
                         </sizing>
-                        <gap>4</gap>
-                        <vertical-alignment>center</vertical-alignment>
-                        <children>
-                        </children>
+                        <children/>
                     </flow-layout>
-                    <!-- Corner 2 row (hidden when not region) -->
-                    <flow-layout direction="horizontal" id="corner2-row">
+                    <flow-layout direction="vertical" id="vertex-list">
                         <sizing>
-                            <horizontal method="fill">100</horizontal>
+                            <horizontal method="content"/>
                             <vertical method="content"/>
                         </sizing>
-                        <gap>4</gap>
-                        <vertical-alignment>center</vertical-alignment>
-                        <children>
-                        </children>
+                        <gap>2</gap>
+                        <children/>
                     </flow-layout>
-                    <!-- Map row -->
-                    <flow-layout direction="horizontal" id="map-row">
+                    <flow-layout direction="horizontal" id="location-buttons">
                         <sizing>
                             <horizontal method="fill">100</horizontal>
                             <vertical method="content"/>
                         </sizing>
                         <gap>4</gap>
                         <vertical-alignment>center</vertical-alignment>
-                        <children>
-                        </children>
+                        <children/>
                     </flow-layout>
                 </children>
             </flow-layout>
