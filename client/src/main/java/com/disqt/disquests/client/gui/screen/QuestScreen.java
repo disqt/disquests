@@ -652,8 +652,12 @@ public class QuestScreen extends DisquestsBaseScreen {
     applyMapLocation(List.of());
   }
 
-  /** Cycles overworld, the_nether, the_end, starting from the map shown on the button. */
+  /**
+   * Cycles overworld, the_nether, the_end, starting from the map shown on the button. Does nothing
+   * while the quest is unlocated, so {@code map} stays null exactly then.
+   */
   void cycleMap() {
+    if (!quest.hasLocation()) return;
     persistFieldValues();
     quest.setMap(
         switch (dimensionForEdit()) {

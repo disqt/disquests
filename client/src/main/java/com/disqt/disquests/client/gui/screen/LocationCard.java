@@ -79,7 +79,10 @@ final class LocationCard {
             "btn-clear-location",
             Component.translatable("gui.disquests.btn.clear_location"),
             screen::clearCoords));
-    buttons.child(button("btn-map", Component.literal("Map: " + dimension), screen::cycleMap));
+    ButtonComponent mapButton =
+        button("btn-map", Component.literal("Map: " + dimension), screen::cycleMap);
+    mapButton.active(quest.hasLocation());
+    buttons.child(mapButton);
     return rows;
   }
 

@@ -5,13 +5,16 @@ import static com.disqt.disquests.test.integration.bdd.UIActions.*;
 import static com.disqt.disquests.test.integration.bdd.UIAssertions.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
 import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
+import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.core.UIComponent;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.minecraft.client.Minecraft;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Order;
@@ -86,19 +89,19 @@ class LocationJourney {
 
     when("player clicks Map (overworld -> the_nether)");
     click(context, "btn-map");
-    waitForScreen(context, QuestScreen.class);
+    waitForMapButton(context, "the_nether");
     then("map button shows the_nether");
     assertButtonText(context, "btn-map", "the_nether");
 
     when("player clicks Map (the_nether -> the_end)");
     click(context, "btn-map");
-    waitForScreen(context, QuestScreen.class);
+    waitForMapButton(context, "the_end");
     then("map button shows the_end");
     assertButtonText(context, "btn-map", "the_end");
 
     when("player clicks Map (the_end -> overworld)");
     click(context, "btn-map");
-    waitForScreen(context, QuestScreen.class);
+    waitForMapButton(context, "overworld");
     then("map button shows overworld again");
     assertButtonText(context, "btn-map", "overworld");
   }
@@ -126,8 +129,8 @@ class LocationJourney {
     waitForComponent(context, "btn-clear-location");
     and("player clicks Clear location");
     click(context, "btn-clear-location");
-    // Clear rebuilds the edit screen
-    waitForScreen(context, QuestScreen.class);
+    // Clear rebuilds the edit screen; wait until the rebuilt one has no vertex row
+    waitForComponentGone(context, "vertex-x-0");
     then("the vertex row is gone");
     assertComponentMissing(context, "vertex-x-0");
 
@@ -153,5 +156,34 @@ class LocationJourney {
     click(context, "btn-back");
     then("MainScreen is shown");
     waitForScreen(context, MainScreen.class);
+  }
+
+  /** Waits until the current screen's {@code btn-map} text contains {@code key}. */
+  private static void waitForMapButton(ClientGameTestContext context, String key) {
+    context.waitFor(
+        client -> {
+          ButtonComponent button = currentComponent(client, ButtonComponent.class, "btn-map");
+          return button != null && button.getMessage().getString().contains(key);
+        },
+        TIMEOUT);
+  }
+
+  /** Waits until the current Disquests screen has no component with {@code id}. */
+  private static void waitForComponentGone(ClientGameTestContext context, String id) {
+    context.waitFor(
+        client ->
+            client.gui.screen() instanceof DisquestsBaseScreen
+                && currentComponent(client, UIComponent.class, id) == null,
+        TIMEOUT);
+  }
+
+  /** Looks up a component on the client thread, inside a {@code waitFor} predicate. */
+  private static <T extends UIComponent> T currentComponent(
+      Minecraft client, Class<T> type, String id) {
+    if (client.gui.screen() instanceof DisquestsBaseScreen screen
+        && screen.getRootComponent() != null) {
+      return screen.getRootComponent().childById(type, id);
+    }
+    return null;
   }
 }
