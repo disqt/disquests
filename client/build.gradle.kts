@@ -485,6 +485,8 @@ fun launchClient(
     if (harness) cmd.add("-Pharness")
     if (coverage) cmd.add("-Pcoverage")
     if (testPackage != null) cmd.add("-PtestPackage=$testPackage")
+    providers.gradleProperty("testServerPort").orNull?.let { cmd.add("-PtestServerPort=$it") }
+    providers.gradleProperty("testRconPort").orNull?.let { cmd.add("-PtestRconPort=$it") }
     logger.lifecycle("  Starting $journey as $username")
     return ProcessBuilder(cmd)
         .directory(rootDir)

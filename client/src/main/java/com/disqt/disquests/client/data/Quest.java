@@ -1,6 +1,7 @@
 package com.disqt.disquests.client.data;
 
 import com.disqt.disquests.common.model.CoordinatesData;
+import com.disqt.disquests.common.model.PointData;
 import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.common.model.Visibility;
 import java.util.ArrayList;
@@ -22,6 +23,7 @@ public class Quest {
   private CoordinatesData coordinates2;
   private String map;
   private List<String> tags = new ArrayList<>();
+  private List<PointData> polygon = new ArrayList<>();
 
   public static Quest fromNetwork(QuestData data) {
     Quest quest = new Quest();
@@ -41,6 +43,7 @@ public class Quest {
     quest.coordinates2 = data.coordinates2();
     quest.map = data.map();
     quest.tags = new ArrayList<>(data.tags());
+    quest.polygon = new ArrayList<>(data.polygon());
     return quest;
   }
 
@@ -146,6 +149,23 @@ public class Quest {
 
   public void setTags(List<String> tags) {
     this.tags = tags;
+  }
+
+  public List<PointData> getPolygon() {
+    return polygon;
+  }
+
+  public void setPolygon(List<PointData> polygon) {
+    this.polygon = polygon != null ? polygon : new ArrayList<>();
+  }
+
+  /** True when the quest has a pin or a polygon. */
+  public boolean hasLocation() {
+    return coordinates != null || !polygon.isEmpty();
+  }
+
+  public boolean isPolygon() {
+    return polygon.size() >= 2;
   }
 
   // --- Permission helpers ---

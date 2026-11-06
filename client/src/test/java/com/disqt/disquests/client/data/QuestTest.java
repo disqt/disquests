@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.CoordinatesData;
+import com.disqt.disquests.common.model.PointData;
 import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.common.model.Visibility;
 import java.util.List;
@@ -146,5 +147,51 @@ class QuestTest {
                 List.of()));
     assertNotNull(q.getTags());
     assertTrue(q.getTags().isEmpty());
+  }
+
+  private Quest questWith(CoordinatesData coords, List<PointData> polygon) {
+    return Quest.fromNetwork(
+        new QuestData(
+            UUID.randomUUID(),
+            "T",
+            "C",
+            OWNER,
+            "OwnerName",
+            Visibility.OPEN,
+            List.of(),
+            0L,
+            coords,
+            false,
+            null,
+            "overworld",
+            List.of(),
+            polygon));
+  }
+
+  @Test
+  void fromNetwork_copiesPolygon() {
+    List<PointData> poly =
+        new java.util.ArrayList<>(List.of(new PointData(1, 2), new PointData(3, 4)));
+    Quest q = questWith(null, poly);
+    assertEquals(poly, q.getPolygon());
+    poly.clear();
+    assertEquals(2, q.getPolygon().size());
+    assertTrue(makeQuest(Visibility.OPEN).getPolygon().isEmpty());
+    q.setPolygon(null);
+    assertNotNull(q.getPolygon());
+  }
+
+  @Test
+  void hasLocation_trueForPinOrPolygon_falseOtherwise() {
+    assertFalse(questWith(null, List.of()).hasLocation());
+    assertTrue(questWith(new CoordinatesData(1, 2, 3), List.of()).hasLocation());
+    assertTrue(questWith(null, List.of(new PointData(1, 2))).hasLocation());
+  }
+
+  @Test
+  void isPolygon_requiresTwoVertices() {
+    assertFalse(questWith(null, List.of()).isPolygon());
+    assertFalse(questWith(null, List.of(new PointData(1, 2))).isPolygon());
+    assertTrue(questWith(null, List.of(new PointData(1, 2), new PointData(3, 4))).isPolygon());
   }
 }

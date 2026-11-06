@@ -75,11 +75,13 @@ public class ClientPacketHandler {
         payload.bluemapMapNames(),
         payload.predefinedTags());
     ClientSession.setBluemapDefaultMap(payload.bluemapDefaultMap());
+    ClientSession.setServerProtocolVersion(payload.serverProtocolVersion());
     PacketSender.requestSync();
   }
 
   private static void handleSyncMyQuests(ByteBufReader r) {
-    List<QuestData> dataList = PacketCodec.readSyncMyQuests(r);
+    List<QuestData> dataList =
+        PacketCodec.readSyncMyQuests(r, ClientSession.getServerProtocolVersion());
     Map<UUID, Integer> counts = PacketCodec.readPendingCounts(r);
     List<Quest> quests = new ArrayList<>(dataList.size());
     for (QuestData data : dataList) {
@@ -90,7 +92,8 @@ public class ClientPacketHandler {
   }
 
   private static void handleSyncServerQuests(ByteBufReader r) {
-    List<QuestData> dataList = PacketCodec.readSyncServerQuests(r);
+    List<QuestData> dataList =
+        PacketCodec.readSyncServerQuests(r, ClientSession.getServerProtocolVersion());
     List<Quest> quests = new ArrayList<>(dataList.size());
     for (QuestData data : dataList) {
       quests.add(Quest.fromNetwork(data));
@@ -99,7 +102,7 @@ public class ClientPacketHandler {
   }
 
   private static void handleUpdateQuest(ByteBufReader r) {
-    QuestData data = PacketCodec.readUpdateQuest(r);
+    QuestData data = PacketCodec.readUpdateQuest(r, ClientSession.getServerProtocolVersion());
     Quest quest = Quest.fromNetwork(data);
     final UUID myUuid = ClientSession.getEffectivePlayerUuid();
     boolean isMine = quest.isOwner(myUuid) || quest.isContributor(myUuid);
@@ -166,7 +169,8 @@ public class ClientPacketHandler {
   }
 
   private static void handleCollaborationResponse(ByteBufReader r) {
-    PacketCodec.CollaborationResponsePayload payload = PacketCodec.readCollaborationResponse(r);
+    PacketCodec.CollaborationResponsePayload payload =
+        PacketCodec.readCollaborationResponse(r, ClientSession.getServerProtocolVersion());
     if (payload.approved() && payload.quest() != null) {
       Quest quest = Quest.fromNetwork(payload.quest());
       ClientCache.addOrUpdateMyQuest(quest);

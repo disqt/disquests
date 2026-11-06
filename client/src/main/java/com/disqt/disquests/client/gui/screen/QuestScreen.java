@@ -220,7 +220,8 @@ public class QuestScreen extends DisquestsBaseScreen {
                 quest.isRegion(),
                 quest.getCoordinates2(),
                 quest.getMap(),
-                quest.getTags());
+                quest.getTags(),
+                quest.getPolygon());
             ClientCache.addOrUpdateMyQuest(quest);
           });
     }
@@ -702,7 +703,8 @@ public class QuestScreen extends DisquestsBaseScreen {
         quest.isRegion(),
         quest.getCoordinates2(),
         quest.getMap(),
-        quest.getTags());
+        quest.getTags(),
+        quest.getPolygon());
 
     UUID myUuid = ClientSession.getEffectivePlayerUuid();
     if (quest.getOwnerUuid().equals(myUuid)) {
