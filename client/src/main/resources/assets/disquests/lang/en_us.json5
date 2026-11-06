@@ -32,6 +32,12 @@
     "region_on": "[x] Region",
   },
 
+  // Inline images in quest content
+  "gui.disquests.image.{}": {
+    "loading": "Loading image…",
+    "failed": "Image failed to load",
+  },
+
   // Contributor permissions
   "gui.disquests.contributor.{}": {
     "can_edit": "Can Edit",

@@ -33,6 +33,12 @@
   },
 
   // Permissions des contributeurs
+  // Images dans le contenu des quêtes
+  "gui.disquests.image.{}": {
+    "loading": "Chargement de l’image…",
+    "failed": "Échec du chargement de l’image",
+  },
+
   "gui.disquests.contributor.{}": {
     "can_edit": "Peut éditer",
     "view_only": "Lecture seule",

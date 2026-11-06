@@ -7,18 +7,25 @@ import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.helper.HoverPreviewRenderer;
 import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
+import com.disqt.disquests.client.image.ImageLayout;
+import com.disqt.disquests.client.image.ImageState;
+import com.disqt.disquests.client.image.Images;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.client.markdown.RenderedLine;
 import io.wispforest.owo.ui.base.BaseUIComponent;
 import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.Sizing;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
@@ -32,11 +39,18 @@ public class MarkdownWidget extends BaseUIComponent {
   private static final int PADDING = 5;
   private static final int SCROLLBAR_THICKNESS = 6;
   private static final String QUEST_INACCESSIBLE_MSG = "This quest is private or no longer exists";
+  private static final int IMAGE_PLACEHOLDER_HEIGHT = 48;
+  private static final int IMAGE_SPACING = 4;
 
   private final List<WrappedEntry> wrappedLines = new ArrayList<>();
   private final List<CheckboxHitbox> checkboxHitboxes = new ArrayList<>();
   private final List<LinkHitbox> linkHitboxes = new ArrayList<>();
   private final List<WikiLinkHitbox> wikiLinkHitboxes = new ArrayList<>();
+  private final List<ImageHitbox> imageHitboxes = new ArrayList<>();
+
+  /** Image URLs still loading at the last layout; a settled one triggers a relayout. */
+  private final Set<String> unsettledImages = new HashSet<>();
+
   private int totalContentHeight = 0;
   private double scrollOffset = 0;
   private CheckboxToggleListener checkboxToggleListener;
@@ -65,6 +79,8 @@ public class MarkdownWidget extends BaseUIComponent {
       int x, int y, int width, int height, String url, Component displayText) {}
 
   private record WikiLinkHitbox(int x, int y, int width, int height, String uuid) {}
+
+  private record ImageHitbox(int x, int y, int width, int height, String url) {}
 
   private static boolean hitTest(double mx, double my, int x, int y, int w, int h) {
     return mx >= x && mx < x + w && my >= y && my < y + h;
@@ -164,10 +180,37 @@ public class MarkdownWidget extends BaseUIComponent {
   }
 
   private record WrappedEntry(
-      FormattedCharSequence text, int indent, float scale, int checkboxIndex, boolean checked) {
-    int height(Font tr) {
-      return Math.round(tr.lineHeight * scale);
+      FormattedCharSequence text,
+      int indent,
+      float scale,
+      int checkboxIndex,
+      boolean checked,
+      String imageUrl,
+      int blockHeight) {
+    WrappedEntry(
+        FormattedCharSequence text, int indent, float scale, int checkboxIndex, boolean checked) {
+      this(text, indent, scale, checkboxIndex, checked, null, 0);
     }
+
+    int height(Font tr) {
+      return imageUrl != null ? blockHeight : Math.round(tr.lineHeight * scale);
+    }
+  }
+
+  /** Number of image blocks in the current layout. For E2E testing. */
+  public int imageBlockCount() {
+    int n = 0;
+    for (WrappedEntry e : wrappedLines) if (e.imageUrl != null) n++;
+    return n;
+  }
+
+  /** Number of image blocks whose image is decoded and ready to draw. For E2E testing. */
+  public int loadedImageCount() {
+    int n = 0;
+    for (WrappedEntry e : wrappedLines) {
+      if (e.imageUrl != null && Images.cache().get(e.imageUrl) instanceof ImageState.Loaded) n++;
+    }
+    return n;
   }
 
   public MarkdownWidget(List<RenderedLine> lines) {
@@ -184,14 +227,30 @@ public class MarkdownWidget extends BaseUIComponent {
     Font textRenderer = Minecraft.getInstance().font;
     wrappedLines.clear();
     checkboxHitboxes.clear();
+    unsettledImages.clear();
     totalContentHeight = 0;
     int checkboxIndex = 0;
 
-    int availableWidth = componentWidth - PADDING * 2 - SCROLLBAR_THICKNESS - 2;
+    int availableWidth = availableWidth(componentWidth);
 
     for (RenderedLine line : lines) {
       int indent = line.indent();
       float scale = line.scale();
+
+      if (line.isImage()) {
+        int blockHeight = imageBlockHeight(line.imageUrl(), availableWidth - indent);
+        wrappedLines.add(
+            new WrappedEntry(
+                FormattedCharSequence.EMPTY,
+                indent,
+                1.0f,
+                -1,
+                false,
+                line.imageUrl(),
+                blockHeight));
+        totalContentHeight += blockHeight + IMAGE_SPACING;
+        continue;
+      }
       int lineAvailWidth = (int) ((availableWidth - indent) / scale);
 
       if (lineAvailWidth <= 0) lineAvailWidth = availableWidth;
@@ -223,6 +282,69 @@ public class MarkdownWidget extends BaseUIComponent {
     }
   }
 
+  private int availableWidth(int componentWidth) {
+    return componentWidth - PADDING * 2 - SCROLLBAR_THICKNESS - 2;
+  }
+
+  /** Block height for an image: its fitted height once loaded, a fixed placeholder otherwise. */
+  private int imageBlockHeight(String url, int availW) {
+    ImageState state = Images.cache().get(url);
+    if (state instanceof ImageState.Loaded loaded) {
+      return ImageLayout.fit(loaded.width(), loaded.height(), availW)[1];
+    }
+    if (state instanceof ImageState.Loading) unsettledImages.add(url);
+    return IMAGE_PLACEHOLDER_HEIGHT;
+  }
+
+  /** Draws one image block at (x, y) and returns the drawn width. */
+  private int drawImageBlock(
+      OwoUIGraphics context, Font font, String url, int x, int y, int availW) {
+    ImageState state = Images.cache().get(url);
+    if (state instanceof ImageState.Loaded loaded) {
+      int[] wh = ImageLayout.fit(loaded.width(), loaded.height(), availW);
+      context.blit(
+          RenderPipelines.GUI_TEXTURED,
+          Images.textureId(loaded.textureKey()),
+          x,
+          y,
+          0f,
+          0f,
+          wh[0],
+          wh[1],
+          loaded.width(),
+          loaded.height(),
+          loaded.width(),
+          loaded.height());
+      return wh[0];
+    }
+    boolean failed = state instanceof ImageState.Failed;
+    int w = Math.max(1, availW);
+    context.fill(x, y, x + w, y + IMAGE_PLACEHOLDER_HEIGHT, 0xFF202020);
+    Component label =
+        Component.translatable(
+            failed ? "gui.disquests.image.failed" : "gui.disquests.image.loading");
+    context.text(
+        font,
+        label.getVisualOrderText(),
+        x + (w - font.width(label)) / 2,
+        y + (failed ? 14 : 20),
+        Colors.TEXT_MUTED,
+        false);
+    if (failed) {
+      Component link =
+          Component.literal(font.plainSubstrByWidth(url, w - 8))
+              .withStyle(ChatFormatting.AQUA, ChatFormatting.UNDERLINE);
+      context.text(
+          font,
+          link.getVisualOrderText(),
+          x + (w - font.width(link)) / 2,
+          y + 28,
+          Colors.TEXT_PRIMARY,
+          false);
+    }
+    return w;
+  }
+
   // --- owo-ui component API ---
 
   @Override
@@ -238,6 +360,16 @@ public class MarkdownWidget extends BaseUIComponent {
   @Override
   public void draw(OwoUIGraphics context, int mouseX, int mouseY, float partialTicks, float delta) {
     Font textRenderer = Minecraft.getInstance().font;
+
+    // An image that finished loading (or failed) changes its block height: relayout.
+    if (!unsettledImages.isEmpty()) {
+      for (String url : unsettledImages) {
+        if (!(Images.cache().get(url) instanceof ImageState.Loading)) {
+          lastKnownWidth = -1;
+          break;
+        }
+      }
+    }
 
     // Rebuild wrapped lines if width changed
     if (this.width() != lastKnownWidth && currentLines != null) {
@@ -255,6 +387,7 @@ public class MarkdownWidget extends BaseUIComponent {
     checkboxHitboxes.clear();
     linkHitboxes.clear();
     wikiLinkHitboxes.clear();
+    imageHitboxes.clear();
     int contentX = compX + PADDING;
     int contentY = compY + PADDING;
     int drawY = contentY - (int) scrollOffset;
@@ -264,6 +397,20 @@ public class MarkdownWidget extends BaseUIComponent {
 
       if (drawY + lineHeight > compY && drawY < compY + compH) {
         int drawX = contentX + entry.indent;
+
+        if (entry.imageUrl != null) {
+          int drawnW =
+              drawImageBlock(
+                  context,
+                  textRenderer,
+                  entry.imageUrl,
+                  drawX,
+                  drawY,
+                  availableWidth(compW) - entry.indent);
+          imageHitboxes.add(new ImageHitbox(drawX, drawY, drawnW, lineHeight, entry.imageUrl));
+          drawY += lineHeight + IMAGE_SPACING;
+          continue;
+        }
 
         if (entry.scale != 1.0f) {
           context.pose().pushMatrix();
@@ -285,10 +432,18 @@ public class MarkdownWidget extends BaseUIComponent {
         collectStyledHitboxes(entry.text(), drawX, drawY, textRenderer);
       }
 
-      drawY += lineHeight;
+      drawY += lineHeight + (entry.imageUrl != null ? IMAGE_SPACING : 0);
     }
 
     context.disableScissor();
+
+    // Image hover tooltip (the URL)
+    for (ImageHitbox ih : imageHitboxes) {
+      if (hitTest(mouseX, mouseY, ih.x(), ih.y(), ih.width(), ih.height())) {
+        context.setTooltipForNextFrame(Component.literal(ih.url()), mouseX, mouseY);
+        break;
+      }
+    }
 
     // Link hover tooltip
     for (LinkHitbox lh : linkHitboxes) {
@@ -387,6 +542,12 @@ public class MarkdownWidget extends BaseUIComponent {
     for (LinkHitbox lh : linkHitboxes) {
       if (hitTest(mx, my, lh.x(), lh.y(), lh.width(), lh.height())) {
         com.disqt.disquests.client.UrlOpener.open(lh.url());
+        return true;
+      }
+    }
+    for (ImageHitbox ih : imageHitboxes) {
+      if (hitTest(mx, my, ih.x(), ih.y(), ih.width(), ih.height())) {
+        com.disqt.disquests.client.UrlOpener.open(ih.url());
         return true;
       }
     }
