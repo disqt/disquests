@@ -1084,6 +1084,7 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
 
     switch (keyCode) {
       case InputConstants.KEY_TAB -> {
+        if (isSingleLine()) return false; // let focus navigation take it
         insertText("    ");
         return true;
       }
@@ -1395,6 +1396,11 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
   @Override
   public boolean isFocused() {
     return this.focused;
+  }
+
+  /** A one-line field: Enter does nothing and Tab moves focus instead of indenting. */
+  public boolean isSingleLine() {
+    return this.maxLines == 1;
   }
 
   public void _deleteTextInternal(int startAbsolute, int endAbsolute) {
