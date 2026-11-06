@@ -335,8 +335,12 @@ git commit -m "feat: render inline images in the quest viewer"
 
 Follow `QuestContentJourney`'s shape (`@IntegrationTest`, `@BeforeAll resetServerAndSync()`, ordered `@PlayerA` tests). In `@BeforeAll` start `com.sun.net.httpserver.HttpServer` on `127.0.0.1:0` serving the resource at `/img.png` with `Content-Type: image/png`, keep the port in a static; stop it in `@AfterAll`.
 
-Test 1 "image link renders as an image block": create a quest titled "Image Test" with content `"Before\nhttps://example.invalid/not-fetched.txt\n![site](http://127.0.0.1:<port>/img.png)\nAfter"`, save, `waitForScreen(QuestScreen.class)`, then
-`context.waitFor(c -> findComponent(context, MarkdownWidget.class, "content-markdown").loadedImageCount() == 1, TIMEOUT)` and assert `imageBlockCount() == 1`.
+Test 1 "image link renders as an image block": create a quest titled "Image Test" with content `"Before
+https://example.invalid/not-fetched.txt
+![site](http://127.0.0.1:<port>/img.png)
+After
+http://127.0.0.1:<port>/img.png"` (the same image twice: once as `![alt](url)`, once as a bare link), save, `waitForScreen(QuestScreen.class)`, then
+`context.waitFor(c -> findComponent(context, MarkdownWidget.class, "content-markdown").loadedImageCount() == 2, TIMEOUT)`, assert `imageBlockCount() == 2`, and assert the server received exactly one request for `/img.png` (count in the handler).
 
 Test 2 "unreachable image shows the failed box, screen still works": edit the quest, replace the content with `"![x](http://127.0.0.1:1/none.png)"`, save, wait until `imageBlockCount() == 1 && loadedImageCount() == 0` and the cache state for that url is `Failed` (expose via `Images.cache().get(url) instanceof ImageState.Failed` inside `computeOnClient`), then `click(context, "btn-edit")` and `assertComponentExists(context, "formatting-panel")`.
 
