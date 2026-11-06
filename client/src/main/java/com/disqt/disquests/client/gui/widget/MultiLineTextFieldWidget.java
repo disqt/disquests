@@ -316,7 +316,7 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
     if (this.lines.isEmpty()) this.lines.add("");
     this.setCursorToEnd();
     this.clearSelection();
-    this.focused = false;
+    setFocused(false);
     this.scrollX = 0;
     this.scrollY = 0;
 
@@ -587,6 +587,11 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
     int contentY = this.y + padding;
     int contentWidth = this.width - padding * 2;
     int contentHeight = this.height - padding * 2;
+    if (this.focused) {
+      Minecraft.getInstance()
+          .textInputManager()
+          .setTextInputArea(this.x, this.y, this.width, this.height);
+    }
 
     // Reserve space for scrollbars if needed
     boolean vNeeded = isScrollbarNeededV();
@@ -848,7 +853,7 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
           this.isDraggingVScrollbar = true;
           this.vScrollbarDragStartY = mouseY;
           this.vScrollbarDragStartScrollY = this.scrollY;
-          this.focused = true;
+          setFocused(true);
           return true;
         }
       }
@@ -861,13 +866,13 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
           this.isDraggingHScrollbar = true;
           this.hScrollbarDragStartX = mouseX;
           this.hScrollbarDragStartScrollX = this.scrollX;
-          this.focused = true;
+          setFocused(true);
           return true;
         }
       }
 
       // normal text area click
-      this.focused = true;
+      setFocused(true);
       int clickedAbs = absoluteIndexFromMouse(mouseX, mouseY);
 
       // --- Double/Triple click detection ---
@@ -900,7 +905,7 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
       }
       return true;
     }
-    this.focused = false;
+    setFocused(false);
     return false;
   }
 
@@ -1378,9 +1383,12 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
 
   @Override
   public void setFocused(boolean focused) {
-    // This check prevents redundant logic if the focus state isn't changing.
     if (this.focused != focused) {
       this.focused = focused;
+      // 26.3 (SDL3) only delivers character events while a text-input session is open; vanilla
+      // EditBox opens and closes it from setFocused, so a custom widget must do the same or
+      // charTyped is never called.
+      Minecraft.getInstance().onTextInputFocusChange(this, focused);
     }
   }
 
