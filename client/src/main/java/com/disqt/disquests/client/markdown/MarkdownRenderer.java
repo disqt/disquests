@@ -212,8 +212,7 @@ public class MarkdownRenderer {
       if (!lines.isEmpty()) lines.add(RenderedLine.empty());
       lines.add(RenderedLine.heading(text, scale));
     } else if (node instanceof Paragraph) {
-      MutableComponent text = collectInlineText(node, style);
-      lines.add(RenderedLine.normal(text, indent));
+      renderParagraph(node, lines, indent, style);
     } else if (node instanceof BulletList) {
       renderChildren(node, lines, indent, style);
     } else if (node instanceof OrderedList orderedList) {
@@ -305,6 +304,61 @@ public class MarkdownRenderer {
       // Fallback: try to render children
       renderChildren(node, lines, indent, style);
     }
+  }
+
+  /**
+   * Renders a paragraph, splitting it at inline images. An image is an {@code Image} node or a bare
+   * autolinked image URL (see {@link ImageLinkDetector}); each one becomes its own {@link
+   * RenderedLine#image} block, with the surrounding text flushed as normal lines.
+   */
+  private static void renderParagraph(
+      Node paragraph, List<RenderedLine> lines, int indent, Style style) {
+    MutableComponent pending = Component.empty().copy();
+    boolean pendingHasText = false;
+    boolean emittedImage = false;
+    Node child = paragraph.getFirstChild();
+    while (child != null) {
+      String imageUrl = null;
+      String imageAlt = null;
+      if (child instanceof Image image) {
+        imageUrl = image.getDestination();
+        imageAlt = plainText(child);
+      } else if (child instanceof Link link
+          && ImageLinkDetector.isBareImageLink(link.getDestination(), plainText(child))) {
+        imageUrl = link.getDestination();
+        imageAlt = "";
+      }
+      if (imageUrl != null) {
+        if (pendingHasText && !pending.getString().isBlank()) {
+          lines.add(RenderedLine.normal(pending, indent));
+        }
+        pending = Component.empty().copy();
+        pendingHasText = false;
+        lines.add(RenderedLine.image(imageUrl, imageAlt, indent));
+        emittedImage = true;
+      } else {
+        appendInline(child, pending, style);
+        pendingHasText = true;
+      }
+      child = child.getNext();
+    }
+    // A paragraph without images always yields a line (even a blank one), as before; after an
+    // image only non-blank trailing text is kept.
+    if (pendingHasText && (!emittedImage || !pending.getString().isBlank())) {
+      lines.add(RenderedLine.normal(pending, indent));
+    }
+  }
+
+  /** Concatenated literal text of an inline node's descendants. */
+  private static String plainText(Node node) {
+    StringBuilder sb = new StringBuilder();
+    Node child = node.getFirstChild();
+    while (child != null) {
+      if (child instanceof org.commonmark.node.Text t) sb.append(t.getLiteral());
+      else sb.append(plainText(child));
+      child = child.getNext();
+    }
+    return sb.toString();
   }
 
   private static void renderCodeLines(String literal, List<RenderedLine> lines, int indent) {

@@ -77,10 +77,12 @@ author can opt out by giving the link a caption.
 ### Block model
 
 `MarkdownRenderer` today returns `List<RenderedLine>` where every line is text. Add an image
-block: `RenderedLine` becomes a sealed interface with two records, `TextLine(text, indent,
-scale)` (the existing fields) and `ImageLine(url, alt, indent)`. An image always occupies its
+block: the `RenderedLine` record gains two nullable fields, `imageUrl` and `imageAlt`, plus an
+`image(url, alt, indent)` factory and `isImage()`; an image line's `text` is a grey "[alt]"
+placeholder so consumers that only read text keep working untouched (chosen over a sealed
+interface during implementation: smaller change, same behaviour). An image always occupies its
 own block, so an inline image in the middle of a paragraph splits the paragraph: text before,
-the image, text after. This is the builder's call to keep the wrapper simple.
+the image, text after.
 
 ### Loading and cache
 
