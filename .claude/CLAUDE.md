@@ -220,7 +220,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 
 ### World map
 - **Keep map logic Minecraft-free** — `TileCache`, `QuestStyle`, `QuestListOrder`, `MapMath` and `PolygonRaster` must not import Minecraft classes, so the client `test` source set can unit-test them. Minecraft textures go through the `TileTextures` seam (`McTileTextures`).
-- **`MapEditScreen` is opened with `setScreen`, not `navigateToScreen`** — it returns to the editor instance via `QuestScreen.applyMapLocation`; navigating would push a back-stack entry and rebuild the editor.
+- **`MapEditScreen` is opened with `setScreen`, not `navigateToScreen`** — Done calls `QuestScreen.applyMapLocation`, which rebuilds the editor through `rebuildEditMode`/`navigateToScreen` (the location snapshot for Cancel rides along); only Cancel/Escape return to the same editor instance. Navigating to the map would push a back-stack entry.
 - **`MapView` takes mouse-click focus while interactive** — owo delivers drag and key events only to the focused component.
 - **`SharedTileCache.reset()` on `leaveServer`** — the production tile cache is a singleton; disk cache lives under `<gameDir>/disquests/tiles/`.
 - **VPS `config.yml` dimension keys** — `nether` still works (`DimensionKeys.normalize`) but should become `the_nether` when next edited.
