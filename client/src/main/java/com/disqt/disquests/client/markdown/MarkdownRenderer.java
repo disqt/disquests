@@ -212,8 +212,7 @@ public class MarkdownRenderer {
       if (!lines.isEmpty()) lines.add(RenderedLine.empty());
       lines.add(RenderedLine.heading(text, scale));
     } else if (node instanceof Paragraph) {
-      MutableComponent text = collectInlineText(node, style);
-      lines.add(RenderedLine.normal(text, indent));
+      renderParagraph(node, lines, indent, style);
     } else if (node instanceof BulletList) {
       renderChildren(node, lines, indent, style);
     } else if (node instanceof OrderedList orderedList) {
@@ -243,11 +242,21 @@ public class MarkdownRenderer {
                       marker.isChecked()
                           ? Style.EMPTY.withColor(ChatFormatting.GREEN)
                           : Style.EMPTY.withColor(ChatFormatting.GRAY));
-          MutableComponent content = collectInlineText(para, style);
+          List<RenderedLine> inner = new ArrayList<>();
+          renderParagraph(para, inner, indent, style);
           if (marker.isChecked()) {
-            content = content.withStyle(ChatFormatting.STRIKETHROUGH, ChatFormatting.GRAY);
+            for (int i = 0; i < inner.size(); i++) {
+              RenderedLine l = inner.get(i);
+              if (!l.isImage()) {
+                inner.set(
+                    i,
+                    RenderedLine.normal(
+                        l.text().withStyle(ChatFormatting.STRIKETHROUGH, ChatFormatting.GRAY),
+                        l.indent()));
+              }
+            }
           }
-          lines.add(RenderedLine.normal(prefix.append(content), indent));
+          prependBullet(inner, prefix, indent, lines);
         }
       } else {
         renderListItem(node, lines, indent, style, "* ");
@@ -264,6 +273,10 @@ public class MarkdownRenderer {
       List<RenderedLine> inner = new ArrayList<>();
       renderChildren(node, inner, 0, style.withColor(ChatFormatting.GRAY));
       for (RenderedLine line : inner) {
+        if (line.isImage()) {
+          lines.add(RenderedLine.image(line.imageUrl(), line.imageAlt(), indent + 8));
+          continue;
+        }
         MutableComponent prefixed =
             Component.literal("| ")
                 .setStyle(Style.EMPTY.withColor(ChatFormatting.DARK_GRAY))
@@ -307,6 +320,61 @@ public class MarkdownRenderer {
     }
   }
 
+  /**
+   * Renders a paragraph, splitting it at inline images. An image is an {@code Image} node or a bare
+   * autolinked image URL (see {@link ImageLinkDetector}); each one becomes its own {@link
+   * RenderedLine#image} block, with the surrounding text flushed as normal lines.
+   */
+  private static void renderParagraph(
+      Node paragraph, List<RenderedLine> lines, int indent, Style style) {
+    MutableComponent pending = Component.empty().copy();
+    boolean pendingHasText = false;
+    boolean emittedImage = false;
+    Node child = paragraph.getFirstChild();
+    while (child != null) {
+      String imageUrl = null;
+      String imageAlt = null;
+      if (child instanceof Image image && ImageLinkDetector.isImageUrl(image.getDestination())) {
+        imageUrl = image.getDestination();
+        imageAlt = plainText(child);
+      } else if (child instanceof Link link
+          && ImageLinkDetector.isBareImageLink(link.getDestination(), plainText(child))) {
+        imageUrl = link.getDestination();
+        imageAlt = "";
+      }
+      if (imageUrl != null) {
+        if (pendingHasText && !pending.getString().isBlank()) {
+          lines.add(RenderedLine.normal(pending, indent));
+        }
+        pending = Component.empty().copy();
+        pendingHasText = false;
+        lines.add(RenderedLine.image(imageUrl, imageAlt, indent));
+        emittedImage = true;
+      } else {
+        appendInline(child, pending, style);
+        pendingHasText = true;
+      }
+      child = child.getNext();
+    }
+    // A paragraph without images always yields a line (even a blank one), as before; after an
+    // image only non-blank trailing text is kept.
+    if (pendingHasText && (!emittedImage || !pending.getString().isBlank())) {
+      lines.add(RenderedLine.normal(pending, indent));
+    }
+  }
+
+  /** Concatenated literal text of an inline node's descendants. */
+  private static String plainText(Node node) {
+    StringBuilder sb = new StringBuilder();
+    Node child = node.getFirstChild();
+    while (child != null) {
+      if (child instanceof org.commonmark.node.Text t) sb.append(t.getLiteral());
+      else sb.append(plainText(child));
+      child = child.getNext();
+    }
+    return sb.toString();
+  }
+
   private static void renderCodeLines(String literal, List<RenderedLine> lines, int indent) {
     String[] codeLines = literal.split("\n", -1);
     for (String cl : codeLines) {
@@ -323,8 +391,29 @@ public class MarkdownRenderer {
     if (firstChild instanceof Paragraph) {
       MutableComponent bulletText =
           Component.literal(bullet).setStyle(Style.EMPTY.withColor(ChatFormatting.GRAY));
-      MutableComponent content = collectInlineText(firstChild, style);
-      lines.add(RenderedLine.normal(bulletText.append(content), indent));
+      List<RenderedLine> inner = new ArrayList<>();
+      renderParagraph(firstChild, inner, indent, style);
+      prependBullet(inner, bulletText, indent, lines);
+    }
+  }
+
+  /**
+   * Adds a list item's rendered lines to {@code lines} with {@code bullet} in front of its first
+   * text line; when the item starts with an image the bullet gets its own line above it.
+   */
+  private static void prependBullet(
+      List<RenderedLine> inner, MutableComponent bullet, int indent, List<RenderedLine> lines) {
+    if (inner.isEmpty()) {
+      lines.add(RenderedLine.normal(bullet, indent));
+      return;
+    }
+    RenderedLine first = inner.get(0);
+    if (first.isImage()) {
+      lines.add(RenderedLine.normal(bullet, indent));
+      lines.addAll(inner);
+    } else {
+      lines.add(RenderedLine.normal(bullet.copy().append(first.text()), indent));
+      lines.addAll(inner.subList(1, inner.size()));
     }
   }
 

@@ -299,6 +299,23 @@ public final class UIActions {
     context.waitTicks(2);
   }
 
+  /**
+   * Like {@link #type} but newlines become Enter key presses. {@code typeChars} sends a bare
+   * newline as a character event, which the editor drops (not an allowed chat character), so a
+   * multi-line string typed with {@link #type} ends up on one line.
+   */
+  public static void typeMultiline(ClientGameTestContext context, String componentId, String text) {
+    String[] lines = text.split("\n", -1);
+    type(context, componentId, lines[0]);
+    for (int i = 1; i < lines.length; i++) {
+      context.getInput().pressKey(InputConstants.KEY_RETURN);
+      context.waitTicks(1);
+      if (!lines[i].isEmpty()) context.getInput().typeChars(lines[i]);
+      context.waitTicks(1);
+    }
+    context.waitTicks(2);
+  }
+
   /** Append text to a text field without clearing existing content. */
   public static void appendText(ClientGameTestContext context, String componentId, String text) {
     click(context, componentId);

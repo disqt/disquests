@@ -17,6 +17,10 @@ public class UrlOpener {
   private static final Logger LOGGER = LoggerFactory.getLogger("Disquests.UrlOpener");
 
   public static void open(String url) {
+    if (!UrlPolicy.isOpenable(url)) {
+      LOGGER.warn("Refusing to open non-http(s) destination: {}", url);
+      return;
+    }
     try {
       if (Util.getPlatform() == Util.OS.WINDOWS) {
         String safeUrl = url.replace("'", "''");
