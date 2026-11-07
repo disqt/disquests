@@ -51,6 +51,7 @@ public class QuestScreen extends DisquestsBaseScreen {
   // Edit mode state preserved across rebuilds
   private String originalTitle;
   private String originalContent;
+  private LocationCard.LocationSnapshot originalLocation;
 
   // Permission cache
   private boolean canEdit;
@@ -65,12 +66,12 @@ public class QuestScreen extends DisquestsBaseScreen {
 
   /** Open in view mode for an existing quest. */
   public QuestScreen(@Nullable Screen parent, Quest quest) {
-    this(parent, quest, false, false, null, null);
+    this(parent, quest, false, false, null, null, null);
   }
 
   /** Open in edit mode when startInEditMode is true (e.g. new quest). */
   public QuestScreen(@Nullable Screen parent, Quest quest, boolean startInEditMode) {
-    this(parent, quest, startInEditMode, startInEditMode, null, null);
+    this(parent, quest, startInEditMode, startInEditMode, null, null, null);
   }
 
   /** Internal constructor preserving edit state across mode switches. */
@@ -80,7 +81,8 @@ public class QuestScreen extends DisquestsBaseScreen {
       boolean editing,
       boolean isNewQuest,
       @Nullable String originalTitle,
-      @Nullable String originalContent) {
+      @Nullable String originalContent,
+      @Nullable LocationCard.LocationSnapshot originalLocation) {
     super(
         DataSource.asset(
             Identifier.fromNamespaceAndPath(
@@ -91,6 +93,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     this.isNewQuest = isNewQuest;
     this.originalTitle = originalTitle;
     this.originalContent = originalContent;
+    this.originalLocation = originalLocation;
   }
 
   // --- Accessors ---
@@ -321,6 +324,9 @@ public class QuestScreen extends DisquestsBaseScreen {
       originalTitle = quest.getTitle() != null ? quest.getTitle() : "";
       originalContent = editableContent;
     }
+    if (originalLocation == null) {
+      originalLocation = LocationCard.LocationSnapshot.of(quest);
+    }
 
     // Title field
     FlowLayout titleRow = root.childById(FlowLayout.class, "title-row");
@@ -510,7 +516,13 @@ public class QuestScreen extends DisquestsBaseScreen {
                 persistFieldValues();
                 QuestScreen returnScreen =
                     new QuestScreen(
-                        this.parent, quest, true, isNewQuest, originalTitle, originalContent);
+                        this.parent,
+                        quest,
+                        true,
+                        isNewQuest,
+                        originalTitle,
+                        originalContent,
+                        originalLocation);
                 navigateToScreen(new TagPickerScreen(returnScreen, quest, returnScreen));
               });
       addTagBtn.sizing(Sizing.content(), Sizing.fixed(12));
@@ -529,7 +541,15 @@ public class QuestScreen extends DisquestsBaseScreen {
         quest.getContent() != null
             ? MarkdownRenderer.reverseResolveWikiLinks(quest.getContent())
             : "";
-    navigateToScreen(new QuestScreen(this.parent, quest, true, isNewQuest, origTitle, origContent));
+    navigateToScreen(
+        new QuestScreen(
+            this.parent,
+            quest,
+            true,
+            isNewQuest,
+            origTitle,
+            origContent,
+            LocationCard.LocationSnapshot.of(quest)));
   }
 
   private void cancelEdit() {
@@ -539,6 +559,10 @@ public class QuestScreen extends DisquestsBaseScreen {
           () -> {
             quest.setTitle(originalTitle);
             quest.setContent(originalContent);
+            // The map editor and vertex rows write straight into the cached quest.
+            if (originalLocation != null) {
+              originalLocation.restore(quest);
+            }
             exitToViewMode();
           });
     } else {
@@ -735,7 +759,14 @@ public class QuestScreen extends DisquestsBaseScreen {
 
   private void rebuildEditMode() {
     navigateToScreen(
-        new QuestScreen(this.parent, quest, true, isNewQuest, originalTitle, originalContent));
+        new QuestScreen(
+            this.parent,
+            quest,
+            true,
+            isNewQuest,
+            originalTitle,
+            originalContent,
+            originalLocation));
   }
 
   // ===================== HELPERS =====================
@@ -769,7 +800,10 @@ public class QuestScreen extends DisquestsBaseScreen {
         contentFieldComponent != null ? contentFieldComponent.getText() : quest.getContent();
     if (currentTitle == null) currentTitle = "";
     if (currentContent == null) currentContent = "";
-    return !currentTitle.equals(originalTitle) || !currentContent.equals(originalContent);
+    return !currentTitle.equals(originalTitle)
+        || !currentContent.equals(originalContent)
+        || (originalLocation != null && !originalLocation.sameLocation(quest))
+        || LocationCard.vertexFieldsEdited(quest, vertexRows);
   }
 
   private String toggleCheckbox(String content, int index, boolean nowChecked) {
