@@ -47,12 +47,17 @@ public class PolygonEditLayer implements MapLayer {
   }
 
   /**
-   * Finishes the edit: false (with a notice) when the outline crosses itself, otherwise runs the
-   * finish callback and returns true. Fires at most once until the corners change.
+   * Finishes the edit: false (with a notice) when the outline has exactly two corners or crosses
+   * itself, otherwise runs the finish callback and returns true. Fires at most once until the
+   * corners change.
    */
   public boolean tryFinish() {
     if (finished) {
       return true;
+    }
+    if (vertices.size() == 2) {
+      notice = Component.translatable("gui.disquests.map.need_three_corners").getString();
+      return false;
     }
     if (!QuestLocation.isSimple(vertices)) {
       notice = Component.translatable("gui.disquests.map.self_intersecting").getString();

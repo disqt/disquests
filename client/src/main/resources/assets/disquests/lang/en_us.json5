@@ -105,6 +105,7 @@
     "toggle_list": "List",
     "edit_hint": "Click to add corners. Enter or click the first corner to finish. Right-click removes the last one.",
     "self_intersecting": "The outline crosses itself",
+    "need_three_corners": "A region needs at least 3 corners",
     "too_many_vertices": "At most %d corners",
   },
   "gui.disquests.map.dim.{}": {
