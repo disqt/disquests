@@ -192,6 +192,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     List<RenderedLine> rendered = MarkdownRenderer.render(contentToRender);
     MarkdownWidget markdownWidget = new MarkdownWidget(rendered);
     markdownWidget.sizing(Sizing.fill(100), Sizing.fill(100));
+    markdownWidget.id("content-markdown");
 
     if (!hideContent) {
       markdownWidget.setCheckboxToggleListener(

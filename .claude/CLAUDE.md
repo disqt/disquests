@@ -171,6 +171,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **Java 25 required for MC 26.1.2** — set `JAVA_HOME` to a JDK 25 installation before running Gradle.
 - **CI uses `gradle/actions/setup-gradle@v5`** — not manual `actions/cache`. Build cache enabled (`org.gradle.caching=true`). Cache is write-only on `main`, read-only on PR branches.
 - **`./gradlew build` includes all unit tests** — don't add separate `:common:test :server:test` invocations.
+- **Client unit tests cannot touch `net.minecraft`** — the client `test` source set has no Minecraft on its classpath. Keep logic that needs unit tests in Minecraft-free seams (`client/image/*` with `ImageFetcher`/`TextureFactory` interfaces, `markdown/ImageLinkDetector`) and thin adapters (`Images`, `MinecraftTextureFactory`) around them; anything built on `Component`/owo is only verified by the E2E journeys.
 - **`project.version` changes jar filenames** — The root `build.gradle.kts` clears `archiveVersion` in `afterEvaluate` to keep names stable. Don't remove this.
 - **Loom `include()` doesn't bundle transitives** — if a bundled library has its own dependencies (e.g., `commonmark-ext-autolink` depends on `org.nibor.autolink:autolink`), each transitive must be explicitly `include()`'d or you get `NoClassDefFoundError` at runtime.
 - **Production deploy: only one plugin jar** — Never leave multiple Disquests jars in the plugins folder. Paper's "Ambiguous plugin name" error prevents loading.

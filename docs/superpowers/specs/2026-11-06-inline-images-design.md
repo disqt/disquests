@@ -51,16 +51,19 @@ wherever it already lives.
 
 - Minecraft 26.3, Fabric, owo-lib 0.13.1+26.3 (vendored), Java 25. Rendering goes through
   `GuiGraphicsExtractor` (26.3 render-state pipeline); `MarkdownWidget` already extracts into it.
-- Textures: `NativeImage.read(byte[])` then `DynamicTexture`, registered with the
+- Textures: stb decode on the IO thread into a `NativeImage`, then `DynamicTexture` on the
+  render thread, registered with the
   `TextureManager` under a `disquests:img/<sha256-of-url>` identifier, released when evicted.
 - HTTP: `java.net.http.HttpClient` (JDK), https only (plain http is allowed only when the
-  JVM property `disquests.test.allowHttpImages` is true; the loom gametest run config sets
+  JVM property `disquests.test.allowHttp` is true; the loom gametest run config sets
   it, like the existing `disquests.test.*` properties, so the E2E journey can serve from a
   local plain-HTTP server; production never sets it), 10 s timeout, follow redirects, response
   size cap 8 MiB, content-type must start with `image/`. Decode on a worker thread, upload the
   texture on the render thread (`Minecraft.execute`).
-- Formats: png, jpg/jpeg, gif (first frame), webp if `NativeImage` (stb_image) decodes it;
-  anything stb cannot decode becomes a broken-image box.
+- Formats: png, jpg/jpeg, gif (first frame). webp is not treated as an image link at all
+  (stb_image cannot decode it; a link to one stays a clickable text link). Decoding goes through
+  stb_image directly, not `NativeImage.read`, which only accepts PNG. Images over 4096 px a side
+  or 16 megapixels are refused before their pixels are allocated.
 - Nothing is sent to the server: the common protocol and SQLite schema are untouched.
 
 ## Design
@@ -77,10 +80,12 @@ author can opt out by giving the link a caption.
 ### Block model
 
 `MarkdownRenderer` today returns `List<RenderedLine>` where every line is text. Add an image
-block: `RenderedLine` becomes a sealed interface with two records, `TextLine(text, indent,
-scale)` (the existing fields) and `ImageLine(url, alt, indent)`. An image always occupies its
+block: the `RenderedLine` record gains two nullable fields, `imageUrl` and `imageAlt`, plus an
+`image(url, alt, indent)` factory and `isImage()`; an image line's `text` is a grey "[alt]"
+placeholder so consumers that only read text keep working untouched (chosen over a sealed
+interface during implementation: smaller change, same behaviour). An image always occupies its
 own block, so an inline image in the middle of a paragraph splits the paragraph: text before,
-the image, text after. This is the builder's call to keep the wrapper simple.
+the image, text after.
 
 ### Loading and cache
 
