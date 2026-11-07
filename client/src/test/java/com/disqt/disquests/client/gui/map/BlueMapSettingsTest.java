@@ -31,6 +31,28 @@ class BlueMapSettingsTest {
   }
 
   @Test
+  void parse_nonPositiveValues_returnDefault() {
+    assertEquals(BlueMapSettings.DEFAULT, BlueMapSettings.parse(lowres("[0,0]", 5, 3)));
+    assertEquals(BlueMapSettings.DEFAULT, BlueMapSettings.parse(lowres("[-500,-500]", 5, 3)));
+    assertEquals(BlueMapSettings.DEFAULT, BlueMapSettings.parse(lowres("[20000,20000]", 5, 3)));
+    assertEquals(BlueMapSettings.DEFAULT, BlueMapSettings.parse(lowres("[500,500]", 1, 3)));
+    assertEquals(BlueMapSettings.DEFAULT, BlueMapSettings.parse(lowres("[500,500]", 0, 3)));
+    assertEquals(BlueMapSettings.DEFAULT, BlueMapSettings.parse(lowres("[500,500]", 5, 0)));
+    assertEquals(BlueMapSettings.DEFAULT, BlueMapSettings.parse(lowres("[500,500]", 5, -1)));
+    assertEquals(new BlueMapSettings(1, 2, 1), BlueMapSettings.parse(lowres("[1,1]", 2, 1)));
+  }
+
+  private static String lowres(String tileSize, int lodFactor, int lodCount) {
+    return "{\"lowres\":{\"tileSize\":"
+        + tileSize
+        + ",\"lodFactor\":"
+        + lodFactor
+        + ",\"lodCount\":"
+        + lodCount
+        + "}}";
+  }
+
+  @Test
   void default_is500_5_3() {
     assertEquals(new BlueMapSettings(500, 5, 3), BlueMapSettings.DEFAULT);
   }

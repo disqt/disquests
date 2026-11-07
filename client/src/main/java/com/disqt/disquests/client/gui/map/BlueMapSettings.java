@@ -7,9 +7,11 @@ import com.google.gson.JsonParser;
 /** BlueMap low-resolution tile layout, read from a map's settings.json. */
 public record BlueMapSettings(int tileSize, int lodFactor, int lodCount) {
   public static final BlueMapSettings DEFAULT = new BlueMapSettings(500, 5, 3);
+  private static final int MAX_TILE_SIZE = 10000;
 
   /**
-   * Parses {@code lowres.tileSize/lodFactor/lodCount}; any missing field or error gives DEFAULT.
+   * Parses {@code lowres.tileSize/lodFactor/lodCount}; any missing field, error or out-of-range
+   * value (tile size outside 1..10000, LOD factor below 2, LOD count below 1) gives DEFAULT.
    */
   public static BlueMapSettings parse(String json) {
     try {
@@ -17,6 +19,9 @@ public record BlueMapSettings(int tileSize, int lodFactor, int lodCount) {
       int tileSize = tileSizeX(lowres.get("tileSize"));
       int lodFactor = lowres.get("lodFactor").getAsInt();
       int lodCount = lowres.get("lodCount").getAsInt();
+      if (tileSize <= 0 || tileSize > MAX_TILE_SIZE || lodFactor <= 1 || lodCount <= 0) {
+        return DEFAULT;
+      }
       return new BlueMapSettings(tileSize, lodFactor, lodCount);
     } catch (RuntimeException e) {
       return DEFAULT;
