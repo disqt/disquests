@@ -5,6 +5,7 @@ import static com.disqt.disquests.test.integration.bdd.UIActions.*;
 import static com.disqt.disquests.test.integration.bdd.UIAssertions.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
@@ -15,6 +16,7 @@ import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.MapEditScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
+import com.disqt.disquests.client.network.PacketSender;
 import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
 import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
@@ -179,11 +181,26 @@ class MapEditJourney {
   void saveAndReopenShowsPolygon(ClientGameTestContext context) {
     when("player clicks Save");
     click(context, "btn-save");
-    then("the server stores the three corners");
     waitForQuestCondition(context, TITLE, true, q -> q.getPolygon().size() == 3);
-    and("view mode shows the region summary");
     // Only view mode has btn-edit
     waitForComponent(context, "btn-edit");
+
+    then("the server stores the three corners");
+    // The save already wrote the local cache, so only a fresh sync proves the round-trip. Clearing
+    // the cache would close the open QuestScreen; the sync replaces the quest under the same id.
+    long before = context.computeOnClient(c -> ClientCache.getVersion());
+    context.runOnClient(c -> PacketSender.requestSync());
+    context.waitFor(c -> ClientCache.getVersion() != before, TIMEOUT);
+    waitForQuestCondition(
+        context,
+        TITLE,
+        true,
+        q ->
+            q.getPolygon().size() == 3
+                && q.getPolygon().get(0).x() == px - 30
+                && q.getPolygon().get(0).z() == pz - 30);
+
+    and("view mode shows the region summary");
     LabelComponent coords = findComponent(context, LabelComponent.class, "coords-label");
     String coordsText = context.computeOnClient(c -> coords.text().getString());
     assertTrue(
