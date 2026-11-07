@@ -192,20 +192,41 @@ public final class TileCache {
       png = r.body();
       writeDisk(url, png, r.maxAgeSeconds());
     }
-    byte[] bytes = png;
-    renderThread.execute(() -> upload(key, bytes, url));
+    Object decoded;
+    try {
+      decoded = textures.decode(png, knownSettings(key.mapId()).tileSize());
+    } catch (IOException | RuntimeException e) {
+      deleteDisk(url);
+      markMissing(key);
+      return;
+    }
+    try {
+      renderThread.execute(() -> upload(key, decoded, url));
+    } catch (RuntimeException e) {
+      // No render thread to hand the image to (shutting down).
+      textures.discard(decoded);
+      markMissing(key);
+    }
+  }
+
+  /** Settings already fetched for a map, or DEFAULT; never triggers a fetch. */
+  private synchronized BlueMapSettings knownSettings(String mapId) {
+    BlueMapSettings known = settings.get(mapId);
+    return known == null ? BlueMapSettings.DEFAULT : known;
   }
 
   /** Runs on the render thread. */
-  private void upload(TileKey key, byte[] png, String url) {
+  private void upload(TileKey key, Object decoded, String url) {
     synchronized (this) {
       if (closed) {
+        textures.discard(decoded);
         return;
       }
     }
     try {
-      textures.upload(key, png);
+      textures.upload(key, decoded);
     } catch (IOException | RuntimeException e) {
+      textures.discard(decoded);
       deleteDisk(url);
       markMissing(key);
       return;

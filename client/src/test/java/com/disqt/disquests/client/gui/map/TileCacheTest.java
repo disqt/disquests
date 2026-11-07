@@ -50,15 +50,32 @@ class TileCacheTest {
   static class FakeTextures implements TileTextures {
     final List<TileKey> uploads = new ArrayList<>();
     final List<TileKey> releases = new ArrayList<>();
+    final List<Integer> decodeSizes = new ArrayList<>();
+    final List<Object> discarded = new ArrayList<>();
     boolean fail;
+    boolean failDecode;
 
     @Override
-    public int[] upload(TileKey key, byte[] png) throws IOException {
+    public Object decode(byte[] png, int tileSize) throws IOException {
+      if (failDecode) {
+        throw new IOException("undecodable png");
+      }
+      decodeSizes.add(tileSize);
+      return new Object();
+    }
+
+    @Override
+    public int[] upload(TileKey key, Object decoded) throws IOException {
       if (fail) {
         throw new IOException("bad png");
       }
       uploads.add(key);
-      return new int[] {501, 1002};
+      return new int[] {500, 500};
+    }
+
+    @Override
+    public void discard(Object decoded) {
+      discarded.add(decoded);
     }
 
     @Override
@@ -175,6 +192,47 @@ class TileCacheTest {
     textures.fail = true;
     c.get(k);
     assertEquals(TileStatus.MISSING, c.get(k));
+    assertEquals(1, textures.discarded.size());
+  }
+
+  @Test
+  void decodeFailure_isMissing() {
+    TileCache c = cache(4);
+    TileKey k = key(0);
+    serve(c, k);
+    textures.failDecode = true;
+    c.get(k);
+    assertEquals(TileStatus.MISSING, c.get(k));
+    assertTrue(textures.uploads.isEmpty());
+    assertEquals(1, c.stats().missing());
+  }
+
+  @Test
+  void decode_runsOnFetchPool_withMapTileSize() {
+    Deferring pool = new Deferring();
+    Deferring render = new Deferring();
+    TileCache c = cache(pool, render, dir, 4);
+    TileKey k = key(0);
+    serve(c, k);
+    c.get(k);
+    pool.drain();
+    assertEquals(List.of(BlueMapSettings.DEFAULT.tileSize()), textures.decodeSizes);
+    assertTrue(textures.uploads.isEmpty());
+    render.drain();
+    assertEquals(List.of(k), textures.uploads);
+  }
+
+  @Test
+  void closedBeforeUpload_discardsDecodedImage() {
+    Deferring render = new Deferring();
+    TileCache c = cache(DIRECT, render, dir, 4);
+    TileKey k = key(0);
+    serve(c, k);
+    c.get(k);
+    c.close();
+    render.drain();
+    assertTrue(textures.uploads.isEmpty());
+    assertEquals(1, textures.discarded.size());
   }
 
   @Test

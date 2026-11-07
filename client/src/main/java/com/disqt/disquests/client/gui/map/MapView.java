@@ -27,10 +27,6 @@ import net.minecraft.network.chat.Component;
 public class MapView extends BaseUIComponent {
   private static final Component TILES_UNAVAILABLE =
       Component.translatable("gui.disquests.map.tiles_unavailable");
-  // BlueMap lowres PNGs are 501x1002: colour in the top 500x500 texels, height data below.
-  private static final int TILE_TEXELS = 500;
-  private static final int TEXTURE_WIDTH = 501;
-  private static final int TEXTURE_HEIGHT = 1002;
 
   private final TileCache cache;
   private final List<MapLayer> layers = new ArrayList<>();
@@ -166,6 +162,8 @@ public class MapView extends BaseUIComponent {
     BlueMapSettings settings = tiles ? cache.settings(mapId) : BlueMapSettings.DEFAULT;
     int lod = Math.max(1, Math.min(MapMath.lodForZoom(camera.zoom()), settings.lodCount()));
     double coverage = MapMath.tileCoverage(settings, lod);
+    // Tile textures hold only the tileSize x tileSize colour region (TileTextures.decode crops it).
+    int texels = settings.tileSize();
     int w = width();
     int h = height();
     double[] min = screenToBlock(0, 0);
@@ -199,10 +197,10 @@ public class MapView extends BaseUIComponent {
               0f,
               sx1 - sx0,
               sy1 - sy0,
-              TILE_TEXELS,
-              TILE_TEXELS,
-              TEXTURE_WIDTH,
-              TEXTURE_HEIGHT);
+              texels,
+              texels,
+              texels,
+              texels);
         }
       }
     }

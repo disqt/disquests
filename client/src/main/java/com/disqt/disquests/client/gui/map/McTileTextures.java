@@ -9,12 +9,36 @@ import net.minecraft.resources.Identifier;
 /** Minecraft-backed tile textures registered under the disquests namespace. */
 public final class McTileTextures implements TileTextures {
   @Override
-  public int[] upload(TileKey key, byte[] png) throws IOException {
-    NativeImage image = NativeImage.read(png);
+  public Object decode(byte[] png, int tileSize) throws IOException {
+    try (NativeImage source = NativeImage.read(png)) {
+      int w = Math.min(tileSize, source.getWidth());
+      int h = Math.min(tileSize, source.getHeight());
+      NativeImage cropped = new NativeImage(source.format(), w, h, false);
+      try {
+        source.copyRect(cropped, 0, 0, 0, 0, w, h, false, false);
+      } catch (RuntimeException e) {
+        cropped.close();
+        throw e;
+      }
+      return cropped;
+    }
+  }
+
+  @Override
+  public int[] upload(TileKey key, Object decoded) throws IOException {
+    NativeImage image = (NativeImage) decoded;
+    int[] size = {image.getWidth(), image.getHeight()};
     Minecraft.getInstance()
         .getTextureManager()
         .register(id(key), new DynamicTexture(() -> key.texturePath(), image));
-    return new int[] {image.getWidth(), image.getHeight()};
+    return size;
+  }
+
+  @Override
+  public void discard(Object decoded) {
+    if (decoded instanceof NativeImage image) {
+      image.close();
+    }
   }
 
   @Override
