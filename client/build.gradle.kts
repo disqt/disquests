@@ -512,6 +512,17 @@ fun launchClient(
         .start()
 }
 
+fun waitForClientExit(processes: List<Process>, logger: org.gradle.api.logging.Logger, timeoutMs: Long = 60_000L) {
+    // Clients exit on their own after writing results (JaCoCo dumps gameTest.exec in that exit).
+    // Killing them first truncates the exec file and the coverage report cannot read it.
+    val deadline = System.currentTimeMillis() + timeoutMs
+    while (System.currentTimeMillis() < deadline && processes.any { it.isAlive }) {
+        Thread.sleep(500)
+    }
+    val stillAlive = processes.count { it.isAlive }
+    if (stillAlive > 0) logger.lifecycle("$stillAlive client process(es) still alive after ${timeoutMs / 1000}s, killing")
+}
+
 fun stopServer(serverProcess: Process?) {
     if (serverProcess != null) {
         try {
@@ -627,6 +638,7 @@ tasks.register("runSoloTests") {
 
         } finally {
             if (!noStart) {
+                waitForClientExit(processes, logger)
                 processes.forEach { it.destroyForcibly() }
                 stopServer(serverProcess)
                 logger.lifecycle("Solo teardown complete")
@@ -774,6 +786,7 @@ tasks.register("runDuoTests") {
 
         } finally {
             if (!harness && !noStart) {
+                waitForClientExit(processes, logger)
                 processes.forEach { it.destroyForcibly() }
                 stopServer(serverProcess)
                 logger.lifecycle("Duo teardown complete")
