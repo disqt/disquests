@@ -21,15 +21,16 @@
     "deny": "Refuser",
     "remove": "Retirer",
     "set_pos": "Position",
-    "clear": "Effacer",
     "view_bluemap": "Voir sur BlueMap",
     "join": "Rejoindre",
     "request": "Demander",
     "requested": "Demandé",
     "add_tag": "+ Tag",
     "add": "Ajouter",
-    "region_off": "[ ] Région",
-    "region_on": "[x] Région",
+    "done": "Terminer",
+    "cancel_map": "Annuler",
+    "clear_location": "Effacer",
+    "edit_on_map": "Modifier sur la map",
   },
 
   // Permissions des contributeurs
@@ -82,6 +83,8 @@
     "no_matching_tags": "Aucun tag correspondant",
     "request_access": "Demander l'accès pour voir",
     "enter_to_create": "Appuie sur Entrée pour créer un tag",
+    "vertex": "%d:",
+    "region_summary": "Région : %d coins, X : %d à %d Z : %d à %d",
   },
 
   // Dialogues de confirmation
@@ -96,6 +99,25 @@
   "gui.disquests.section.{}": {
     "tags": "Tags (%d)",
     "contributors": "Contributeurs (%d)",
+  },
+
+  // World map
+  "gui.disquests.map.{}": {
+    "tiles_unavailable": "Tuiles de la map indisponibles",
+    "unplaced": "Sans emplacement",
+    "centre_me": "Centrer sur moi",
+    "zoom": "Zoom %d",
+    "server_outdated": "Le serveur doit être mis à jour pour afficher la map",
+    "toggle_list": "Liste",
+    "edit_hint": "Clique pour ajouter des coins. Entrée ou clic sur le premier coin pour terminer. Clic droit retire le dernier.",
+    "self_intersecting": "Le contour se croise lui-même",
+    "need_three_corners": "Une région a besoin d'au moins 3 coins",
+    "too_many_vertices": "%d coins au maximum",
+  },
+  "gui.disquests.map.dim.{}": {
+    "overworld": "Overworld",
+    "the_nether": "Nether",
+    "the_end": "End",
   },
 
   // owo-config

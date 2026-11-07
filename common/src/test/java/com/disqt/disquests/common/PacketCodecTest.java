@@ -6,6 +6,7 @@ import com.disqt.disquests.common.model.CollaborationRequestData;
 import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.ContributorOp;
 import com.disqt.disquests.common.model.CoordinatesData;
+import com.disqt.disquests.common.model.PointData;
 import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.common.model.Visibility;
 import java.util.List;
@@ -100,6 +101,7 @@ class PacketCodecTest {
     assertEquals(3, payload.pendingRequestCount());
     assertEquals(pinnedIds, payload.pinnedQuestIds());
     assertEquals(playerUuid, payload.playerUuid());
+    assertEquals(ProtocolVersion.CURRENT, payload.serverProtocolVersion());
     assertEquals(0, reader.remaining());
   }
 
@@ -118,6 +120,7 @@ class PacketCodecTest {
     assertEquals(0, payload.pendingRequestCount());
     assertTrue(payload.pinnedQuestIds().isEmpty());
     assertEquals(playerUuid, payload.playerUuid());
+    assertEquals(ProtocolVersion.CURRENT, payload.serverProtocolVersion());
     assertEquals(0, reader.remaining());
   }
 
@@ -878,7 +881,7 @@ class PacketCodecTest {
     ByteBufWriter buf = new ByteBufWriter();
     PacketCodec.writeQuest(buf, quest, ProtocolVersion.V0);
     ByteBufReader reader = new ByteBufReader(buf.toByteArray());
-    QuestData decoded = PacketCodec.readQuest(reader);
+    QuestData decoded = PacketCodec.readQuest(reader, ProtocolVersion.V0);
     // v0 format has no tags, reader falls back to empty list
     assertTrue(decoded.tags().isEmpty());
     assertEquals(0, reader.remaining());
@@ -905,13 +908,13 @@ class PacketCodecTest {
     ByteBufWriter buf = new ByteBufWriter();
     PacketCodec.writeQuest(buf, quest, ProtocolVersion.V1);
     ByteBufReader reader = new ByteBufReader(buf.toByteArray());
-    QuestData decoded = PacketCodec.readQuest(reader);
+    QuestData decoded = PacketCodec.readQuest(reader, ProtocolVersion.V1);
     assertEquals(tags, decoded.tags());
     assertEquals(0, reader.remaining());
   }
 
   @Test
-  void writeHandshakeV0_omitsPredefinedTags() {
+  void writeHandshake_ignoresProtocolVersionParameter() {
     UUID playerUuid = UUID.randomUUID();
     Map<String, String> mapNames = Map.of("overworld", "world_new");
     List<String> predefinedTags = List.of("combat", "exploration");
@@ -929,8 +932,8 @@ class PacketCodecTest {
     PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(reader);
     assertEquals("https://example.com", payload.bluemapUrl());
     assertEquals(mapNames, payload.bluemapMapNames());
-    // v0: predefinedTags not written, reader falls back to empty
-    assertTrue(payload.predefinedTags().isEmpty());
+    // the version parameter no longer gates anything: tags are always written
+    assertEquals(predefinedTags, payload.predefinedTags());
     assertEquals(0, reader.remaining());
   }
 
@@ -1016,7 +1019,7 @@ class PacketCodecTest {
     byte[] packet = PacketCodec.writeUpdateQuest(quest, ProtocolVersion.V0);
     ByteBufReader reader = new ByteBufReader(packet);
     assertEquals(PacketType.UPDATE_QUEST, PacketCodec.readType(reader));
-    QuestData decoded = PacketCodec.readQuest(reader);
+    QuestData decoded = PacketCodec.readQuest(reader, ProtocolVersion.V0);
     assertTrue(decoded.tags().isEmpty());
     assertEquals(0, reader.remaining());
   }
@@ -1041,7 +1044,7 @@ class PacketCodecTest {
     byte[] packet = PacketCodec.writeSyncMyQuests(List.of(quest), Map.of(), ProtocolVersion.V0);
     ByteBufReader reader = new ByteBufReader(packet);
     assertEquals(PacketType.SYNC_MY_QUESTS, PacketCodec.readType(reader));
-    List<QuestData> decoded = PacketCodec.readSyncMyQuests(reader);
+    List<QuestData> decoded = PacketCodec.readSyncMyQuests(reader, ProtocolVersion.V0);
     assertEquals(1, decoded.size());
     assertTrue(decoded.get(0).tags().isEmpty());
   }
@@ -1066,8 +1069,137 @@ class PacketCodecTest {
     byte[] packet = PacketCodec.writeSyncServerQuests(List.of(quest), ProtocolVersion.V0);
     ByteBufReader reader = new ByteBufReader(packet);
     assertEquals(PacketType.SYNC_SERVER_QUESTS, PacketCodec.readType(reader));
-    List<QuestData> decoded = PacketCodec.readSyncServerQuests(reader);
+    List<QuestData> decoded = PacketCodec.readSyncServerQuests(reader, ProtocolVersion.V0);
     assertEquals(1, decoded.size());
     assertTrue(decoded.get(0).tags().isEmpty());
+  }
+
+  // ---- V2: polygons and handshake server version ----
+
+  private static final List<PointData> TRIANGLE =
+      List.of(new PointData(0, 0), new PointData(10, 0), new PointData(10, 8));
+
+  @Test
+  void quest_v2_roundTrip_withPolygon() {
+    QuestData quest = makeQuest(true, true, true).withPolygon(TRIANGLE);
+    ByteBufWriter buf = new ByteBufWriter();
+    PacketCodec.writeQuest(buf, quest, ProtocolVersion.V2);
+    ByteBufReader reader = new ByteBufReader(buf.toByteArray());
+    QuestData decoded = PacketCodec.readQuest(reader, ProtocolVersion.V2);
+    assertEquals(TRIANGLE, decoded.polygon());
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void quest_v1_write_derivesBoundingBox() {
+    QuestData quest = makeQuest(false, false, true).withPolygon(TRIANGLE);
+    ByteBufWriter buf = new ByteBufWriter();
+    PacketCodec.writeQuest(buf, quest, ProtocolVersion.V1);
+    ByteBufReader reader = new ByteBufReader(buf.toByteArray());
+    QuestData decoded = PacketCodec.readQuest(reader, ProtocolVersion.V1);
+    assertTrue(decoded.isRegion());
+    assertEquals(new CoordinatesData(0, 64, 0), decoded.coordinates());
+    assertEquals(new CoordinatesData(10, 64, 8), decoded.coordinates2());
+    assertTrue(decoded.polygon().isEmpty());
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void quest_v2_read_ofV1Bytes_hasEmptyPolygon() {
+    QuestData quest = makeQuest(true, false, true);
+    ByteBufWriter buf = new ByteBufWriter();
+    PacketCodec.writeQuest(buf, quest, ProtocolVersion.V1);
+    ByteBufReader reader = new ByteBufReader(buf.toByteArray());
+    QuestData decoded = PacketCodec.readQuest(reader, ProtocolVersion.V1);
+    assertTrue(decoded.polygon().isEmpty());
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void questList_v2_roundTrip_twoQuestsBothPolygons() {
+    List<PointData> second = List.of(new PointData(-5.5, 2), new PointData(3, 3.25));
+    List<QuestData> quests =
+        List.of(
+            makeQuest(true, true, true).withPolygon(TRIANGLE),
+            makeQuest(true, true, false).withPolygon(second));
+    byte[] packet = PacketCodec.writeSyncServerQuests(quests, ProtocolVersion.V2);
+    ByteBufReader reader = new ByteBufReader(packet);
+    assertEquals(PacketType.SYNC_SERVER_QUESTS, PacketCodec.readType(reader));
+    List<QuestData> decoded = PacketCodec.readSyncServerQuests(reader, ProtocolVersion.V2);
+    assertEquals(2, decoded.size());
+    assertEquals(TRIANGLE, decoded.get(0).polygon());
+    assertEquals(second, decoded.get(1).polygon());
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void saveQuest_roundTrip_withPolygon() {
+    UUID id = UUID.randomUUID();
+    byte[] packet =
+        PacketCodec.writeSaveQuest(
+            id, "t", "c", null, false, null, "overworld", List.of("a"), TRIANGLE);
+    ByteBufReader reader = new ByteBufReader(packet);
+    assertEquals(PacketType.SAVE_QUEST, PacketCodec.readType(reader));
+    PacketCodec.SaveQuestPayload payload = PacketCodec.readSaveQuest(reader);
+    assertEquals(TRIANGLE, payload.polygon());
+    assertEquals(List.of("a"), payload.tags());
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void saveQuest_legacyBytes_readAsEmptyPolygon() {
+    byte[] packet =
+        PacketCodec.writeSaveQuest(
+            UUID.randomUUID(), "t", "c", null, false, null, "overworld", List.of());
+    ByteBufReader reader = new ByteBufReader(packet);
+    PacketCodec.readType(reader);
+    assertTrue(PacketCodec.readSaveQuest(reader).polygon().isEmpty());
+  }
+
+  @Test
+  void handshake_carriesServerProtocolVersion() {
+    byte[] packet = PacketCodec.writeHandshake("u", 0, List.of(), UUID.randomUUID());
+    ByteBufReader reader = new ByteBufReader(packet);
+    PacketCodec.readType(reader);
+    assertEquals(
+        ProtocolVersion.CURRENT, PacketCodec.readHandshake(reader).serverProtocolVersion());
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void handshake_withoutTrailingVersion_defaultsToV1() {
+    ByteBufWriter w = new ByteBufWriter();
+    w.writeByte(PacketType.HANDSHAKE.getId());
+    w.writeBoolean(true);
+    w.writeString("url");
+    w.writeVarInt(0);
+    w.writeVarInt(0);
+    w.writeUUID(UUID.randomUUID());
+    w.writeVarInt(0);
+    w.writeVarInt(0);
+    w.writeString("overworld");
+    ByteBufReader reader = new ByteBufReader(w.toByteArray());
+    PacketCodec.readType(reader);
+    PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(reader);
+    assertEquals(ProtocolVersion.V1, payload.serverProtocolVersion());
+    assertEquals("overworld", payload.bluemapDefaultMap());
+  }
+
+  @Test
+  void saveQuest_rejectsMoreThan64Vertices() {
+    ByteBufWriter w = new ByteBufWriter();
+    w.writeByte(PacketType.SAVE_QUEST.getId());
+    w.writeUUID(UUID.randomUUID());
+    w.writeString("t");
+    w.writeString("c");
+    w.writeBoolean(false);
+    w.writeBoolean(false);
+    w.writeBoolean(false);
+    w.writeBoolean(false);
+    w.writeVarInt(0);
+    w.writeVarInt(65);
+    ByteBufReader reader = new ByteBufReader(w.toByteArray());
+    PacketCodec.readType(reader);
+    assertThrows(IllegalArgumentException.class, () -> PacketCodec.readSaveQuest(reader));
   }
 }

@@ -3,6 +3,7 @@ package com.disqt.disquests.client.network;
 import com.disqt.disquests.common.PacketCodec;
 import com.disqt.disquests.common.ProtocolVersion;
 import com.disqt.disquests.common.model.CoordinatesData;
+import com.disqt.disquests.common.model.PointData;
 import com.disqt.disquests.common.model.Visibility;
 import java.util.List;
 import java.util.UUID;
@@ -22,8 +23,11 @@ public class PacketSender {
       boolean isRegion,
       CoordinatesData coords2,
       String map,
-      List<String> tags) {
-    send(PacketCodec.writeSaveQuest(questId, title, content, coords, isRegion, coords2, map, tags));
+      List<String> tags,
+      List<PointData> polygon) {
+    send(
+        PacketCodec.writeSaveQuest(
+            questId, title, content, coords, isRegion, coords2, map, tags, polygon));
   }
 
   public static void deleteQuest(UUID questId) {

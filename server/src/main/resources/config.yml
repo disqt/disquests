@@ -7,9 +7,10 @@ bluemap-default-map: "overworld"
 
 # Map name mappings: quest map name -> BlueMap map ID.
 # Used to generate correct BlueMap URLs from quest coordinates.
+# Canonical keys are overworld, the_nether, the_end; the legacy keys "nether" and "end" are still accepted.
 bluemap-map-names:
   overworld: "world_new"
-  nether: "world_new_nether"
+  the_nether: "world_new_nether"
   the_end: "world_new_the_end"
 
 # Predefined tags shown to clients for quick selection.

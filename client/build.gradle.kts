@@ -110,6 +110,7 @@ tasks.test {
 
 val testServerPort = providers.gradleProperty("testServerPort").getOrElse("25565")
 val testRconPort = providers.gradleProperty("testRconPort").getOrElse("25575")
+val testTilePort = providers.gradleProperty("testTilePort").getOrElse("25580")
 
 loom {
     log4jConfigs.from(file("src/testmod/resources/log4j2-test.xml"))
@@ -125,6 +126,7 @@ loom {
             vmArg("-Ddisquests.test.rcon.port=$testRconPort")
             vmArg("-Ddisquests.test.rcon.password=testpassword")
             vmArg("-Ddisquests.test.allowHttp=true")
+            vmArg("-Ddisquests.test.tilePort=$testTilePort")
             // Integration test properties (passed via -P from orchestrator)
             val journey = providers.gradleProperty("testJourney")
             val phase = providers.gradleProperty("testPhase")
@@ -150,6 +152,7 @@ loom {
             vmArg("-Ddisquests.test.rcon.port=$testRconPort")
             vmArg("-Ddisquests.test.rcon.password=testpassword")
             vmArg("-Ddisquests.test.allowHttp=true")
+            vmArg("-Ddisquests.test.tilePort=$testTilePort")
             val journeyB = providers.gradleProperty("testJourney")
             val phaseB = providers.gradleProperty("testPhase")
             val usernameB = providers.gradleProperty("testUsername")
@@ -378,6 +381,18 @@ fun ensureServer(serverDir: File, logger: org.gradle.api.logging.Logger, pluginJ
         pluginJar.copyTo(pluginDest, overwrite = true)
         logger.lifecycle("Deployed plugin jar")
 
+        // Point the plugin's BlueMap URL at the harness tile fixture (TileFixtureServer)
+        val pluginConfigDir = File(serverDir, "plugins/Disquests")
+        pluginConfigDir.mkdirs()
+        val defaultConfig = file("../server/src/main/resources/config.yml").readText()
+        val testConfig = defaultConfig.replace(
+            "bluemap-url: \"\"", "bluemap-url: \"http://localhost:$testTilePort/\"")
+        if (testConfig == defaultConfig) {
+            throw RuntimeException("config.yml has no 'bluemap-url: \"\"' line to point at the tile fixture")
+        }
+        File(pluginConfigDir, "config.yml").writeText(testConfig)
+        logger.lifecycle("Wrote plugins/Disquests/config.yml (bluemap-url -> localhost:$testTilePort)")
+
         val paperJar = File(serverDir, "paper.jar")
         if (!paperJar.exists()) {
             bootstrapServerDir(serverDir, mcVersion, logger)
@@ -487,11 +502,25 @@ fun launchClient(
     if (harness) cmd.add("-Pharness")
     if (coverage) cmd.add("-Pcoverage")
     if (testPackage != null) cmd.add("-PtestPackage=$testPackage")
+    providers.gradleProperty("testServerPort").orNull?.let { cmd.add("-PtestServerPort=$it") }
+    providers.gradleProperty("testRconPort").orNull?.let { cmd.add("-PtestRconPort=$it") }
+    providers.gradleProperty("testTilePort").orNull?.let { cmd.add("-PtestTilePort=$it") }
     logger.lifecycle("  Starting $journey as $username")
     return ProcessBuilder(cmd)
         .directory(rootDir)
         .redirectErrorStream(true)
         .start()
+}
+
+fun waitForClientExit(processes: List<Process>, logger: org.gradle.api.logging.Logger, timeoutMs: Long = 60_000L) {
+    // Clients exit on their own after writing results (JaCoCo dumps gameTest.exec in that exit).
+    // Killing them first truncates the exec file and the coverage report cannot read it.
+    val deadline = System.currentTimeMillis() + timeoutMs
+    while (System.currentTimeMillis() < deadline && processes.any { it.isAlive }) {
+        Thread.sleep(500)
+    }
+    val stillAlive = processes.count { it.isAlive }
+    if (stillAlive > 0) logger.lifecycle("$stillAlive client process(es) still alive after ${timeoutMs / 1000}s, killing")
 }
 
 fun stopServer(serverProcess: Process?) {
@@ -609,6 +638,7 @@ tasks.register("runSoloTests") {
 
         } finally {
             if (!noStart) {
+                waitForClientExit(processes, logger)
                 processes.forEach { it.destroyForcibly() }
                 stopServer(serverProcess)
                 logger.lifecycle("Solo teardown complete")
@@ -756,6 +786,7 @@ tasks.register("runDuoTests") {
 
         } finally {
             if (!harness && !noStart) {
+                waitForClientExit(processes, logger)
                 processes.forEach { it.destroyForcibly() }
                 stopServer(serverProcess)
                 logger.lifecycle("Duo teardown complete")

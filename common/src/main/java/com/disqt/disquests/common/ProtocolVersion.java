@@ -7,8 +7,11 @@ public final class ProtocolVersion {
   /** Tags protocol. Adds tags to quests, predefinedTags to handshake, SYNC_TAGS packet. */
   public static final int V1 = 1;
 
+  /** Polygon protocol. Adds an optional polygon vertex list to quests. */
+  public static final int V2 = 2;
+
   /** The current protocol version this build speaks. */
-  public static final int CURRENT = V1;
+  public static final int CURRENT = V2;
 
   private ProtocolVersion() {}
 }

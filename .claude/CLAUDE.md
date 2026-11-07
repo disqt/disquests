@@ -104,6 +104,11 @@ Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with physical input via
 - **CI Xvfb** — `854x480x24` with `guiScale:1` via `ensureClientOptions()`. Do NOT increase Xvfb resolution -- 1920x1080 causes 4x software-rendering overhead, making tests 2x slower.
 - **`catch(Throwable)` not `catch(Exception)` for `waitFor`** — Fabric's `waitFor` throws `AssertionError` (extends `Error`). `catch(Exception)` won't catch it.
 - **Server handshake retry** — `ServerPacketHandler.onPlayerJoin` retries every 20 ticks (up to 10 attempts) because client channel registration can be delayed on slow CI.
+- **`CoordinatesJourney` is now `LocationJourney`** — filter with `-PtestFilter=LocationJourney`; map journeys are `MapBoardJourney` and `MapEditJourney`.
+- **Same-class screen rebuild** — after `QuestScreen` rebuilds itself (edit/view switch), `waitForScreen` returns immediately; wait on a component only the new screen has.
+- **Tile fixture** — `TileFixtureServer` (harness package) serves one BlueMap lowres tile (`/maps/{id}/tiles/1/x0/z0.png`) plus `settings.json` on `localhost:${disquests.test.tilePort}` (default 25580); everything else 404s. Player A starts it before connecting; a bind failure is logged and ignored.
+- **`disquests.test.allowHttp=true`** — set by both client run configs so `HttpFetcher` accepts the fixture's `http://` URL (production only allows `https://`).
+- **`ensureServer` writes `plugins/Disquests/config.yml`** — the default config with `bluemap-url` pointing at the fixture, before Paper starts (only when no server is already running). Non-default ports: `-PtestServerPort`, `-PtestRconPort`, `-PtestTilePort` (forwarded to the client subprocesses).
 
 ## Networking Protocol
 
@@ -114,10 +119,13 @@ Channel: `disquests:main`. First byte = PacketType ID.
 **S2C**: HANDSHAKE, SYNC_MY_QUESTS, SYNC_SERVER_QUESTS, UPDATE_QUEST, DELETE_QUEST_S2C, COLLABORATION_REQUEST, COLLABORATION_RESPONSE, SYNC_PENDING_REQUESTS, SYNC_TAGS
 
 ### Protocol Versioning
-- `ProtocolVersion.java`: V0 (legacy, pre-tags), V1 (current with tags). Client sends version in REQUEST_SYNC.
+- `ProtocolVersion.java`: V0 (legacy, pre-tags), V1 (tags), V2 (current, polygon). Client sends version in REQUEST_SYNC.
 - Server tracks per-player version in `ServerPacketHandler`. V0 clients get packets without tag fields.
 - **All new packet fields must be trailing-optional** with `buf.remaining() > 0` guards on the reader side.
 - When adding new fields: append at end, never insert mid-packet. Update `ProtocolVersion.CURRENT`.
+- **V2 polygon block** — quests carry a trailing `polygon` after the tags (varint count <= 64, then raw-long doubles `x, z` per vertex). SAVE_QUEST carries the same block trailing-optional (`remaining() > 0`). The server rejects > 64 vertices or non-finite values.
+- **HANDSHAKE always writes the full form** (tags, default map) followed by a trailing `varint serverProtocolVersion` (V1 assumed when absent). The client keeps it in `ClientSession.getServerProtocolVersion()` and reads every quest packet with that version (`PacketCodec.readQuest(buf, version)` and the version overloads), because `remaining()` guards cannot work for quests inside a list. `ClientSession.supportsMap()` = `>= V2`.
+- **V1 downgrade** — `writeQuest` for `< V2` and `DataManager.saveQuest` use `QuestLocation.normalize`: polygon of >= 2 vertices becomes `coordinates`/`coordinates2` = bounding-box min/max (y 64 unless a pin y exists) with `isRegion` true; 1 vertex becomes a pin. A V1 client re-saving a polygon quest with an unchanged rectangle keeps the polygon.
 - **Save broadcast scoping** — `handleSaveQuest` sends `UPDATE_QUEST` only to owner + contributors (not all mod players). Other handlers like `handleUpdateVisibility` still use `broadcastQuestUpdate()` which sends to all mod players for Open/Closed quests.
 
 ## Key Files
@@ -126,7 +134,9 @@ Channel: `disquests:main`. First byte = PacketType ID.
 |------|---------|
 | `common/src/main/java/com/disqt/disquests/common/PacketCodec.java` | All packet encode/decode methods |
 | `common/src/main/java/com/disqt/disquests/common/PacketType.java` | Packet type enum with byte IDs |
-| `common/src/main/java/com/disqt/disquests/common/ProtocolVersion.java` | Protocol version enum (V0, V1) |
+| `common/src/main/java/com/disqt/disquests/common/ProtocolVersion.java` | Protocol version enum (V0, V1, V2) |
+| `common/src/main/java/com/disqt/disquests/common/QuestLocation.java` | Pin/polygon geometry, bounding box and V1 `normalize` downgrade |
+| `common/src/main/java/com/disqt/disquests/common/DimensionKeys.java` | `normalize` maps `nether`/`end` to `the_nether`/`the_end` (config keys, saves, migration) |
 | `common/src/main/java/com/disqt/disquests/common/BlueMapUrlBuilder.java` | BlueMap URL construction with coords |
 | `common/src/main/java/com/disqt/disquests/common/model/` | QuestData, Visibility, ContributorData, ContributorOp, CoordinatesData, CollaborationRequestData |
 | `client/src/main/java/com/disqt/disquests/client/DisquestsClient.java` | Fabric mod entrypoint, keybinds, channel registration |
@@ -134,6 +144,9 @@ Channel: `disquests:main`. First byte = PacketType ID.
 | `client/src/main/java/com/disqt/disquests/client/ClientCache.java` | Client-side quest cache |
 | `client/.../gui/screen/` | All screens (MainScreen, QuestScreen, ContributorScreen, TagPickerScreen). Base: `DisquestsBaseScreen`. Confirm dialogs use overlay. |
 | `client/.../gui/component/` | Custom owo-ui components: QuestEntryComponent, TagChipComponent, TextFieldComponent |
+| `client/.../gui/map/` | World map: MapMath, TileCache/SharedTileCache, MapView, layers (quest polygons, player marker, polygon edit), QuestStyle |
+| `client/.../gui/screen/LocationCard.java` | Location card (mini map, vertex fields, map button) shared by edit and view mode of QuestScreen |
+| `client/.../gui/screen/MapEditScreen.java` | Full-screen polygon editor for a quest location |
 | `client/.../gui/helper/` | Colors, Theme, TagColors, HoverPreviewRenderer, DisquestsConfigModel (owo-config) |
 | `client/src/main/resources/assets/disquests/owo_ui/*.xml` | XML UI models for all screens (hot-reloadable) |
 | `server/src/main/java/com/disqt/disquests/server/papermc/DisquestsPlugin.java` | Plugin entry, channel registration |
@@ -142,6 +155,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 | `server/src/main/java/com/disqt/disquests/server/papermc/PlayerNameTracker.java` | Tracks online player display names |
 | `server/src/main/java/com/disqt/disquests/server/papermc/Commands.java` | `/disquests reload` and `/disquests reset` (debug mode) |
 | `client/src/testmod/.../integration/harness/` | JUnit 5 harness: HarnessCommon, TestContext, IntegrationTestExtension, RconClient |
+| `client/src/testmod/.../integration/harness/TileFixtureServer.java` | Local HTTP server serving one BlueMap tile for map E2E |
 | `client/src/testmod/.../integration/journeys/` | Solo and duo journey test classes |
 
 ## Dependencies
@@ -204,6 +218,14 @@ Channel: `disquests:main`. First byte = PacketType ID.
 ### Wiki-links
 - **Dirty tracking has two entry points** — `enterEditMode()` passes `origContent` to the constructor, `buildEditMode()` has a fallback snapshot guarded by `if (originalTitle == null)`. Both must reverse-resolve wiki-link UUIDs. The constructor path is the one used in practice (view→edit mode switch).
 - **Server resolution is per-recipient** — `WikiLinkResolver.resolveForRecipient()` converts `[[Quest Name]]` → `[[uuid|title]]` when sending to clients. `reverseResolve()` converts back on save. DB stores raw `[[Quest Name]]` form, clients receive UUID form.
+
+### World map
+- **Keep map logic Minecraft-free** — `TileCache`, `QuestStyle`, `QuestListOrder`, `MapMath` and `PolygonRaster` must not import Minecraft classes, so the client `test` source set can unit-test them. Minecraft textures go through the `TileTextures` seam (`McTileTextures`).
+- **`MapEditScreen` is opened with `setScreen`, not `navigateToScreen`** — Done calls `QuestScreen.applyMapLocation`, which rebuilds the editor through `rebuildEditMode`/`navigateToScreen` (the location snapshot for Cancel rides along); only Cancel/Escape return to the same editor instance. Navigating to the map would push a back-stack entry.
+- **`MapView` takes mouse-click focus while interactive** — owo delivers drag and key events only to the focused component.
+- **`SharedTileCache.reset()` on `leaveServer`** — the production tile cache is a singleton; disk cache lives under `<gameDir>/disquests/tiles/`.
+- **VPS `config.yml` dimension keys** — `nether` still works (`DimensionKeys.normalize`) but should become `the_nether` when next edited.
+- **`MainScreen` layouts** — `main_screen.xml` (map + side panel) when `supportsMap()`, else `main_screen_legacy.xml` with a `server-notice` label.
 
 ### Testing & E2E
 - **QuestScreen auto-close** — `tick()` closes the screen if the quest is not in `ClientCache`. E2E tests must add quests to cache before opening screens.

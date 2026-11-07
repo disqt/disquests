@@ -131,6 +131,10 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
       plugin.getLogger().warning("Quest field too long from " + player.getName());
       return;
     }
+    if (!QuestLocation.isValid(payload.polygon())) {
+      plugin.getLogger().warning("Invalid quest polygon from " + player.getName());
+      return;
+    }
     List<String> tags =
         payload.tags().stream()
             .map(String::toLowerCase)
@@ -158,8 +162,9 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
               payload.coords(),
               payload.isRegion(),
               payload.coords2(),
-              payload.map(),
-              tags);
+              DimensionKeys.normalize(payload.map()),
+              tags,
+              payload.polygon());
       dataManager.saveQuest(newQuest);
       QuestData saved = dataManager.getQuest(payload.questId());
       // Private quest - only send back to owner
@@ -190,19 +195,47 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
               payload.coords(),
               payload.isRegion(),
               payload.coords2(),
-              payload.map(),
-              tags);
+              DimensionKeys.normalize(payload.map()),
+              tags,
+              payload.polygon());
+      updated = keepExistingPolygonForUnchangedRectangle(player, existing, updated);
       boolean tagsChanged =
           !new java.util.HashSet<>(existing.tags()).equals(new java.util.HashSet<>(tags));
       dataManager.saveQuest(updated);
       QuestData saved = dataManager.getQuest(payload.questId());
       // Only notify owner + contributors, not all players
-      byte[] packet = PacketCodec.writeUpdateQuest(saved);
       Player owner = Bukkit.getPlayer(saved.ownerUuid());
-      if (owner != null && isModPlayer(owner)) sendPacket(owner, packet);
-      broadcastToContributors(saved, packet);
+      if (owner != null && isModPlayer(owner)) sendUpdateQuest(owner, saved);
+      for (ContributorData c : saved.contributors()) {
+        Player p = Bukkit.getPlayer(c.uuid());
+        if (p != null && isModPlayer(p)) sendUpdateQuest(p, saved);
+      }
       if (tagsChanged) broadcastSyncTags();
     }
+  }
+
+  private void sendUpdateQuest(Player recipient, QuestData quest) {
+    sendPacket(recipient, PacketCodec.writeUpdateQuest(quest, getProtocolVersion(recipient)));
+  }
+
+  /**
+   * A pre-V2 client only sees the bounding rectangle of a polygon. If it saves that rectangle back
+   * unchanged, keep the stored polygon instead of flattening it to a rectangle.
+   */
+  private QuestData keepExistingPolygonForUnchangedRectangle(
+      Player player, QuestData existing, QuestData updated) {
+    if (getProtocolVersion(player) >= ProtocolVersion.V2) return updated;
+    if (existing.polygon().size() < 2) return updated;
+    if (updated.coordinates() == null || updated.coordinates2() == null) return updated;
+    CoordinatesData[] box = QuestLocation.boundingBox(existing.polygon(), 0);
+    if (sameXZ(updated.coordinates(), box[0]) && sameXZ(updated.coordinates2(), box[1])) {
+      return updated.withPolygon(existing.polygon());
+    }
+    return updated;
+  }
+
+  private static boolean sameXZ(CoordinatesData a, CoordinatesData b) {
+    return Math.abs(a.x() - b.x()) <= 1e-6 && Math.abs(a.z() - b.z()) <= 1e-6;
   }
 
   private void handleDeleteQuest(Player player, UUID questId) {
@@ -479,20 +512,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
   private QuestData resolveWikiLinks(QuestData quest, UUID recipientUuid) {
     String resolvedContent = wikiLinkResolver.resolveForRecipient(quest.content(), recipientUuid);
     if (resolvedContent.equals(quest.content())) return quest;
-    return new QuestData(
-        quest.id(),
-        quest.title(),
-        resolvedContent,
-        quest.ownerUuid(),
-        quest.ownerName(),
-        quest.visibility(),
-        quest.contributors(),
-        quest.lastModified(),
-        quest.coordinates(),
-        quest.isRegion(),
-        quest.coordinates2(),
-        quest.map(),
-        quest.tags());
+    return quest.withContent(resolvedContent);
   }
 
   private void sendHandshake(Player player) {
