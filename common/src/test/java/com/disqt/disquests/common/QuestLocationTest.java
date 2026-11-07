@@ -164,6 +164,31 @@ class QuestLocationTest {
   }
 
   @Test
+  void normalize_legacyRectangleRoundTripsThroughBoundingBox() {
+    CoordinatesData min = new CoordinatesData(-3, 65, -5);
+    CoordinatesData max = new CoordinatesData(10, 65, 20);
+    // Corners in either order: a V1 server stores whatever the client sent as corner 1 and 2.
+    for (CoordinatesData[] corners :
+        List.of(
+            new CoordinatesData[] {min, max},
+            new CoordinatesData[] {
+              new CoordinatesData(10, 65, -5), new CoordinatesData(-3, 65, 20)
+            })) {
+      QuestData q =
+          QuestLocation.normalize(quest(corners[0], true, corners[1], "overworld", List.of()));
+      assertEquals(4, q.polygon().size());
+      CoordinatesData[] bb = QuestLocation.boundingBox(q.polygon(), 65);
+      assertEquals(min, bb[0]);
+      assertEquals(max, bb[1]);
+      // Normalising again (what a save does) keeps the same rectangle.
+      QuestData again = QuestLocation.normalize(q);
+      assertEquals(q.polygon(), again.polygon());
+      assertEquals(min, again.coordinates());
+      assertEquals(max, again.coordinates2());
+    }
+  }
+
+  @Test
   void normalize_pointWithoutRegionDropsCorner2() {
     QuestData q =
         QuestLocation.normalize(

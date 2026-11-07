@@ -1,6 +1,7 @@
 package com.disqt.disquests.client.gui.screen;
 
 import com.disqt.disquests.client.BlueMapHelper;
+import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.UrlOpener;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
@@ -22,6 +23,7 @@ import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.VerticalAlignment;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
@@ -50,6 +52,42 @@ final class LocationCard {
   /** One vertex row's fields; {@code y} is only present for a pin. */
   record VertexRow(TextFieldComponent x, @Nullable TextFieldComponent y, TextFieldComponent z) {}
 
+  /**
+   * The quest's location as edit mode found it, so Cancel can tell whether it changed and put it
+   * back. An outline compares by its corners (its bounding-box fields follow from them), a pin by
+   * its coordinates.
+   */
+  record LocationSnapshot(
+      @Nullable CoordinatesData coordinates,
+      @Nullable CoordinatesData coordinates2,
+      boolean isRegion,
+      @Nullable String map,
+      List<PointData> polygon) {
+    static LocationSnapshot of(Quest quest) {
+      return new LocationSnapshot(
+          quest.getCoordinates(),
+          quest.getCoordinates2(),
+          quest.isRegion(),
+          quest.getMap(),
+          List.copyOf(quest.getPolygon()));
+    }
+
+    boolean sameLocation(Quest quest) {
+      if (!Objects.equals(map, quest.getMap()) || !polygon.equals(quest.getPolygon())) {
+        return false;
+      }
+      return !polygon.isEmpty() || Objects.equals(coordinates, quest.getCoordinates());
+    }
+
+    void restore(Quest quest) {
+      quest.setCoordinates(coordinates);
+      quest.setCoordinates2(coordinates2);
+      quest.setRegion(isRegion);
+      quest.setMap(map);
+      quest.setPolygon(new ArrayList<>(polygon));
+    }
+  }
+
   private LocationCard() {}
 
   // ===================== EDIT MODE =====================
@@ -62,11 +100,15 @@ final class LocationCard {
     List<VertexRow> rows = buildVertexRows(root.childById(FlowLayout.class, "vertex-list"), quest);
 
     FlowLayout buttons = root.childById(FlowLayout.class, "location-buttons");
-    buttons.child(
-        button(
-            "btn-edit-on-map",
-            Component.translatable("gui.disquests.btn.edit_on_map"),
-            screen::openMapEditor));
+    // A pre-V2 server cannot store outlines from the map editor; the vertex rows stay the editor.
+    boolean mapEditing = ClientSession.supportsMap();
+    if (mapEditing) {
+      buttons.child(
+          button(
+              "btn-edit-on-map",
+              Component.translatable("gui.disquests.btn.edit_on_map"),
+              screen::openMapEditor));
+    }
     ButtonComponent setPos =
         button(
             "btn-set-pos",
@@ -83,6 +125,13 @@ final class LocationCard {
         button("btn-map", Component.literal("Map: " + dimension), screen::cycleMap);
     mapButton.active(quest.hasLocation());
     buttons.child(mapButton);
+    if (!mapEditing) {
+      LabelComponent outdated =
+          labelFor(Component.translatable("gui.disquests.map.server_outdated"));
+      outdated.id("map-server-outdated");
+      outdated.horizontalSizing(Sizing.fill(100));
+      root.childById(FlowLayout.class, "location-card").child(outdated);
+    }
     return rows;
   }
 
@@ -92,8 +141,8 @@ final class LocationCard {
       List<PointData> polygon = quest.getPolygon();
       for (int i = 0; i < polygon.size(); i++) {
         PointData p = polygon.get(i);
-        TextFieldComponent x = coordField("vertex-x-" + i, format(p.x()), "X");
-        TextFieldComponent z = coordField("vertex-z-" + i, format(p.z()), "Z");
+        TextFieldComponent x = coordField("vertex-x-" + i, vertexText(p.x()), "X");
+        TextFieldComponent z = coordField("vertex-z-" + i, vertexText(p.z()), "Z");
         FlowLayout row = vertexRow(i);
         row.child(labelFor(Component.literal("X:"))).child(x);
         row.child(labelFor(Component.literal("Z:"))).child(z);
@@ -102,9 +151,9 @@ final class LocationCard {
       }
     } else if (quest.getCoordinates() != null) {
       CoordinatesData c = quest.getCoordinates();
-      TextFieldComponent x = coordField("vertex-x-0", String.valueOf((int) c.x()), "X");
-      TextFieldComponent y = coordField("vertex-y-0", String.valueOf((int) c.y()), "Y");
-      TextFieldComponent z = coordField("vertex-z-0", String.valueOf((int) c.z()), "Z");
+      TextFieldComponent x = coordField("vertex-x-0", pinText(c.x()), "X");
+      TextFieldComponent y = coordField("vertex-y-0", pinText(c.y()), "Y");
+      TextFieldComponent z = coordField("vertex-z-0", pinText(c.z()), "Z");
       FlowLayout row = vertexRow(0);
       row.child(labelFor(Component.literal("X:"))).child(x);
       row.child(labelFor(Component.literal("Y:"))).child(y);
@@ -155,6 +204,32 @@ final class LocationCard {
         quest.setCoordinates(new CoordinatesData(x, y, z));
       }
     }
+  }
+
+  /** True when a vertex field's text differs from what the card filled it with. */
+  static boolean vertexFieldsEdited(Quest quest, List<VertexRow> rows) {
+    if (rows.isEmpty()) return false;
+    if (quest.isPolygon()) {
+      List<PointData> polygon = quest.getPolygon();
+      if (rows.size() != polygon.size()) return false;
+      for (int i = 0; i < rows.size(); i++) {
+        if (edited(rows.get(i).x(), vertexText(polygon.get(i).x()))
+            || edited(rows.get(i).z(), vertexText(polygon.get(i).z()))) {
+          return true;
+        }
+      }
+      return false;
+    }
+    CoordinatesData c = quest.getCoordinates();
+    if (c == null) return false;
+    VertexRow row = rows.get(0);
+    return edited(row.x(), pinText(c.x()))
+        || edited(row.y(), pinText(c.y()))
+        || edited(row.z(), pinText(c.z()));
+  }
+
+  private static boolean edited(@Nullable TextFieldComponent field, String shown) {
+    return field != null && !field.getText().trim().equals(shown);
   }
 
   // ===================== VIEW MODE =====================
@@ -294,8 +369,13 @@ final class LocationCard {
     return button;
   }
 
+  /** A pin field shows the block coordinate. */
+  private static String pinText(double v) {
+    return String.valueOf((int) v);
+  }
+
   /** Whole numbers without a decimal point, so the field round-trips the stored value. */
-  private static String format(double v) {
+  private static String vertexText(double v) {
     return v == Math.rint(v) ? String.valueOf((long) v) : String.valueOf(v);
   }
 
