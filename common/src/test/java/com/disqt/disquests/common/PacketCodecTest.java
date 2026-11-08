@@ -1316,4 +1316,85 @@ class PacketCodecTest {
     PacketCodec.readType(reader);
     assertThrows(IllegalArgumentException.class, () -> PacketCodec.readSaveQuest(reader));
   }
+
+  // ---- V3: quest completion ----
+
+  private static QuestData completionQuest(long at, UUID by, String byName) {
+    return new QuestData(
+            UUID.randomUUID(),
+            "T",
+            "C",
+            UUID.randomUUID(),
+            "Owner",
+            Visibility.CLOSED,
+            List.of(),
+            5L,
+            null,
+            false,
+            null,
+            null,
+            List.of(),
+            List.of())
+        .withCompletion(at, by, byName);
+  }
+
+  @Test
+  void quest_v3_roundTrip_withCompletion() {
+    UUID by = UUID.randomUUID();
+    QuestData q = completionQuest(1_700_000_000_000L, by, "Leo");
+    ByteBufWriter buf = new ByteBufWriter();
+    PacketCodec.writeQuest(buf, q, ProtocolVersion.V3);
+    ByteBufReader reader = new ByteBufReader(buf.toByteArray());
+    QuestData d = PacketCodec.readQuest(reader, ProtocolVersion.V3);
+    assertEquals(1_700_000_000_000L, d.completedAt());
+    assertEquals(by, d.completedBy());
+    assertEquals("Leo", d.completedByName());
+    assertTrue(d.isCompleted());
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void quest_v3_roundTrip_notCompleted() {
+    QuestData q = completionQuest(0L, null, null);
+    ByteBufWriter buf = new ByteBufWriter();
+    PacketCodec.writeQuest(buf, q, ProtocolVersion.V3);
+    ByteBufReader reader = new ByteBufReader(buf.toByteArray());
+    QuestData d = PacketCodec.readQuest(reader, ProtocolVersion.V3);
+    assertEquals(0L, d.completedAt());
+    assertNull(d.completedBy());
+    assertNull(d.completedByName());
+    assertFalse(d.isCompleted());
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void quest_v2_write_omitsCompletion() {
+    QuestData q = completionQuest(123L, UUID.randomUUID(), "Leo");
+    ByteBufWriter buf = new ByteBufWriter();
+    PacketCodec.writeQuest(buf, q, ProtocolVersion.V2);
+    ByteBufReader reader = new ByteBufReader(buf.toByteArray());
+    QuestData d = PacketCodec.readQuest(reader, ProtocolVersion.V2);
+    assertEquals(0L, d.completedAt());
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void completeQuest_roundTrip() {
+    UUID id = UUID.randomUUID();
+    byte[] packet = PacketCodec.writeCompleteQuest(id);
+    assertEquals(0x0B, packet[0]);
+    ByteBufReader reader = new ByteBufReader(packet);
+    assertEquals(PacketType.COMPLETE_QUEST, PacketCodec.readType(reader));
+    assertEquals(id, PacketCodec.readCompleteQuest(reader));
+  }
+
+  @Test
+  void reopenQuest_roundTrip() {
+    UUID id = UUID.randomUUID();
+    byte[] packet = PacketCodec.writeReopenQuest(id);
+    assertEquals(0x0C, packet[0]);
+    ByteBufReader reader = new ByteBufReader(packet);
+    assertEquals(PacketType.REOPEN_QUEST, PacketCodec.readType(reader));
+    assertEquals(id, PacketCodec.readReopenQuest(reader));
+  }
 }

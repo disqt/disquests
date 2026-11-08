@@ -17,7 +17,10 @@ public record QuestData(
     CoordinatesData coordinates2,
     String map,
     List<String> tags,
-    List<PointData> polygon) {
+    List<PointData> polygon,
+    long completedAt,
+    UUID completedBy,
+    String completedByName) {
 
   public QuestData {
     if (polygon == null) polygon = List.of();
@@ -52,7 +55,72 @@ public record QuestData(
         coordinates2,
         map,
         tags,
-        List.of());
+        List.of(),
+        0L,
+        null,
+        null);
+  }
+
+  /** Pre-completion signature; the quest is not completed. */
+  public QuestData(
+      UUID id,
+      String title,
+      String content,
+      UUID ownerUuid,
+      String ownerName,
+      Visibility visibility,
+      List<ContributorData> contributors,
+      long lastModified,
+      CoordinatesData coordinates,
+      boolean isRegion,
+      CoordinatesData coordinates2,
+      String map,
+      List<String> tags,
+      List<PointData> polygon) {
+    this(
+        id,
+        title,
+        content,
+        ownerUuid,
+        ownerName,
+        visibility,
+        contributors,
+        lastModified,
+        coordinates,
+        isRegion,
+        coordinates2,
+        map,
+        tags,
+        polygon,
+        0L,
+        null,
+        null);
+  }
+
+  public boolean isCompleted() {
+    return completedAt != 0L;
+  }
+
+  public QuestData withCompletion(
+      long newCompletedAt, UUID newCompletedBy, String newCompletedByName) {
+    return new QuestData(
+        id,
+        title,
+        content,
+        ownerUuid,
+        ownerName,
+        visibility,
+        contributors,
+        lastModified,
+        coordinates,
+        isRegion,
+        coordinates2,
+        map,
+        tags,
+        polygon,
+        newCompletedAt,
+        newCompletedBy,
+        newCompletedByName);
   }
 
   public QuestData withPolygon(List<PointData> newPolygon) {
@@ -70,7 +138,10 @@ public record QuestData(
         coordinates2,
         map,
         tags,
-        newPolygon);
+        newPolygon,
+        completedAt,
+        completedBy,
+        completedByName);
   }
 
   public QuestData withContributors(List<ContributorData> newContributors) {
@@ -88,7 +159,10 @@ public record QuestData(
         coordinates2,
         map,
         tags,
-        polygon);
+        polygon,
+        completedAt,
+        completedBy,
+        completedByName);
   }
 
   public QuestData withTags(List<String> newTags) {
@@ -106,7 +180,10 @@ public record QuestData(
         coordinates2,
         map,
         newTags,
-        polygon);
+        polygon,
+        completedAt,
+        completedBy,
+        completedByName);
   }
 
   public QuestData withContent(String newContent) {
@@ -124,7 +201,10 @@ public record QuestData(
         coordinates2,
         map,
         tags,
-        polygon);
+        polygon,
+        completedAt,
+        completedBy,
+        completedByName);
   }
 
   public QuestData withLocation(
@@ -146,6 +226,9 @@ public record QuestData(
         newCoords2,
         map,
         tags,
-        newPolygon);
+        newPolygon,
+        completedAt,
+        completedBy,
+        completedByName);
   }
 }

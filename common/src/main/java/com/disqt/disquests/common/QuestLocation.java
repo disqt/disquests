@@ -112,7 +112,10 @@ public final class QuestLocation {
             q.coordinates2(),
             map,
             q.tags(),
-            q.polygon());
+            q.polygon(),
+            q.completedAt(),
+            q.completedBy(),
+            q.completedByName());
     double y = q.coordinates() != null ? q.coordinates().y() : DEFAULT_Y;
     List<PointData> poly = q.polygon();
     if (poly.size() == 1) {
