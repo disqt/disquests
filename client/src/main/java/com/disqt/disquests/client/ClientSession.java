@@ -165,11 +165,12 @@ public class ClientSession {
    * Only the last term changes during a session, and only from true to false.
    */
   public static boolean mapAvailable() {
-    return supportsMap()
-        && serverWorldMapEnabled
-        && DisquestsClient.CONFIG.worldMap()
-        && hasBluemap()
-        && !mapUnreachable();
+    return mapAvailableIgnoringSetting() && DisquestsClient.CONFIG.worldMap();
+  }
+
+  /** Whether the map would be available if the player's {@code worldMap} setting were on. */
+  public static boolean mapAvailableIgnoringSetting() {
+    return supportsMap() && serverWorldMapEnabled && hasBluemap() && !mapUnreachable();
   }
 
   /** True once the BlueMap settings probe for the default map has failed. */

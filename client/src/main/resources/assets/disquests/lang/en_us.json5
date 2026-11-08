@@ -125,6 +125,7 @@
     "zoom": "Zoom %d",
     "server_outdated": "The server needs updating to show the map",
     "map_unavailable": "The map is unavailable right now (BlueMap unreachable)",
+    "toggle_map": "Map",
     "toggle_list": "List",
     "edit_hint": "Click to add corners. Enter or click the first corner to finish. Right-click removes the last one. Drag to move the map.",
     "self_intersecting": "The outline crosses itself",

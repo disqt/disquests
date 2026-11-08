@@ -48,6 +48,16 @@
                             <left>4</left>
                         </margins>
                     </label>
+                    <button id="btn-toggle-map">
+                        <text>Map</text>
+                        <sizing>
+                            <horizontal method="content"/>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                        <margins>
+                            <left>4</left>
+                        </margins>
+                    </button>
                 </children>
             </flow-layout>
 

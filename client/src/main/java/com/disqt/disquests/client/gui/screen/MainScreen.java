@@ -191,6 +191,14 @@ public class MainScreen extends DisquestsBaseScreen {
     this.btnInteract.onPress(ignored -> interactWithQuest());
     this.btnOpen.onPress(ignored -> openSelected());
     wireBackButton(root);
+    ButtonComponent toggleMap = root.childById(ButtonComponent.class, "btn-toggle-map");
+    if (mapMode || ClientSession.mapAvailableIgnoringSetting()) {
+      toggleMap.setMessage(Component.translatable("gui.disquests.map.toggle_map"));
+      toggleMap.onPress(ignored -> setWorldMap(!mapMode));
+    } else {
+      // Look the header up by id: parent() is only set once the tree is mounted.
+      root.childById(FlowLayout.class, "header-row").removeChild(toggleMap);
+    }
 
     // --- Create search text box programmatically ---
     // The map layout's panel is resizable, so the search box follows its width there.
@@ -654,6 +662,13 @@ public class MainScreen extends DisquestsBaseScreen {
     }
     CoordinatesData pin = quest.getCoordinates();
     return new double[] {pin.x(), pin.z()};
+  }
+
+  /** Persists the {@code worldMap} setting and reopens the board in the matching layout. */
+  private void setWorldMap(boolean enabled) {
+    DisquestsClient.CONFIG.worldMap(enabled);
+    DisquestsClient.CONFIG.save();
+    this.minecraft.gui.setScreen(new MainScreen(this.parent));
   }
 
   /** Explains why the map is off (outdated server, BlueMap unreachable); none when switched off. */
