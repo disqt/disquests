@@ -1232,6 +1232,71 @@ class PacketCodecTest {
     PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(reader);
     assertEquals(ProtocolVersion.CURRENT, payload.serverProtocolVersion());
     assertTrue(payload.worldMapEnabled());
+    assertTrue(payload.playerMarkerEnabled());
+  }
+
+  @Test
+  void handshake_playerMarkerDisabled_roundTrips() {
+    byte[] packet =
+        PacketCodec.writeHandshake(
+            "u",
+            0,
+            List.of(),
+            UUID.randomUUID(),
+            Map.of(),
+            List.of(),
+            "overworld",
+            ProtocolVersion.CURRENT,
+            true,
+            false);
+    ByteBufReader reader = new ByteBufReader(packet);
+    PacketCodec.readType(reader);
+    PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(reader);
+    assertTrue(payload.worldMapEnabled());
+    assertFalse(payload.playerMarkerEnabled());
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void handshake_defaultOverloads_writePlayerMarkerEnabled() {
+    byte[] packet =
+        PacketCodec.writeHandshake(
+            "u",
+            0,
+            List.of(),
+            UUID.randomUUID(),
+            Map.of(),
+            List.of(),
+            "overworld",
+            ProtocolVersion.CURRENT,
+            false);
+    ByteBufReader reader = new ByteBufReader(packet);
+    PacketCodec.readType(reader);
+    PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(reader);
+    assertFalse(payload.worldMapEnabled());
+    assertTrue(payload.playerMarkerEnabled());
+  }
+
+  @Test
+  void handshake_withoutPlayerMarkerField_defaultsToEnabled() {
+    ByteBufWriter w = new ByteBufWriter();
+    w.writeByte(PacketType.HANDSHAKE.getId());
+    w.writeBoolean(true);
+    w.writeString("url");
+    w.writeVarInt(0);
+    w.writeVarInt(0);
+    w.writeUUID(UUID.randomUUID());
+    w.writeVarInt(0);
+    w.writeVarInt(0);
+    w.writeString("overworld");
+    w.writeVarInt(ProtocolVersion.CURRENT);
+    w.writeBoolean(false);
+    ByteBufReader reader = new ByteBufReader(w.toByteArray());
+    PacketCodec.readType(reader);
+    PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(reader);
+    assertFalse(payload.worldMapEnabled());
+    assertTrue(payload.playerMarkerEnabled());
+    assertEquals(0, reader.remaining());
   }
 
   @Test

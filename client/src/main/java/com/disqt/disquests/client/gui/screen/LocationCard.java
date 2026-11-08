@@ -8,6 +8,7 @@ import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.map.BannerLayer;
+import com.disqt.disquests.client.gui.map.MapCameraMemory;
 import com.disqt.disquests.client.gui.map.MapMath;
 import com.disqt.disquests.client.gui.map.MapView;
 import com.disqt.disquests.client.gui.map.PolygonEditLayer;
@@ -107,7 +108,8 @@ final class LocationCard {
     int[] size = mapSize(EDIT_MAP_WIDTH, EDIT_MAP_HEIGHT, screen.height, EDIT_MAP_SCREEN_DIVISOR);
     FlowLayout vertexList = root.childById(FlowLayout.class, "vertex-list");
     List<VertexRow> rows = buildVertexRows(vertexList, quest);
-    capVertexList(vertexList, rows.size(), size[1]);
+    capVertexList(
+        root.childById(FlowLayout.class, "location-main"), vertexList, rows.size(), size[1]);
 
     // With the map off (pre-V2 server, switched off, or BlueMap unreachable) the vertex rows are
     // the whole editor: no mini map and no full-screen map editor.
@@ -241,9 +243,11 @@ final class LocationCard {
    * Wraps the vertex list in a scroll area of the map's height when its rows would be taller, so a
    * many-cornered outline does not stretch the card.
    */
-  private static void capVertexList(FlowLayout list, int rowCount, int maxHeight) {
+  private static void capVertexList(
+      FlowLayout parent, FlowLayout list, int rowCount, int maxHeight) {
+    // The parent is passed in: owo only sets parent() when the tree is mounted, after build().
     int height = rowCount * ROW_HEIGHT + Math.max(0, rowCount - 1) * VERTEX_LIST_GAP;
-    if (height <= maxHeight || !(list.parent() instanceof FlowLayout parent)) return;
+    if (height <= maxHeight || parent == null) return;
     int index = parent.children().indexOf(list);
     parent.removeChild(list);
     ScrollContainer<FlowLayout> scroll =
@@ -378,7 +382,8 @@ final class LocationCard {
   /**
    * Adds a map of the quest to {@code mini-map-slot}, with only the banner layer (no labels) and
    * non-interactive: an outline fitted to the map, a pin at zoom 2, otherwise the player (or the
-   * origin) at zoom 2.
+   * origin) at zoom 2. With the player marker off an unlocated quest shows the remembered camera,
+   * else the whole world.
    */
   private static MapView addMiniMap(
       FlowLayout root, Quest quest, String dimension, int mapWidth, int mapHeight) {
@@ -401,6 +406,9 @@ final class LocationCard {
     } else if (quest.getCoordinates() != null) {
       map.centerOn(quest.getCoordinates().x(), quest.getCoordinates().z());
       map.setZoom(PIN_ZOOM);
+    } else if (!ClientSession.isPlayerMarkerEnabled()) {
+      MapMath.Camera remembered = ClientSession.rememberedCamera(dimension);
+      map.setCamera(remembered != null ? remembered : MapCameraMemory.WORLD_VIEW);
     } else {
       LocalPlayer player = Minecraft.getInstance().player;
       if (player != null && player.level().dimension().identifier().getPath().equals(dimension)) {

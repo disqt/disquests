@@ -229,4 +229,5 @@ keyboard path. "Edit on map" opens a full-screen `MapEditScreen` on top of the e
 - **`MapView` takes mouse-click focus** while interactive, because owo delivers drag and key events only to the focused component.
 - **`unplaced-header` only appears when both groups are visible** (unplaced and placed quests).
 - **Mini-map height is capped on short screens** (`min(200, max(60, height/4))` in edit mode, `min(120, max(60, height/5))` in view mode; never below 60 px).
+- **Player marker and "Centre on me" are server-switchable** (`player-marker` in `config.yml`, trailing HANDSHAKE boolean); off on disqt, where maps open on the remembered camera or the whole world.
 - **The old coordinate editor is not kept** (Rollout 2). Against a V1 server the location card's vertex rows are the editor and "Edit on map" is hidden, with the `server_outdated` notice under the buttons. Quests read from a V1 server are normalised on arrival, so a legacy rectangle becomes its 4-corner polygon and saves back as the same bounding box.

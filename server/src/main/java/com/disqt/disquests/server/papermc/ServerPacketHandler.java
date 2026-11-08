@@ -530,7 +530,8 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
             config.getPredefinedTags(),
             config.getBluemapDefaultMap(),
             protocolVersion,
-            config.isWorldMapEnabled()));
+            config.isWorldMapEnabled(),
+            config.isPlayerMarkerEnabled()));
   }
 
   private void sendPacket(Player player, byte[] data) {

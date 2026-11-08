@@ -4,6 +4,7 @@ import com.disqt.disquests.common.DimensionKeys;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -14,6 +15,7 @@ public class Config {
   private List<String> predefinedTags;
   private boolean debug;
   private boolean worldMap;
+  private boolean playerMarker;
 
   public Config(JavaPlugin plugin) {
     plugin.saveDefaultConfig();
@@ -44,6 +46,7 @@ public class Config {
       if (this.predefinedTags == null) this.predefinedTags = List.of();
     }
     this.worldMap = cfg.getBoolean("world-map", true);
+    this.playerMarker = readPlayerMarker(cfg);
     this.debug = cfg.getBoolean("debug", false);
     if (Boolean.getBoolean("disquests.debug")) {
       this.debug = true;
@@ -64,6 +67,16 @@ public class Config {
 
   public boolean isWorldMapEnabled() {
     return worldMapEnabled(worldMap, bluemapUrl);
+  }
+
+  /** The {@code player-marker} flag, true when absent. */
+  static boolean readPlayerMarker(ConfigurationSection cfg) {
+    return cfg.getBoolean("player-marker", true);
+  }
+
+  /** Whether clients show each player's own marker and "Centre on me" on the in-game map. */
+  public boolean isPlayerMarkerEnabled() {
+    return playerMarker;
   }
 
   public boolean isDebug() {

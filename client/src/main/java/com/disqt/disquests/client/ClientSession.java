@@ -1,5 +1,7 @@
 package com.disqt.disquests.client;
 
+import com.disqt.disquests.client.gui.map.MapCameraMemory;
+import com.disqt.disquests.client.gui.map.MapMath;
 import com.disqt.disquests.client.gui.map.SharedTileCache;
 import com.disqt.disquests.common.ProtocolVersion;
 import java.util.Collections;
@@ -35,6 +37,8 @@ public class ClientSession {
   private static List<String> serverTags = List.of();
   private static int serverProtocolVersion = ProtocolVersion.V1;
   private static boolean serverWorldMapEnabled = true;
+  private static boolean serverPlayerMarkerEnabled = true;
+  private static final MapCameraMemory cameraMemory = new MapCameraMemory();
 
   // UI state
   private static Tab activeTab = Tab.MY_QUESTS;
@@ -88,6 +92,8 @@ public class ClientSession {
     serverTags = List.of();
     serverProtocolVersion = ProtocolVersion.V1;
     serverWorldMapEnabled = true;
+    serverPlayerMarkerEnabled = true;
+    cameraMemory.clear();
     activeTab = Tab.MY_QUESTS;
     searchTerm = "";
     serverQuestsFilter = QuestFilter.ALL;
@@ -112,6 +118,39 @@ public class ClientSession {
 
   public static void setServerWorldMapEnabled(boolean enabled) {
     serverWorldMapEnabled = enabled;
+  }
+
+  /**
+   * The server's {@code player-marker} switch from the handshake (true when the server sent none).
+   * When false the map shows no player marker and no "Centre on me" button, and opens on the
+   * remembered camera or the whole world instead of the player.
+   */
+  public static boolean isPlayerMarkerEnabled() {
+    return serverPlayerMarkerEnabled;
+  }
+
+  public static void setServerPlayerMarkerEnabled(boolean enabled) {
+    serverPlayerMarkerEnabled = enabled;
+  }
+
+  /** Remembers the map camera last used in {@code dimension}, for this server session. */
+  public static void rememberCamera(String dimension, MapMath.Camera camera) {
+    cameraMemory.remember(dimension, camera);
+  }
+
+  /** The map camera last used in {@code dimension}, or null. */
+  public static MapMath.Camera rememberedCamera(String dimension) {
+    return cameraMemory.get(dimension);
+  }
+
+  /** The dimension of the last remembered map camera, or null. */
+  public static String lastCameraDimension() {
+    return cameraMemory.lastDimension();
+  }
+
+  /** Forgets every remembered map camera (also done on {@link #leaveServer}). */
+  public static void forgetCameras() {
+    cameraMemory.clear();
   }
 
   /**
