@@ -2,6 +2,8 @@ package com.disqt.disquests.client.gui.map;
 
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.net.HttpFetcher;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import net.minecraft.client.Minecraft;
@@ -42,6 +44,19 @@ public final class SharedTileCache {
       banners = new BannerCache(baseUrl(), fetcher, pool);
     }
     return banners;
+  }
+
+  /** Touches the banner cache for each map id so stale entries refresh in the background. */
+  public static void refreshBanners(Collection<String> mapIds) {
+    if (mapIds == null) {
+      return;
+    }
+    BannerCache cache = banners();
+    for (String id : new HashSet<>(mapIds)) {
+      if (id != null && !id.isEmpty()) {
+        cache.get(id);
+      }
+    }
   }
 
   public static synchronized void reset() {
