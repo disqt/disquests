@@ -8,6 +8,7 @@ import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.map.BannerLayer;
+import com.disqt.disquests.client.gui.map.MapCameraMemory;
 import com.disqt.disquests.client.gui.map.MapMath;
 import com.disqt.disquests.client.gui.map.MapView;
 import com.disqt.disquests.client.gui.map.PolygonEditLayer;
@@ -378,7 +379,8 @@ final class LocationCard {
   /**
    * Adds a map of the quest to {@code mini-map-slot}, with only the banner layer (no labels) and
    * non-interactive: an outline fitted to the map, a pin at zoom 2, otherwise the player (or the
-   * origin) at zoom 2.
+   * origin) at zoom 2. With the player marker off an unlocated quest shows the remembered camera,
+   * else the whole world.
    */
   private static MapView addMiniMap(
       FlowLayout root, Quest quest, String dimension, int mapWidth, int mapHeight) {
@@ -401,6 +403,9 @@ final class LocationCard {
     } else if (quest.getCoordinates() != null) {
       map.centerOn(quest.getCoordinates().x(), quest.getCoordinates().z());
       map.setZoom(PIN_ZOOM);
+    } else if (!ClientSession.isPlayerMarkerEnabled()) {
+      MapMath.Camera remembered = ClientSession.rememberedCamera(dimension);
+      map.setCamera(remembered != null ? remembered : MapCameraMemory.WORLD_VIEW);
     } else {
       LocalPlayer player = Minecraft.getInstance().player;
       if (player != null && player.level().dimension().identifier().getPath().equals(dimension)) {

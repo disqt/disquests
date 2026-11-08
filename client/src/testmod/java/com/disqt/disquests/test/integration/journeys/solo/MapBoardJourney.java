@@ -10,18 +10,21 @@ import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.QuestEntryComponent;
 import com.disqt.disquests.client.gui.map.MapMath;
 import com.disqt.disquests.client.gui.map.MapView;
+import com.disqt.disquests.client.gui.map.PlayerMarkerLayer;
 import com.disqt.disquests.client.gui.map.QuestPolygonLayer;
 import com.disqt.disquests.client.gui.map.SharedTileCache;
 import com.disqt.disquests.client.gui.map.TileCache;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.client.network.PacketSender;
+import com.disqt.disquests.common.DimensionKeys;
 import com.disqt.disquests.common.ProtocolVersion;
 import com.disqt.disquests.common.model.PointData;
 import com.disqt.disquests.common.model.Visibility;
 import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
 import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
+import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.container.FlowLayout;
 import java.util.ArrayList;
@@ -397,6 +400,51 @@ class MapBoardJourney {
           "map-view should not exist when the world map is off");
     } finally {
       context.runOnClient(c -> ClientSession.setServerWorldMapEnabled(true));
+    }
+  }
+
+  @Test
+  @Order(10)
+  @PlayerA
+  @DisplayName("A server with player-marker off hides the marker and opens on the world")
+  void playerMarkerOffOpensOnWorld(ClientGameTestContext context) {
+    given("the server switches the player marker off and no camera is remembered");
+    try {
+      context.runOnClient(
+          c -> {
+            ClientSession.setServerPlayerMarkerEnabled(false);
+            // Close first: the outgoing screen remembers its camera in removed().
+            c.gui.setScreen(null);
+            ClientSession.forgetCameras();
+            c.gui.setScreen(new MainScreen(null));
+          });
+      waitForScreen(context, MainScreen.class);
+      waitForComponent(context, "map-view");
+
+      then("the map shows without the player marker or the Centre on me button");
+      MapView view = mapView(context);
+      assertNull(
+          findComponentOrNull(context, ButtonComponent.class, "btn-centre-me"),
+          "btn-centre-me should be removed when the player marker is off");
+      assertNull(
+          context.computeOnClient(c -> view.getLayer(PlayerMarkerLayer.class)),
+          "no PlayerMarkerLayer when the player marker is off");
+
+      and("the camera shows the whole world in the server's default dimension");
+      MapMath.Camera camera = context.computeOnClient(c -> view.getCamera());
+      assertEquals(0, camera.zoom(), "world-view zoom");
+      assertEquals(0.0, camera.centerX(), 1e-9, "camera centre x");
+      assertEquals(0.0, camera.centerZ(), 1e-9, "camera centre z");
+      String expected =
+          context.computeOnClient(
+              c -> DimensionKeys.normalize(ClientSession.getBluemapDefaultMap()));
+      assertEquals(expected, context.computeOnClient(c -> view.getDimension()), "map dimension");
+    } finally {
+      context.runOnClient(
+          c -> {
+            ClientSession.setServerPlayerMarkerEnabled(true);
+            ClientSession.forgetCameras();
+          });
     }
   }
 }

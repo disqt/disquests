@@ -46,6 +46,7 @@ class ServerPacketHandlerTest {
     when(config.getBluemapUrl()).thenReturn("");
     when(config.getPredefinedTags()).thenReturn(List.of());
     when(config.getBluemapDefaultMap()).thenReturn("overworld");
+    when(config.isPlayerMarkerEnabled()).thenReturn(true);
     when(config.isWorldMapEnabled()).thenReturn(true);
 
     handler = new ServerPacketHandler(plugin, dm, config);
@@ -334,5 +335,26 @@ class ServerPacketHandlerTest {
     ByteBufReader buf2 = new ByteBufReader(captor.getValue());
     PacketCodec.readType(buf2);
     Assertions.assertTrue(PacketCodec.readHandshake(buf2).worldMapEnabled());
+  }
+
+  @Test
+  void handshake_carriesConfiguredPlayerMarkerFlag() {
+    when(config.isPlayerMarkerEnabled()).thenReturn(false);
+    handler.resendHandshakes();
+    ArgumentCaptor<byte[]> captor = ArgumentCaptor.forClass(byte[].class);
+    verify(ownerPlayer).sendPluginMessage(eq(plugin), eq(CHANNEL), captor.capture());
+    ByteBufReader buf = new ByteBufReader(captor.getValue());
+    Assertions.assertEquals(PacketType.HANDSHAKE, PacketCodec.readType(buf));
+    PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(buf);
+    Assertions.assertFalse(payload.playerMarkerEnabled());
+    Assertions.assertTrue(payload.worldMapEnabled());
+
+    clearInvocations(ownerPlayer);
+    when(config.isPlayerMarkerEnabled()).thenReturn(true);
+    handler.resendHandshakes();
+    verify(ownerPlayer).sendPluginMessage(eq(plugin), eq(CHANNEL), captor.capture());
+    ByteBufReader buf2 = new ByteBufReader(captor.getValue());
+    PacketCodec.readType(buf2);
+    Assertions.assertTrue(PacketCodec.readHandshake(buf2).playerMarkerEnabled());
   }
 }

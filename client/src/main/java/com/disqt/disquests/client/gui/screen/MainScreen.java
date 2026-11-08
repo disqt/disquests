@@ -7,12 +7,15 @@ import com.disqt.disquests.client.gui.component.QuestEntryComponent;
 import com.disqt.disquests.client.gui.component.TagAutocompleteDropdown;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.map.BannerLayer;
+import com.disqt.disquests.client.gui.map.MapCameraMemory;
+import com.disqt.disquests.client.gui.map.MapMath;
 import com.disqt.disquests.client.gui.map.MapView;
 import com.disqt.disquests.client.gui.map.PlayerMarkerLayer;
 import com.disqt.disquests.client.gui.map.QuestPolygonLayer;
 import com.disqt.disquests.client.gui.map.SharedTileCache;
 import com.disqt.disquests.client.gui.widget.ToastOverlay;
 import com.disqt.disquests.client.network.PacketSender;
+import com.disqt.disquests.common.DimensionKeys;
 import com.disqt.disquests.common.QuestLocation;
 import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.Visibility;
@@ -463,25 +466,35 @@ public class MainScreen extends DisquestsBaseScreen {
     this.polygonLayer = new QuestPolygonLayer();
     this.polygonLayer.onQuestClick(quest -> navigateToScreen(new QuestScreen(this, quest)));
     this.mapView = new MapView(SharedTileCache.get());
-    this.mapView
-        .addLayer(new BannerLayer(SharedTileCache.banners()))
-        .addLayer(polygonLayer)
-        .addLayer(new PlayerMarkerLayer());
+    this.mapView.addLayer(new BannerLayer(SharedTileCache.banners())).addLayer(polygonLayer);
+    boolean playerMarker = ClientSession.isPlayerMarkerEnabled();
+    if (playerMarker) {
+      this.mapView.addLayer(new PlayerMarkerLayer());
+    }
     this.mapView.sizing(Sizing.fill(100), Sizing.fill(100));
     this.mapView.id("map-view");
     root.childById(FlowLayout.class, "map-slot").child(mapView);
 
     wireDimensionButtons(root);
     ButtonComponent centreMe = root.childById(ButtonComponent.class, "btn-centre-me");
-    centreMe.setMessage(Component.translatable("gui.disquests.map.centre_me"));
-    centreMe.onPress(ignored -> centreOnPlayer());
+    if (playerMarker) {
+      centreMe.setMessage(Component.translatable("gui.disquests.map.centre_me"));
+      centreMe.onPress(ignored -> centreOnPlayer());
+    } else if (centreMe.parent() instanceof FlowLayout toolbar) {
+      // Server switched the player marker off: no GPS shortcut either.
+      toolbar.removeChild(centreMe);
+    }
     ButtonComponent toggleList = root.childById(ButtonComponent.class, "btn-toggle-list");
     toggleList.setMessage(Component.translatable("gui.disquests.map.toggle_list"));
     toggleList.onPress(ignored -> toggleList());
     this.zoomLabel = root.childById(LabelComponent.class, "zoom-label");
 
     mapView.setZoom(INITIAL_ZOOM);
-    centreOnPlayer();
+    if (playerMarker) {
+      centreOnPlayer();
+    } else {
+      showRememberedOrWorld();
+    }
     updateZoomLabel();
     if (QuestListOrder.shouldCollapseList(this.width)) {
       root.removeChild(sidePanel);
@@ -511,6 +524,32 @@ public class MainScreen extends DisquestsBaseScreen {
     if (player != null) {
       mapView.centerOn(player.getX(), player.getZ());
     }
+  }
+
+  /**
+   * Without the player marker the board opens where the player last left the map this session, else
+   * on the whole world in the server's default dimension.
+   */
+  private void showRememberedOrWorld() {
+    String dimension = ClientSession.lastCameraDimension();
+    if (dimension == null) {
+      dimension = DimensionKeys.normalize(ClientSession.getBluemapDefaultMap());
+    }
+    if (dimension == null) {
+      dimension = DimensionKeys.OVERWORLD;
+    }
+    selectDimension(dimension);
+    MapMath.Camera remembered = ClientSession.rememberedCamera(dimension);
+    mapView.setCamera(remembered != null ? remembered : MapCameraMemory.WORLD_VIEW);
+  }
+
+  /** Remembers the map camera whenever the board goes away (close, navigation, back/forward). */
+  @Override
+  public void removed() {
+    if (mapView != null) {
+      ClientSession.rememberCamera(mapView.getDimension(), mapView.getCamera());
+    }
+    super.removed();
   }
 
   private void toggleList() {

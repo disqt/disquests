@@ -75,7 +75,8 @@ public final class PacketCodec {
       List<String> predefinedTags,
       String bluemapDefaultMap,
       int serverProtocolVersion,
-      boolean worldMapEnabled) {}
+      boolean worldMapEnabled,
+      boolean playerMarkerEnabled) {}
 
   public record CollaborationRequestPayload(
       UUID requestId, UUID questId, String questTitle, String requesterName) {}
@@ -276,11 +277,34 @@ public final class PacketCodec {
         true);
   }
 
+  public static byte[] writeHandshake(
+      String bluemapUrl,
+      int pendingRequestCount,
+      List<UUID> pinnedQuestIds,
+      UUID playerUuid,
+      Map<String, String> mapNames,
+      List<String> predefinedTags,
+      String defaultMap,
+      int protocolVersion,
+      boolean worldMapEnabled) {
+    return writeHandshake(
+        bluemapUrl,
+        pendingRequestCount,
+        pinnedQuestIds,
+        playerUuid,
+        mapNames,
+        predefinedTags,
+        defaultMap,
+        protocolVersion,
+        worldMapEnabled,
+        true);
+  }
+
   /**
-   * Writes the handshake in its full form: tags, default map, the server protocol version, then
-   * whether the server enables the in-game world map. The server sends this at join, before it
-   * knows the client's version, so nothing is gated. Older readers stop earlier and ignore the
-   * trailing bytes.
+   * Writes the handshake in its full form: tags, default map, the server protocol version, whether
+   * the server enables the in-game world map, then whether it shows each player's own marker. The
+   * server sends this at join, before it knows the client's version, so nothing is gated. Older
+   * readers stop earlier and ignore the trailing bytes.
    *
    * @param protocolVersion ignored, kept for source compatibility
    */
@@ -293,7 +317,8 @@ public final class PacketCodec {
       List<String> predefinedTags,
       String defaultMap,
       int protocolVersion,
-      boolean worldMapEnabled) {
+      boolean worldMapEnabled,
+      boolean playerMarkerEnabled) {
     ByteBufWriter buf = new ByteBufWriter();
     buf.writeByte(PacketType.HANDSHAKE.getId());
     writeNullableString(buf, bluemapUrl);
@@ -315,6 +340,7 @@ public final class PacketCodec {
     buf.writeString(defaultMap != null ? defaultMap : "overworld");
     buf.writeVarInt(ProtocolVersion.CURRENT);
     buf.writeBoolean(worldMapEnabled);
+    buf.writeBoolean(playerMarkerEnabled);
     return buf.toByteArray();
   }
 
@@ -653,6 +679,7 @@ public final class PacketCodec {
     String defaultMap = buf.remaining() > 0 ? buf.readString() : "overworld";
     int serverProtocolVersion = buf.remaining() > 0 ? buf.readVarInt() : ProtocolVersion.V1;
     boolean worldMapEnabled = buf.remaining() > 0 ? buf.readBoolean() : true;
+    boolean playerMarkerEnabled = buf.remaining() > 0 ? buf.readBoolean() : true;
     return new HandshakePayload(
         bluemapUrl,
         pendingRequestCount,
@@ -662,7 +689,8 @@ public final class PacketCodec {
         predefinedTags,
         defaultMap,
         serverProtocolVersion,
-        worldMapEnabled);
+        worldMapEnabled,
+        playerMarkerEnabled);
   }
 
   private static List<QuestData> readQuestList(ByteBufReader buf, int protocolVersion) {

@@ -4,7 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.Test;
 
 class ConfigTest {
@@ -29,5 +32,29 @@ class ConfigTest {
     assertFalse(Config.worldMapEnabled(true, ""));
     assertFalse(Config.worldMapEnabled(true, "   "));
     assertFalse(Config.worldMapEnabled(true, null));
+  }
+
+  @Test
+  void playerMarker_defaultsToTrueWhenAbsent() throws Exception {
+    YamlConfiguration cfg = new YamlConfiguration();
+    cfg.loadFromString("world-map: true");
+    assertTrue(Config.readPlayerMarker(cfg));
+  }
+
+  @Test
+  void playerMarker_falseWhenConfigured() throws Exception {
+    YamlConfiguration cfg = new YamlConfiguration();
+    cfg.loadFromString("player-marker: false");
+    assertFalse(Config.readPlayerMarker(cfg));
+  }
+
+  @Test
+  void playerMarker_bundledConfigDefaultsToTrue() throws Exception {
+    try (var in = ConfigTest.class.getResourceAsStream("/config.yml")) {
+      YamlConfiguration cfg =
+          YamlConfiguration.loadConfiguration(new InputStreamReader(in, StandardCharsets.UTF_8));
+      assertTrue(cfg.contains("player-marker"));
+      assertTrue(Config.readPlayerMarker(cfg));
+    }
   }
 }

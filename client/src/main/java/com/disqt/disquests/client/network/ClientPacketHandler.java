@@ -80,6 +80,7 @@ public class ClientPacketHandler {
     ClientSession.setBluemapDefaultMap(payload.bluemapDefaultMap());
     ClientSession.setServerProtocolVersion(payload.serverProtocolVersion());
     ClientSession.setServerWorldMapEnabled(payload.worldMapEnabled());
+    ClientSession.setServerPlayerMarkerEnabled(payload.playerMarkerEnabled());
     if (ClientSession.supportsMap()
         && ClientSession.isServerWorldMapEnabled()
         && ClientSession.hasBluemap()) {

@@ -1,7 +1,10 @@
 package com.disqt.disquests.client.gui.screen;
 
+import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.map.BannerLayer;
+import com.disqt.disquests.client.gui.map.MapCameraMemory;
+import com.disqt.disquests.client.gui.map.MapMath;
 import com.disqt.disquests.client.gui.map.MapView;
 import com.disqt.disquests.client.gui.map.PlayerMarkerLayer;
 import com.disqt.disquests.client.gui.map.PolygonEditLayer;
@@ -69,10 +72,11 @@ public class MapEditScreen extends DisquestsBaseScreen {
     this.layer.onFinish(editor::applyMapLocation);
     this.mapView = new MapView(SharedTileCache.get());
     this.mapView.interactive(true).setDimension(dimension);
-    this.mapView
-        .addLayer(new BannerLayer(SharedTileCache.banners()))
-        .addLayer(new PlayerMarkerLayer())
-        .addLayer(layer);
+    this.mapView.addLayer(new BannerLayer(SharedTileCache.banners()));
+    if (ClientSession.isPlayerMarkerEnabled()) {
+      this.mapView.addLayer(new PlayerMarkerLayer());
+    }
+    this.mapView.addLayer(layer);
     this.mapView.sizing(Sizing.fill(100), Sizing.fill(100));
     this.mapView.id("map-view");
     root.childById(FlowLayout.class, "map-slot").child(mapView);
@@ -109,11 +113,19 @@ public class MapEditScreen extends DisquestsBaseScreen {
     return Math.max(HINT_MIN_WIDTH, Math.min(this.width - 16, HINT_MAX_WIDTH));
   }
 
-  /** The initial shape's bounding-box centre, else the player (same dimension), else (0, 0). */
+  /**
+   * The initial shape's bounding-box centre, else the player (same dimension), else (0, 0). With
+   * the player marker off the fallback is the remembered camera, else the whole world.
+   */
   private void centreCamera() {
     if (!initial.isEmpty()) {
       CoordinatesData[] box = QuestLocation.boundingBox(initial, 0);
       mapView.centerOn((box[0].x() + box[1].x()) / 2, (box[0].z() + box[1].z()) / 2);
+      return;
+    }
+    if (!ClientSession.isPlayerMarkerEnabled()) {
+      MapMath.Camera remembered = ClientSession.rememberedCamera(dimension);
+      mapView.setCamera(remembered != null ? remembered : MapCameraMemory.WORLD_VIEW);
       return;
     }
     LocalPlayer player = minecraft != null ? minecraft.player : null;
@@ -154,6 +166,15 @@ public class MapEditScreen extends DisquestsBaseScreen {
   @Override
   public void onClose() {
     cancel();
+  }
+
+  /** Remembers the editor's camera on Done, Clear, Cancel and Escape alike. */
+  @Override
+  public void removed() {
+    if (mapView != null) {
+      ClientSession.rememberCamera(mapView.getDimension(), mapView.getCamera());
+    }
+    super.removed();
   }
 
   private void cancel() {
