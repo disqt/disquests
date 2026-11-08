@@ -13,10 +13,11 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 
 /**
- * Edits a quest outline on the map: left-click adds a corner or grabs one to drag, right-click
- * removes the last corner, Enter or a click (press and release without moving) on the first of
- * three or more corners finishes. Zero corners means "clear", one is a pin, two or more are an
- * outline (three or more must not cross itself).
+ * Edits a quest outline on the map: left-click adds a corner (a left drag on empty map pans the
+ * view instead, see {@link MapView}) or grabs one to drag, right-click removes the last corner,
+ * Enter or a click (press and release without moving) on the first of three or more corners
+ * finishes. Zero corners means "clear", one is a pin, two or more are an outline (three or more
+ * must not cross itself).
  *
  * <p>In {@linkplain #moveOnly(boolean) move-only mode} (the quest editor's preview) the layer only
  * drags existing corners: no adding, removing or finishing, and a drag that would make the outline
@@ -103,6 +104,12 @@ public class PolygonEditLayer implements MapLayer {
   }
 
   // --- Input ---
+
+  /** A left press on a corner handle (within 6 px) is taken at once, so the corner drags. */
+  @Override
+  public boolean wantsPress(MapView view, double relX, double relY, int button) {
+    return button == InputConstants.MOUSE_BUTTON_LEFT && hitVertex(view, relX, relY) >= 0;
+  }
 
   @Override
   public boolean onMouseDown(MapView view, double relX, double relY, int button) {

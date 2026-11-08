@@ -19,12 +19,18 @@ import net.minecraft.network.chat.Component;
 
 /**
  * Pannable, zoomable BlueMap view. Draws low-resolution tiles from a {@link TileCache}, then its
- * {@link MapLayer}s in order, and routes input to the layers. Middle-drag pans, scroll zooms.
+ * {@link MapLayer}s in order, and routes input to the layers. Left- or middle-drag pans, scroll
+ * zooms. A left press is held back until release: if the cursor moved more than 3 px it was a pan,
+ * otherwise the layers get the press and release then. A layer that {@linkplain MapLayer#wantsPress
+ * wants the press} (a corner handle) gets it at once instead, with its drags.
  *
  * <p>The view takes owo focus on mouse click only, because owo routes drags and releases to the
  * focused component. It never takes keyboard-cycle focus.
  */
 public class MapView extends BaseUIComponent {
+  /** Pixels the cursor must travel with the left button held before the gesture becomes a pan. */
+  private static final double DRAG_THRESHOLD = 3;
+
   private static final Component TILES_UNAVAILABLE =
       Component.translatable("gui.disquests.map.tiles_unavailable");
 
@@ -35,6 +41,13 @@ public class MapView extends BaseUIComponent {
   private boolean interactive = true;
   private Component hoverTooltip;
   private Component shownTooltip;
+
+  // Left-button gesture: held back until it is known to be a click or a pan.
+  private boolean pendingLeft;
+  private boolean leftDragging;
+  private double pressX;
+  private double pressY;
+  private MapLayer pressOwner;
 
   public MapView(TileCache cache) {
     this.cache = cache;
@@ -258,12 +271,25 @@ public class MapView extends BaseUIComponent {
       return false;
     }
     int button = click.button();
-    if (button == InputConstants.MOUSE_BUTTON_LEFT || button == InputConstants.MOUSE_BUTTON_RIGHT) {
+    if (button == InputConstants.MOUSE_BUTTON_LEFT) {
+      pendingLeft = false;
+      leftDragging = false;
+      pressOwner = null;
       for (MapLayer layer : layers) {
-        if (layer.onMouseDown(this, click.x(), click.y(), button)) {
-          break;
+        if (layer.wantsPress(this, click.x(), click.y(), button)) {
+          pressOwner = layer;
+          layer.onMouseDown(this, click.x(), click.y(), button);
+          return true;
         }
       }
+      // Held back until release: a drag pans, a plain click reaches the layers then.
+      pendingLeft = true;
+      pressX = click.x();
+      pressY = click.y();
+      return true;
+    }
+    if (button == InputConstants.MOUSE_BUTTON_RIGHT) {
+      dispatchDown(click.x(), click.y(), button);
     }
     return true;
   }
@@ -278,6 +304,24 @@ public class MapView extends BaseUIComponent {
       camera = MapMath.pan(camera, deltaX, deltaY);
       return true;
     }
+    if (button == InputConstants.MOUSE_BUTTON_LEFT && pendingLeft) {
+      if (!leftDragging) {
+        double dx = click.x() - pressX;
+        double dy = click.y() - pressY;
+        if (Math.hypot(dx, dy) <= DRAG_THRESHOLD) {
+          return true;
+        }
+        // Catch up on the movement below the threshold so the map stays under the cursor.
+        leftDragging = true;
+        camera = MapMath.pan(camera, dx, dy);
+        return true;
+      }
+      camera = MapMath.pan(camera, deltaX, deltaY);
+      return true;
+    }
+    if (button == InputConstants.MOUSE_BUTTON_LEFT && pressOwner != null) {
+      return pressOwner.onMouseDrag(this, click.x(), click.y(), button, deltaX, deltaY);
+    }
     for (MapLayer layer : layers) {
       if (layer.onMouseDrag(this, click.x(), click.y(), button, deltaX, deltaY)) {
         return true;
@@ -291,8 +335,39 @@ public class MapView extends BaseUIComponent {
     if (!interactive) {
       return false;
     }
+    int button = click.button();
+    if (button == InputConstants.MOUSE_BUTTON_LEFT) {
+      if (pendingLeft) {
+        pendingLeft = false;
+        if (leftDragging) {
+          leftDragging = false;
+          return true;
+        }
+        dispatchDown(pressX, pressY, button);
+        dispatchUp(pressX, pressY, button);
+        return true;
+      }
+      if (pressOwner != null) {
+        MapLayer owner = pressOwner;
+        pressOwner = null;
+        owner.onMouseUp(this, click.x(), click.y(), button);
+        return true;
+      }
+    }
+    return dispatchUp(click.x(), click.y(), button);
+  }
+
+  private void dispatchDown(double relX, double relY, int button) {
     for (MapLayer layer : layers) {
-      if (layer.onMouseUp(this, click.x(), click.y(), click.button())) {
+      if (layer.onMouseDown(this, relX, relY, button)) {
+        return;
+      }
+    }
+  }
+
+  private boolean dispatchUp(double relX, double relY, int button) {
+    for (MapLayer layer : layers) {
+      if (layer.onMouseUp(this, relX, relY, button)) {
         return true;
       }
     }

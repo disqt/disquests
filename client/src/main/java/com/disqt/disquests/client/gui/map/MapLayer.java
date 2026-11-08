@@ -10,6 +10,15 @@ import net.minecraft.client.input.KeyEvent;
 public interface MapLayer {
   void draw(MapView view, OwoUIGraphics g, int mouseX, int mouseY);
 
+  /**
+   * True when this layer must get a press right away (for example a draggable handle under the
+   * cursor) instead of after release; the view then sends it the press, drags and release and does
+   * not pan.
+   */
+  default boolean wantsPress(MapView view, double relX, double relY, int button) {
+    return false;
+  }
+
   default boolean onMouseDown(MapView view, double relX, double relY, int button) {
     return false;
   }
