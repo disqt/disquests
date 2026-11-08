@@ -112,6 +112,11 @@ public class ClientSession {
     return serverProtocolVersion >= ProtocolVersion.V2;
   }
 
+  /** True when the server understands quest completion (protocol V3 or later). */
+  public static boolean supportsCompletion() {
+    return getServerProtocolVersion() >= ProtocolVersion.V3;
+  }
+
   /** The server's {@code world-map} switch from the handshake (true when the server sent none). */
   public static boolean isServerWorldMapEnabled() {
     return serverWorldMapEnabled;

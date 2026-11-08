@@ -323,14 +323,14 @@ public class QuestScreen extends DisquestsBaseScreen {
 
     // Complete (active quest) or Reopen (completed quest), for players who may edit
     ButtonComponent completeBtn = root.childById(ButtonComponent.class, "btn-complete");
-    if (canEdit && !completed) {
+    if (canEdit && !completed && ClientSession.supportsCompletion()) {
       completeBtn.setMessage(Component.translatable("gui.disquests.btn.complete"));
       completeBtn.onPress(ignored -> confirmComplete());
     } else {
       buttonRow.removeChild(completeBtn);
     }
     ButtonComponent reopenBtn = root.childById(ButtonComponent.class, "btn-reopen");
-    if (canEdit && completed) {
+    if (canEdit && completed && ClientSession.supportsCompletion()) {
       reopenBtn.setMessage(Component.translatable("gui.disquests.btn.reopen"));
       reopenBtn.onPress(ignored -> confirmReopen());
     } else {

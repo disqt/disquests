@@ -900,6 +900,57 @@ class DataManagerTest {
   }
 
   @Test
+  void migration_from07xKeepsPolygonTagsAndContributors() throws Exception {
+    Path dir = tempDir.resolve("v07x");
+    UUID id = UUID.randomUUID();
+    insertLegacyRow(dir, id, 10.0, 64.0, 20.0, 1, 30.0, 70.0, 40.0, "overworld");
+    try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + dir.resolve("disquests.db"));
+        Statement st = c.createStatement()) {
+      st.executeUpdate(
+          "CREATE TABLE quest_polygons (quest_id TEXT NOT NULL, idx INTEGER NOT NULL,"
+              + " x REAL NOT NULL, z REAL NOT NULL, PRIMARY KEY (quest_id, idx))");
+      st.executeUpdate(
+          "CREATE TABLE quest_tags (quest_id TEXT NOT NULL, tag TEXT NOT NULL,"
+              + " PRIMARY KEY (quest_id, tag))");
+      st.executeUpdate(
+          "CREATE TABLE contributors (quest_id TEXT NOT NULL, player_uuid TEXT NOT NULL,"
+              + " can_edit INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (quest_id, player_uuid))");
+      st.executeUpdate("INSERT INTO quest_polygons VALUES ('" + id + "', 0, 1.0, 2.0)");
+      st.executeUpdate("INSERT INTO quest_polygons VALUES ('" + id + "', 1, 5.0, 2.0)");
+      st.executeUpdate("INSERT INTO quest_polygons VALUES ('" + id + "', 2, 5.0, 8.0)");
+      st.executeUpdate("INSERT INTO quest_tags VALUES ('" + id + "', 'base')");
+      st.executeUpdate("INSERT INTO quest_tags VALUES ('" + id + "', 'farm')");
+      st.executeUpdate("INSERT INTO contributors VALUES ('" + id + "', '" + PLAYER2 + "', 1)");
+    }
+    DataManager first = migrated(dir);
+    first.close();
+    DataManager second = migrated(dir);
+    try {
+      QuestData q = second.getQuest(id);
+      assertEquals(0L, q.completedAt());
+      assertFalse(q.isCompleted());
+      assertEquals(
+          List.of(new PointData(1, 2), new PointData(5, 2), new PointData(5, 8)), q.polygon());
+      assertEquals(2, q.tags().size());
+      assertTrue(q.tags().containsAll(List.of("base", "farm")));
+      List<ContributorData> contributors = second.getContributors(id);
+      assertEquals(1, contributors.size());
+      assertEquals(PLAYER2, contributors.get(0).uuid());
+      assertTrue(contributors.get(0).canEdit());
+    } finally {
+      second.close();
+    }
+    try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + dir.resolve("disquests.db"));
+        Statement st = c.createStatement();
+        java.sql.ResultSet rs = st.executeQuery("PRAGMA table_info(quests)")) {
+      java.util.Set<String> cols = new java.util.HashSet<>();
+      while (rs.next()) cols.add(rs.getString("name"));
+      assertTrue(cols.contains("completed_at"));
+      assertTrue(cols.contains("completed_by"));
+    }
+  }
+
+  @Test
   void migration_unlocatedUntouched() throws Exception {
     Path dir = tempDir.resolve("legacy");
     UUID id = UUID.randomUUID();

@@ -143,6 +143,14 @@ public class MainScreen extends DisquestsBaseScreen {
     this.tabQuestBoard = root.childById(ButtonComponent.class, "tab-quest-board");
     this.tabArchived = root.childById(ButtonComponent.class, "tab-archived");
     this.tabRow = root.childById(FlowLayout.class, "tab-row");
+    if (!ClientSession.supportsCompletion()) {
+      // An older server cannot archive quests: drop the tab (removed by id, not parent())
+      tabRow.removeChild(tabArchived);
+      if (currentTab == ClientSession.Tab.ARCHIVED) {
+        currentTab = ClientSession.Tab.MY_QUESTS;
+        ClientSession.setActiveTab(currentTab);
+      }
+    }
     // parent() is only set once the tree is mounted, so look the holder up by id.
     this.tabsParent = mapMode ? root.childById(FlowLayout.class, "side-panel") : root;
     this.filterRow = root.childById(FlowLayout.class, "filter-row");
@@ -471,7 +479,7 @@ public class MainScreen extends DisquestsBaseScreen {
     selectedEntry = entry;
     updateActionButtons();
     Quest quest = entry.getQuest();
-    if (mapView != null && quest.hasLocation()) {
+    if (mapView != null && quest.hasLocation() && !quest.isCompleted()) {
       if (quest.getMap() != null) {
         selectDimension(quest.getMap());
       }

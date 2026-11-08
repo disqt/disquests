@@ -539,6 +539,24 @@ class ServerPacketHandlerTest {
   }
 
   @Test
+  void reopen_ofPrivateQuest_notifiesOnlyParticipants() {
+    UUID id = seedQuest(Visibility.PRIVATE);
+    dm.addContributor(id, CONTRIBUTOR, true);
+    dm.completeQuest(id, OWNER, 5000L);
+    register(ownerPlayer, ProtocolVersion.V3);
+    register(contributorPlayer, ProtocolVersion.V3);
+    register(bystanderPlayer, ProtocolVersion.V3);
+    clearInvocations(ownerPlayer, contributorPlayer, bystanderPlayer);
+
+    reopen(ownerPlayer, id);
+
+    Assertions.assertFalse(dm.getQuest(id).isCompleted());
+    Assertions.assertFalse(onlyUpdate(ownerPlayer, ProtocolVersion.V3).isCompleted());
+    Assertions.assertFalse(onlyUpdate(contributorPlayer, ProtocolVersion.V3).isCompleted());
+    verify(bystanderPlayer, never()).sendPluginMessage(any(), any(), any());
+  }
+
+  @Test
   void reopen_byDemotedContributor_isRefused() {
     UUID id = seedQuest(Visibility.OPEN);
     dm.addContributor(id, CONTRIBUTOR, true);
