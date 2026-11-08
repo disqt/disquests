@@ -14,8 +14,9 @@ import net.minecraft.network.chat.Component;
 
 /**
  * Edits a quest outline on the map: left-click adds a corner or grabs one to drag, right-click
- * removes the last corner, Enter or a click on the first corner finishes. Zero corners means
- * "clear", one is a pin, two or more are an outline (three or more must not cross itself).
+ * removes the last corner, Enter or a click (press and release without moving) on the first of
+ * three or more corners finishes. Zero corners means "clear", one is a pin, two or more are an
+ * outline (three or more must not cross itself).
  *
  * <p>In {@linkplain #moveOnly(boolean) move-only mode} (the quest editor's preview) the layer only
  * drags existing corners: no adding, removing or finishing, and a drag that would make the outline
@@ -33,6 +34,7 @@ public class PolygonEditLayer implements MapLayer {
   private String notice;
   private int dragging = -1;
   private PointData dragStart;
+  private boolean dragMoved;
   private boolean finished;
   private boolean moveOnly;
 
@@ -116,13 +118,11 @@ public class PolygonEditLayer implements MapLayer {
       notice = null;
     }
     int hit = hitVertex(view, relX, relY);
-    if (!moveOnly && hit == 0 && vertices.size() >= 3) {
-      tryFinish();
-      return true;
-    }
     if (hit >= 0) {
+      // Every corner drags; a release on the first one without moving finishes (onMouseUp).
       dragging = hit;
       dragStart = vertices.get(hit);
+      dragMoved = false;
       return true;
     }
     if (moveOnly) {
@@ -154,6 +154,7 @@ public class PolygonEditLayer implements MapLayer {
     PointData moved = blockAt(view, relX, relY);
     if (!moved.equals(vertices.get(dragging))) {
       vertices.set(dragging, moved);
+      dragMoved = true;
       changed();
     }
     return true;
@@ -166,6 +167,12 @@ public class PolygonEditLayer implements MapLayer {
     }
     int released = dragging;
     dragging = -1;
+    if (!dragMoved) {
+      if (!moveOnly && released == 0 && vertices.size() >= 3) {
+        tryFinish();
+      }
+      return true;
+    }
     if (vertices.get(released).equals(dragStart)) {
       return true;
     }
