@@ -142,6 +142,10 @@ public class ClientPacketHandler {
       ClientCache.addOrUpdateServerQuest(quest);
       ClientCache.removeFromMyQuests(quest.getId());
     }
+    if (quest.isCompleted()) {
+      // Completed quests leave the HUD; the server drops the pin as well.
+      ClientSession.removePinnedQuest(quest.getId());
+    }
 
     // Refresh the current screen if it shows the updated quest
     Minecraft client = Minecraft.getInstance();
@@ -150,8 +154,10 @@ public class ClientPacketHandler {
     } else if (client.gui.screen() instanceof QuestScreen questScreen
         && !questScreen.isEditing()
         && questScreen.getQuest().getId().equals(quest.getId())
-        && !java.util.Objects.equals(questScreen.getQuest().getContent(), quest.getContent())) {
+        && (!java.util.Objects.equals(questScreen.getQuest().getContent(), quest.getContent())
+            || questScreen.getQuest().getCompletedAt() != quest.getCompletedAt())) {
       // Re-open view mode when content changed (e.g. server resolved wiki-link UUIDs)
+      // or the quest was completed/reopened, so the buttons match its state
       client.gui.setScreen(new QuestScreen(questScreen.getParentScreen(), quest));
     }
     if (justJoined) {

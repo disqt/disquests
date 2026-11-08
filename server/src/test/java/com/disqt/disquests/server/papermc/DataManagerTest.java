@@ -900,6 +900,57 @@ class DataManagerTest {
   }
 
   @Test
+  void migration_from07xKeepsPolygonTagsAndContributors() throws Exception {
+    Path dir = tempDir.resolve("v07x");
+    UUID id = UUID.randomUUID();
+    insertLegacyRow(dir, id, 10.0, 64.0, 20.0, 1, 30.0, 70.0, 40.0, "overworld");
+    try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + dir.resolve("disquests.db"));
+        Statement st = c.createStatement()) {
+      st.executeUpdate(
+          "CREATE TABLE quest_polygons (quest_id TEXT NOT NULL, idx INTEGER NOT NULL,"
+              + " x REAL NOT NULL, z REAL NOT NULL, PRIMARY KEY (quest_id, idx))");
+      st.executeUpdate(
+          "CREATE TABLE quest_tags (quest_id TEXT NOT NULL, tag TEXT NOT NULL,"
+              + " PRIMARY KEY (quest_id, tag))");
+      st.executeUpdate(
+          "CREATE TABLE contributors (quest_id TEXT NOT NULL, player_uuid TEXT NOT NULL,"
+              + " can_edit INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (quest_id, player_uuid))");
+      st.executeUpdate("INSERT INTO quest_polygons VALUES ('" + id + "', 0, 1.0, 2.0)");
+      st.executeUpdate("INSERT INTO quest_polygons VALUES ('" + id + "', 1, 5.0, 2.0)");
+      st.executeUpdate("INSERT INTO quest_polygons VALUES ('" + id + "', 2, 5.0, 8.0)");
+      st.executeUpdate("INSERT INTO quest_tags VALUES ('" + id + "', 'base')");
+      st.executeUpdate("INSERT INTO quest_tags VALUES ('" + id + "', 'farm')");
+      st.executeUpdate("INSERT INTO contributors VALUES ('" + id + "', '" + PLAYER2 + "', 1)");
+    }
+    DataManager first = migrated(dir);
+    first.close();
+    DataManager second = migrated(dir);
+    try {
+      QuestData q = second.getQuest(id);
+      assertEquals(0L, q.completedAt());
+      assertFalse(q.isCompleted());
+      assertEquals(
+          List.of(new PointData(1, 2), new PointData(5, 2), new PointData(5, 8)), q.polygon());
+      assertEquals(2, q.tags().size());
+      assertTrue(q.tags().containsAll(List.of("base", "farm")));
+      List<ContributorData> contributors = second.getContributors(id);
+      assertEquals(1, contributors.size());
+      assertEquals(PLAYER2, contributors.get(0).uuid());
+      assertTrue(contributors.get(0).canEdit());
+    } finally {
+      second.close();
+    }
+    try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + dir.resolve("disquests.db"));
+        Statement st = c.createStatement();
+        java.sql.ResultSet rs = st.executeQuery("PRAGMA table_info(quests)")) {
+      java.util.Set<String> cols = new java.util.HashSet<>();
+      while (rs.next()) cols.add(rs.getString("name"));
+      assertTrue(cols.contains("completed_at"));
+      assertTrue(cols.contains("completed_by"));
+    }
+  }
+
+  @Test
   void migration_unlocatedUntouched() throws Exception {
     Path dir = tempDir.resolve("legacy");
     UUID id = UUID.randomUUID();
@@ -1106,5 +1157,118 @@ class DataManagerTest {
 
     assertEquals(before, dm.getQuest(id));
     assertEquals(3, dm.countPolygonRows());
+  }
+
+  // -------------------------------------------------------------------------
+  // Completion
+  // -------------------------------------------------------------------------
+
+  private static java.util.Set<String> questColumns(Path dir) throws Exception {
+    java.util.Set<String> cols = new java.util.HashSet<>();
+    try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + dir.resolve("disquests.db"));
+        Statement st = c.createStatement();
+        java.sql.ResultSet rs = st.executeQuery("PRAGMA table_info(quests)")) {
+      while (rs.next()) cols.add(rs.getString("name"));
+    }
+    return cols;
+  }
+
+  @Test
+  void migration_addsCompletionColumns_idempotent() throws Exception {
+    Path dir = tempDir.resolve("legacy");
+    UUID id = UUID.randomUUID();
+    insertLegacyRow(dir, id, 10.0, 64.0, 20.0, 0, null, null, null, "overworld");
+    migrated(dir).close();
+    DataManager second = migrated(dir);
+    try {
+      assertTrue(questColumns(dir).containsAll(java.util.Set.of("completed_at", "completed_by")));
+      QuestData q = second.getQuest(id);
+      assertEquals(0L, q.completedAt());
+      assertNull(q.completedBy());
+      assertFalse(q.isCompleted());
+    } finally {
+      second.close();
+    }
+  }
+
+  @Test
+  void completeQuest_setsFieldsAndName() {
+    UUID id = UUID.randomUUID();
+    dm.upsertPlayerName(OWNER, "Alice");
+    dm.saveQuest(makeQuest(id, OWNER, "Q", Visibility.OPEN));
+    dm.completeQuest(id, OWNER, 5000L);
+    QuestData q = dm.getQuest(id);
+    assertEquals(5000L, q.completedAt());
+    assertEquals(OWNER, q.completedBy());
+    assertEquals("Alice", q.completedByName());
+    assertTrue(q.isCompleted());
+  }
+
+  @Test
+  void complete_removesPins() {
+    UUID id = UUID.randomUUID();
+    dm.saveQuest(makeQuest(id, OWNER, "Q", Visibility.OPEN));
+    dm.pinQuest(OWNER, id);
+    dm.pinQuest(PLAYER2, id);
+    dm.completeQuest(id, OWNER, 5000L);
+    assertFalse(dm.isQuestPinned(OWNER, id));
+    assertFalse(dm.isQuestPinned(PLAYER2, id));
+  }
+
+  @Test
+  void complete_deletesPendingRequests() {
+    UUID id = UUID.randomUUID();
+    dm.saveQuest(makeQuest(id, OWNER, "Q", Visibility.OPEN));
+    dm.createCollaborationRequest(id, PLAYER2);
+    assertEquals(1, dm.getPendingRequestCount(OWNER));
+    dm.completeQuest(id, OWNER, 5000L);
+    assertEquals(0, dm.getPendingRequestCount(OWNER));
+  }
+
+  @Test
+  void reopenQuest_clearsCompletion() {
+    UUID id = UUID.randomUUID();
+    dm.saveQuest(makeQuest(id, OWNER, "Q", Visibility.OPEN));
+    dm.completeQuest(id, OWNER, 5000L);
+    dm.reopenQuest(id);
+    QuestData q = dm.getQuest(id);
+    assertEquals(0L, q.completedAt());
+    assertNull(q.completedBy());
+    assertNull(q.completedByName());
+  }
+
+  @Test
+  void getServerQuests_excludesCompleted() {
+    UUID open = UUID.randomUUID();
+    UUID done = UUID.randomUUID();
+    dm.saveQuest(makeQuest(open, OWNER, "Open", Visibility.OPEN));
+    dm.saveQuest(makeQuest(done, OWNER, "Done", Visibility.OPEN));
+    dm.completeQuest(done, OWNER, 5000L);
+    List<UUID> ids = dm.getServerQuests(PLAYER3).stream().map(QuestData::id).toList();
+    assertEquals(List.of(open), ids);
+  }
+
+  @Test
+  void getQuestsForPlayer_includesCompleted() {
+    UUID done = UUID.randomUUID();
+    dm.upsertPlayerName(OWNER, "Alice");
+    dm.saveQuest(makeQuest(done, OWNER, "Done", Visibility.PRIVATE));
+    dm.completeQuest(done, OWNER, 5000L);
+    List<QuestData> quests = dm.getQuestsForPlayer(OWNER);
+    assertEquals(1, quests.size());
+    assertEquals(5000L, quests.get(0).completedAt());
+    assertEquals("Alice", quests.get(0).completedByName());
+  }
+
+  @Test
+  void saveQuest_preservesCompletion() {
+    UUID id = UUID.randomUUID();
+    dm.saveQuest(makeQuest(id, OWNER, "Q", Visibility.OPEN));
+    dm.completeQuest(id, OWNER, 5000L);
+    dm.saveQuest(makeQuest(id, OWNER, "Q edited", Visibility.OPEN));
+    QuestData q = dm.getQuest(id);
+    assertEquals("Q edited", q.title());
+    assertEquals(5000L, q.completedAt());
+    assertEquals(OWNER, q.completedBy());
   }
 }

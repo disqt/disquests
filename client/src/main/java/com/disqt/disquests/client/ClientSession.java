@@ -16,7 +16,8 @@ public class ClientSession {
 
   public enum Tab {
     MY_QUESTS,
-    SERVER_QUESTS
+    SERVER_QUESTS,
+    ARCHIVED
   }
 
   public enum QuestFilter {
@@ -111,6 +112,11 @@ public class ClientSession {
     return serverProtocolVersion >= ProtocolVersion.V2;
   }
 
+  /** True when the server understands quest completion (protocol V3 or later). */
+  public static boolean supportsCompletion() {
+    return getServerProtocolVersion() >= ProtocolVersion.V3;
+  }
+
   /** The server's {@code world-map} switch from the handshake (true when the server sent none). */
   public static boolean isServerWorldMapEnabled() {
     return serverWorldMapEnabled;
@@ -159,11 +165,12 @@ public class ClientSession {
    * Only the last term changes during a session, and only from true to false.
    */
   public static boolean mapAvailable() {
-    return supportsMap()
-        && serverWorldMapEnabled
-        && DisquestsClient.CONFIG.worldMap()
-        && hasBluemap()
-        && !mapUnreachable();
+    return mapAvailableIgnoringSetting() && DisquestsClient.CONFIG.worldMap();
+  }
+
+  /** Whether the map would be available if the player's {@code worldMap} setting were on. */
+  public static boolean mapAvailableIgnoringSetting() {
+    return supportsMap() && serverWorldMapEnabled && hasBluemap() && !mapUnreachable();
   }
 
   /** True once the BlueMap settings probe for the default map has failed. */

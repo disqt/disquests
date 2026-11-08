@@ -24,7 +24,7 @@
 
                     <flow-layout direction="horizontal" id="map-toolbar">
                         <sizing>
-                            <horizontal method="content"/>
+                            <horizontal method="fill">100</horizontal>
                             <vertical method="content"/>
                         </sizing>
                         <gap>4</gap>
@@ -33,25 +33,12 @@
                         </padding>
                         <vertical-alignment>center</vertical-alignment>
                         <children>
-                            <!-- Button and label texts are set from lang keys in MainScreen -->
-                            <button id="btn-dim-overworld">
+                            <!-- Button texts and tooltips are set from lang keys in MainScreen.
+                                 The dimension buttons live in the dimension-menu popup, built in code. -->
+                            <button id="btn-dimension">
                                 <text>Overworld</text>
                                 <sizing>
-                                    <horizontal method="fixed">60</horizontal>
-                                    <vertical method="fixed">14</vertical>
-                                </sizing>
-                            </button>
-                            <button id="btn-dim-the_nether">
-                                <text>Nether</text>
-                                <sizing>
-                                    <horizontal method="fixed">60</horizontal>
-                                    <vertical method="fixed">14</vertical>
-                                </sizing>
-                            </button>
-                            <button id="btn-dim-the_end">
-                                <text>End</text>
-                                <sizing>
-                                    <horizontal method="fixed">60</horizontal>
+                                    <horizontal method="content"/>
                                     <vertical method="fixed">14</vertical>
                                 </sizing>
                             </button>
@@ -62,18 +49,32 @@
                                     <vertical method="fixed">14</vertical>
                                 </sizing>
                             </button>
-                            <label id="zoom-label">
-                                <text>Zoom</text>
-                                <shadow>true</shadow>
+                            <button id="btn-zoom-out">
+                                <text>−</text>
                                 <sizing>
-                                    <horizontal method="content"/>
-                                    <vertical method="content"/>
+                                    <horizontal method="fixed">14</horizontal>
+                                    <vertical method="fixed">14</vertical>
                                 </sizing>
-                            </label>
+                            </button>
+                            <button id="btn-zoom-in">
+                                <text>+</text>
+                                <sizing>
+                                    <horizontal method="fixed">14</horizontal>
+                                    <vertical method="fixed">14</vertical>
+                                </sizing>
+                            </button>
+                            <!-- Spacer: pushes the List toggle to the right edge of the map area -->
+                            <flow-layout direction="horizontal" id="map-toolbar-spacer">
+                                <sizing>
+                                    <horizontal method="expand">100</horizontal>
+                                    <vertical method="fixed">1</vertical>
+                                </sizing>
+                                <children/>
+                            </flow-layout>
                             <button id="btn-toggle-list">
                                 <text>List</text>
                                 <sizing>
-                                    <horizontal method="fixed">40</horizontal>
+                                    <horizontal method="content"/>
                                     <vertical method="fixed">14</vertical>
                                 </sizing>
                             </button>
@@ -96,7 +97,7 @@
                  Its width is set from the config and the panel-divider drag in MainScreen. -->
             <flow-layout direction="vertical" id="side-panel">
                 <sizing>
-                    <horizontal method="fixed">180</horizontal>
+                    <horizontal method="fixed">216</horizontal>
                     <vertical method="fill">100</vertical>
                 </sizing>
                 <surface>
@@ -137,16 +138,27 @@
                                     <left>4</left>
                                 </margins>
                             </label>
+                            <button id="btn-toggle-map">
+                                <text>Map</text>
+                                <sizing>
+                                    <horizontal method="content"/>
+                                    <vertical method="fixed">20</vertical>
+                                </sizing>
+                                <margins>
+                                    <left>4</left>
+                                </margins>
+                            </button>
                         </children>
                     </flow-layout>
 
-                    <!-- Tab row -->
+                    <!-- Tab row: tabs share the row width; MainScreen sets each one's expand
+                         percentage from the number of tabs present -->
                     <flow-layout direction="horizontal" id="tab-row">
                         <sizing>
-                            <horizontal method="content"/>
+                            <horizontal method="fill">100</horizontal>
                             <vertical method="content"/>
                         </sizing>
-                        <gap>4</gap>
+                        <gap>2</gap>
                         <margins>
                             <bottom>2</bottom>
                         </margins>
@@ -154,14 +166,22 @@
                             <button id="tab-my-quests">
                                 <text>My Quests</text>
                                 <sizing>
-                                    <horizontal method="fixed">80</horizontal>
+                                    <horizontal method="expand">33</horizontal>
                                     <vertical method="fixed">20</vertical>
                                 </sizing>
                             </button>
                             <button id="tab-quest-board">
                                 <text>Quest Board</text>
                                 <sizing>
-                                    <horizontal method="fixed">80</horizontal>
+                                    <horizontal method="expand">33</horizontal>
+                                    <vertical method="fixed">20</vertical>
+                                </sizing>
+                            </button>
+                            <!-- Text set from a lang key in MainScreen -->
+                            <button id="tab-archived">
+                                <text>Archived</text>
+                                <sizing>
+                                    <horizontal method="expand">33</horizontal>
                                     <vertical method="fixed">20</vertical>
                                 </sizing>
                             </button>
@@ -240,7 +260,7 @@
                     <!-- Action button row -->
                     <flow-layout direction="horizontal" id="action-row">
                         <sizing>
-                            <horizontal method="content"/>
+                            <horizontal method="fill">100</horizontal>
                             <vertical method="content"/>
                         </sizing>
                         <gap>4</gap>
@@ -251,21 +271,21 @@
                             <button id="btn-new-quest">
                                 <text>New Quest</text>
                                 <sizing>
-                                    <horizontal method="fixed">70</horizontal>
+                                    <horizontal method="expand">33</horizontal>
                                     <vertical method="fixed">20</vertical>
                                 </sizing>
                             </button>
                             <button id="btn-interact">
                                 <text>Join</text>
                                 <sizing>
-                                    <horizontal method="fixed">70</horizontal>
+                                    <horizontal method="expand">33</horizontal>
                                     <vertical method="fixed">20</vertical>
                                 </sizing>
                             </button>
                             <button id="btn-open">
                                 <text>Open</text>
                                 <sizing>
-                                    <horizontal method="fixed">70</horizontal>
+                                    <horizontal method="expand">33</horizontal>
                                     <vertical method="fixed">20</vertical>
                                 </sizing>
                             </button>

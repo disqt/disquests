@@ -10,8 +10,11 @@ public final class ProtocolVersion {
   /** Polygon protocol. Adds an optional polygon vertex list to quests. */
   public static final int V2 = 2;
 
+  /** Completion protocol. Adds completedAt, completedBy and completedByName to quests. */
+  public static final int V3 = 3;
+
   /** The current protocol version this build speaks. */
-  public static final int CURRENT = V2;
+  public static final int CURRENT = V3;
 
   private ProtocolVersion() {}
 }

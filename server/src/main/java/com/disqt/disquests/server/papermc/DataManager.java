@@ -56,6 +56,7 @@ public class DataManager {
       boolean polygonsTableExisted = tableExists("quest_polygons");
       createTables();
       migratePinnedQuests();
+      migrateCompletion();
       if (!polygonsTableExisted) {
         migrateLocations(defaultMap);
       }
@@ -82,7 +83,9 @@ public class DataManager {
                         coord2_y REAL,
                         coord2_z REAL,
                         map TEXT,
-                        last_modified INTEGER NOT NULL
+                        last_modified INTEGER NOT NULL,
+                        completed_at INTEGER NOT NULL DEFAULT 0,
+                        completed_by TEXT
                     )""");
 
       stmt.executeUpdate(
@@ -265,7 +268,7 @@ public class DataManager {
   public synchronized QuestData getQuest(UUID id) {
     try (PreparedStatement stmt =
         connection.prepareStatement(
-            "SELECT q.*, pn.name as owner_name FROM quests q LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid WHERE q.id = ?")) {
+            "SELECT q.*, pn.name as owner_name, cn.name as completed_by_name FROM quests q LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid LEFT JOIN player_names cn ON q.completed_by = cn.uuid WHERE q.id = ?")) {
       stmt.setString(1, id.toString());
       ResultSet rs = stmt.executeQuery();
       if (rs.next()) {
@@ -283,8 +286,8 @@ public class DataManager {
     try (PreparedStatement stmt =
         connection.prepareStatement(
             """
-                SELECT q.*, pn.name as owner_name FROM quests q
-                LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid
+                SELECT q.*, pn.name as owner_name, cn.name as completed_by_name FROM quests q
+                LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid LEFT JOIN player_names cn ON q.completed_by = cn.uuid
                 WHERE q.owner_uuid = ?
                    OR q.id IN (SELECT quest_id FROM contributors WHERE player_uuid = ?)
                 """)) {
@@ -305,9 +308,10 @@ public class DataManager {
     try (PreparedStatement stmt =
         connection.prepareStatement(
             """
-                SELECT q.*, pn.name as owner_name FROM quests q
-                LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid
+                SELECT q.*, pn.name as owner_name, cn.name as completed_by_name FROM quests q
+                LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid LEFT JOIN player_names cn ON q.completed_by = cn.uuid
                 WHERE q.visibility IN ('OPEN', 'CLOSED')
+                  AND q.completed_at = 0
                   AND q.owner_uuid != ?
                   AND q.id NOT IN (SELECT quest_id FROM contributors WHERE player_uuid = ?)
                 """)) {
@@ -329,8 +333,8 @@ public class DataManager {
     String placeholders = titles.stream().map(t -> "?").collect(Collectors.joining(","));
     try (PreparedStatement stmt =
         connection.prepareStatement(
-            "SELECT q.*, pn.name as owner_name FROM quests q "
-                + "LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid "
+            "SELECT q.*, pn.name as owner_name, cn.name as completed_by_name FROM quests q "
+                + "LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid LEFT JOIN player_names cn ON q.completed_by = cn.uuid "
                 + "WHERE LOWER(q.title) IN ("
                 + placeholders
                 + ")")) {
@@ -749,6 +753,82 @@ public class DataManager {
     }
   }
 
+  /** Adds the completion columns to databases created before quest completion existed. */
+  private void migrateCompletion() throws SQLException {
+    boolean hasCompletedAt = false;
+    boolean hasCompletedBy = false;
+    try (Statement stmt = connection.createStatement();
+        ResultSet rs = stmt.executeQuery("PRAGMA table_info(quests)")) {
+      while (rs.next()) {
+        String name = rs.getString("name");
+        if ("completed_at".equals(name)) hasCompletedAt = true;
+        if ("completed_by".equals(name)) hasCompletedBy = true;
+      }
+    }
+    if (hasCompletedAt && hasCompletedBy) return;
+    connection.setAutoCommit(false);
+    try (Statement stmt = connection.createStatement()) {
+      if (!hasCompletedAt) {
+        stmt.executeUpdate("ALTER TABLE quests ADD COLUMN completed_at INTEGER NOT NULL DEFAULT 0");
+      }
+      if (!hasCompletedBy) {
+        stmt.executeUpdate("ALTER TABLE quests ADD COLUMN completed_by TEXT");
+      }
+      connection.commit();
+    } catch (SQLException e) {
+      connection.rollback();
+      throw e;
+    } finally {
+      connection.setAutoCommit(true);
+    }
+  }
+
+  /**
+   * Marks a quest completed and drops its pins and pending collaboration requests in one
+   * transaction.
+   */
+  public synchronized void completeQuest(UUID questId, UUID completedBy, long completedAt) {
+    try {
+      connection.setAutoCommit(false);
+      try (PreparedStatement upd =
+              connection.prepareStatement(
+                  "UPDATE quests SET completed_at = ?, completed_by = ? WHERE id = ?");
+          PreparedStatement pins =
+              connection.prepareStatement("DELETE FROM pinned_quests WHERE quest_id = ?");
+          PreparedStatement reqs =
+              connection.prepareStatement(
+                  "DELETE FROM collaboration_requests WHERE quest_id = ?")) {
+        upd.setLong(1, completedAt);
+        upd.setString(2, completedBy.toString());
+        upd.setString(3, questId.toString());
+        upd.executeUpdate();
+        pins.setString(1, questId.toString());
+        pins.executeUpdate();
+        reqs.setString(1, questId.toString());
+        reqs.executeUpdate();
+        connection.commit();
+      } catch (SQLException e) {
+        connection.rollback();
+        throw e;
+      } finally {
+        connection.setAutoCommit(true);
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to complete quest", e);
+    }
+  }
+
+  public synchronized void reopenQuest(UUID questId) {
+    try (PreparedStatement stmt =
+        connection.prepareStatement(
+            "UPDATE quests SET completed_at = 0, completed_by = NULL WHERE id = ?")) {
+      stmt.setString(1, questId.toString());
+      stmt.executeUpdate();
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to reopen quest", e);
+    }
+  }
+
   private boolean tableExists(String table) throws SQLException {
     try (Statement stmt = connection.createStatement();
         ResultSet rs = stmt.executeQuery("PRAGMA table_info(" + table + ")")) {
@@ -836,6 +916,7 @@ public class DataManager {
                 rs.getDouble("coord2_x"), rs.getDouble("coord2_y"), rs.getDouble("coord2_z"))
             : null;
 
+    String completedBy = rs.getString("completed_by");
     return new QuestData(
         UUID.fromString(rs.getString("id")),
         rs.getString("title"),
@@ -849,7 +930,11 @@ public class DataManager {
         rs.getInt("is_region") != 0,
         coords2,
         rs.getString("map"),
-        List.of());
+        List.of(),
+        List.of(),
+        rs.getLong("completed_at"),
+        completedBy == null ? null : UUID.fromString(completedBy),
+        rs.getString("completed_by_name"));
   }
 
   private QuestData withContributors(QuestData quest) {

@@ -195,6 +195,20 @@ public final class PacketCodec {
     return buf.toByteArray();
   }
 
+  public static byte[] writeCompleteQuest(UUID questId) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.COMPLETE_QUEST.getId());
+    buf.writeUUID(questId);
+    return buf.toByteArray();
+  }
+
+  public static byte[] writeReopenQuest(UUID questId) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.REOPEN_QUEST.getId());
+    buf.writeUUID(questId);
+    return buf.toByteArray();
+  }
+
   public static byte[] writeLeaveQuest(UUID questId) {
     ByteBufWriter w = new ByteBufWriter();
     w.writeByte(PacketType.LEAVE_QUEST.getId());
@@ -487,6 +501,11 @@ public final class PacketCodec {
     if (protocolVersion >= ProtocolVersion.V2) {
       writePolygon(buf, quest.polygon());
     }
+    if (protocolVersion >= ProtocolVersion.V3) {
+      buf.writeLong(quest.completedAt());
+      writeNullableUUID(buf, quest.completedBy());
+      writeNullableString(buf, quest.completedByName());
+    }
   }
 
   public static QuestData readQuest(ByteBufReader buf) {
@@ -528,6 +547,14 @@ public final class PacketCodec {
       tags = List.of();
     }
     List<PointData> polygon = protocolVersion >= ProtocolVersion.V2 ? readPolygon(buf) : List.of();
+    long completedAt = 0L;
+    UUID completedBy = null;
+    String completedByName = null;
+    if (protocolVersion >= ProtocolVersion.V3) {
+      completedAt = buf.readLong();
+      completedBy = readNullableUUID(buf);
+      completedByName = readNullableString(buf);
+    }
     return new QuestData(
         id,
         title,
@@ -542,7 +569,10 @@ public final class PacketCodec {
         coordinates2,
         map,
         tags,
-        polygon);
+        polygon,
+        completedAt,
+        completedBy,
+        completedByName);
   }
 
   // ---- SYNC_TAGS ----
@@ -637,6 +667,14 @@ public final class PacketCodec {
 
   public static UUID readPinQuest(ByteBufReader buf) {
     return readNullableUUID(buf);
+  }
+
+  public static UUID readCompleteQuest(ByteBufReader buf) {
+    return buf.readUUID();
+  }
+
+  public static UUID readReopenQuest(ByteBufReader buf) {
+    return buf.readUUID();
   }
 
   public static UUID readLeaveQuest(ByteBufReader r) {

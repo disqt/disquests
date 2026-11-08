@@ -275,8 +275,14 @@ class MapBoardJourney {
     given("the map shows the Map Quest");
     context.waitFor(MapBoardJourney::hitsMapQuest, TIMEOUT);
 
-    when("player selects The End");
+    when("player opens the dimension menu and selects The End");
+    click(context, "btn-dimension");
+    waitForComponent(context, "dimension-menu");
     click(context, "btn-dim-the_end");
+    then("the menu closes");
+    assertNull(
+        findComponentOrNull(context, FlowLayout.class, "dimension-menu"),
+        "dimension menu should close after a choice");
     then("the map shows the_end and the overworld triangle is gone");
     MapView view = mapView(context);
     assertEquals("the_end", context.computeOnClient(c -> view.getDimension()), "map dimension");

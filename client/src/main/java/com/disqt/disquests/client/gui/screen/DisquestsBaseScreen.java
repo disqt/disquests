@@ -16,6 +16,7 @@ import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
 import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
 import java.util.UUID;
+import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
@@ -48,10 +49,36 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   public sealed interface NavEntry {
     record QuestNav(UUID questId, boolean editing) implements NavEntry {}
 
-    record MainNav(boolean serverTab, String searchTerm) implements NavEntry {}
+    record MainNav(ClientSession.Tab tab, String searchTerm) implements NavEntry {}
   }
 
   public abstract NavEntry toNavEntry();
+
+  private static final SystemToast.SystemToastId ARCHIVED_TOAST =
+      new SystemToast.SystemToastId(8000L);
+
+  /**
+   * The cached quest when it was completed after this screen took its copy, else null. Screens that
+   * edit a stale copy check this before writing: the server silently drops edits to archived quests
+   * and sends no correction, so writing the copy to the cache would show the quest as active again.
+   */
+  @Nullable
+  protected static Quest archivedMeanwhile(UUID questId) {
+    Quest cached = ClientCache.getQuestById(questId);
+    return cached != null && cached.isCompleted() ? cached : null;
+  }
+
+  /** Tells the player their edit was dropped and shows the archived quest instead. */
+  protected void showArchivedInstead(@Nullable Screen viewParent, Quest archived) {
+    if (this.minecraft != null) {
+      SystemToast.add(
+          this.minecraft.gui.toastManager(),
+          ARCHIVED_TOAST,
+          Component.literal("Disquests"),
+          Component.translatable("gui.disquests.toast.quest_archived"));
+    }
+    navigateToScreen(new QuestScreen(viewParent, archived));
+  }
 
   @Nullable
   private Screen rebuildFromEntry(NavEntry entry) {
@@ -60,8 +87,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
       if (quest == null) return null;
       return new QuestScreen(this.parent, quest, qn.editing());
     } else if (entry instanceof NavEntry.MainNav mn) {
-      ClientSession.setActiveTab(
-          mn.serverTab() ? ClientSession.Tab.SERVER_QUESTS : ClientSession.Tab.MY_QUESTS);
+      ClientSession.setActiveTab(mn.tab());
       ClientSession.setSearchTerm(mn.searchTerm());
       return new MainScreen(this.parent);
     }

@@ -5,7 +5,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.PointData;
+import com.disqt.disquests.common.model.QuestData;
+import com.disqt.disquests.common.model.Visibility;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class QuestListOrderTest {
@@ -52,11 +55,54 @@ class QuestListOrderTest {
   }
 
   @Test
-  void clampPanelWidth_between180And60PercentOfScreen() {
-    assertEquals(180, QuestListOrder.clampPanelWidth(100, 1000));
+  void clampPanelWidth_between216And60PercentOfScreen() {
+    assertEquals(216, QuestListOrder.clampPanelWidth(100, 1000));
     assertEquals(400, QuestListOrder.clampPanelWidth(400, 1000));
     assertEquals(600, QuestListOrder.clampPanelWidth(900, 1000));
     // Narrow screens never go below the minimum.
-    assertEquals(180, QuestListOrder.clampPanelWidth(500, 200));
+    assertEquals(216, QuestListOrder.clampPanelWidth(500, 200));
+  }
+
+  private static Quest completed(String title, long completedAt) {
+    return Quest.fromNetwork(
+        new QuestData(
+                UUID.randomUUID(),
+                title,
+                "",
+                UUID.randomUUID(),
+                "Owner",
+                Visibility.OPEN,
+                List.of(),
+                0L,
+                null,
+                false,
+                null,
+                null,
+                List.of(),
+                List.of())
+            .withCompletion(completedAt, UUID.randomUUID(), "Completer"));
+  }
+
+  @Test
+  void archived_onlyCompleted_newestFirst() {
+    Quest active = quest("active");
+    Quest older = completed("older", 100L);
+    Quest newest = completed("newest", 300L);
+    Quest middle = completed("middle", 200L);
+
+    assertEquals(
+        List.of(newest, middle, older),
+        QuestListOrder.archived(List.of(older, active, newest, middle)));
+    assertEquals(List.of(), QuestListOrder.archived(List.of(active)));
+  }
+
+  @Test
+  void active_dropsCompleted() {
+    Quest a = quest("a");
+    Quest done = completed("done", 100L);
+    Quest b = pin("b");
+
+    assertEquals(List.of(a, b), QuestListOrder.active(List.of(a, done, b)));
+    assertEquals(List.of(), QuestListOrder.active(List.of(done)));
   }
 }

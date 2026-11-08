@@ -155,8 +155,22 @@ public class ContributorScreen extends DisquestsBaseScreen {
     rebuildUi();
   }
 
+  /** True (and bounces to the archived quest) when the quest was completed meanwhile. */
+  private boolean archivedSinceOpened() {
+    Quest archived = archivedMeanwhile(quest.getId());
+    if (archived == null) return false;
+    // Skip the stale quest screen this one was opened from.
+    Screen viewParent =
+        this.parent instanceof QuestScreen questScreen
+            ? questScreen.getParentScreen()
+            : this.parent;
+    showArchivedInstead(viewParent, archived);
+    return true;
+  }
+
   private void togglePermission(int index) {
     if (index < 0 || index >= quest.getContributors().size()) return;
+    if (archivedSinceOpened()) return;
     Contributor contrib = quest.getContributors().get(index);
     boolean newCanEdit = !contrib.canEdit();
 
@@ -181,6 +195,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
     showConfirmOverlay(
         Component.translatable("gui.disquests.confirm.remove_contributor", contrib.getName()),
         () -> {
+          if (archivedSinceOpened()) return;
           PacketSender.updateContributors(
               quest.getId(),
               List.of(

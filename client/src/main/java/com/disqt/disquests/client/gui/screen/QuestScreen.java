@@ -24,14 +24,21 @@ import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.CollapsibleContainer;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.container.UIContainers;
+import io.wispforest.owo.ui.core.Color;
 import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.ParentUIComponent;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.UIComponent;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -112,7 +119,7 @@ public class QuestScreen extends DisquestsBaseScreen {
   }
 
   public boolean hasLeaveButton() {
-    return isContributor && !isOwner && !editing;
+    return isContributor && !isOwner && !editing && !quest.isCompleted();
   }
 
   @Override
@@ -197,7 +204,8 @@ public class QuestScreen extends DisquestsBaseScreen {
     if (!hideContent) {
       markdownWidget.setCheckboxToggleListener(
           (checkboxIndex, nowChecked) -> {
-            if (!canEdit) return;
+            // Archived quests are read-only (the server refuses saves while completed).
+            if (!canEdit || quest.isCompleted()) return;
             String content = quest.getContent();
             if (content == null) return;
             String updated = toggleCheckbox(content, checkboxIndex, nowChecked);
@@ -254,7 +262,18 @@ public class QuestScreen extends DisquestsBaseScreen {
 
     // Buttons
     FlowLayout buttonRow = root.childById(FlowLayout.class, "button-row");
-    boolean canJoinOrRequest = !isOwner && !isContributor;
+    boolean completed = quest.isCompleted();
+    // A completed quest is read-only: no Join/Request, Edit or Leave.
+    boolean canJoinOrRequest = !isOwner && !isContributor && !completed;
+
+    if (completed) {
+      LabelComponent completedLabel = UIComponents.label(completedText());
+      completedLabel.id("completed-label");
+      completedLabel.color(Color.ofArgb(Colors.TEXT_MUTED));
+      completedLabel.shadow(true);
+      completedLabel.margins(Insets.top(4));
+      root.child(root.children().indexOf(buttonRow), completedLabel);
+    }
 
     // Interact button: Join (OPEN), Request (CLOSED), or hidden (member/owner)
     ButtonComponent interactBtn = root.childById(ButtonComponent.class, "btn-interact");
@@ -279,10 +298,11 @@ public class QuestScreen extends DisquestsBaseScreen {
       buttonRow.removeChild(interactBtn);
     }
 
-    // Edit button: hidden for non-members, greyed with tooltip for view-only contributors
+    // Edit button: hidden for non-members and completed quests, greyed with tooltip for view-only
+    // contributors
     ButtonComponent editBtn = root.childById(ButtonComponent.class, "btn-edit");
-    if (canJoinOrRequest) {
-      // Non-member: hide Edit entirely
+    if (canJoinOrRequest || completed) {
+      // Non-member or archived: hide Edit entirely
       buttonRow.removeChild(editBtn);
     } else {
       editBtn.onPress(ignored -> enterEditMode());
@@ -295,10 +315,26 @@ public class QuestScreen extends DisquestsBaseScreen {
     }
 
     ButtonComponent leaveBtn = root.childById(ButtonComponent.class, "btn-leave");
-    if (isContributor && !isOwner) {
+    if (isContributor && !isOwner && !completed) {
       leaveBtn.onPress(ignored -> leaveQuest());
     } else {
       buttonRow.removeChild(leaveBtn);
+    }
+
+    // Complete (active quest) or Reopen (completed quest), for players who may edit
+    ButtonComponent completeBtn = root.childById(ButtonComponent.class, "btn-complete");
+    if (canEdit && !completed && ClientSession.supportsCompletion()) {
+      completeBtn.setMessage(Component.translatable("gui.disquests.btn.complete"));
+      completeBtn.onPress(ignored -> confirmComplete());
+    } else {
+      buttonRow.removeChild(completeBtn);
+    }
+    ButtonComponent reopenBtn = root.childById(ButtonComponent.class, "btn-reopen");
+    if (canEdit && completed && ClientSession.supportsCompletion()) {
+      reopenBtn.setMessage(Component.translatable("gui.disquests.btn.reopen"));
+      reopenBtn.onPress(ignored -> confirmReopen());
+    } else {
+      buttonRow.removeChild(reopenBtn);
     }
 
     // Delete button: only visible for owner
@@ -572,7 +608,11 @@ public class QuestScreen extends DisquestsBaseScreen {
   }
 
   private void exitToViewMode() {
-    if (isNewQuest) {
+    Quest archived = archivedMeanwhile(quest.getId());
+    if (archived != null) {
+      // Completed by a teammate while editing: show it as it is now, not the stale copy.
+      navigateToScreen(new QuestScreen(this.parent, archived));
+    } else if (isNewQuest) {
       navigateToScreen(this.parent);
     } else {
       navigateToScreen(new QuestScreen(this.parent, quest));
@@ -580,6 +620,12 @@ public class QuestScreen extends DisquestsBaseScreen {
   }
 
   private void saveAndView() {
+    Quest archived = archivedMeanwhile(quest.getId());
+    if (archived != null) {
+      // A teammate completed the quest while we edited; the server would drop this save.
+      showArchivedInstead(this.parent, archived);
+      return;
+    }
     persistFieldValues();
     ClientCache.addOrUpdateMyQuest(quest);
     PacketSender.saveQuest(
@@ -602,6 +648,42 @@ public class QuestScreen extends DisquestsBaseScreen {
   }
 
   // ===================== VIEW MODE ACTIONS =====================
+
+  /** "Completed on <date> by <player>", without the name when the server does not know it. */
+  private Component completedText() {
+    String date =
+        DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+            .withLocale(gameLocale())
+            .withZone(ZoneId.systemDefault())
+            .format(Instant.ofEpochMilli(quest.getCompletedAt()));
+    String name = quest.getCompletedByName();
+    return name != null
+        ? Component.translatable("gui.disquests.label.completed_by", date, name)
+        : Component.translatable("gui.disquests.label.completed", date);
+  }
+
+  /** The game language (e.g. fr_fr) as a Locale, so dates follow it rather than the JVM. */
+  private static Locale gameLocale() {
+    String code = Minecraft.getInstance().getLanguageManager().getSelected();
+    return code != null ? Locale.forLanguageTag(code.replace('_', '-')) : Locale.getDefault();
+  }
+
+  private void confirmComplete() {
+    showConfirmOverlay(
+        Component.translatable("gui.disquests.confirm.complete"),
+        () -> {
+          PacketSender.completeQuest(quest.getId());
+          navigateToScreen(this.parent);
+        });
+  }
+
+  private void confirmReopen() {
+    // The server answers with UPDATE_QUEST; ClientPacketHandler then reopens this screen with the
+    // active quest, so the buttons switch back.
+    showConfirmOverlay(
+        Component.translatable("gui.disquests.confirm.reopen"),
+        () -> PacketSender.reopenQuest(quest.getId()));
+  }
 
   private void confirmDelete() {
     showConfirmOverlay(

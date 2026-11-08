@@ -27,7 +27,7 @@ public class HudPinManager {
     List<Quest> result = new ArrayList<>();
     for (UUID id : ClientSession.getPinnedQuestIds()) {
       Quest quest = ClientCache.getQuestById(id);
-      if (quest != null) {
+      if (quest != null && !quest.isCompleted()) {
         result.add(quest);
       }
     }

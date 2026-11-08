@@ -48,6 +48,16 @@
                             <left>4</left>
                         </margins>
                     </label>
+                    <button id="btn-toggle-map">
+                        <text>Map</text>
+                        <sizing>
+                            <horizontal method="content"/>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                        <margins>
+                            <left>4</left>
+                        </margins>
+                    </button>
                 </children>
             </flow-layout>
 
@@ -71,6 +81,14 @@
                     </button>
                     <button id="tab-quest-board">
                         <text>Quest Board</text>
+                        <sizing>
+                            <horizontal method="fixed">80</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                    <!-- Text set from a lang key in MainScreen -->
+                    <button id="tab-archived">
+                        <text>Archived</text>
                         <sizing>
                             <horizontal method="fixed">80</horizontal>
                             <vertical method="fixed">20</vertical>

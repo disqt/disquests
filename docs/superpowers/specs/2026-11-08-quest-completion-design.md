@@ -1,7 +1,7 @@
 # Quest Completion and Archive Design
 
 **Date:** 2026-11-08
-**Status:** Designed, ready for planning
+**Status:** Implemented in 0.8.0
 **Branch:** `feat/quest-completion` (off `main`)
 
 ## Context
