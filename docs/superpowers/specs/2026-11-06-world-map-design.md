@@ -1,7 +1,7 @@
 # In-Game World Map with Quest Regions Design
 
 **Date:** 2026-11-06
-**Status:** Implemented in 0.6.0 (branch feat/world-map)
+**Status:** Implemented in 0.7.0 (branch feat/world-map)
 **Branch:** `feat/world-map` (off `main`, after inline images or independently; they do not
 touch the same files except lang files)
 
