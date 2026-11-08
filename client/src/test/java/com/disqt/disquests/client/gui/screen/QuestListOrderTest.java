@@ -50,4 +50,13 @@ class QuestListOrderTest {
     assertFalse(QuestListOrder.shouldCollapseList(640));
     assertFalse(QuestListOrder.shouldCollapseList(1920));
   }
+
+  @Test
+  void clampPanelWidth_between180And60PercentOfScreen() {
+    assertEquals(180, QuestListOrder.clampPanelWidth(100, 1000));
+    assertEquals(400, QuestListOrder.clampPanelWidth(400, 1000));
+    assertEquals(600, QuestListOrder.clampPanelWidth(900, 1000));
+    // Narrow screens never go below the minimum.
+    assertEquals(180, QuestListOrder.clampPanelWidth(500, 200));
+  }
 }

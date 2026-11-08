@@ -92,7 +92,8 @@
                 </children>
             </flow-layout>
 
-            <!-- Side panel: header, tabs, filters, search, quest list, actions -->
+            <!-- Side panel: header, tabs, filters, search, quest list, actions.
+                 Its width is set from the config and the panel-divider drag in MainScreen. -->
             <flow-layout direction="vertical" id="side-panel">
                 <sizing>
                     <horizontal method="fixed">180</horizontal>
@@ -205,7 +206,7 @@
                     <!-- Search row: TextBox added programmatically -->
                     <flow-layout direction="horizontal" id="search-row">
                         <sizing>
-                            <horizontal method="content"/>
+                            <horizontal method="fill">100</horizontal>
                             <vertical method="content"/>
                         </sizing>
                         <margins>

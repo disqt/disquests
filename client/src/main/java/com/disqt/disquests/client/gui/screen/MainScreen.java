@@ -2,8 +2,10 @@ package com.disqt.disquests.client.gui.screen;
 
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
+import com.disqt.disquests.client.DisquestsClient;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.QuestEntryComponent;
+import com.disqt.disquests.client.gui.component.SplitterComponent;
 import com.disqt.disquests.client.gui.component.TagAutocompleteDropdown;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.map.BannerLayer;
@@ -74,6 +76,8 @@ public class MainScreen extends DisquestsBaseScreen {
   @Nullable private MapView mapView;
   @Nullable private QuestPolygonLayer polygonLayer;
   @Nullable private FlowLayout sidePanel;
+  @Nullable private SplitterComponent panelDivider;
+  private int sidePanelWidth = QuestListOrder.MIN_PANEL_WIDTH;
   @Nullable private LabelComponent zoomLabel;
   private final Map<String, ButtonComponent> dimensionButtons = new LinkedHashMap<>();
   private int shownZoom = -1;
@@ -165,7 +169,8 @@ public class MainScreen extends DisquestsBaseScreen {
     wireBackButton(root);
 
     // --- Create search text box programmatically ---
-    this.searchField = UIComponents.textBox(Sizing.fixed(168));
+    // The map layout's panel is resizable, so the search box follows its width there.
+    this.searchField = UIComponents.textBox(mapMode ? Sizing.fill(100) : Sizing.fixed(168));
     this.searchField.text(this.searchTerm);
     this.searchField.setHint(Component.translatable("gui.disquests.placeholder.search"));
     this.searchField.onChanged().subscribe(this::onSearchTermChanged);
@@ -497,9 +502,42 @@ public class MainScreen extends DisquestsBaseScreen {
       showRememberedOrWorld();
     }
     updateZoomLabel();
+    buildPanelDivider(root);
     if (QuestListOrder.shouldCollapseList(this.width)) {
+      root.removeChild(panelDivider);
       root.removeChild(sidePanel);
     }
+  }
+
+  /** Inserts the draggable divider before the side panel and applies the saved panel width. */
+  private void buildPanelDivider(FlowLayout root) {
+    this.sidePanelWidth =
+        QuestListOrder.clampPanelWidth(DisquestsClient.CONFIG.sidePanelWidth(), this.width);
+    sidePanel.horizontalSizing(Sizing.fixed(sidePanelWidth));
+    // Width at the press: only drags change it, and each commit re-anchors it.
+    int[] startWidth = {sidePanelWidth};
+    this.panelDivider = new SplitterComponent();
+    panelDivider.id("panel-divider");
+    panelDivider.onDrag(
+        totalDx -> {
+          // Dragging left widens the panel, so the divider follows the cursor.
+          int width =
+              QuestListOrder.clampPanelWidth((int) Math.round(startWidth[0] - totalDx), this.width);
+          if (width != sidePanelWidth) {
+            sidePanelWidth = width;
+            sidePanel.horizontalSizing(Sizing.fixed(width));
+          }
+        });
+    panelDivider.onCommit(
+        () -> {
+          startWidth[0] = sidePanelWidth;
+          if (DisquestsClient.CONFIG.sidePanelWidth() != sidePanelWidth) {
+            DisquestsClient.CONFIG.sidePanelWidth(sidePanelWidth);
+            // Option#set does not write the file.
+            DisquestsClient.CONFIG.save();
+          }
+        });
+    root.child(root.children().indexOf(sidePanel), panelDivider);
   }
 
   private void wireDimensionButtons(FlowLayout root) {
@@ -555,8 +593,10 @@ public class MainScreen extends DisquestsBaseScreen {
 
   private void toggleList() {
     if (rootLayout.children().contains(sidePanel)) {
+      rootLayout.removeChild(panelDivider);
       rootLayout.removeChild(sidePanel);
     } else {
+      rootLayout.child(panelDivider);
       rootLayout.child(sidePanel);
     }
   }

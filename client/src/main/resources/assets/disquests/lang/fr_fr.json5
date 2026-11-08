@@ -126,6 +126,7 @@
     "title": "Configuration Disquests",
     "option.pinnedVisible": "Afficher les quêtes épinglées",
     "option.pinnedWidth": "Largeur des quêtes épinglées",
+    "option.sidePanelWidth": "Largeur de la liste des quêtes",
     "option.theme": "Thème",
     "option.worldMap": "Map du monde",
     "enum.theme.vanilla": "Vanilla",

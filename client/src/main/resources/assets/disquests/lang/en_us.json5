@@ -126,6 +126,7 @@
     "title": "Disquests Config",
     "option.pinnedVisible": "Show Pinned Quests",
     "option.pinnedWidth": "Pinned Width",
+    "option.sidePanelWidth": "Quest list width",
     "option.theme": "Theme",
     "option.worldMap": "World map",
     // owo builds enum keys as text.config.<config>.enum.<enumName>.<value>,
