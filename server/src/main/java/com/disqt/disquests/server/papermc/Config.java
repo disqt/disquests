@@ -13,6 +13,7 @@ public class Config {
   private String bluemapDefaultMap;
   private List<String> predefinedTags;
   private boolean debug;
+  private boolean worldMap;
 
   public Config(JavaPlugin plugin) {
     plugin.saveDefaultConfig();
@@ -42,6 +43,7 @@ public class Config {
       this.predefinedTags = cfg.getStringList("predefined-tags");
       if (this.predefinedTags == null) this.predefinedTags = List.of();
     }
+    this.worldMap = cfg.getBoolean("world-map", true);
     this.debug = cfg.getBoolean("debug", false);
     if (Boolean.getBoolean("disquests.debug")) {
       this.debug = true;
@@ -53,6 +55,15 @@ public class Config {
     Map<String, String> out = new HashMap<>();
     raw.forEach((k, v) -> out.put(DimensionKeys.normalize(k), v));
     return out;
+  }
+
+  /** The in-game map is on when the {@code world-map} flag is set and a BlueMap URL exists. */
+  static boolean worldMapEnabled(boolean worldMapFlag, String bluemapUrl) {
+    return worldMapFlag && bluemapUrl != null && !bluemapUrl.isBlank();
+  }
+
+  public boolean isWorldMapEnabled() {
+    return worldMapEnabled(worldMap, bluemapUrl);
   }
 
   public boolean isDebug() {

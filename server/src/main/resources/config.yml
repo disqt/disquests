@@ -1,6 +1,9 @@
 # BlueMap web map URL. Leave empty to disable BlueMap links.
 bluemap-url: ""
 
+# Set to false to hide the in-game map for everyone; the map is also off while bluemap-url is empty.
+world-map: true
+
 # Default map dimension used when a quest has no map set.
 # Must be a key in bluemap-map-names (e.g. "overworld").
 bluemap-default-map: "overworld"

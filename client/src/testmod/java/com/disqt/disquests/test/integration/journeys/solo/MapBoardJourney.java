@@ -372,4 +372,31 @@ class MapBoardJourney {
       context.runOnClient(c -> ClientSession.setServerProtocolVersion(ProtocolVersion.V2));
     }
   }
+
+  @Test
+  @Order(9)
+  @PlayerA
+  @DisplayName("A server with world-map off shows the plain list")
+  void worldMapOffShowsPlainList(ClientGameTestContext context) {
+    given("the server switches the world map off");
+    try {
+      context.runOnClient(
+          c -> {
+            ClientSession.setServerWorldMapEnabled(false);
+            c.gui.setScreen(new MainScreen(null));
+          });
+      waitForScreen(context, MainScreen.class);
+      waitForComponent(context, "tab-row");
+
+      then("the legacy home shows no notice and no map");
+      assertNull(
+          findComponentOrNull(context, LabelComponent.class, "server-notice"),
+          "server-notice should not show when the map is simply switched off");
+      assertNull(
+          findComponentOrNull(context, MapView.class, "map-view"),
+          "map-view should not exist when the world map is off");
+    } finally {
+      context.runOnClient(c -> ClientSession.setServerWorldMapEnabled(true));
+    }
+  }
 }

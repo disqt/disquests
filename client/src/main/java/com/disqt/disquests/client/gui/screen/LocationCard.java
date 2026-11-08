@@ -2,6 +2,7 @@ package com.disqt.disquests.client.gui.screen;
 
 import com.disqt.disquests.client.BlueMapHelper;
 import com.disqt.disquests.client.ClientSession;
+import com.disqt.disquests.client.DisquestsClient;
 import com.disqt.disquests.client.UrlOpener;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
@@ -108,25 +109,28 @@ final class LocationCard {
     List<VertexRow> rows = buildVertexRows(vertexList, quest);
     capVertexList(vertexList, rows.size(), size[1]);
 
-    // The preview drags existing corners in place; adding, removing and finishing stay in the
-    // full-screen editor. A drag updates the quest and the fields without rebuilding the screen.
-    PolygonEditLayer layer =
-        new PolygonEditLayer(locationVertices(quest))
-            .moveOnly(true)
-            .color(QuestStyle.outlineColor(quest.getId(), quest.getVisibility()));
-    layer.onVerticesChanged(
-        vertices -> {
-          List<PointData> before = locationVertices(quest);
-          screen.moveMapLocation(vertices);
-          refreshVertexFields(rows, before, vertices);
-        });
-    MapView map = addMiniMap(root, quest, dimension, size[0], size[1]);
-    map.addLayer(layer);
-    map.interactive(true);
+    // With the map off (pre-V2 server, switched off, or BlueMap unreachable) the vertex rows are
+    // the whole editor: no mini map and no full-screen map editor.
+    boolean mapEditing = ClientSession.mapAvailable();
+    if (mapEditing) {
+      // The preview drags existing corners in place; adding, removing and finishing stay in the
+      // full-screen editor. A drag updates the quest and the fields without rebuilding the screen.
+      PolygonEditLayer layer =
+          new PolygonEditLayer(locationVertices(quest))
+              .moveOnly(true)
+              .color(QuestStyle.outlineColor(quest.getId(), quest.getVisibility()));
+      layer.onVerticesChanged(
+          vertices -> {
+            List<PointData> before = locationVertices(quest);
+            screen.moveMapLocation(vertices);
+            refreshVertexFields(rows, before, vertices);
+          });
+      MapView map = addMiniMap(root, quest, dimension, size[0], size[1]);
+      map.addLayer(layer);
+      map.interactive(true);
+    }
 
     FlowLayout buttons = root.childById(FlowLayout.class, "location-buttons");
-    // A pre-V2 server cannot store outlines from the map editor; the vertex rows stay the editor.
-    boolean mapEditing = ClientSession.supportsMap();
     if (mapEditing) {
       buttons.child(
           button(
@@ -150,14 +154,31 @@ final class LocationCard {
         button("btn-map", Component.literal("Map: " + dimension), screen::cycleMap);
     mapButton.active(quest.hasLocation());
     buttons.child(mapButton);
-    if (!mapEditing) {
-      LabelComponent outdated =
-          labelFor(Component.translatable("gui.disquests.map.server_outdated"));
+    String noticeKey = mapOffNoticeKey();
+    if (!mapEditing && noticeKey != null) {
+      LabelComponent outdated = labelFor(Component.translatable(noticeKey));
       outdated.id("map-server-outdated");
       outdated.horizontalSizing(Sizing.fill(100));
       root.childById(FlowLayout.class, "location-card").child(outdated);
     }
     return rows;
+  }
+
+  /**
+   * Why the map is off, as a lang key: the server is too old, or BlueMap is unreachable. Null when
+   * the map is on or simply switched off (server {@code world-map} or the client setting).
+   */
+  @Nullable
+  static String mapOffNoticeKey() {
+    if (!ClientSession.supportsMap()) {
+      return "gui.disquests.map.server_outdated";
+    }
+    if (!ClientSession.isServerWorldMapEnabled()
+        || !DisquestsClient.CONFIG.worldMap()
+        || !ClientSession.hasBluemap()) {
+      return null;
+    }
+    return ClientSession.mapUnreachable() ? "gui.disquests.map.map_unavailable" : null;
   }
 
   private static List<VertexRow> buildVertexRows(FlowLayout list, Quest quest) {
@@ -310,11 +331,13 @@ final class LocationCard {
       card.sizing(Sizing.fixed(0), Sizing.fixed(0));
       return;
     }
-    int[] size = mapSize(VIEW_MAP_WIDTH, VIEW_MAP_HEIGHT, screen.height, VIEW_MAP_SCREEN_DIVISOR);
-    MapView map = addMiniMap(root, quest, screen.dimensionForEdit(), size[0], size[1]);
-    QuestPolygonLayer layer = new QuestPolygonLayer();
-    layer.setQuests(List.of(quest));
-    map.addLayer(layer);
+    if (ClientSession.mapAvailable()) {
+      int[] size = mapSize(VIEW_MAP_WIDTH, VIEW_MAP_HEIGHT, screen.height, VIEW_MAP_SCREEN_DIVISOR);
+      MapView map = addMiniMap(root, quest, screen.dimensionForEdit(), size[0], size[1]);
+      QuestPolygonLayer layer = new QuestPolygonLayer();
+      layer.setQuests(List.of(quest));
+      map.addLayer(layer);
+    }
 
     root.childById(LabelComponent.class, "coords-label")
         .text(buildCoordsText(quest).withColor(Colors.TEXT_MUTED));

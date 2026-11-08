@@ -323,6 +323,36 @@ class TileCacheTest {
   }
 
   @Test
+  void settingsFailed_trueAfter404OrIoError_falseOnSuccessOrUnknown() {
+    TileCache c = cache(4);
+    String json = "{\"lowres\":{\"tileSize\":[100,100],\"lodFactor\":4,\"lodCount\":2}}";
+    fetcher.responses.put(
+        BASE + "/maps/ok/settings.json",
+        new FetchResult(200, json.getBytes(StandardCharsets.UTF_8), "application/json", 60));
+    fetcher.responses.put(BASE + "/maps/down/settings.json", new IOException("refused"));
+
+    c.settings("ok");
+    c.settings("missing"); // FakeFetcher answers 404 for unknown URLs
+    c.settings("down");
+
+    assertFalse(c.settingsFailed("ok"));
+    assertTrue(c.settingsFailed("missing"));
+    assertTrue(c.settingsFailed("down"));
+    assertFalse(c.settingsFailed("never-requested"));
+    assertFalse(c.settingsFailed(null));
+  }
+
+  @Test
+  void settingsFailed_falseWhileFetchPending() {
+    Deferring pool = new Deferring();
+    TileCache c = cache(pool, DIRECT, dir, 4);
+    c.settings("missing");
+    assertFalse(c.settingsFailed("missing"));
+    pool.drain();
+    assertTrue(c.settingsFailed("missing"));
+  }
+
+  @Test
   void isAvailable_falseForEmptyBaseUrl() {
     assertFalse(new TileCache("", fetcher, textures, DIRECT, DIRECT, dir, 4).isAvailable());
     assertFalse(new TileCache("http://x", fetcher, textures, DIRECT, DIRECT, dir, 4).isAvailable());

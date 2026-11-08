@@ -108,6 +108,7 @@
     "centre_me": "Centre on me",
     "zoom": "Zoom %d",
     "server_outdated": "The server needs updating to show the map",
+    "map_unavailable": "The map is unavailable right now (BlueMap unreachable)",
     "toggle_list": "List",
     "edit_hint": "Click to add corners. Enter or click the first corner to finish. Right-click removes the last one. Drag to move the map.",
     "self_intersecting": "The outline crosses itself",
@@ -126,6 +127,7 @@
     "option.pinnedVisible": "Show Pinned Quests",
     "option.pinnedWidth": "Pinned Width",
     "option.theme": "Theme",
+    "option.worldMap": "World map",
     // owo builds enum keys as text.config.<config>.enum.<enumName>.<value>,
     // with enumName uncapitalised and value lowercased (ConfigEnumButton#updateMessage).
     "enum.theme.vanilla": "Vanilla",

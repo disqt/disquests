@@ -34,6 +34,7 @@ public class ClientSession {
   private static List<String> predefinedTags = List.of();
   private static List<String> serverTags = List.of();
   private static int serverProtocolVersion = ProtocolVersion.V1;
+  private static boolean serverWorldMapEnabled = true;
 
   // UI state
   private static Tab activeTab = Tab.MY_QUESTS;
@@ -86,6 +87,7 @@ public class ClientSession {
     predefinedTags = List.of();
     serverTags = List.of();
     serverProtocolVersion = ProtocolVersion.V1;
+    serverWorldMapEnabled = true;
     activeTab = Tab.MY_QUESTS;
     searchTerm = "";
     serverQuestsFilter = QuestFilter.ALL;
@@ -101,6 +103,38 @@ public class ClientSession {
 
   public static boolean supportsMap() {
     return serverProtocolVersion >= ProtocolVersion.V2;
+  }
+
+  /** The server's {@code world-map} switch from the handshake (true when the server sent none). */
+  public static boolean isServerWorldMapEnabled() {
+    return serverWorldMapEnabled;
+  }
+
+  public static void setServerWorldMapEnabled(boolean enabled) {
+    serverWorldMapEnabled = enabled;
+  }
+
+  /**
+   * Whether the in-game map is shown: the server is V2+, the server and the client setting both
+   * allow it, BlueMap is configured, and the settings probe for the default map has not failed.
+   * Only the last term changes during a session, and only from true to false.
+   */
+  public static boolean mapAvailable() {
+    return supportsMap()
+        && serverWorldMapEnabled
+        && DisquestsClient.CONFIG.worldMap()
+        && hasBluemap()
+        && !mapUnreachable();
+  }
+
+  /** True once the BlueMap settings probe for the default map has failed. */
+  public static boolean mapUnreachable() {
+    return hasBluemap() && SharedTileCache.get().settingsFailed(defaultMapId());
+  }
+
+  /** BlueMap map id of the server's default dimension, or null when it has no mapping. */
+  public static String defaultMapId() {
+    return bluemapMapNames.get(bluemapDefaultMap);
   }
 
   public static boolean isOnServer() {

@@ -41,6 +41,7 @@ public final class TileCache {
   private final Set<TileKey> missing = new HashSet<>();
   private final Map<String, BlueMapSettings> settings = new HashMap<>();
   private final Set<String> settingsRequested = new HashSet<>();
+  private final Set<String> settingsFailed = new HashSet<>();
   private int fetches;
   private int evictions;
   private boolean closed;
@@ -132,8 +133,22 @@ public final class TileCache {
       fetchPool.execute(() -> loadSettings(mapId));
     } catch (RuntimeException e) {
       lastError = String.valueOf(e);
+      markSettingsFailed(mapId);
     }
     return BlueMapSettings.DEFAULT;
+  }
+
+  /**
+   * True once the settings fetch for {@code mapId} ended in failure (no response, a non-200 status,
+   * or an error); false while it is pending, after it succeeded, or when it was never requested.
+   * Failures are memoised, so this only ever flips from false to true.
+   */
+  public synchronized boolean settingsFailed(String mapId) {
+    return mapId != null && settingsFailed.contains(mapId);
+  }
+
+  private synchronized void markSettingsFailed(String mapId) {
+    settingsFailed.add(mapId);
   }
 
   public void close() {
@@ -154,12 +169,14 @@ public final class TileCache {
       loadSettingsUnchecked(mapId);
     } catch (RuntimeException e) {
       lastError = String.valueOf(e);
+      markSettingsFailed(mapId);
     }
   }
 
   private void loadSettingsUnchecked(String mapId) {
     FetchResult r = fetchTracked(baseUrl + "/maps/" + mapId + "/settings.json");
     if (r == null || r.status() != 200) {
+      markSettingsFailed(mapId);
       return;
     }
     BlueMapSettings parsed = BlueMapSettings.parse(new String(r.body(), StandardCharsets.UTF_8));

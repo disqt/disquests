@@ -3,6 +3,7 @@ package com.disqt.disquests.client.network;
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
+import com.disqt.disquests.client.gui.map.SharedTileCache;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.common.ByteBufReader;
@@ -78,6 +79,13 @@ public class ClientPacketHandler {
         payload.predefinedTags());
     ClientSession.setBluemapDefaultMap(payload.bluemapDefaultMap());
     ClientSession.setServerProtocolVersion(payload.serverProtocolVersion());
+    ClientSession.setServerWorldMapEnabled(payload.worldMapEnabled());
+    if (ClientSession.supportsMap()
+        && ClientSession.isServerWorldMapEnabled()
+        && ClientSession.hasBluemap()) {
+      // Probe BlueMap at connect time so an unreachable map is known before the board opens.
+      SharedTileCache.get().settings(ClientSession.defaultMapId());
+    }
     PacketSender.requestSync();
   }
 
