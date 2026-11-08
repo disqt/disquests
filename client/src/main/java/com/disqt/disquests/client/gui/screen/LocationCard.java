@@ -11,6 +11,7 @@ import com.disqt.disquests.client.gui.map.MapMath;
 import com.disqt.disquests.client.gui.map.MapView;
 import com.disqt.disquests.client.gui.map.PolygonEditLayer;
 import com.disqt.disquests.client.gui.map.QuestPolygonLayer;
+import com.disqt.disquests.client.gui.map.QuestStyle;
 import com.disqt.disquests.client.gui.map.SharedTileCache;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.common.QuestLocation;
@@ -109,7 +110,10 @@ final class LocationCard {
 
     // The preview drags existing corners in place; adding, removing and finishing stay in the
     // full-screen editor. A drag updates the quest and the fields without rebuilding the screen.
-    PolygonEditLayer layer = new PolygonEditLayer(locationVertices(quest)).moveOnly(true);
+    PolygonEditLayer layer =
+        new PolygonEditLayer(locationVertices(quest))
+            .moveOnly(true)
+            .color(QuestStyle.outlineColor(quest.getId(), quest.getVisibility()));
     layer.onVerticesChanged(
         vertices -> {
           List<PointData> before = locationVertices(quest);

@@ -40,8 +40,10 @@ public class TagColors {
     return (tag.hashCode() & 0x7FFFFFFF) % PALETTE_SIZE;
   }
 
-  /** Convert HSL + alpha to ARGB int. Hue in [0, 360), s/l in [0, 1]. */
-  private static int hslToArgb(double h, double s, double l, int a) {
+  /**
+   * Convert HSL + alpha to ARGB int. Hue in [0, 360), s/l in [0, 1]. Shared with the map palette.
+   */
+  public static int hslToArgb(double h, double s, double l, int a) {
     double c = (1.0 - Math.abs(2.0 * l - 1.0)) * s;
     double hp = h / 60.0;
     double x = c * (1.0 - Math.abs(hp % 2.0 - 1.0));

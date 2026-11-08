@@ -26,7 +26,7 @@ public class PolygonEditLayer implements MapLayer {
   private static final double HIT_RADIUS = 6;
   private static final int VERTEX_SIZE = 5;
   private static final int FIRST_VERTEX_SIZE = 7;
-  private static final int FILL_COLOR = (Colors.MAP_OPEN & 0x00FFFFFF) | 0x40000000;
+  private static final int FILL_ALPHA = 0x40;
 
   private final List<PointData> vertices;
   private Consumer<List<PointData>> onFinish;
@@ -37,6 +37,7 @@ public class PolygonEditLayer implements MapLayer {
   private boolean dragMoved;
   private boolean finished;
   private boolean moveOnly;
+  private int color = Colors.AMBER;
 
   public PolygonEditLayer(List<PointData> initial) {
     this.vertices = new ArrayList<>(initial);
@@ -62,6 +63,12 @@ public class PolygonEditLayer implements MapLayer {
   /** Restricts the layer to dragging existing corners (see the class comment). */
   public PolygonEditLayer moveOnly(boolean moveOnly) {
     this.moveOnly = moveOnly;
+    return this;
+  }
+
+  /** Outline colour (opaque ARGB); the fill uses the same hue, translucent. */
+  public PolygonEditLayer color(int argb) {
+    this.color = 0xFF000000 | argb;
     return this;
   }
 
@@ -235,9 +242,9 @@ public class PolygonEditLayer implements MapLayer {
       return;
     }
     double[][] p = MapDraw.project(view, vertices);
-    MapDraw.fillPolygon(g, view, p[0], p[1], FILL_COLOR);
+    MapDraw.fillPolygon(g, view, p[0], p[1], (FILL_ALPHA << 24) | (color & 0x00FFFFFF));
     if (n >= 2) {
-      MapDraw.outlinePolygon(g, view, p[0], p[1], Colors.MAP_OPEN);
+      MapDraw.outlinePolygon(g, view, p[0], p[1], color);
     }
     for (int i = 0; i < n; i++) {
       int size = i == 0 && n >= 3 && !moveOnly ? FIRST_VERTEX_SIZE : VERTEX_SIZE;

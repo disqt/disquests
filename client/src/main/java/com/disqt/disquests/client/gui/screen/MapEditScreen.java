@@ -1,9 +1,11 @@
 package com.disqt.disquests.client.gui.screen;
 
+import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.map.BannerLayer;
 import com.disqt.disquests.client.gui.map.MapView;
 import com.disqt.disquests.client.gui.map.PlayerMarkerLayer;
 import com.disqt.disquests.client.gui.map.PolygonEditLayer;
+import com.disqt.disquests.client.gui.map.QuestStyle;
 import com.disqt.disquests.client.gui.map.SharedTileCache;
 import com.disqt.disquests.common.QuestLocation;
 import com.disqt.disquests.common.model.CoordinatesData;
@@ -61,6 +63,8 @@ public class MapEditScreen extends DisquestsBaseScreen {
     applyThemeRoot(root);
 
     this.layer = new PolygonEditLayer(initial);
+    Quest quest = editor.getQuest();
+    this.layer.color(QuestStyle.outlineColor(quest.getId(), quest.getVisibility()));
     this.layer.onFinish(editor::applyMapLocation);
     this.mapView = new MapView(SharedTileCache.get());
     this.mapView.interactive(true).setDimension(dimension);
