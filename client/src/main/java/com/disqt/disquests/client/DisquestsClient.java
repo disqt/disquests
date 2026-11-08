@@ -3,6 +3,7 @@ package com.disqt.disquests.client;
 import com.disqt.disquests.client.debug.DebugScreenEvents;
 import com.disqt.disquests.client.gui.helper.DisquestsConfigWrapper;
 import com.disqt.disquests.client.gui.helper.Theme;
+import com.disqt.disquests.client.gui.map.SharedTileCache;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.hud.HudPinRenderer;
 import com.disqt.disquests.client.network.ClientPacketHandler;
@@ -18,6 +19,8 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 
 @Environment(EnvType.CLIENT)
 public class DisquestsClient implements ClientModInitializer {
+  private static int bannerTicks;
+
   public static final DisquestsConfigWrapper CONFIG = DisquestsConfigWrapper.createAndLoad();
 
   @Override
@@ -33,6 +36,12 @@ public class DisquestsClient implements ClientModInitializer {
 
     ClientTickEvents.END_CLIENT_TICK.register(
         client -> {
+          if (++bannerTicks >= 20) {
+            bannerTicks = 0;
+            if (ClientSession.isOnServer() && ClientSession.mapAvailable()) {
+              SharedTileCache.refreshBanners(ClientSession.getBluemapMapNames().values());
+            }
+          }
           while (KeyBinds.openGuiKey.consumeClick()) {
             if (client.gui.screen() == null && ClientSession.isOnServer()) {
               client.gui.setScreen(new MainScreen());
