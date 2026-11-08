@@ -194,4 +194,36 @@ class QuestTest {
     assertFalse(questWith(null, List.of(new PointData(1, 2))).isPolygon());
     assertTrue(questWith(null, List.of(new PointData(1, 2), new PointData(3, 4))).isPolygon());
   }
+
+  @Test
+  void fromNetwork_copiesCompletion() {
+    UUID completer = UUID.randomUUID();
+    QuestData base =
+        new QuestData(
+            UUID.randomUUID(),
+            "T",
+            "C",
+            OWNER,
+            "OwnerName",
+            Visibility.OPEN,
+            List.of(),
+            0L,
+            null,
+            false,
+            null,
+            "overworld",
+            List.of(),
+            List.of());
+    Quest completed = Quest.fromNetwork(base.withCompletion(1234L, completer, "Alice"));
+    assertTrue(completed.isCompleted());
+    assertEquals(1234L, completed.getCompletedAt());
+    assertEquals(completer, completed.getCompletedBy());
+    assertEquals("Alice", completed.getCompletedByName());
+
+    Quest active = Quest.fromNetwork(base);
+    assertFalse(active.isCompleted());
+    assertEquals(0L, active.getCompletedAt());
+    assertNull(active.getCompletedBy());
+    assertNull(active.getCompletedByName());
+  }
 }

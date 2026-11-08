@@ -16,7 +16,8 @@ public class ClientSession {
 
   public enum Tab {
     MY_QUESTS,
-    SERVER_QUESTS
+    SERVER_QUESTS,
+    ARCHIVED
   }
 
   public enum QuestFilter {

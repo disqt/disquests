@@ -24,6 +24,9 @@ public class Quest {
   private String map;
   private List<String> tags = new ArrayList<>();
   private List<PointData> polygon = new ArrayList<>();
+  private long completedAt;
+  private UUID completedBy;
+  private String completedByName;
 
   public static Quest fromNetwork(QuestData data) {
     Quest quest = new Quest();
@@ -44,6 +47,9 @@ public class Quest {
     quest.map = data.map();
     quest.tags = new ArrayList<>(data.tags());
     quest.polygon = new ArrayList<>(data.polygon());
+    quest.completedAt = data.completedAt();
+    quest.completedBy = data.completedBy();
+    quest.completedByName = data.completedByName();
     return quest;
   }
 
@@ -157,6 +163,23 @@ public class Quest {
 
   public void setPolygon(List<PointData> polygon) {
     this.polygon = polygon != null ? polygon : new ArrayList<>();
+  }
+
+  public long getCompletedAt() {
+    return completedAt;
+  }
+
+  public UUID getCompletedBy() {
+    return completedBy;
+  }
+
+  public String getCompletedByName() {
+    return completedByName;
+  }
+
+  /** True when the quest has been marked completed (archived). */
+  public boolean isCompleted() {
+    return completedAt != 0L;
   }
 
   /** True when the quest has a pin or a polygon. */
