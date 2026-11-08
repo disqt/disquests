@@ -24,7 +24,7 @@
 
                     <flow-layout direction="horizontal" id="map-toolbar">
                         <sizing>
-                            <horizontal method="content"/>
+                            <horizontal method="fill">100</horizontal>
                             <vertical method="content"/>
                         </sizing>
                         <gap>4</gap>
@@ -33,25 +33,12 @@
                         </padding>
                         <vertical-alignment>center</vertical-alignment>
                         <children>
-                            <!-- Button and label texts are set from lang keys in MainScreen -->
-                            <button id="btn-dim-overworld">
+                            <!-- Button texts and tooltips are set from lang keys in MainScreen.
+                                 The dimension buttons live in the dimension-menu popup, built in code. -->
+                            <button id="btn-dimension">
                                 <text>Overworld</text>
                                 <sizing>
-                                    <horizontal method="fixed">60</horizontal>
-                                    <vertical method="fixed">14</vertical>
-                                </sizing>
-                            </button>
-                            <button id="btn-dim-the_nether">
-                                <text>Nether</text>
-                                <sizing>
-                                    <horizontal method="fixed">60</horizontal>
-                                    <vertical method="fixed">14</vertical>
-                                </sizing>
-                            </button>
-                            <button id="btn-dim-the_end">
-                                <text>End</text>
-                                <sizing>
-                                    <horizontal method="fixed">60</horizontal>
+                                    <horizontal method="content"/>
                                     <vertical method="fixed">14</vertical>
                                 </sizing>
                             </button>
@@ -62,18 +49,32 @@
                                     <vertical method="fixed">14</vertical>
                                 </sizing>
                             </button>
-                            <label id="zoom-label">
-                                <text>Zoom</text>
-                                <shadow>true</shadow>
+                            <button id="btn-zoom-out">
+                                <text>−</text>
                                 <sizing>
-                                    <horizontal method="content"/>
-                                    <vertical method="content"/>
+                                    <horizontal method="fixed">14</horizontal>
+                                    <vertical method="fixed">14</vertical>
                                 </sizing>
-                            </label>
+                            </button>
+                            <button id="btn-zoom-in">
+                                <text>+</text>
+                                <sizing>
+                                    <horizontal method="fixed">14</horizontal>
+                                    <vertical method="fixed">14</vertical>
+                                </sizing>
+                            </button>
+                            <!-- Spacer: pushes the List toggle to the right edge of the map area -->
+                            <flow-layout direction="horizontal" id="map-toolbar-spacer">
+                                <sizing>
+                                    <horizontal method="expand">100</horizontal>
+                                    <vertical method="fixed">1</vertical>
+                                </sizing>
+                                <children/>
+                            </flow-layout>
                             <button id="btn-toggle-list">
                                 <text>List</text>
                                 <sizing>
-                                    <horizontal method="fixed">40</horizontal>
+                                    <horizontal method="content"/>
                                     <vertical method="fixed">14</vertical>
                                 </sizing>
                             </button>

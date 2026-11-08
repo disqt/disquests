@@ -21,14 +21,19 @@ import com.disqt.disquests.common.DimensionKeys;
 import com.disqt.disquests.common.QuestLocation;
 import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.Visibility;
+import com.mojang.blaze3d.platform.InputConstants;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.TextBoxComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.Color;
+import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.ParentUIComponent;
+import io.wispforest.owo.ui.core.Positioning;
 import io.wispforest.owo.ui.core.Sizing;
+import io.wispforest.owo.ui.core.Surface;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -42,6 +47,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -82,7 +88,12 @@ public class MainScreen extends DisquestsBaseScreen {
   @Nullable private FlowLayout sidePanel;
   @Nullable private SplitterComponent panelDivider;
   private int sidePanelWidth = QuestListOrder.MIN_PANEL_WIDTH;
-  @Nullable private LabelComponent zoomLabel;
+  @Nullable private ButtonComponent dimensionButton;
+  // Popup under btn-dimension, added to the root with absolute positioning while open
+  @Nullable private FlowLayout dimensionMenu;
+  @Nullable private ButtonComponent zoomOut;
+  @Nullable private ButtonComponent zoomIn;
+  @Nullable private ButtonComponent listToggle;
   private final Map<String, ButtonComponent> dimensionButtons = new LinkedHashMap<>();
   private int shownZoom = -1;
 
@@ -193,7 +204,9 @@ public class MainScreen extends DisquestsBaseScreen {
     wireBackButton(root);
     ButtonComponent toggleMap = root.childById(ButtonComponent.class, "btn-toggle-map");
     if (mapMode || ClientSession.mapAvailableIgnoringSetting()) {
-      toggleMap.setMessage(Component.translatable("gui.disquests.map.toggle_map"));
+      toggleMap.setMessage(
+          Component.translatable(
+              mapMode ? "gui.disquests.map.map_on" : "gui.disquests.map.map_off"));
       toggleMap.onPress(ignored -> setWorldMap(!mapMode));
     } else {
       // Look the header up by id: parent() is only set once the tree is mounted.
@@ -366,6 +379,11 @@ public class MainScreen extends DisquestsBaseScreen {
 
   @Override
   public boolean keyPressed(KeyEvent keyInput) {
+    // Escape closes the dimension menu before it closes the screen
+    if (keyInput.key() == InputConstants.KEY_ESCAPE && isDimensionMenuOpen()) {
+      closeDimensionMenu();
+      return true;
+    }
     // Intercept arrow/enter/tab/escape for the tag autocomplete dropdown
     if (tagDropdown != null && tagDropdown.isVisible()) {
       if (tagDropdown.onKeyDown(keyInput)) {
@@ -525,7 +543,7 @@ public class MainScreen extends DisquestsBaseScreen {
     this.mapView.id("map-view");
     root.childById(FlowLayout.class, "map-slot").child(mapView);
 
-    wireDimensionButtons(root);
+    wireDimensionMenu(root);
     ButtonComponent centreMe = root.childById(ButtonComponent.class, "btn-centre-me");
     if (playerMarker) {
       centreMe.setMessage(Component.translatable("gui.disquests.map.centre_me"));
@@ -535,10 +553,12 @@ public class MainScreen extends DisquestsBaseScreen {
       // owo only sets parent() when the tree is mounted, which happens after build().
       root.childById(FlowLayout.class, "map-toolbar").removeChild(centreMe);
     }
-    ButtonComponent toggleList = root.childById(ButtonComponent.class, "btn-toggle-list");
-    toggleList.setMessage(Component.translatable("gui.disquests.map.toggle_list"));
-    toggleList.onPress(ignored -> toggleList());
-    this.zoomLabel = root.childById(LabelComponent.class, "zoom-label");
+    this.listToggle = root.childById(ButtonComponent.class, "btn-toggle-list");
+    listToggle.onPress(ignored -> toggleList());
+    this.zoomOut = root.childById(ButtonComponent.class, "btn-zoom-out");
+    this.zoomIn = root.childById(ButtonComponent.class, "btn-zoom-in");
+    zoomOut.onPress(ignored -> zoomStep(-1));
+    zoomIn.onPress(ignored -> zoomStep(1));
 
     mapView.setZoom(INITIAL_ZOOM);
     if (playerMarker) {
@@ -546,12 +566,14 @@ public class MainScreen extends DisquestsBaseScreen {
     } else {
       showRememberedOrWorld();
     }
-    updateZoomLabel();
+    updateZoomControls();
     buildPanelDivider(root);
-    if (QuestListOrder.shouldCollapseList(this.width)) {
+    boolean collapse = QuestListOrder.shouldCollapseList(this.width);
+    if (collapse) {
       root.removeChild(panelDivider);
       root.removeChild(sidePanel);
     }
+    updateListToggle(!collapse);
   }
 
   /** Inserts the draggable divider before the side panel and applies the saved panel width. */
@@ -585,19 +607,82 @@ public class MainScreen extends DisquestsBaseScreen {
     root.child(root.children().indexOf(sidePanel), panelDivider);
   }
 
-  private void wireDimensionButtons(FlowLayout root) {
+  /**
+   * btn-dimension names the shown dimension and opens a small menu below it with one button per
+   * dimension. The menu is built once and added to the root (absolute positioning) only while open;
+   * not an OverlayContainer, which would centre it.
+   */
+  private void wireDimensionMenu(FlowLayout root) {
+    this.dimensionButton = root.childById(ButtonComponent.class, "btn-dimension");
+    dimensionButton.onPress(ignored -> toggleDimensionMenu());
+    FlowLayout menu = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
+    menu.id("dimension-menu");
+    menu.surface(Surface.DARK_PANEL);
+    menu.padding(Insets.of(3));
+    menu.gap(2);
     for (String dimension : DIMENSIONS) {
-      ButtonComponent button = root.childById(ButtonComponent.class, "btn-dim-" + dimension);
-      button.setMessage(Component.translatable("gui.disquests.map.dim." + dimension));
-      button.onPress(ignored -> selectDimension(dimension));
+      ButtonComponent button =
+          UIComponents.button(
+              Component.translatable("gui.disquests.map.dim." + dimension),
+              ignored -> {
+                selectDimension(dimension);
+                closeDimensionMenu();
+              });
+      button.id("btn-dim-" + dimension);
+      button.sizing(Sizing.fixed(64), Sizing.fixed(14));
+      menu.child(button);
       dimensionButtons.put(dimension, button);
+    }
+    this.dimensionMenu = menu;
+  }
+
+  private boolean isDimensionMenuOpen() {
+    return dimensionMenu != null && rootLayout.children().contains(dimensionMenu);
+  }
+
+  private void toggleDimensionMenu() {
+    if (isDimensionMenuOpen()) {
+      closeDimensionMenu();
+      return;
+    }
+    // The root sits at 0,0, so the button's screen position is also its position in the root
+    dimensionMenu.positioning(
+        Positioning.absolute(
+            dimensionButton.x(), dimensionButton.y() + dimensionButton.height() + 1));
+    rootLayout.child(dimensionMenu);
+  }
+
+  private void closeDimensionMenu() {
+    if (isDimensionMenuOpen()) {
+      rootLayout.removeChild(dimensionMenu);
     }
   }
 
-  /** Shows {@code dimension} on the map; its button looks pressed, like the selected tab. */
+  /** A click outside the open menu and its button closes it; on the map it does nothing else. */
+  @Override
+  public boolean mouseClicked(MouseButtonEvent click, boolean simulated) {
+    if (isDimensionMenuOpen()
+        && !dimensionMenu.isInBoundingBox(click.x(), click.y())
+        && !dimensionButton.isInBoundingBox(click.x(), click.y())) {
+      closeDimensionMenu();
+      if (mapView != null && mapView.isInBoundingBox(click.x(), click.y())) {
+        return true;
+      }
+    }
+    return super.mouseClicked(click, simulated);
+  }
+
+  /**
+   * Shows {@code dimension} on the map: btn-dimension names it and its menu entry looks pressed,
+   * like the selected tab.
+   */
   private void selectDimension(String dimension) {
     mapView.setDimension(dimension);
     dimensionButtons.forEach((key, button) -> button.active(!key.equals(dimension)));
+    if (dimensionButton != null) {
+      dimensionButton.setMessage(
+          Component.translatable("gui.disquests.map.dim." + dimension).append(" \u25BE"));
+    }
   }
 
   private void centreOnPlayer() {
@@ -637,20 +722,50 @@ public class MainScreen extends DisquestsBaseScreen {
   }
 
   private void toggleList() {
-    if (rootLayout.children().contains(sidePanel)) {
+    boolean shown = rootLayout.children().contains(sidePanel);
+    if (shown) {
       rootLayout.removeChild(panelDivider);
       rootLayout.removeChild(sidePanel);
     } else {
-      rootLayout.child(panelDivider);
-      rootLayout.child(sidePanel);
+      // Insert before the dimension menu, if open, so the popup stays last (on top)
+      int index = isDimensionMenuOpen() ? rootLayout.children().indexOf(dimensionMenu) : -1;
+      if (index >= 0) {
+        rootLayout.child(index, sidePanel);
+        rootLayout.child(index, panelDivider);
+      } else {
+        rootLayout.child(panelDivider);
+        rootLayout.child(sidePanel);
+      }
     }
+    updateListToggle(!shown);
   }
 
-  private void updateZoomLabel() {
+  private void updateListToggle(boolean listShown) {
+    listToggle.setMessage(
+        Component.translatable(
+            listShown ? "gui.disquests.map.list_on" : "gui.disquests.map.list_off"));
+  }
+
+  /** One zoom step around the map centre, from the toolbar's zoom buttons. */
+  private void zoomStep(int delta) {
+    mapView.zoomBy(delta, mapView.width() / 2.0, mapView.height() / 2.0);
+    updateZoomControls();
+  }
+
+  /**
+   * Greys out zoom-out at the widest zoom and zoom-in at the closest, and refreshes their "Zoom n /
+   * max" tooltip. Runs every tick, so scroll zooming is picked up too.
+   */
+  private void updateZoomControls() {
     int zoom = mapView.getCamera().zoom();
     if (zoom != shownZoom) {
       shownZoom = zoom;
-      zoomLabel.text(Component.translatable("gui.disquests.map.zoom", zoom));
+      Component tooltip =
+          Component.translatable("gui.disquests.map.zoom_tooltip", zoom, MapMath.MAX_ZOOM);
+      zoomOut.active(zoom > 0);
+      zoomIn.active(zoom < MapMath.MAX_ZOOM);
+      zoomOut.tooltip(tooltip);
+      zoomIn.tooltip(tooltip);
     }
   }
 
@@ -817,7 +932,7 @@ public class MainScreen extends DisquestsBaseScreen {
       refreshListContents();
     }
     if (mapView != null) {
-      updateZoomLabel();
+      updateZoomControls();
     }
   }
 
