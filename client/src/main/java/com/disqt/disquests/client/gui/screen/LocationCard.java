@@ -108,7 +108,8 @@ final class LocationCard {
     int[] size = mapSize(EDIT_MAP_WIDTH, EDIT_MAP_HEIGHT, screen.height, EDIT_MAP_SCREEN_DIVISOR);
     FlowLayout vertexList = root.childById(FlowLayout.class, "vertex-list");
     List<VertexRow> rows = buildVertexRows(vertexList, quest);
-    capVertexList(vertexList, rows.size(), size[1]);
+    capVertexList(
+        root.childById(FlowLayout.class, "location-main"), vertexList, rows.size(), size[1]);
 
     // With the map off (pre-V2 server, switched off, or BlueMap unreachable) the vertex rows are
     // the whole editor: no mini map and no full-screen map editor.
@@ -242,9 +243,11 @@ final class LocationCard {
    * Wraps the vertex list in a scroll area of the map's height when its rows would be taller, so a
    * many-cornered outline does not stretch the card.
    */
-  private static void capVertexList(FlowLayout list, int rowCount, int maxHeight) {
+  private static void capVertexList(
+      FlowLayout parent, FlowLayout list, int rowCount, int maxHeight) {
+    // The parent is passed in: owo only sets parent() when the tree is mounted, after build().
     int height = rowCount * ROW_HEIGHT + Math.max(0, rowCount - 1) * VERTEX_LIST_GAP;
-    if (height <= maxHeight || !(list.parent() instanceof FlowLayout parent)) return;
+    if (height <= maxHeight || parent == null) return;
     int index = parent.children().indexOf(list);
     parent.removeChild(list);
     ScrollContainer<FlowLayout> scroll =
