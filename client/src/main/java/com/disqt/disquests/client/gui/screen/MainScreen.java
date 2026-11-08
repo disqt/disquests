@@ -6,6 +6,7 @@ import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.QuestEntryComponent;
 import com.disqt.disquests.client.gui.component.TagAutocompleteDropdown;
 import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.map.BannerLayer;
 import com.disqt.disquests.client.gui.map.MapView;
 import com.disqt.disquests.client.gui.map.PlayerMarkerLayer;
 import com.disqt.disquests.client.gui.map.QuestPolygonLayer;
@@ -462,7 +463,10 @@ public class MainScreen extends DisquestsBaseScreen {
     this.polygonLayer = new QuestPolygonLayer();
     this.polygonLayer.onQuestClick(quest -> navigateToScreen(new QuestScreen(this, quest)));
     this.mapView = new MapView(SharedTileCache.get());
-    this.mapView.addLayer(polygonLayer).addLayer(new PlayerMarkerLayer());
+    this.mapView
+        .addLayer(new BannerLayer(SharedTileCache.banners()))
+        .addLayer(polygonLayer)
+        .addLayer(new PlayerMarkerLayer());
     this.mapView.sizing(Sizing.fill(100), Sizing.fill(100));
     this.mapView.id("map-view");
     root.childById(FlowLayout.class, "map-slot").child(mapView);

@@ -6,6 +6,7 @@ import com.disqt.disquests.client.UrlOpener;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.map.BannerLayer;
 import com.disqt.disquests.client.gui.map.MapMath;
 import com.disqt.disquests.client.gui.map.MapView;
 import com.disqt.disquests.client.gui.map.PolygonEditLayer;
@@ -348,8 +349,9 @@ final class LocationCard {
   // ===================== MINI MAP =====================
 
   /**
-   * Adds a map of the quest to {@code mini-map-slot}, without layers and non-interactive: an
-   * outline fitted to the map, a pin at zoom 2, otherwise the player (or the origin) at zoom 2.
+   * Adds a map of the quest to {@code mini-map-slot}, with only the banner layer (no labels) and
+   * non-interactive: an outline fitted to the map, a pin at zoom 2, otherwise the player (or the
+   * origin) at zoom 2.
    */
   private static MapView addMiniMap(
       FlowLayout root, Quest quest, String dimension, int mapWidth, int mapHeight) {
@@ -357,6 +359,7 @@ final class LocationCard {
     MapView map = new MapView(SharedTileCache.get()).interactive(false).setDimension(dimension);
     map.sizing(Sizing.fixed(mapWidth), Sizing.fixed(mapHeight));
     map.id("mini-map");
+    map.addLayer(new BannerLayer(SharedTileCache.banners()).showLabels(false));
 
     if (quest.isPolygon()) {
       CoordinatesData[] box = QuestLocation.boundingBox(quest.getPolygon(), DEFAULT_Y);

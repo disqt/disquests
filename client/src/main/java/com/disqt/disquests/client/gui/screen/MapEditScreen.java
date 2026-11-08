@@ -1,5 +1,6 @@
 package com.disqt.disquests.client.gui.screen;
 
+import com.disqt.disquests.client.gui.map.BannerLayer;
 import com.disqt.disquests.client.gui.map.MapView;
 import com.disqt.disquests.client.gui.map.PlayerMarkerLayer;
 import com.disqt.disquests.client.gui.map.PolygonEditLayer;
@@ -63,7 +64,10 @@ public class MapEditScreen extends DisquestsBaseScreen {
     this.layer.onFinish(editor::applyMapLocation);
     this.mapView = new MapView(SharedTileCache.get());
     this.mapView.interactive(true).setDimension(dimension);
-    this.mapView.addLayer(new PlayerMarkerLayer()).addLayer(layer);
+    this.mapView
+        .addLayer(new BannerLayer(SharedTileCache.banners()))
+        .addLayer(new PlayerMarkerLayer())
+        .addLayer(layer);
     this.mapView.sizing(Sizing.fill(100), Sizing.fill(100));
     this.mapView.id("map-view");
     root.childById(FlowLayout.class, "map-slot").child(mapView);
