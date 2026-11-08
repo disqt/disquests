@@ -16,12 +16,16 @@ public final class QuestStyle {
   private static final int HOVER_ALPHA = 0x73;
   private static final int PALETTE_SIZE = 12;
 
-  /** Twelve hues 30 degrees apart, ordered so neighbouring slots are far apart on the wheel. */
+  /**
+   * Twelve hues 30 degrees apart (15, 45, ... 345), ordered so neighbouring slots are far apart on
+   * the wheel.
+   */
   private static final int[] PALETTE = new int[PALETTE_SIZE];
 
   static {
     for (int i = 0; i < PALETTE_SIZE; i++) {
-      double hue = (i * 5 % PALETTE_SIZE) * (360.0 / PALETTE_SIZE);
+      // Offset by 15 degrees so no hue sits on the player marker's blue (210) or the old amber.
+      double hue = 15 + (i * 5 % PALETTE_SIZE) * (360.0 / PALETTE_SIZE);
       PALETTE[i] = TagColors.hslToArgb(hue, 0.80, 0.58, 0xFF) & 0x00FFFFFF;
     }
   }

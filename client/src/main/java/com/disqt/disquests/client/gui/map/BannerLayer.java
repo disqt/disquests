@@ -17,7 +17,8 @@ public class BannerLayer implements MapLayer {
   private static final int FLAG_WIDTH = 5;
   private static final int FLAG_HEIGHT = 5;
   private static final int POLE_COLOR = 0xFFD0D0D0;
-  private static final int LABEL_GAP = 2;
+  private static final int OUTLINE_COLOR = 0xFFDDDDDD;
+  private static final int LABEL_GAP = 3;
 
   private final BannerCache cache;
   private boolean showLabels = true;
@@ -52,6 +53,11 @@ public class BannerLayer implements MapLayer {
       int ax = view.x() + px;
       int ay = view.y() + top;
       g.fill(ax, ay, ax + 1, ay + HEIGHT, POLE_COLOR);
+      // Light outline first (one px larger on every side), so dark dyes stay visible.
+      for (int i = -1; i <= FLAG_WIDTH; i++) {
+        int inset = Math.max(0, i) / 2;
+        g.fill(ax + 1 + i, ay + inset - 1, ax + 2 + i, ay + FLAG_HEIGHT - inset + 1, OUTLINE_COLOR);
+      }
       // Pennant: 1 px columns narrowing to a point on the right of the pole.
       for (int i = 0; i < FLAG_WIDTH; i++) {
         int inset = i / 2;

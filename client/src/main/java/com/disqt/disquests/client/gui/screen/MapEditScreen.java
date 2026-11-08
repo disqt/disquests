@@ -31,6 +31,7 @@ import net.minecraft.resources.Identifier;
 public class MapEditScreen extends DisquestsBaseScreen {
   private static final int INITIAL_ZOOM = 2;
   private static final int HINT_MIN_WIDTH = 100;
+  private static final int HINT_MAX_WIDTH = 480;
   private static final Component EDIT_HINT = Component.translatable("gui.disquests.map.edit_hint");
 
   private final QuestScreen editor;
@@ -80,7 +81,7 @@ public class MapEditScreen extends DisquestsBaseScreen {
 
     this.hintLabel = root.childById(LabelComponent.class, "hint-label");
     hintLabel.text(EDIT_HINT);
-    hintLabel.maxWidth(Math.max(HINT_MIN_WIDTH, this.width - 16));
+    hintLabel.maxWidth(hintWidth());
     hintLabel.horizontalTextAlignment(HorizontalAlignment.CENTER);
 
     ButtonComponent done = root.childById(ButtonComponent.class, "btn-map-done");
@@ -92,6 +93,20 @@ public class MapEditScreen extends DisquestsBaseScreen {
     ButtonComponent cancel = root.childById(ButtonComponent.class, "btn-map-cancel");
     cancel.setMessage(Component.translatable("gui.disquests.btn.cancel_map"));
     cancel.onPress(ignored -> cancel());
+  }
+
+  /** owo keeps the built UI across resizes (init only resizes the adapter), so re-wrap the hint. */
+  @Override
+  protected void init() {
+    super.init();
+    if (hintLabel != null) {
+      hintLabel.maxWidth(hintWidth());
+    }
+  }
+
+  /** The hint wraps at min(screen width - 16, 480), never narrower than 100. */
+  private int hintWidth() {
+    return Math.max(HINT_MIN_WIDTH, Math.min(this.width - 16, HINT_MAX_WIDTH));
   }
 
   /** The initial shape's bounding-box centre, else the player (same dimension), else (0, 0). */

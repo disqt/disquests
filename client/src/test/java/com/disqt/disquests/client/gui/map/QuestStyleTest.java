@@ -59,6 +59,40 @@ class QuestStyleTest {
     }
   }
 
+  @Test
+  void palette_avoidsPlayerBlueAndAmber() {
+    for (int i = 0; i < 200; i++) {
+      int c = QuestStyle.baseColor(UUID.nameUUIDFromBytes(new byte[] {(byte) i, 7}));
+      assertTrue(hueDistance(hue(c), 210) >= 10, "near player blue: " + Integer.toHexString(c));
+      assertTrue(hueDistance(hue(c), 35) >= 5, "near amber: " + Integer.toHexString(c));
+    }
+  }
+
+  private static double hueDistance(double a, double b) {
+    double d = Math.abs(a - b) % 360;
+    return Math.min(d, 360 - d);
+  }
+
+  private static double hue(int rgb) {
+    double r = ((rgb >> 16) & 0xFF) / 255.0;
+    double g = ((rgb >> 8) & 0xFF) / 255.0;
+    double b = (rgb & 0xFF) / 255.0;
+    double max = Math.max(r, Math.max(g, b));
+    double d = max - Math.min(r, Math.min(g, b));
+    if (d == 0) {
+      return 0;
+    }
+    double h;
+    if (max == r) {
+      h = ((g - b) / d) % 6;
+    } else if (max == g) {
+      h = (b - r) / d + 2;
+    } else {
+      h = (r - g) / d + 4;
+    }
+    return (h * 60 + 360) % 360;
+  }
+
   private static double saturation(int rgb) {
     int r = (rgb >> 16) & 0xFF;
     int g = (rgb >> 8) & 0xFF;
