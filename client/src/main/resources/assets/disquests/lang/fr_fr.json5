@@ -35,6 +35,11 @@
     "reopen": "Rouvrir",
   },
 
+  // Notifications
+  "gui.disquests.toast.{}": {
+    "quest_archived": "Cette quête a été terminée par un coéquipier ; tes modifications n'ont pas été enregistrées.",
+  },
+
   // Onglets de l'accueil
   "gui.disquests.tab.{}": {
     "archived": "Archivées",

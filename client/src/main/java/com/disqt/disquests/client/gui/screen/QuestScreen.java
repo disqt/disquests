@@ -34,9 +34,11 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -117,7 +119,7 @@ public class QuestScreen extends DisquestsBaseScreen {
   }
 
   public boolean hasLeaveButton() {
-    return isContributor && !isOwner && !editing;
+    return isContributor && !isOwner && !editing && !quest.isCompleted();
   }
 
   @Override
@@ -606,7 +608,11 @@ public class QuestScreen extends DisquestsBaseScreen {
   }
 
   private void exitToViewMode() {
-    if (isNewQuest) {
+    Quest archived = archivedMeanwhile(quest.getId());
+    if (archived != null) {
+      // Completed by a teammate while editing: show it as it is now, not the stale copy.
+      navigateToScreen(new QuestScreen(this.parent, archived));
+    } else if (isNewQuest) {
       navigateToScreen(this.parent);
     } else {
       navigateToScreen(new QuestScreen(this.parent, quest));
@@ -614,6 +620,12 @@ public class QuestScreen extends DisquestsBaseScreen {
   }
 
   private void saveAndView() {
+    Quest archived = archivedMeanwhile(quest.getId());
+    if (archived != null) {
+      // A teammate completed the quest while we edited; the server would drop this save.
+      showArchivedInstead(this.parent, archived);
+      return;
+    }
     persistFieldValues();
     ClientCache.addOrUpdateMyQuest(quest);
     PacketSender.saveQuest(
@@ -641,12 +653,19 @@ public class QuestScreen extends DisquestsBaseScreen {
   private Component completedText() {
     String date =
         DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+            .withLocale(gameLocale())
             .withZone(ZoneId.systemDefault())
             .format(Instant.ofEpochMilli(quest.getCompletedAt()));
     String name = quest.getCompletedByName();
     return name != null
         ? Component.translatable("gui.disquests.label.completed_by", date, name)
         : Component.translatable("gui.disquests.label.completed", date);
+  }
+
+  /** The game language (e.g. fr_fr) as a Locale, so dates follow it rather than the JVM. */
+  private static Locale gameLocale() {
+    String code = Minecraft.getInstance().getLanguageManager().getSelected();
+    return code != null ? Locale.forLanguageTag(code.replace('_', '-')) : Locale.getDefault();
   }
 
   private void confirmComplete() {

@@ -35,6 +35,11 @@
     "reopen": "Reopen",
   },
 
+  // Toasts
+  "gui.disquests.toast.{}": {
+    "quest_archived": "This quest was completed by a teammate; your changes were not saved.",
+  },
+
   // Home tabs
   "gui.disquests.tab.{}": {
     "archived": "Archived",
