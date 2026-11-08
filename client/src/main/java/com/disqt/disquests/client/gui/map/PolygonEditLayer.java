@@ -112,6 +112,9 @@ public class PolygonEditLayer implements MapLayer {
     if (button != InputConstants.MOUSE_BUTTON_LEFT) {
       return false;
     }
+    if (moveOnly) {
+      notice = null;
+    }
     int hit = hitVertex(view, relX, relY);
     if (!moveOnly && hit == 0 && vertices.size() >= 3) {
       tryFinish();
@@ -142,6 +145,11 @@ public class PolygonEditLayer implements MapLayer {
       MapView view, double relX, double relY, int button, double dx, double dy) {
     if (dragging < 0 || button != InputConstants.MOUSE_BUTTON_LEFT) {
       return false;
+    }
+    if (moveOnly) {
+      // Keep the corner where the preview can show it.
+      relX = Math.max(0, Math.min(view.width(), relX));
+      relY = Math.max(0, Math.min(view.height(), relY));
     }
     PointData moved = blockAt(view, relX, relY);
     if (!moved.equals(vertices.get(dragging))) {

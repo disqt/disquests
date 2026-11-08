@@ -223,7 +223,8 @@ final class LocationCard {
     ScrollContainer<FlowLayout> scroll =
         UIContainers.verticalScroll(Sizing.content(), Sizing.fixed(maxHeight), list);
     scroll.scrollbarThiccness(SCROLLBAR_WIDTH);
-    scroll.padding(Insets.right(SCROLLBAR_WIDTH + 2));
+    // owo draws the bar inside the scroll's content box; pad the list so it clears the fields.
+    list.padding(Insets.right(SCROLLBAR_WIDTH + 2));
     parent.child(index, scroll);
   }
 
