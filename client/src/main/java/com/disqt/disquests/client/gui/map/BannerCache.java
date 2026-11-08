@@ -6,13 +6,16 @@ import com.disqt.disquests.client.net.TileFetcher;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.function.LongSupplier;
 
 /**
- * BlueMap banner markers per map id, fetched once per session in the background. No Minecraft
- * imports. {@link #get} never blocks.
+ * BlueMap banner markers per map id, fetched in the background and refreshed while read. No
+ * Minecraft imports. {@link #get} never blocks.
  */
 public final class BannerCache {
   public enum Status {
@@ -21,6 +24,8 @@ public final class BannerCache {
     FAILED
   }
 
+  public static final long REFRESH_MILLIS = 60_000L;
+
   private final String baseUrl;
   private final TileFetcher fetcher;
   private final Executor pool;
@@ -28,9 +33,24 @@ public final class BannerCache {
   // Guarded by "this".
   private final Map<String, Status> status = new HashMap<>();
   private final Map<String, List<BannerMarker>> markers = new HashMap<>();
+  private final Map<String, Long> lastAttempt = new HashMap<>();
+  private final Set<String> inFlight = new HashSet<>();
+  private final LongSupplier nowMillis;
+  private final long refreshMillis;
   private boolean closed;
 
   public BannerCache(String baseUrl, TileFetcher fetcher, Executor pool) {
+    this(baseUrl, fetcher, pool, System::currentTimeMillis, REFRESH_MILLIS);
+  }
+
+  public BannerCache(
+      String baseUrl,
+      TileFetcher fetcher,
+      Executor pool,
+      LongSupplier nowMillis,
+      long refreshMillis) {
+    this.nowMillis = nowMillis;
+    this.refreshMillis = refreshMillis;
     String base = baseUrl == null ? "" : baseUrl;
     this.baseUrl = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
     this.fetcher = fetcher;
@@ -46,31 +66,41 @@ public final class BannerCache {
     return status.get(mapId);
   }
 
-  /** The banners of a map; empty while loading or after a failure. Starts the fetch once. */
+  /**
+   * The last good banner list of a map; empty before the first success. Schedules a background
+   * refresh when none is in flight and the last attempt is older than the refresh interval.
+   */
   public List<BannerMarker> get(String mapId) {
     if (mapId == null || mapId.isEmpty()) {
       return List.of();
     }
+    List<BannerMarker> current;
     synchronized (this) {
-      List<BannerMarker> known = markers.get(mapId);
-      if (known != null) {
-        return known;
-      }
-      if (closed || status.containsKey(mapId)) {
-        return List.of();
+      current = markers.getOrDefault(mapId, List.of());
+      if (closed || inFlight.contains(mapId)) {
+        return current;
       }
       if (baseUrl.isEmpty() || !HttpFetcher.isAllowedUrl(baseUrl)) {
         status.put(mapId, Status.FAILED);
-        return List.of();
+        return current;
       }
-      status.put(mapId, Status.LOADING);
+      long now = nowMillis.getAsLong();
+      Long last = lastAttempt.get(mapId);
+      if (last != null && now - last < refreshMillis) {
+        return current;
+      }
+      lastAttempt.put(mapId, now);
+      inFlight.add(mapId);
+      if (!markers.containsKey(mapId)) {
+        status.put(mapId, Status.LOADING);
+      }
     }
     try {
       pool.execute(() -> load(mapId));
     } catch (RuntimeException e) {
       fail(mapId);
     }
-    return List.of();
+    return current;
   }
 
   public synchronized void close() {
@@ -89,6 +119,7 @@ public final class BannerCache {
       synchronized (this) {
         markers.put(mapId, parsed);
         status.put(mapId, Status.LOADED);
+        inFlight.remove(mapId);
       }
     } catch (IOException | RuntimeException e) {
       fail(mapId);
@@ -96,6 +127,9 @@ public final class BannerCache {
   }
 
   private synchronized void fail(String mapId) {
-    status.put(mapId, Status.FAILED);
+    inFlight.remove(mapId);
+    if (!markers.containsKey(mapId)) {
+      status.put(mapId, Status.FAILED);
+    }
   }
 }
