@@ -68,7 +68,7 @@
             </template>
 
             <!-- Location card (mini map, coords, map, BlueMap button), zero-sized when unlocated -->
-            <flow-layout direction="vertical" id="location-card">
+            <flow-layout direction="horizontal" id="location-card">
                 <sizing>
                     <horizontal method="fill">85</horizontal>
                     <vertical method="content"/>
@@ -79,25 +79,25 @@
                 <padding>
                     <all>4</all>
                 </padding>
-                <gap>2</gap>
+                <gap>6</gap>
                 <margins>
                     <top>2</top>
                 </margins>
                 <children>
+                    <!-- LocationCard sets the map size -->
                     <flow-layout direction="vertical" id="mini-map-slot">
                         <sizing>
-                            <horizontal method="fill">100</horizontal>
-                            <vertical method="fixed">120</vertical>
+                            <horizontal method="content"/>
+                            <vertical method="content"/>
                         </sizing>
                         <children/>
                     </flow-layout>
-                    <flow-layout direction="horizontal" id="location-labels">
+                    <flow-layout direction="vertical" id="location-labels">
                         <sizing>
-                            <horizontal method="fill">100</horizontal>
+                            <horizontal method="expand">100</horizontal>
                             <vertical method="content"/>
                         </sizing>
-                        <vertical-alignment>center</vertical-alignment>
-                        <gap>8</gap>
+                        <gap>4</gap>
                         <children>
                             <label id="coords-label">
                                 <text></text>

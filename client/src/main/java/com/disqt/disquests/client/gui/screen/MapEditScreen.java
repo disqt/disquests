@@ -1,8 +1,11 @@
 package com.disqt.disquests.client.gui.screen;
 
+import com.disqt.disquests.client.data.Quest;
+import com.disqt.disquests.client.gui.map.BannerLayer;
 import com.disqt.disquests.client.gui.map.MapView;
 import com.disqt.disquests.client.gui.map.PlayerMarkerLayer;
 import com.disqt.disquests.client.gui.map.PolygonEditLayer;
+import com.disqt.disquests.client.gui.map.QuestStyle;
 import com.disqt.disquests.client.gui.map.SharedTileCache;
 import com.disqt.disquests.common.QuestLocation;
 import com.disqt.disquests.common.model.CoordinatesData;
@@ -28,6 +31,7 @@ import net.minecraft.resources.Identifier;
 public class MapEditScreen extends DisquestsBaseScreen {
   private static final int INITIAL_ZOOM = 2;
   private static final int HINT_MIN_WIDTH = 100;
+  private static final int HINT_MAX_WIDTH = 480;
   private static final Component EDIT_HINT = Component.translatable("gui.disquests.map.edit_hint");
 
   private final QuestScreen editor;
@@ -60,10 +64,15 @@ public class MapEditScreen extends DisquestsBaseScreen {
     applyThemeRoot(root);
 
     this.layer = new PolygonEditLayer(initial);
+    Quest quest = editor.getQuest();
+    this.layer.color(QuestStyle.outlineColor(quest.getId(), quest.getVisibility()));
     this.layer.onFinish(editor::applyMapLocation);
     this.mapView = new MapView(SharedTileCache.get());
     this.mapView.interactive(true).setDimension(dimension);
-    this.mapView.addLayer(new PlayerMarkerLayer()).addLayer(layer);
+    this.mapView
+        .addLayer(new BannerLayer(SharedTileCache.banners()))
+        .addLayer(new PlayerMarkerLayer())
+        .addLayer(layer);
     this.mapView.sizing(Sizing.fill(100), Sizing.fill(100));
     this.mapView.id("map-view");
     root.childById(FlowLayout.class, "map-slot").child(mapView);
@@ -72,7 +81,7 @@ public class MapEditScreen extends DisquestsBaseScreen {
 
     this.hintLabel = root.childById(LabelComponent.class, "hint-label");
     hintLabel.text(EDIT_HINT);
-    hintLabel.maxWidth(Math.max(HINT_MIN_WIDTH, this.width - 16));
+    hintLabel.maxWidth(hintWidth());
     hintLabel.horizontalTextAlignment(HorizontalAlignment.CENTER);
 
     ButtonComponent done = root.childById(ButtonComponent.class, "btn-map-done");
@@ -84,6 +93,20 @@ public class MapEditScreen extends DisquestsBaseScreen {
     ButtonComponent cancel = root.childById(ButtonComponent.class, "btn-map-cancel");
     cancel.setMessage(Component.translatable("gui.disquests.btn.cancel_map"));
     cancel.onPress(ignored -> cancel());
+  }
+
+  /** owo keeps the built UI across resizes (init only resizes the adapter), so re-wrap the hint. */
+  @Override
+  protected void init() {
+    super.init();
+    if (hintLabel != null) {
+      hintLabel.maxWidth(hintWidth());
+    }
+  }
+
+  /** The hint wraps at min(screen width - 16, 480), never narrower than 100. */
+  private int hintWidth() {
+    return Math.max(HINT_MIN_WIDTH, Math.min(this.width - 16, HINT_MAX_WIDTH));
   }
 
   /** The initial shape's bounding-box centre, else the player (same dimension), else (0, 0). */

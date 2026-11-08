@@ -56,8 +56,6 @@ public final class Colors {
   // --- World map ---
   public static int MAP_BACKGROUND = 0xFF141414;
   public static int MAP_GRID = 0xFF262626;
-  public static int MAP_OPEN = AMBER;
-  public static int MAP_CLOSED = 0xFF9A9A9A;
   public static int MAP_OWN_OUTLINE = 0xFFFFFFFF;
   public static int MAP_PLAYER = 0xFF55AAFF;
   public static int MAP_VERTEX = 0xFFFFFFFF;

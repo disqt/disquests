@@ -717,6 +717,19 @@ public class QuestScreen extends DisquestsBaseScreen {
    * null. Rebuilds the editor.
    */
   public void applyMapLocation(List<PointData> vertices) {
+    setLocation(vertices, false);
+    rebuildEditMode();
+  }
+
+  /**
+   * Applies corners dragged in the location card's preview with the rules of {@link
+   * #applyMapLocation}, but keeps the screen (the drag must not tear it down) and a pin's height.
+   */
+  void moveMapLocation(List<PointData> vertices) {
+    setLocation(vertices, true);
+  }
+
+  private void setLocation(List<PointData> vertices, boolean keepPinY) {
     String dimension = dimensionForEdit();
     if (vertices.isEmpty()) {
       quest.setCoordinates(null);
@@ -727,7 +740,9 @@ public class QuestScreen extends DisquestsBaseScreen {
     } else if (vertices.size() == 1) {
       PointData p = vertices.get(0);
       double y = LocationCard.DEFAULT_Y;
-      if (minecraft != null
+      if (keepPinY && quest.getCoordinates() != null && !quest.isPolygon()) {
+        y = quest.getCoordinates().y();
+      } else if (minecraft != null
           && minecraft.player != null
           && minecraft.player.level().dimension().identifier().getPath().equals(dimension)) {
         y = minecraft.player.getY();
@@ -744,7 +759,6 @@ public class QuestScreen extends DisquestsBaseScreen {
       quest.setRegion(true);
     }
     quest.setMap(dimension);
-    rebuildEditMode();
   }
 
   /** The quest's map, or the player's dimension when the quest has none. */

@@ -112,8 +112,10 @@ public class QuestPolygonLayer implements MapLayer {
 
   private void drawPolygon(MapView view, OwoUIGraphics g, Quest q, boolean isHovered, boolean own) {
     double[][] p = MapDraw.project(view, q.getPolygon());
-    MapDraw.fillPolygon(g, view, p[0], p[1], QuestStyle.fillColor(q.getVisibility(), isHovered));
-    MapDraw.outlinePolygon(g, view, p[0], p[1], QuestStyle.outlineColor(q.getVisibility()));
+    MapDraw.fillPolygon(
+        g, view, p[0], p[1], QuestStyle.fillColor(q.getId(), q.getVisibility(), isHovered));
+    MapDraw.outlinePolygon(
+        g, view, p[0], p[1], QuestStyle.outlineColor(q.getId(), q.getVisibility()));
     if (own) {
       double[][] in = MapDraw.inset(p[0], p[1], 1);
       MapDraw.outlinePolygon(g, view, in[0], in[1], Colors.MAP_OWN_OUTLINE);
@@ -128,8 +130,14 @@ public class QuestPolygonLayer implements MapLayer {
     double[] s = view.blockToScreen(pin[0], pin[1]);
     int x = view.x() + (int) Math.round(s[0]) - PIN_HALF;
     int y = view.y() + (int) Math.round(s[1]) - PIN_HALF;
-    g.fill(x, y, x + PIN_SIZE, y + PIN_SIZE, QuestStyle.fillColor(q.getVisibility(), isHovered));
-    g.drawRectOutline(x, y, PIN_SIZE, PIN_SIZE, QuestStyle.outlineColor(q.getVisibility()));
+    g.fill(
+        x,
+        y,
+        x + PIN_SIZE,
+        y + PIN_SIZE,
+        QuestStyle.fillColor(q.getId(), q.getVisibility(), isHovered));
+    g.drawRectOutline(
+        x, y, PIN_SIZE, PIN_SIZE, QuestStyle.outlineColor(q.getId(), q.getVisibility()));
     if (own) {
       g.drawRectOutline(x + 1, y + 1, PIN_SIZE - 2, PIN_SIZE - 2, Colors.MAP_OWN_OUTLINE);
     }

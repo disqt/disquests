@@ -6,9 +6,12 @@ import com.disqt.disquests.client.UrlOpener;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.map.BannerLayer;
 import com.disqt.disquests.client.gui.map.MapMath;
 import com.disqt.disquests.client.gui.map.MapView;
+import com.disqt.disquests.client.gui.map.PolygonEditLayer;
 import com.disqt.disquests.client.gui.map.QuestPolygonLayer;
+import com.disqt.disquests.client.gui.map.QuestStyle;
 import com.disqt.disquests.client.gui.map.SharedTileCache;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.common.QuestLocation;
@@ -18,7 +21,9 @@ import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.container.ScrollContainer;
 import io.wispforest.owo.ui.container.UIContainers;
+import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.VerticalAlignment;
 import java.util.ArrayList;
@@ -37,17 +42,20 @@ import org.jetbrains.annotations.Nullable;
 final class LocationCard {
   static final double DEFAULT_Y = 64;
 
-  // Preferred mini-map heights (the XML values); short screens get less, see mapHeight.
-  private static final int EDIT_MAP_HEIGHT = 200;
-  private static final int VIEW_MAP_HEIGHT = 120;
+  // Mini-map sizes (the slots in the XML are content-sized; these are the only source). Short
+  // screens get a smaller map with the same aspect, see mapSize.
+  private static final int EDIT_MAP_WIDTH = 220;
+  private static final int EDIT_MAP_HEIGHT = 140;
+  private static final int VIEW_MAP_WIDTH = 220;
+  private static final int VIEW_MAP_HEIGHT = 110;
   private static final int EDIT_MAP_SCREEN_DIVISOR = 4;
   private static final int VIEW_MAP_SCREEN_DIVISOR = 5;
-  private static final int MIN_MAP_HEIGHT = 60;
-  private static final double CARD_WIDTH_FRACTION = 0.85;
   private static final int MAP_FIT_MARGIN = 8;
   private static final int PIN_ZOOM = 2;
   private static final int FIELD_WIDTH = 50;
   private static final int ROW_HEIGHT = 14;
+  private static final int VERTEX_LIST_GAP = 2;
+  private static final int SCROLLBAR_WIDTH = 3;
 
   /** One vertex row's fields; {@code y} is only present for a pin. */
   record VertexRow(TextFieldComponent x, @Nullable TextFieldComponent y, TextFieldComponent z) {}
@@ -95,9 +103,26 @@ final class LocationCard {
   /** Fills the edit-mode card and returns the vertex rows it built (empty when unlocated). */
   static List<VertexRow> buildEdit(QuestScreen screen, FlowLayout root, Quest quest) {
     String dimension = screen.dimensionForEdit();
-    int mapHeight = mapHeight(EDIT_MAP_HEIGHT, screen.height, EDIT_MAP_SCREEN_DIVISOR);
-    addMiniMap(root, quest, dimension, screen.width, mapHeight);
-    List<VertexRow> rows = buildVertexRows(root.childById(FlowLayout.class, "vertex-list"), quest);
+    int[] size = mapSize(EDIT_MAP_WIDTH, EDIT_MAP_HEIGHT, screen.height, EDIT_MAP_SCREEN_DIVISOR);
+    FlowLayout vertexList = root.childById(FlowLayout.class, "vertex-list");
+    List<VertexRow> rows = buildVertexRows(vertexList, quest);
+    capVertexList(vertexList, rows.size(), size[1]);
+
+    // The preview drags existing corners in place; adding, removing and finishing stay in the
+    // full-screen editor. A drag updates the quest and the fields without rebuilding the screen.
+    PolygonEditLayer layer =
+        new PolygonEditLayer(locationVertices(quest))
+            .moveOnly(true)
+            .color(QuestStyle.outlineColor(quest.getId(), quest.getVisibility()));
+    layer.onVerticesChanged(
+        vertices -> {
+          List<PointData> before = locationVertices(quest);
+          screen.moveMapLocation(vertices);
+          refreshVertexFields(rows, before, vertices);
+        });
+    MapView map = addMiniMap(root, quest, dimension, size[0], size[1]);
+    map.addLayer(layer);
+    map.interactive(true);
 
     FlowLayout buttons = root.childById(FlowLayout.class, "location-buttons");
     // A pre-V2 server cannot store outlines from the map editor; the vertex rows stay the editor.
@@ -163,6 +188,49 @@ final class LocationCard {
     }
     chainTabTargets(rows);
     return rows;
+  }
+
+  /** The quest's outline corners, its pin as one corner, or nothing. */
+  private static List<PointData> locationVertices(Quest quest) {
+    if (quest.isPolygon()) {
+      return List.copyOf(quest.getPolygon());
+    }
+    CoordinatesData c = quest.getCoordinates();
+    return c != null ? List.of(new PointData(c.x(), c.z())) : List.of();
+  }
+
+  /**
+   * Rewrites the fields of the corners a preview drag moved. Other rows keep their text, so a value
+   * typed but not yet saved survives a drag of another corner; a pin keeps its Y field.
+   */
+  private static void refreshVertexFields(
+      List<VertexRow> rows, List<PointData> before, List<PointData> after) {
+    if (rows.size() != after.size()) return;
+    for (int i = 0; i < rows.size(); i++) {
+      PointData p = after.get(i);
+      if (i < before.size() && p.equals(before.get(i))) continue;
+      VertexRow row = rows.get(i);
+      boolean pin = row.y() != null;
+      row.x().getDelegate().setText(pin ? pinText(p.x()) : vertexText(p.x()));
+      row.z().getDelegate().setText(pin ? pinText(p.z()) : vertexText(p.z()));
+    }
+  }
+
+  /**
+   * Wraps the vertex list in a scroll area of the map's height when its rows would be taller, so a
+   * many-cornered outline does not stretch the card.
+   */
+  private static void capVertexList(FlowLayout list, int rowCount, int maxHeight) {
+    int height = rowCount * ROW_HEIGHT + Math.max(0, rowCount - 1) * VERTEX_LIST_GAP;
+    if (height <= maxHeight || !(list.parent() instanceof FlowLayout parent)) return;
+    int index = parent.children().indexOf(list);
+    parent.removeChild(list);
+    ScrollContainer<FlowLayout> scroll =
+        UIContainers.verticalScroll(Sizing.content(), Sizing.fixed(maxHeight), list);
+    scroll.scrollbarThiccness(SCROLLBAR_WIDTH);
+    // owo draws the bar inside the scroll's content box; pad the list so it clears the fields.
+    list.padding(Insets.right(SCROLLBAR_WIDTH + 2));
+    parent.child(index, scroll);
   }
 
   private static void chainTabTargets(List<VertexRow> rows) {
@@ -242,8 +310,11 @@ final class LocationCard {
       card.sizing(Sizing.fixed(0), Sizing.fixed(0));
       return;
     }
-    int mapHeight = mapHeight(VIEW_MAP_HEIGHT, screen.height, VIEW_MAP_SCREEN_DIVISOR);
-    addMiniMap(root, quest, screen.dimensionForEdit(), screen.width, mapHeight);
+    int[] size = mapSize(VIEW_MAP_WIDTH, VIEW_MAP_HEIGHT, screen.height, VIEW_MAP_SCREEN_DIVISOR);
+    MapView map = addMiniMap(root, quest, screen.dimensionForEdit(), size[0], size[1]);
+    QuestPolygonLayer layer = new QuestPolygonLayer();
+    layer.setQuests(List.of(quest));
+    map.addLayer(layer);
 
     root.childById(LabelComponent.class, "coords-label")
         .text(buildCoordsText(quest).withColor(Colors.TEXT_MUTED));
@@ -282,30 +353,26 @@ final class LocationCard {
   // ===================== MINI MAP =====================
 
   /**
-   * Adds a non-interactive map of the quest to {@code mini-map-slot}: an outline fitted to the
-   * card, a pin at zoom 2, otherwise the player (or the origin) at zoom 2.
+   * Adds a map of the quest to {@code mini-map-slot}, with only the banner layer (no labels) and
+   * non-interactive: an outline fitted to the map, a pin at zoom 2, otherwise the player (or the
+   * origin) at zoom 2.
    */
-  private static void addMiniMap(
-      FlowLayout root, Quest quest, String dimension, int screenWidth, int mapHeight) {
+  private static MapView addMiniMap(
+      FlowLayout root, Quest quest, String dimension, int mapWidth, int mapHeight) {
     FlowLayout slot = root.childById(FlowLayout.class, "mini-map-slot");
-    slot.verticalSizing(Sizing.fixed(mapHeight));
-
-    QuestPolygonLayer layer = new QuestPolygonLayer();
-    layer.setQuests(List.of(quest));
     MapView map = new MapView(SharedTileCache.get()).interactive(false).setDimension(dimension);
-    map.addLayer(layer);
-    map.sizing(Sizing.fill(100), Sizing.fill(100));
+    map.sizing(Sizing.fixed(mapWidth), Sizing.fixed(mapHeight));
     map.id("mini-map");
+    map.addLayer(new BannerLayer(SharedTileCache.banners()).showLabels(false));
 
     if (quest.isPolygon()) {
       CoordinatesData[] box = QuestLocation.boundingBox(quest.getPolygon(), DEFAULT_Y);
       map.centerOn((box[0].x() + box[1].x()) / 2, (box[0].z() + box[1].z()) / 2);
-      int cardWidth = (int) (CARD_WIDTH_FRACTION * screenWidth);
       map.setZoom(
           MapMath.fitZoom(
               box[1].x() - box[0].x(),
               box[1].z() - box[0].z(),
-              cardWidth,
+              mapWidth,
               mapHeight,
               MAP_FIT_MARGIN));
     } else if (quest.getCoordinates() != null) {
@@ -321,11 +388,16 @@ final class LocationCard {
       map.setZoom(PIN_ZOOM);
     }
     slot.child(map);
+    return map;
   }
 
-  /** The preferred height, shrunk to a share of short screens so the rows below stay visible. */
-  private static int mapHeight(int preferred, int screenHeight, int divisor) {
-    return Math.min(preferred, Math.max(MIN_MAP_HEIGHT, screenHeight / divisor));
+  /**
+   * The preferred {width, height}, shrunk on short screens to at most {@code screenHeight /
+   * divisor} tall with the same aspect, so the rows below stay visible.
+   */
+  private static int[] mapSize(int width, int height, int screenHeight, int divisor) {
+    int h = Math.max(1, Math.min(height, screenHeight / divisor));
+    return new int[] {(int) Math.round((double) width * h / height), h};
   }
 
   // ===================== WIDGETS =====================
