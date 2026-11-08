@@ -146,7 +146,8 @@
                 </children>
             </flow-layout>
 
-            <!-- Location card: mini map, vertex fields, location buttons (built programmatically) -->
+            <!-- Location card: mini map beside the vertex fields, location buttons below (built
+                 programmatically; LocationCard sets the map size) -->
             <flow-layout direction="vertical" id="location-card">
                 <sizing>
                     <horizontal method="fill">85</horizontal>
@@ -163,20 +164,29 @@
                     <top>2</top>
                 </margins>
                 <children>
-                    <flow-layout direction="vertical" id="mini-map-slot">
-                        <sizing>
-                            <horizontal method="fill">100</horizontal>
-                            <vertical method="fixed">200</vertical>
-                        </sizing>
-                        <children/>
-                    </flow-layout>
-                    <flow-layout direction="vertical" id="vertex-list">
+                    <flow-layout direction="horizontal" id="location-main">
                         <sizing>
                             <horizontal method="content"/>
                             <vertical method="content"/>
                         </sizing>
-                        <gap>2</gap>
-                        <children/>
+                        <gap>6</gap>
+                        <children>
+                            <flow-layout direction="vertical" id="mini-map-slot">
+                                <sizing>
+                                    <horizontal method="content"/>
+                                    <vertical method="content"/>
+                                </sizing>
+                                <children/>
+                            </flow-layout>
+                            <flow-layout direction="vertical" id="vertex-list">
+                                <sizing>
+                                    <horizontal method="content"/>
+                                    <vertical method="content"/>
+                                </sizing>
+                                <gap>2</gap>
+                                <children/>
+                            </flow-layout>
+                        </children>
                     </flow-layout>
                     <flow-layout direction="horizontal" id="location-buttons">
                         <sizing>
