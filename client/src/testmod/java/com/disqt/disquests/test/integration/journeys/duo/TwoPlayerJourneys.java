@@ -7,6 +7,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
+import com.disqt.disquests.client.data.Contributor;
+import com.disqt.disquests.client.data.Quest;
+import com.disqt.disquests.client.gui.component.QuestEntryComponent;
 import com.disqt.disquests.client.gui.screen.ContributorScreen;
 import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
@@ -16,12 +19,16 @@ import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
 import com.disqt.disquests.test.integration.harness.PlayerB;
 import io.wispforest.owo.ui.component.ButtonComponent;
+import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.container.FlowLayout;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.client.gui.screens.Screen;
 import org.junit.jupiter.api.*;
 
-/** All two-player journeys in one flat class. Order ranges: Collaboration 1-5, OpenQuest 10-12. */
+/**
+ * All two-player journeys in one flat class. Order ranges: Collaboration 1-5, OpenQuest 10-12,
+ * Completion 20-21.
+ */
 @IntegrationTest
 @DisplayName("Two-Player Journeys")
 class TwoPlayerJourneys {
@@ -384,5 +391,187 @@ class TwoPlayerJourneys {
     then("quest is removed from PlayerB's My Quests");
     waitForScreen(context, MainScreen.class);
     assertEntryCount(context, 0);
+  }
+
+  // =========================================================================
+  // Completion: A completes a quest B edits; B finds it in Archived
+  // =========================================================================
+
+  @Test
+  @Order(20)
+  @PlayerA
+  @DisplayName("Completion: A creates OPEN quest")
+  void completion_a_creates_open_quest(ClientGameTestContext context) {
+    given("PlayerA is on the My Quests tab");
+    context.waitFor(client -> ClientSession.isOnServer(), CONNECT_TIMEOUT);
+    context.runOnClient(
+        c -> {
+          ClientSession.setActiveTab(ClientSession.Tab.MY_QUESTS);
+          ClientSession.setSearchTerm("");
+        });
+
+    when("PlayerA creates an OPEN quest");
+    openMainScreen(context);
+    click(context, "btn-new-quest");
+    waitForScreen(context, QuestScreen.class);
+    type(context, "title-field", "Archive Quest");
+    click(context, "btn-visibility");
+    click(context, "btn-visibility");
+    assertButtonText(context, "btn-visibility", "Open");
+    click(context, "btn-save");
+    waitForScreen(context, QuestScreen.class);
+
+    then("the quest is saved");
+    assertLabelText(context, "title-label", "Archive Quest");
+    click(context, "btn-back");
+    waitForScreen(context, MainScreen.class);
+
+    PhaseSync.signal("archive-quest-created");
+  }
+
+  @Test
+  @Order(20)
+  @PlayerB
+  @DisplayName("Completion: B joins the OPEN quest")
+  void completion_b_joins_quest(ClientGameTestContext context) {
+    given("PlayerB is connected to the server");
+    context.waitFor(client -> ClientSession.isOnServer(), CONNECT_TIMEOUT);
+    context.runOnClient(
+        c -> {
+          ClientSession.setActiveTab(ClientSession.Tab.MY_QUESTS);
+          ClientSession.setSearchTerm("");
+        });
+    PhaseSync.waitFor("archive-quest-created", context);
+
+    when("PlayerB joins the quest from the Quest Board");
+    openMainScreen(context);
+    click(context, "tab-quest-board");
+    waitForQuestByTitle(context, "Archive Quest", false);
+    clickEntryByTitle(context, "Archive Quest");
+    click(context, "btn-interact");
+
+    then("the quest is in PlayerB's My Quests");
+    waitForQuestByTitle(context, "Archive Quest", true);
+    click(context, "tab-my-quests");
+
+    PhaseSync.signal("archive-quest-joined");
+  }
+
+  @Test
+  @Order(21)
+  @PlayerA
+  @DisplayName("Completion: A grants B edit rights and completes the quest")
+  void completion_a_grants_and_completes(ClientGameTestContext context) {
+    given("PlayerB has joined the quest");
+    PhaseSync.waitFor("archive-quest-joined", context);
+    waitForQuestCondition(context, "Archive Quest", true, q -> !q.getContributors().isEmpty());
+
+    when("PlayerA gives PlayerB edit rights from the Contributors screen");
+    openMainScreen(context);
+    clickEntryByTitle(context, "Archive Quest");
+    click(context, "btn-open");
+    waitForScreen(context, QuestScreen.class);
+    click(context, "btn-edit");
+    waitForScreen(context, QuestScreen.class);
+    click(context, "btn-contributors");
+    waitForScreen(context, ContributorScreen.class);
+    clickAt(context, firstContributorPermissionButton(context), 4);
+    waitForQuestCondition(
+        context,
+        "Archive Quest",
+        true,
+        q -> q.getContributors().stream().anyMatch(Contributor::canEdit));
+
+    and("PlayerA opens the quest in view mode and completes it");
+    // Leaves the untouched editor behind: nothing to save.
+    openMainScreen(context);
+    clickEntryByTitle(context, "Archive Quest");
+    click(context, "btn-open");
+    waitForScreen(context, QuestScreen.class);
+    waitForComponent(context, "btn-complete");
+    click(context, "btn-complete");
+    waitForComponent(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
+    click(context, DisquestsBaseScreen.CONFIRM_YES_ID);
+
+    then("the quest is completed in PlayerA's cache");
+    waitForQuestCondition(context, "Archive Quest", true, Quest::isCompleted);
+    waitForScreen(context, MainScreen.class);
+
+    PhaseSync.signal("archive-quest-completed");
+  }
+
+  @Test
+  @Order(21)
+  @PlayerB
+  @DisplayName("Completion: B sees the quest completed in Archived")
+  void completion_b_sees_archived(ClientGameTestContext context) {
+    when("PlayerA completes the quest");
+    PhaseSync.waitFor("archive-quest-completed", context);
+
+    then("PlayerB's cache marks it completed");
+    waitForQuestCondition(context, "Archive Quest", true, Quest::isCompleted);
+
+    when("PlayerB opens the Archived tab");
+    openMainScreen(context);
+    click(context, "tab-archived");
+
+    then("the quest is listed there");
+    context.waitFor(
+        client -> {
+          if (!(client.gui.screen() instanceof MainScreen screen)) return false;
+          var root = screen.getRootComponent();
+          FlowLayout list = root != null ? root.childById(FlowLayout.class, "quest-list") : null;
+          return list != null
+              && list.children().stream()
+                  .anyMatch(
+                      child ->
+                          child instanceof QuestEntryComponent entry
+                              && "Archive Quest".equals(entry.getQuest().getTitle()));
+        },
+        TIMEOUT);
+
+    when("PlayerB opens it");
+    clickEntryByTitle(context, "Archive Quest");
+    click(context, "btn-open");
+    waitForScreen(context, QuestScreen.class);
+
+    then("it is a read-only record PlayerB may reopen");
+    waitForComponent(context, "completed-label");
+    LabelComponent label = findComponent(context, LabelComponent.class, "completed-label");
+    String text = context.computeOnClient(c -> label.text().getString());
+    assertTrue(text.startsWith("Completed on"), "completed-label text was '" + text + "'");
+    assertComponentExists(context, "btn-reopen");
+    assertComponentMissing(context, "btn-edit");
+    assertComponentMissing(context, "btn-leave");
+
+    and("PlayerB returns to My Quests");
+    click(context, "btn-back");
+    waitForScreen(context, MainScreen.class);
+    click(context, "tab-my-quests");
+  }
+
+  /** Centre of the permission toggle in the first ContributorScreen contributor row. */
+  private static double[] firstContributorPermissionButton(ClientGameTestContext context) {
+    return context.computeOnClient(
+        c -> {
+          if (!(c.gui.screen() instanceof DisquestsBaseScreen dScreen))
+            throw new AssertionError("Not a Disquests screen");
+          var root = dScreen.getRootComponent();
+          if (root == null) throw new AssertionError("Root not found");
+          FlowLayout contribList = root.childById(FlowLayout.class, "contributor-list");
+          if (contribList == null || contribList.children().isEmpty())
+            throw new AssertionError("contributor-list is empty");
+          if (!(contribList.children().get(0) instanceof FlowLayout rowLayout))
+            throw new AssertionError("First contributor row is not a FlowLayout");
+          ButtonComponent permBtn =
+              rowLayout.children().stream()
+                  .filter(child -> child instanceof ButtonComponent)
+                  .map(child -> (ButtonComponent) child)
+                  .findFirst()
+                  .orElseThrow(() -> new AssertionError("Permission button not found"));
+          return new double[] {
+            permBtn.x() + permBtn.width() / 2.0, permBtn.y() + permBtn.height() / 2.0
+          };
+        });
   }
 }

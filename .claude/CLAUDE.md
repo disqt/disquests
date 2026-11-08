@@ -114,16 +114,17 @@ Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with physical input via
 
 Channel: `disquests:main`. First byte = PacketType ID.
 
-**C2S**: REQUEST_SYNC, SAVE_QUEST, DELETE_QUEST, JOIN_QUEST, REQUEST_COLLABORATION, RESPOND_COLLABORATION, UPDATE_CONTRIBUTORS, UPDATE_VISIBILITY, PIN_QUEST, LEAVE_QUEST
+**C2S**: REQUEST_SYNC, SAVE_QUEST, DELETE_QUEST, JOIN_QUEST, REQUEST_COLLABORATION, RESPOND_COLLABORATION, UPDATE_CONTRIBUTORS, UPDATE_VISIBILITY, PIN_QUEST, LEAVE_QUEST, COMPLETE_QUEST (0x0B), REOPEN_QUEST (0x0C)
 
 **S2C**: HANDSHAKE, SYNC_MY_QUESTS, SYNC_SERVER_QUESTS, UPDATE_QUEST, DELETE_QUEST_S2C, COLLABORATION_REQUEST, COLLABORATION_RESPONSE, SYNC_PENDING_REQUESTS, SYNC_TAGS
 
 ### Protocol Versioning
-- `ProtocolVersion.java`: V0 (legacy, pre-tags), V1 (tags), V2 (current, polygon). Client sends version in REQUEST_SYNC.
+- `ProtocolVersion.java`: V0 (legacy, pre-tags), V1 (tags), V2 (polygon), V3 (current, completion). Client sends version in REQUEST_SYNC.
 - Server tracks per-player version in `ServerPacketHandler`. V0 clients get packets without tag fields.
 - **All new packet fields must be trailing-optional** with `buf.remaining() > 0` guards on the reader side.
 - When adding new fields: append at end, never insert mid-packet. Update `ProtocolVersion.CURRENT`.
 - **V2 polygon block** — quests carry a trailing `polygon` after the tags (varint count <= 64, then raw-long doubles `x, z` per vertex). SAVE_QUEST carries the same block trailing-optional (`remaining() > 0`). The server rejects > 64 vertices or non-finite values.
+- **V3 completion block** — quests carry `long completedAt` (0 = active), nullable UUID `completedBy`, nullable string `completedByName`, after the polygon block. SAVE_QUEST does not carry them: completion changes only through COMPLETE_QUEST / REOPEN_QUEST (payload = quest UUID).
 - **HANDSHAKE always writes the full form** (tags, default map) followed by a trailing `varint serverProtocolVersion` (V1 assumed when absent), then a trailing `boolean worldMapEnabled` (true when absent, so older servers read as enabled), then a trailing `boolean playerMarkerEnabled` (true when absent). The client keeps it in `ClientSession.getServerProtocolVersion()` and reads every quest packet with that version (`PacketCodec.readQuest(buf, version)` and the version overloads), because `remaining()` guards cannot work for quests inside a list. `ClientSession.supportsMap()` = `>= V2`.
 - **V1 downgrade** — `writeQuest` for `< V2` and `DataManager.saveQuest` use `QuestLocation.normalize`: polygon of >= 2 vertices becomes `coordinates`/`coordinates2` = bounding-box min/max (y 64 unless a pin y exists) with `isRegion` true; 1 vertex becomes a pin. A V1 client re-saving a polygon quest with an unchanged rectangle keeps the polygon.
 - **Save broadcast scoping** — `handleSaveQuest` sends `UPDATE_QUEST` only to owner + contributors (not all mod players). Other handlers like `handleUpdateVisibility` still use `broadcastQuestUpdate()` which sends to all mod players for Open/Closed quests.
@@ -134,7 +135,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 |------|---------|
 | `common/src/main/java/com/disqt/disquests/common/PacketCodec.java` | All packet encode/decode methods |
 | `common/src/main/java/com/disqt/disquests/common/PacketType.java` | Packet type enum with byte IDs |
-| `common/src/main/java/com/disqt/disquests/common/ProtocolVersion.java` | Protocol version enum (V0, V1, V2) |
+| `common/src/main/java/com/disqt/disquests/common/ProtocolVersion.java` | Protocol version enum (V0-V3) |
 | `common/src/main/java/com/disqt/disquests/common/QuestLocation.java` | Pin/polygon geometry, bounding box and V1 `normalize` downgrade |
 | `common/src/main/java/com/disqt/disquests/common/DimensionKeys.java` | `normalize` maps `nether`/`end` to `the_nether`/`the_end` (config keys, saves, migration) |
 | `common/src/main/java/com/disqt/disquests/common/BlueMapUrlBuilder.java` | BlueMap URL construction with coords |
@@ -228,6 +229,13 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **`MainScreen` layouts** — `main_screen.xml` (map + side panel) when `ClientSession.mapAvailable()`, else `main_screen_legacy.xml`; its `server-notice` label shows only for an outdated server (`server_outdated`) or an unreachable BlueMap (`map_unavailable`), not when the map is switched off. `LocationCard` drops the mini map and `btn-edit-on-map` under the same rule.
 - **Server config `world-map`** (default `true`) — `Config.isWorldMapEnabled()` = `world-map` && non-empty `bluemap-url`, sent in the HANDSHAKE; `/disquests reload` resends handshakes. The client also has an owo-config `worldMap` setting. `mapAvailable()` = `supportsMap()` && server flag && client setting && `hasBluemap()` && the default map's `settings.json` probe (started in `handleHandshake`, `TileCache.settingsFailed`) has not failed.
 - **Server config `player-marker`** (default `true`) — `Config.isPlayerMarkerEnabled()`, sent in the HANDSHAKE, read as `ClientSession.isPlayerMarkerEnabled()`. When false: no `PlayerMarkerLayer` on `MainScreen`/`MapEditScreen`, `btn-centre-me` is removed, and maps open on the camera remembered this session (`ClientSession.rememberCamera`/`rememberedCamera`, a per-dimension `MapCameraMemory`, saved in `removed()` of both map screens, cleared on `leaveServer`) else `MapCameraMemory.WORLD_VIEW` ((0,0) zoom 0) in the default map's dimension. When true the board still opens on the player. `btn-set-pos` is unaffected.
+
+### Quest completion
+- **Archive lock is server-side** — every edit handler (save, contributors, visibility, join, request, pin, leave) returns early when `quest.isCompleted()`; COMPLETE/REOPEN need `canEdit`. Completing drops the quest's pins and pending requests. Only REOPEN unlocks it.
+- **Clients < V3 never receive completed quests** — syncs filter them out, and a completion sends those clients DELETE_QUEST_S2C; reopen sends the quest back. Completed Open/Closed quests leave every board.
+- **Stale-editor guard** — `DisquestsBaseScreen.archivedMeanwhile(id)` returns the cached quest when it was completed after a screen took its copy. `QuestScreen` save and `ContributorScreen` edits check it and call `showArchivedInstead` (toast + view of the archived quest) instead of sending an edit the server would silently drop.
+- **Archived tab** — `tab-archived` (`ClientSession.Tab.ARCHIVED`) lists `QuestListOrder.archived(ClientCache.getMyQuests())`, newest completion first; completed quests stay in `myQuests`, so filter with `Quest.isCompleted()`. View ids: `btn-complete` (active), `btn-reopen` + `completed-label` (completed; no `btn-edit`/`btn-leave`). Complete navigates back to the parent; Reopen rebuilds the open `QuestScreen` via `ClientPacketHandler`, so wait for `btn-complete`, not `waitForScreen`.
+- **`ClientSession.activeTab` persists across journey classes** — reset it (and the search term) at the start of a journey that relies on My Quests.
 
 ### Testing & E2E
 - **QuestScreen auto-close** — `tick()` closes the screen if the quest is not in `ClientCache`. E2E tests must add quests to cache before opening screens.
