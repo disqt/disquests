@@ -480,9 +480,10 @@ public class MainScreen extends DisquestsBaseScreen {
     if (playerMarker) {
       centreMe.setMessage(Component.translatable("gui.disquests.map.centre_me"));
       centreMe.onPress(ignored -> centreOnPlayer());
-    } else if (centreMe.parent() instanceof FlowLayout toolbar) {
-      // Server switched the player marker off: no GPS shortcut either.
-      toolbar.removeChild(centreMe);
+    } else {
+      // Server switched the player marker off: no GPS shortcut either. Look the toolbar up by id:
+      // owo only sets parent() when the tree is mounted, which happens after build().
+      root.childById(FlowLayout.class, "map-toolbar").removeChild(centreMe);
     }
     ButtonComponent toggleList = root.childById(ButtonComponent.class, "btn-toggle-list");
     toggleList.setMessage(Component.translatable("gui.disquests.map.toggle_list"));
