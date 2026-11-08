@@ -66,7 +66,7 @@ public class MainScreen extends DisquestsBaseScreen {
   private ButtonComponent btnOpen;
   private FlowLayout actionRow;
 
-  // Map mode (server protocol >= V2); all null in legacy mode
+  // Map mode (ClientSession.mapAvailable()); all null in legacy mode
   private final boolean mapMode;
   @Nullable private MapView mapView;
   @Nullable private QuestPolygonLayer polygonLayer;
@@ -99,7 +99,7 @@ public class MainScreen extends DisquestsBaseScreen {
   }
 
   public MainScreen(Screen parent) {
-    this(parent, ClientSession.supportsMap());
+    this(parent, ClientSession.mapAvailable());
   }
 
   private MainScreen(Screen parent, boolean mapMode) {
@@ -452,7 +452,7 @@ public class MainScreen extends DisquestsBaseScreen {
 
   // --- MAP ---
 
-  /** The map component, or null when the server is too old for the map (legacy layout). */
+  /** The map component, or null when the map is off (legacy layout). */
   @Nullable
   public MapView getMapView() {
     return mapView;
@@ -539,9 +539,13 @@ public class MainScreen extends DisquestsBaseScreen {
     return new double[] {pin.x(), pin.z()};
   }
 
+  /** Explains why the map is off (outdated server, BlueMap unreachable); none when switched off. */
   private void addServerNotice(FlowLayout root) {
-    LabelComponent notice =
-        UIComponents.label(Component.translatable("gui.disquests.map.server_outdated"));
+    String key = LocationCard.mapOffNoticeKey();
+    if (key == null) {
+      return;
+    }
+    LabelComponent notice = UIComponents.label(Component.translatable(key));
     notice.color(Color.ofArgb(Colors.TEXT_MUTED));
     notice.id("server-notice");
     FlowLayout header = root.childById(FlowLayout.class, "header-row");

@@ -8,6 +8,9 @@ public class DisquestsConfigModel {
 
   @Hook public Theme theme = Theme.FROSTED;
 
+  /** Shows the in-game world map on the quest board; off falls back to the classic list. */
+  public boolean worldMap = true;
+
   @SectionHeader("hud")
   public boolean pinnedVisible = true;
 

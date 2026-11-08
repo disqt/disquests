@@ -1186,6 +1186,55 @@ class PacketCodecTest {
   }
 
   @Test
+  void handshake_worldMapDisabled_roundTrips() {
+    byte[] packet =
+        PacketCodec.writeHandshake(
+            "u",
+            0,
+            List.of(),
+            UUID.randomUUID(),
+            Map.of(),
+            List.of(),
+            "overworld",
+            ProtocolVersion.CURRENT,
+            false);
+    ByteBufReader reader = new ByteBufReader(packet);
+    PacketCodec.readType(reader);
+    PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(reader);
+    assertFalse(payload.worldMapEnabled());
+    assertEquals(ProtocolVersion.CURRENT, payload.serverProtocolVersion());
+    assertEquals(0, reader.remaining());
+  }
+
+  @Test
+  void handshake_defaultOverloads_writeWorldMapEnabled() {
+    byte[] packet = PacketCodec.writeHandshake("u", 0, List.of(), UUID.randomUUID());
+    ByteBufReader reader = new ByteBufReader(packet);
+    PacketCodec.readType(reader);
+    assertTrue(PacketCodec.readHandshake(reader).worldMapEnabled());
+  }
+
+  @Test
+  void handshake_withoutWorldMapField_defaultsToEnabled() {
+    ByteBufWriter w = new ByteBufWriter();
+    w.writeByte(PacketType.HANDSHAKE.getId());
+    w.writeBoolean(true);
+    w.writeString("url");
+    w.writeVarInt(0);
+    w.writeVarInt(0);
+    w.writeUUID(UUID.randomUUID());
+    w.writeVarInt(0);
+    w.writeVarInt(0);
+    w.writeString("overworld");
+    w.writeVarInt(ProtocolVersion.CURRENT);
+    ByteBufReader reader = new ByteBufReader(w.toByteArray());
+    PacketCodec.readType(reader);
+    PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(reader);
+    assertEquals(ProtocolVersion.CURRENT, payload.serverProtocolVersion());
+    assertTrue(payload.worldMapEnabled());
+  }
+
+  @Test
   void saveQuest_rejectsMoreThan64Vertices() {
     ByteBufWriter w = new ByteBufWriter();
     w.writeByte(PacketType.SAVE_QUEST.getId());

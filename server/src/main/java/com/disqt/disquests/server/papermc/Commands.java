@@ -26,7 +26,8 @@ public class Commands implements CommandExecutor {
 
     if (args[0].equalsIgnoreCase("reload")) {
       plugin.getDisquestsConfig().reload(plugin);
-      sender.sendMessage("Disquests config reloaded.");
+      packetHandler.resendHandshakes();
+      sender.sendMessage("Disquests config reloaded. Handshakes resent.");
       return true;
     }
 
