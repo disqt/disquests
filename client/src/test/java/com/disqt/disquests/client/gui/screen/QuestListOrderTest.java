@@ -55,12 +55,12 @@ class QuestListOrderTest {
   }
 
   @Test
-  void clampPanelWidth_between180And60PercentOfScreen() {
-    assertEquals(180, QuestListOrder.clampPanelWidth(100, 1000));
+  void clampPanelWidth_between216And60PercentOfScreen() {
+    assertEquals(216, QuestListOrder.clampPanelWidth(100, 1000));
     assertEquals(400, QuestListOrder.clampPanelWidth(400, 1000));
     assertEquals(600, QuestListOrder.clampPanelWidth(900, 1000));
     // Narrow screens never go below the minimum.
-    assertEquals(180, QuestListOrder.clampPanelWidth(500, 200));
+    assertEquals(216, QuestListOrder.clampPanelWidth(500, 200));
   }
 
   private static Quest completed(String title, long completedAt) {

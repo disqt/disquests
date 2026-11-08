@@ -151,6 +151,13 @@ public class MainScreen extends DisquestsBaseScreen {
         ClientSession.setActiveTab(currentTab);
       }
     }
+    if (mapMode) {
+      // The tabs split the row evenly; expand() is a percentage of the remaining space each
+      int share = ClientSession.supportsCompletion() ? 33 : 50;
+      tabMyQuests.horizontalSizing(Sizing.expand(share));
+      tabQuestBoard.horizontalSizing(Sizing.expand(share));
+      tabArchived.horizontalSizing(Sizing.expand(share));
+    }
     // parent() is only set once the tree is mounted, so look the holder up by id.
     this.tabsParent = mapMode ? root.childById(FlowLayout.class, "side-panel") : root;
     this.filterRow = root.childById(FlowLayout.class, "filter-row");

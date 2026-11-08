@@ -10,7 +10,7 @@ final class QuestListOrder {
   private static final int COLLAPSE_BELOW_WIDTH = 640;
 
   /** Narrowest side panel: fits the tab and action rows. */
-  static final int MIN_PANEL_WIDTH = 180;
+  static final int MIN_PANEL_WIDTH = 216;
 
   private QuestListOrder() {}
 
@@ -53,7 +53,7 @@ final class QuestListOrder {
     return guiWidth < COLLAPSE_BELOW_WIDTH;
   }
 
-  /** Clamps a side panel width to [180, max(180, 60 % of the GUI width)]. */
+  /** Clamps a side panel width to [216, max(216, 60 % of the GUI width)]. */
   static int clampPanelWidth(int requested, int guiWidth) {
     int max = Math.max(MIN_PANEL_WIDTH, guiWidth * 3 / 5);
     return Math.max(MIN_PANEL_WIDTH, Math.min(max, requested));

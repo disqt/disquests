@@ -96,7 +96,7 @@
                  Its width is set from the config and the panel-divider drag in MainScreen. -->
             <flow-layout direction="vertical" id="side-panel">
                 <sizing>
-                    <horizontal method="fixed">180</horizontal>
+                    <horizontal method="fixed">216</horizontal>
                     <vertical method="fill">100</vertical>
                 </sizing>
                 <surface>
@@ -140,11 +140,11 @@
                         </children>
                     </flow-layout>
 
-                    <!-- Tab row: three fixed 56 px tabs with 2 px gaps fill the 172 px inside
-                         the narrowest (180 px) panel -->
+                    <!-- Tab row: tabs share the row width; MainScreen sets each one's expand
+                         percentage from the number of tabs present -->
                     <flow-layout direction="horizontal" id="tab-row">
                         <sizing>
-                            <horizontal method="content"/>
+                            <horizontal method="fill">100</horizontal>
                             <vertical method="content"/>
                         </sizing>
                         <gap>2</gap>
@@ -155,14 +155,14 @@
                             <button id="tab-my-quests">
                                 <text>My Quests</text>
                                 <sizing>
-                                    <horizontal method="fixed">56</horizontal>
+                                    <horizontal method="expand">33</horizontal>
                                     <vertical method="fixed">20</vertical>
                                 </sizing>
                             </button>
                             <button id="tab-quest-board">
                                 <text>Quest Board</text>
                                 <sizing>
-                                    <horizontal method="fixed">56</horizontal>
+                                    <horizontal method="expand">33</horizontal>
                                     <vertical method="fixed">20</vertical>
                                 </sizing>
                             </button>
@@ -170,7 +170,7 @@
                             <button id="tab-archived">
                                 <text>Archived</text>
                                 <sizing>
-                                    <horizontal method="fixed">56</horizontal>
+                                    <horizontal method="expand">33</horizontal>
                                     <vertical method="fixed">20</vertical>
                                 </sizing>
                             </button>
@@ -249,7 +249,7 @@
                     <!-- Action button row -->
                     <flow-layout direction="horizontal" id="action-row">
                         <sizing>
-                            <horizontal method="content"/>
+                            <horizontal method="fill">100</horizontal>
                             <vertical method="content"/>
                         </sizing>
                         <gap>4</gap>
@@ -260,21 +260,21 @@
                             <button id="btn-new-quest">
                                 <text>New Quest</text>
                                 <sizing>
-                                    <horizontal method="fixed">70</horizontal>
+                                    <horizontal method="expand">33</horizontal>
                                     <vertical method="fixed">20</vertical>
                                 </sizing>
                             </button>
                             <button id="btn-interact">
                                 <text>Join</text>
                                 <sizing>
-                                    <horizontal method="fixed">70</horizontal>
+                                    <horizontal method="expand">33</horizontal>
                                     <vertical method="fixed">20</vertical>
                                 </sizing>
                             </button>
                             <button id="btn-open">
                                 <text>Open</text>
                                 <sizing>
-                                    <horizontal method="fixed">70</horizontal>
+                                    <horizontal method="expand">33</horizontal>
                                     <vertical method="fixed">20</vertical>
                                 </sizing>
                             </button>

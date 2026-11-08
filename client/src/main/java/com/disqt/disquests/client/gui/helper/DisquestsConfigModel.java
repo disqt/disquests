@@ -12,7 +12,7 @@ public class DisquestsConfigModel {
   public boolean worldMap = true;
 
   /** Width of the map home's quest list, set by dragging its divider; clamped to the screen. */
-  public int sidePanelWidth = 180;
+  public int sidePanelWidth = 216;
 
   @SectionHeader("hud")
   public boolean pinnedVisible = true;
