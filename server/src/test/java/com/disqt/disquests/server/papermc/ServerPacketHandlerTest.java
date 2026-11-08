@@ -357,4 +357,350 @@ class ServerPacketHandlerTest {
     PacketCodec.readType(buf2);
     Assertions.assertTrue(PacketCodec.readHandshake(buf2).playerMarkerEnabled());
   }
+
+  // ---- V3 quest completion ----
+
+  private UUID seedQuest(Visibility visibility) {
+    dm.upsertPlayerName(OWNER, "Owner");
+    dm.upsertPlayerName(CONTRIBUTOR, "Contributor");
+    dm.upsertPlayerName(BYSTANDER, "Bystander");
+    UUID id = UUID.randomUUID();
+    dm.saveQuest(
+        new QuestData(
+            id,
+            "Gare",
+            "Content",
+            OWNER,
+            "Owner",
+            visibility,
+            List.of(),
+            1000L,
+            null,
+            false,
+            null,
+            "overworld",
+            List.of()));
+    return id;
+  }
+
+  private List<byte[]> packetsOfType(Player player, PacketType type) {
+    ArgumentCaptor<byte[]> captor = ArgumentCaptor.forClass(byte[].class);
+    verify(player, atLeast(0)).sendPluginMessage(eq(plugin), eq(CHANNEL), captor.capture());
+    return captor.getAllValues().stream()
+        .filter(d -> d.length > 0 && d[0] == type.getId())
+        .toList();
+  }
+
+  private QuestData onlyUpdate(Player player, int version) {
+    List<byte[]> updates = packetsOfType(player, PacketType.UPDATE_QUEST);
+    Assertions.assertEquals(1, updates.size(), "expected exactly one UPDATE_QUEST");
+    ByteBufReader buf = new ByteBufReader(updates.get(0));
+    PacketCodec.readType(buf);
+    return PacketCodec.readUpdateQuest(buf, version);
+  }
+
+  private UUID onlyDelete(Player player) {
+    List<byte[]> deletes = packetsOfType(player, PacketType.DELETE_QUEST_S2C);
+    Assertions.assertEquals(1, deletes.size(), "expected exactly one DELETE_QUEST_S2C");
+    ByteBufReader buf = new ByteBufReader(deletes.get(0));
+    PacketCodec.readType(buf);
+    return PacketCodec.readDeleteQuestS2C(buf);
+  }
+
+  private void complete(Player player, UUID id) {
+    handler.onPluginMessageReceived(CHANNEL, player, PacketCodec.writeCompleteQuest(id));
+  }
+
+  private void reopen(Player player, UUID id) {
+    handler.onPluginMessageReceived(CHANNEL, player, PacketCodec.writeReopenQuest(id));
+  }
+
+  @Test
+  void complete_byOwner_marksCompleted_andUpdatesV3Owner() {
+    UUID id = seedQuest(Visibility.PRIVATE);
+    register(ownerPlayer, ProtocolVersion.V3);
+    clearInvocations(ownerPlayer);
+
+    complete(ownerPlayer, id);
+
+    QuestData stored = dm.getQuest(id);
+    Assertions.assertTrue(stored.isCompleted());
+    Assertions.assertEquals(OWNER, stored.completedBy());
+    QuestData sent = onlyUpdate(ownerPlayer, ProtocolVersion.V3);
+    Assertions.assertTrue(sent.isCompleted());
+    Assertions.assertEquals(OWNER, sent.completedBy());
+    Assertions.assertEquals("Owner", sent.completedByName());
+  }
+
+  @Test
+  void complete_byViewOnlyContributor_isRefused() {
+    UUID id = seedQuest(Visibility.OPEN);
+    dm.addContributor(id, CONTRIBUTOR, false);
+    register(contributorPlayer, ProtocolVersion.V3);
+    clearInvocations(ownerPlayer, contributorPlayer, bystanderPlayer);
+
+    complete(contributorPlayer, id);
+
+    Assertions.assertFalse(dm.getQuest(id).isCompleted());
+    verify(ownerPlayer, never()).sendPluginMessage(any(), any(), any());
+    verify(contributorPlayer, never()).sendPluginMessage(any(), any(), any());
+    verify(bystanderPlayer, never()).sendPluginMessage(any(), any(), any());
+  }
+
+  @Test
+  void complete_byEditContributor_isAccepted() {
+    UUID id = seedQuest(Visibility.PRIVATE);
+    dm.addContributor(id, CONTRIBUTOR, true);
+    complete(contributorPlayer, id);
+    QuestData stored = dm.getQuest(id);
+    Assertions.assertTrue(stored.isCompleted());
+    Assertions.assertEquals(CONTRIBUTOR, stored.completedBy());
+  }
+
+  @Test
+  void complete_sendsDeleteToV2Viewers() {
+    UUID id = seedQuest(Visibility.OPEN);
+    register(ownerPlayer, ProtocolVersion.V3);
+    register(bystanderPlayer, ProtocolVersion.V2);
+    register(contributorPlayer, ProtocolVersion.V3); // not a participant
+    clearInvocations(ownerPlayer, contributorPlayer, bystanderPlayer);
+
+    complete(ownerPlayer, id);
+
+    Assertions.assertEquals(id, onlyDelete(bystanderPlayer));
+    Assertions.assertTrue(packetsOfType(bystanderPlayer, PacketType.UPDATE_QUEST).isEmpty());
+    Assertions.assertEquals(id, onlyDelete(contributorPlayer));
+    Assertions.assertTrue(packetsOfType(contributorPlayer, PacketType.UPDATE_QUEST).isEmpty());
+    Assertions.assertTrue(onlyUpdate(ownerPlayer, ProtocolVersion.V3).isCompleted());
+    Assertions.assertTrue(packetsOfType(ownerPlayer, PacketType.DELETE_QUEST_S2C).isEmpty());
+  }
+
+  @Test
+  void complete_sendsDeleteToV2Contributor() {
+    UUID id = seedQuest(Visibility.PRIVATE);
+    dm.addContributor(id, CONTRIBUTOR, true);
+    register(ownerPlayer, ProtocolVersion.V3);
+    register(contributorPlayer, ProtocolVersion.V2);
+    clearInvocations(ownerPlayer, contributorPlayer, bystanderPlayer);
+
+    complete(ownerPlayer, id);
+
+    Assertions.assertEquals(id, onlyDelete(contributorPlayer));
+    Assertions.assertTrue(packetsOfType(contributorPlayer, PacketType.UPDATE_QUEST).isEmpty());
+    // Private quest: a non-participant never saw it and gets nothing
+    verify(bystanderPlayer, never()).sendPluginMessage(any(), any(), any());
+  }
+
+  @Test
+  void complete_removesPins_andResendsOwnerHandshakeWhenRequestsDropped() {
+    UUID id = seedQuest(Visibility.CLOSED);
+    dm.pinQuest(BYSTANDER, id);
+    dm.createCollaborationRequest(id, BYSTANDER);
+    register(ownerPlayer, ProtocolVersion.V3);
+    clearInvocations(ownerPlayer);
+
+    complete(ownerPlayer, id);
+
+    Assertions.assertFalse(dm.isQuestPinned(BYSTANDER, id));
+    Assertions.assertEquals(0, dm.getPendingRequestCount(OWNER));
+    List<byte[]> handshakes = packetsOfType(ownerPlayer, PacketType.HANDSHAKE);
+    Assertions.assertEquals(1, handshakes.size());
+    ByteBufReader buf = new ByteBufReader(handshakes.get(0));
+    PacketCodec.readType(buf);
+    Assertions.assertEquals(0, PacketCodec.readHandshake(buf).pendingRequestCount());
+  }
+
+  @Test
+  void complete_withoutPendingRequests_sendsNoHandshake() {
+    UUID id = seedQuest(Visibility.CLOSED);
+    register(ownerPlayer, ProtocolVersion.V3);
+    clearInvocations(ownerPlayer);
+    complete(ownerPlayer, id);
+    Assertions.assertTrue(packetsOfType(ownerPlayer, PacketType.HANDSHAKE).isEmpty());
+  }
+
+  @Test
+  void reopen_byOwner_restoresAndBroadcasts() {
+    UUID id = seedQuest(Visibility.OPEN);
+    dm.completeQuest(id, OWNER, 5000L);
+    register(ownerPlayer, ProtocolVersion.V3);
+    register(bystanderPlayer, ProtocolVersion.V3);
+    register(contributorPlayer, ProtocolVersion.V3);
+    clearInvocations(ownerPlayer, contributorPlayer, bystanderPlayer);
+
+    reopen(ownerPlayer, id);
+
+    Assertions.assertFalse(dm.getQuest(id).isCompleted());
+    Assertions.assertFalse(onlyUpdate(ownerPlayer, ProtocolVersion.V3).isCompleted());
+    QuestData toBystander = onlyUpdate(bystanderPlayer, ProtocolVersion.V3);
+    Assertions.assertEquals(id, toBystander.id());
+    Assertions.assertFalse(toBystander.isCompleted());
+    Assertions.assertFalse(onlyUpdate(contributorPlayer, ProtocolVersion.V3).isCompleted());
+  }
+
+  @Test
+  void reopen_byDemotedContributor_isRefused() {
+    UUID id = seedQuest(Visibility.OPEN);
+    dm.addContributor(id, CONTRIBUTOR, true);
+    dm.completeQuest(id, CONTRIBUTOR, 5000L);
+    dm.updateContributor(id, CONTRIBUTOR, false);
+    clearInvocations(ownerPlayer, contributorPlayer, bystanderPlayer);
+
+    reopen(contributorPlayer, id);
+
+    Assertions.assertTrue(dm.getQuest(id).isCompleted());
+    verify(ownerPlayer, never()).sendPluginMessage(any(), any(), any());
+    verify(bystanderPlayer, never()).sendPluginMessage(any(), any(), any());
+  }
+
+  @Test
+  void saveOnCompletedQuest_isIgnored() {
+    UUID id = seedQuest(Visibility.PRIVATE);
+    dm.completeQuest(id, OWNER, 5000L);
+    clearInvocations(ownerPlayer);
+
+    handler.onPluginMessageReceived(
+        CHANNEL,
+        ownerPlayer,
+        PacketCodec.writeSaveQuest(id, "New title", "New", null, false, null, null, List.of()));
+
+    QuestData stored = dm.getQuest(id);
+    Assertions.assertEquals("Gare", stored.title());
+    Assertions.assertTrue(stored.isCompleted());
+    verify(ownerPlayer, never()).sendPluginMessage(any(), any(), any());
+  }
+
+  @Test
+  void joinCompletedQuest_isIgnored() {
+    UUID id = seedQuest(Visibility.OPEN);
+    dm.completeQuest(id, OWNER, 5000L);
+    clearInvocations(bystanderPlayer);
+
+    handler.onPluginMessageReceived(CHANNEL, bystanderPlayer, PacketCodec.writeJoinQuest(id));
+
+    Assertions.assertFalse(dm.isContributor(id, BYSTANDER));
+    verify(bystanderPlayer, never()).sendPluginMessage(any(), any(), any());
+  }
+
+  @Test
+  void pinCompletedQuest_isIgnored() {
+    UUID id = seedQuest(Visibility.OPEN);
+    dm.completeQuest(id, OWNER, 5000L);
+
+    handler.onPluginMessageReceived(CHANNEL, ownerPlayer, PacketCodec.writePinQuest(id));
+    handler.onPluginMessageReceived(CHANNEL, bystanderPlayer, PacketCodec.writePinQuest(id));
+
+    Assertions.assertFalse(dm.isQuestPinned(OWNER, id));
+    Assertions.assertFalse(dm.isQuestPinned(BYSTANDER, id));
+  }
+
+  @Test
+  void leaveCompletedQuest_isIgnored() {
+    UUID id = seedQuest(Visibility.OPEN);
+    dm.addContributor(id, CONTRIBUTOR, true);
+    dm.completeQuest(id, OWNER, 5000L);
+    clearInvocations(contributorPlayer);
+
+    handler.onPluginMessageReceived(CHANNEL, contributorPlayer, PacketCodec.writeLeaveQuest(id));
+
+    Assertions.assertTrue(dm.isContributor(id, CONTRIBUTOR));
+    verify(contributorPlayer, never()).sendPluginMessage(any(), any(), any());
+  }
+
+  @Test
+  void contributorsVisibilityAndRequestOnCompletedQuest_areIgnored() {
+    UUID id = seedQuest(Visibility.CLOSED);
+    dm.completeQuest(id, OWNER, 5000L);
+
+    handler.onPluginMessageReceived(
+        CHANNEL, ownerPlayer, PacketCodec.writeUpdateVisibility(id, Visibility.OPEN));
+    handler.onPluginMessageReceived(
+        CHANNEL, bystanderPlayer, PacketCodec.writeRequestCollaboration(id));
+
+    Assertions.assertEquals(Visibility.CLOSED, dm.getQuest(id).visibility());
+    Assertions.assertEquals(0, dm.getPendingRequestCount(OWNER));
+  }
+
+  @Test
+  void deleteCompletedQuest_byOwner_isAccepted() {
+    UUID id = seedQuest(Visibility.PRIVATE);
+    dm.completeQuest(id, OWNER, 5000L);
+    handler.onPluginMessageReceived(CHANNEL, ownerPlayer, PacketCodec.writeDeleteQuest(id));
+    Assertions.assertNull(dm.getQuest(id));
+  }
+
+  private List<QuestData> syncList(Player player, int version, PacketType type) {
+    clearInvocations(player);
+    register(player, version);
+    List<byte[]> packets = packetsOfType(player, type);
+    Assertions.assertEquals(1, packets.size());
+    ByteBufReader buf = new ByteBufReader(packets.get(0));
+    PacketCodec.readType(buf);
+    return type == PacketType.SYNC_MY_QUESTS
+        ? PacketCodec.readSyncMyQuests(buf, version)
+        : PacketCodec.readSyncServerQuests(buf, version);
+  }
+
+  @Test
+  void sync_v2_excludesCompleted_v3_includesForParticipants() {
+    UUID done = seedQuest(Visibility.OPEN);
+    dm.addContributor(done, CONTRIBUTOR, false);
+    dm.completeQuest(done, OWNER, 5000L);
+    UUID active = UUID.randomUUID();
+    dm.saveQuest(
+        new QuestData(
+            active,
+            "Active",
+            "C",
+            OWNER,
+            "Owner",
+            Visibility.OPEN,
+            List.of(),
+            1000L,
+            null,
+            false,
+            null,
+            "overworld",
+            List.of()));
+
+    List<UUID> ownerV2 =
+        syncList(ownerPlayer, ProtocolVersion.V2, PacketType.SYNC_MY_QUESTS).stream()
+            .map(QuestData::id)
+            .toList();
+    Assertions.assertEquals(List.of(active), ownerV2);
+
+    List<QuestData> ownerV3 = syncList(ownerPlayer, ProtocolVersion.V3, PacketType.SYNC_MY_QUESTS);
+    Assertions.assertEquals(
+        Set.of(done, active), new HashSet<>(ownerV3.stream().map(QuestData::id).toList()));
+    Assertions.assertTrue(
+        ownerV3.stream().filter(q -> q.id().equals(done)).findFirst().orElseThrow().isCompleted());
+
+    List<UUID> contribV2 =
+        syncList(contributorPlayer, ProtocolVersion.V2, PacketType.SYNC_MY_QUESTS).stream()
+            .map(QuestData::id)
+            .toList();
+    Assertions.assertTrue(contribV2.isEmpty());
+
+    List<UUID> contribV3 =
+        syncList(contributorPlayer, ProtocolVersion.V3, PacketType.SYNC_MY_QUESTS).stream()
+            .map(QuestData::id)
+            .toList();
+    Assertions.assertEquals(List.of(done), contribV3);
+
+    List<UUID> bystanderBoard =
+        syncList(bystanderPlayer, ProtocolVersion.V3, PacketType.SYNC_SERVER_QUESTS).stream()
+            .map(QuestData::id)
+            .toList();
+    Assertions.assertFalse(bystanderBoard.contains(done));
+    Assertions.assertTrue(bystanderBoard.contains(active));
+  }
+
+  @Test
+  void wikiLink_toCompletedQuest_stillResolves() {
+    UUID id = seedQuest(Visibility.OPEN);
+    dm.completeQuest(id, OWNER, 5000L);
+    WikiLinkResolver resolver = new WikiLinkResolver(dm);
+    Assertions.assertEquals(
+        "See [[" + id + "|Gare]]", resolver.resolveForRecipient("See [[Gare]]", BYSTANDER));
+  }
 }

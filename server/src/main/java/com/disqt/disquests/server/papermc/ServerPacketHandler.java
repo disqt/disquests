@@ -54,6 +54,8 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
             handleUpdateVisibility(player, PacketCodec.readUpdateVisibility(buf));
         case PIN_QUEST -> handlePinQuest(player, PacketCodec.readPinQuest(buf));
         case LEAVE_QUEST -> handleLeaveQuest(player, buf);
+        case COMPLETE_QUEST -> handleCompleteQuest(player, PacketCodec.readCompleteQuest(buf));
+        case REOPEN_QUEST -> handleReopenQuest(player, PacketCodec.readReopenQuest(buf));
         default ->
             plugin.getLogger().warning("Unknown C2S packet from " + player.getName() + ": " + type);
       }
@@ -103,6 +105,10 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
 
     UUID uuid = player.getUniqueId();
     List<QuestData> myQuests = dataManager.getQuestsForPlayer(uuid);
+    if (protocolVersion < ProtocolVersion.V3) {
+      // Pre-V3 clients have no Archived tab: completed quests are simply absent for them.
+      myQuests = myQuests.stream().filter(q -> !q.isCompleted()).toList();
+    }
     List<QuestData> serverQuests = dataManager.getServerQuests(uuid);
     Map<UUID, Integer> pendingCounts = dataManager.getPendingCountByQuest(uuid);
     List<CollaborationRequestData> pendingRequests = dataManager.getPendingRequestsForOwner(uuid);
@@ -174,13 +180,9 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
               resolveWikiLinks(saved, playerUuid), getProtocolVersion(player)));
       broadcastSyncTags();
     } else {
-      // Existing quest - check permission
-      boolean isOwner = existing.ownerUuid().equals(playerUuid);
-      boolean canEdit =
-          isOwner
-              || existing.contributors().stream()
-                  .anyMatch(c -> c.uuid().equals(playerUuid) && c.canEdit());
-      if (!canEdit) return; // silently ignore unauthorized edits
+      // Existing quest - completed quests are locked; then check permission
+      if (existing.isCompleted()) return;
+      if (!canEdit(existing, playerUuid)) return; // silently ignore unauthorized edits
 
       QuestData updated =
           new QuestData(
@@ -216,6 +218,83 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
 
   private void sendUpdateQuest(Player recipient, QuestData quest) {
     sendPacket(recipient, PacketCodec.writeUpdateQuest(quest, getProtocolVersion(recipient)));
+  }
+
+  /** Owner or a contributor with edit rights, judged on the quest's current state. */
+  private boolean canEdit(QuestData quest, UUID playerUuid) {
+    return quest.ownerUuid().equals(playerUuid)
+        || quest.contributors().stream().anyMatch(c -> c.uuid().equals(playerUuid) && c.canEdit());
+  }
+
+  /**
+   * Sends {@code UPDATE_QUEST} at the recipient's protocol version, with wiki-links resolved for
+   * them. A completed quest cannot be shown below V3, so those clients get {@code DELETE_QUEST_S2C}
+   * instead.
+   */
+  private void sendQuestTo(Player recipient, QuestData quest) {
+    int pv = getProtocolVersion(recipient);
+    if (quest.isCompleted() && pv < ProtocolVersion.V3) {
+      sendPacket(recipient, PacketCodec.writeDeleteQuestS2C(quest.id()));
+      return;
+    }
+    sendPacket(
+        recipient,
+        PacketCodec.writeUpdateQuest(resolveWikiLinks(quest, recipient.getUniqueId()), pv));
+  }
+
+  private void handleCompleteQuest(Player player, UUID questId) {
+    QuestData quest = dataManager.getQuest(questId);
+    if (quest == null || quest.isCompleted()) return;
+    if (!canEdit(quest, player.getUniqueId())) return;
+
+    int droppedRequests =
+        dataManager.getPendingCountByQuest(quest.ownerUuid()).getOrDefault(questId, 0);
+    dataManager.completeQuest(questId, player.getUniqueId(), System.currentTimeMillis());
+    QuestData completed = dataManager.getQuest(questId);
+    notifyCompletionChange(completed);
+
+    // completeQuest dropped the quest's pending requests: refresh the owner's inbox count, which
+    // only the handshake carries (the client re-syncs its request list in response).
+    if (droppedRequests > 0) {
+      Player owner = Bukkit.getPlayer(quest.ownerUuid());
+      if (owner != null && isModPlayer(owner)) sendHandshake(owner);
+    }
+  }
+
+  private void handleReopenQuest(Player player, UUID questId) {
+    QuestData quest = dataManager.getQuest(questId);
+    if (quest == null || !quest.isCompleted()) return;
+    if (!canEdit(quest, player.getUniqueId())) return;
+
+    dataManager.reopenQuest(questId);
+    notifyCompletionChange(dataManager.getQuest(questId));
+  }
+
+  /**
+   * Tells everyone who saw the quest that it was completed or reopened. Participants get it per
+   * version via {@link #sendQuestTo}. For Open/Closed quests every other mod player loses it from
+   * the board on complete and gets it back on reopen.
+   */
+  private void notifyCompletionChange(QuestData quest) {
+    Set<UUID> participants = new HashSet<>();
+    participants.add(quest.ownerUuid());
+    for (ContributorData c : quest.contributors()) participants.add(c.uuid());
+
+    for (UUID uuid : participants) {
+      Player p = Bukkit.getPlayer(uuid);
+      if (p != null && isModPlayer(p)) sendQuestTo(p, quest);
+    }
+    if (quest.visibility() == Visibility.PRIVATE) return;
+
+    byte[] deletePacket = PacketCodec.writeDeleteQuestS2C(quest.id());
+    for (Player p : getModPlayers()) {
+      if (participants.contains(p.getUniqueId())) continue;
+      if (quest.isCompleted()) {
+        sendPacket(p, deletePacket);
+      } else {
+        sendQuestTo(p, quest);
+      }
+    }
   }
 
   /**
@@ -260,6 +339,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
   private void handleJoinQuest(Player player, UUID questId) {
     QuestData quest = dataManager.getQuest(questId);
     if (quest == null) return;
+    if (quest.isCompleted()) return;
     if (quest.visibility() != Visibility.OPEN) return; // only open quests
     if (quest.ownerUuid().equals(player.getUniqueId())) return; // owner can't join own quest
     if (dataManager.isContributor(questId, player.getUniqueId())) return; // already contributor
@@ -279,6 +359,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
   private void handleRequestCollaboration(Player player, UUID questId) {
     QuestData quest = dataManager.getQuest(questId);
     if (quest == null) return;
+    if (quest.isCompleted()) return;
     if (quest.visibility() != Visibility.CLOSED) return;
     if (quest.ownerUuid().equals(player.getUniqueId())) return;
     if (dataManager.isContributor(questId, player.getUniqueId())) return;
@@ -345,7 +426,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
   private void handleUpdateContributors(
       Player player, PacketCodec.UpdateContributorsPayload payload) {
     QuestData quest = dataManager.getQuest(payload.questId());
-    if (quest == null) return;
+    if (quest == null || quest.isCompleted()) return;
     if (!quest.ownerUuid().equals(player.getUniqueId())) return; // owner only
 
     // Track players that need notification
@@ -409,7 +490,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
 
   private void handleUpdateVisibility(Player player, PacketCodec.UpdateVisibilityPayload payload) {
     QuestData quest = dataManager.getQuest(payload.questId());
-    if (quest == null) return;
+    if (quest == null || quest.isCompleted()) return;
     if (!quest.ownerUuid().equals(player.getUniqueId())) return; // owner only
 
     Visibility oldVisibility = quest.visibility();
@@ -455,10 +536,11 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
   private void handlePinQuest(Player player, UUID questId) {
     if (questId == null) return;
     UUID playerUuid = player.getUniqueId();
+    QuestData quest = dataManager.getQuest(questId);
+    if (quest != null && quest.isCompleted()) return; // archived quests are never pinned
     if (dataManager.isQuestPinned(playerUuid, questId)) {
       dataManager.unpinQuest(playerUuid, questId);
     } else {
-      QuestData quest = dataManager.getQuest(questId);
       if (quest == null) return;
       boolean canSee =
           quest.ownerUuid().equals(playerUuid)
@@ -474,7 +556,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
     UUID playerUuid = player.getUniqueId();
 
     QuestData quest = dataManager.getQuest(questId);
-    if (quest == null) return;
+    if (quest == null || quest.isCompleted()) return;
 
     // Owner cannot leave, only delete
     if (quest.ownerUuid().equals(playerUuid)) return;
