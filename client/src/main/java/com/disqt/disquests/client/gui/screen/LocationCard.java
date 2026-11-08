@@ -8,6 +8,7 @@ import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.map.MapMath;
 import com.disqt.disquests.client.gui.map.MapView;
+import com.disqt.disquests.client.gui.map.PolygonEditLayer;
 import com.disqt.disquests.client.gui.map.QuestPolygonLayer;
 import com.disqt.disquests.client.gui.map.SharedTileCache;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
@@ -96,8 +97,20 @@ final class LocationCard {
   static List<VertexRow> buildEdit(QuestScreen screen, FlowLayout root, Quest quest) {
     String dimension = screen.dimensionForEdit();
     int mapHeight = mapHeight(EDIT_MAP_HEIGHT, screen.height, EDIT_MAP_SCREEN_DIVISOR);
-    addMiniMap(root, quest, dimension, screen.width, mapHeight);
     List<VertexRow> rows = buildVertexRows(root.childById(FlowLayout.class, "vertex-list"), quest);
+
+    // The preview drags existing corners in place; adding, removing and finishing stay in the
+    // full-screen editor. A drag updates the quest and the fields without rebuilding the screen.
+    PolygonEditLayer layer = new PolygonEditLayer(locationVertices(quest)).moveOnly(true);
+    layer.onVerticesChanged(
+        vertices -> {
+          List<PointData> before = locationVertices(quest);
+          screen.moveMapLocation(vertices);
+          refreshVertexFields(rows, before, vertices);
+        });
+    MapView map = addMiniMap(root, quest, dimension, screen.width, mapHeight);
+    map.addLayer(layer);
+    map.interactive(true);
 
     FlowLayout buttons = root.childById(FlowLayout.class, "location-buttons");
     // A pre-V2 server cannot store outlines from the map editor; the vertex rows stay the editor.
@@ -163,6 +176,32 @@ final class LocationCard {
     }
     chainTabTargets(rows);
     return rows;
+  }
+
+  /** The quest's outline corners, its pin as one corner, or nothing. */
+  private static List<PointData> locationVertices(Quest quest) {
+    if (quest.isPolygon()) {
+      return List.copyOf(quest.getPolygon());
+    }
+    CoordinatesData c = quest.getCoordinates();
+    return c != null ? List.of(new PointData(c.x(), c.z())) : List.of();
+  }
+
+  /**
+   * Rewrites the fields of the corners a preview drag moved. Other rows keep their text, so a value
+   * typed but not yet saved survives a drag of another corner; a pin keeps its Y field.
+   */
+  private static void refreshVertexFields(
+      List<VertexRow> rows, List<PointData> before, List<PointData> after) {
+    if (rows.size() != after.size()) return;
+    for (int i = 0; i < rows.size(); i++) {
+      PointData p = after.get(i);
+      if (i < before.size() && p.equals(before.get(i))) continue;
+      VertexRow row = rows.get(i);
+      boolean pin = row.y() != null;
+      row.x().getDelegate().setText(pin ? pinText(p.x()) : vertexText(p.x()));
+      row.z().getDelegate().setText(pin ? pinText(p.z()) : vertexText(p.z()));
+    }
   }
 
   private static void chainTabTargets(List<VertexRow> rows) {
@@ -243,7 +282,10 @@ final class LocationCard {
       return;
     }
     int mapHeight = mapHeight(VIEW_MAP_HEIGHT, screen.height, VIEW_MAP_SCREEN_DIVISOR);
-    addMiniMap(root, quest, screen.dimensionForEdit(), screen.width, mapHeight);
+    MapView map = addMiniMap(root, quest, screen.dimensionForEdit(), screen.width, mapHeight);
+    QuestPolygonLayer layer = new QuestPolygonLayer();
+    layer.setQuests(List.of(quest));
+    map.addLayer(layer);
 
     root.childById(LabelComponent.class, "coords-label")
         .text(buildCoordsText(quest).withColor(Colors.TEXT_MUTED));
@@ -282,18 +324,15 @@ final class LocationCard {
   // ===================== MINI MAP =====================
 
   /**
-   * Adds a non-interactive map of the quest to {@code mini-map-slot}: an outline fitted to the
-   * card, a pin at zoom 2, otherwise the player (or the origin) at zoom 2.
+   * Adds a map of the quest to {@code mini-map-slot}, without layers and non-interactive: an
+   * outline fitted to the card, a pin at zoom 2, otherwise the player (or the origin) at zoom 2.
    */
-  private static void addMiniMap(
+  private static MapView addMiniMap(
       FlowLayout root, Quest quest, String dimension, int screenWidth, int mapHeight) {
     FlowLayout slot = root.childById(FlowLayout.class, "mini-map-slot");
     slot.verticalSizing(Sizing.fixed(mapHeight));
 
-    QuestPolygonLayer layer = new QuestPolygonLayer();
-    layer.setQuests(List.of(quest));
     MapView map = new MapView(SharedTileCache.get()).interactive(false).setDimension(dimension);
-    map.addLayer(layer);
     map.sizing(Sizing.fill(100), Sizing.fill(100));
     map.id("mini-map");
 
@@ -321,6 +360,7 @@ final class LocationCard {
       map.setZoom(PIN_ZOOM);
     }
     slot.child(map);
+    return map;
   }
 
   /** The preferred height, shrunk to a share of short screens so the rows below stay visible. */

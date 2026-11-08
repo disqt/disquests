@@ -8,6 +8,7 @@ import io.wispforest.owo.ui.core.OwoUIGraphics;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 
@@ -15,6 +16,10 @@ import net.minecraft.network.chat.Component;
  * Edits a quest outline on the map: left-click adds a corner or grabs one to drag, right-click
  * removes the last corner, Enter or a click on the first corner finishes. Zero corners means
  * "clear", one is a pin, two or more are an outline (three or more must not cross itself).
+ *
+ * <p>In {@linkplain #moveOnly(boolean) move-only mode} (the quest editor's preview) the layer only
+ * drags existing corners: no adding, removing or finishing, and a drag that would make the outline
+ * cross itself snaps back.
  */
 public class PolygonEditLayer implements MapLayer {
   private static final double HIT_RADIUS = 6;
@@ -24,9 +29,12 @@ public class PolygonEditLayer implements MapLayer {
 
   private final List<PointData> vertices;
   private Consumer<List<PointData>> onFinish;
+  private Consumer<List<PointData>> onVerticesChanged;
   private String notice;
   private int dragging = -1;
+  private PointData dragStart;
   private boolean finished;
+  private boolean moveOnly;
 
   public PolygonEditLayer(List<PointData> initial) {
     this.vertices = new ArrayList<>(initial);
@@ -39,6 +47,20 @@ public class PolygonEditLayer implements MapLayer {
 
   public void onFinish(Consumer<List<PointData>> callback) {
     this.onFinish = callback;
+  }
+
+  /**
+   * Called with a copy of the corners after a drag ends with the corner moved, and after a corner
+   * is added or removed.
+   */
+  public void onVerticesChanged(Consumer<List<PointData>> callback) {
+    this.onVerticesChanged = callback;
+  }
+
+  /** Restricts the layer to dragging existing corners (see the class comment). */
+  public PolygonEditLayer moveOnly(boolean moveOnly) {
+    this.moveOnly = moveOnly;
+    return this;
   }
 
   /** A transient one-line message for the user, or null. Cleared by the next successful action. */
@@ -76,10 +98,14 @@ public class PolygonEditLayer implements MapLayer {
   @Override
   public boolean onMouseDown(MapView view, double relX, double relY, int button) {
     if (button == InputConstants.MOUSE_BUTTON_RIGHT) {
+      if (moveOnly) {
+        return false;
+      }
       dragging = -1;
       if (!vertices.isEmpty()) {
         vertices.remove(vertices.size() - 1);
         changed();
+        notifyVerticesChanged();
       }
       return true;
     }
@@ -87,13 +113,17 @@ public class PolygonEditLayer implements MapLayer {
       return false;
     }
     int hit = hitVertex(view, relX, relY);
-    if (hit == 0 && vertices.size() >= 3) {
+    if (!moveOnly && hit == 0 && vertices.size() >= 3) {
       tryFinish();
       return true;
     }
     if (hit >= 0) {
       dragging = hit;
+      dragStart = vertices.get(hit);
       return true;
+    }
+    if (moveOnly) {
+      return false;
     }
     if (vertices.size() >= QuestLocation.MAX_VERTICES) {
       notice =
@@ -103,6 +133,7 @@ public class PolygonEditLayer implements MapLayer {
     }
     vertices.add(blockAt(view, relX, relY));
     changed();
+    notifyVerticesChanged();
     return true;
   }
 
@@ -125,13 +156,23 @@ public class PolygonEditLayer implements MapLayer {
     if (dragging < 0) {
       return false;
     }
+    int released = dragging;
     dragging = -1;
+    if (vertices.get(released).equals(dragStart)) {
+      return true;
+    }
+    if (moveOnly && vertices.size() >= 3 && !QuestLocation.isSimple(vertices)) {
+      vertices.set(released, dragStart);
+      notice = Component.translatable("gui.disquests.map.self_intersecting").getString();
+      return true;
+    }
+    notifyVerticesChanged();
     return true;
   }
 
   @Override
   public boolean onKeyPress(MapView view, KeyEvent event) {
-    if (event.key() != InputConstants.KEY_RETURN) {
+    if (moveOnly || event.key() != InputConstants.KEY_RETURN) {
       return false;
     }
     tryFinish();
@@ -141,6 +182,12 @@ public class PolygonEditLayer implements MapLayer {
   private void changed() {
     notice = null;
     finished = false;
+  }
+
+  private void notifyVerticesChanged() {
+    if (onVerticesChanged != null) {
+      onVerticesChanged.accept(vertices());
+    }
   }
 
   /** Index of the nearest corner within 6 px of the component-relative point, or -1. */
@@ -178,10 +225,20 @@ public class PolygonEditLayer implements MapLayer {
       MapDraw.outlinePolygon(g, view, p[0], p[1], Colors.MAP_OPEN);
     }
     for (int i = 0; i < n; i++) {
-      int size = i == 0 && n >= 3 ? FIRST_VERTEX_SIZE : VERTEX_SIZE;
+      int size = i == 0 && n >= 3 && !moveOnly ? FIRST_VERTEX_SIZE : VERTEX_SIZE;
       int x = view.x() + (int) Math.round(p[0][i]) - size / 2;
       int y = view.y() + (int) Math.round(p[1][i]) - size / 2;
       g.fill(x, y, x + size, y + size, Colors.MAP_VERTEX);
+    }
+    // The full editor shows notices in its hint label; the preview has no room for one.
+    if (moveOnly && notice != null) {
+      g.text(
+          Minecraft.getInstance().font,
+          Component.literal(notice),
+          view.x() + 4,
+          view.y() + 4,
+          Colors.AMBER,
+          true);
     }
   }
 }
