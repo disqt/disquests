@@ -1,0 +1,179 @@
+<owo-ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/wisp-forest/owo-lib/1.21/owo-ui.xsd">
+
+    <components>
+    <!-- Root: vertical flow, full screen, translucent background -->
+    <flow-layout direction="vertical" id="root">
+        <sizing>
+            <horizontal method="fill">100</horizontal>
+            <vertical method="fill">100</vertical>
+        </sizing>
+        <surface>
+            <vanilla-translucent/>
+        </surface>
+        <horizontal-alignment>center</horizontal-alignment>
+        <padding>
+            <all>0</all>
+            <top>4</top>
+        </padding>
+
+        <children>
+
+            <!-- Header row: back arrow + title -->
+            <flow-layout direction="horizontal" id="header-row">
+                <sizing>
+                    <horizontal method="fill">85</horizontal>
+                    <vertical method="content"/>
+                </sizing>
+                <vertical-alignment>center</vertical-alignment>
+                <margins>
+                    <bottom>4</bottom>
+                </margins>
+                <children>
+                    <button id="btn-back">
+                        <text>&lt;</text>
+                        <sizing>
+                            <horizontal method="fixed">20</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                    <label id="title-label">
+                        <text>Disquests</text>
+                        <shadow>true</shadow>
+                        <sizing>
+                            <horizontal method="content"/>
+                            <vertical method="content"/>
+                        </sizing>
+                        <margins>
+                            <left>4</left>
+                        </margins>
+                    </label>
+                </children>
+            </flow-layout>
+
+            <!-- Tab row -->
+            <flow-layout direction="horizontal" id="tab-row">
+                <sizing>
+                    <horizontal method="content"/>
+                    <vertical method="content"/>
+                </sizing>
+                <gap>4</gap>
+                <margins>
+                    <bottom>2</bottom>
+                </margins>
+                <children>
+                    <button id="tab-my-quests">
+                        <text>My Quests</text>
+                        <sizing>
+                            <horizontal method="fixed">80</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                    <button id="tab-quest-board">
+                        <text>Quest Board</text>
+                        <sizing>
+                            <horizontal method="fixed">80</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                </children>
+            </flow-layout>
+
+            <!-- Filter row (Server Quests tab only) -->
+            <flow-layout direction="horizontal" id="filter-row">
+                <sizing>
+                    <horizontal method="content"/>
+                    <vertical method="content"/>
+                </sizing>
+                <gap>4</gap>
+                <margins>
+                    <bottom>2</bottom>
+                </margins>
+                <children>
+                    <button id="filter-all">
+                        <text>All</text>
+                        <sizing>
+                            <horizontal method="fixed">50</horizontal>
+                            <vertical method="fixed">14</vertical>
+                        </sizing>
+                    </button>
+                    <button id="filter-open">
+                        <text>Open</text>
+                        <sizing>
+                            <horizontal method="fixed">50</horizontal>
+                            <vertical method="fixed">14</vertical>
+                        </sizing>
+                    </button>
+                    <button id="filter-closed">
+                        <text>Closed</text>
+                        <sizing>
+                            <horizontal method="fixed">50</horizontal>
+                            <vertical method="fixed">14</vertical>
+                        </sizing>
+                    </button>
+                </children>
+            </flow-layout>
+
+            <!-- Scrollable quest list area -->
+            <template name="scrollable-list@disquests:templates">
+                <scroll-id>quest-scroll</scroll-id>
+                <list-id>quest-list</list-id>
+                <width>85</width>
+                <height>55</height>
+            </template>
+
+            <!-- Search row -->
+            <flow-layout direction="horizontal" id="search-row">
+                <sizing>
+                    <horizontal method="content"/>
+                    <vertical method="content"/>
+                </sizing>
+                <horizontal-alignment>center</horizontal-alignment>
+                <margins>
+                    <top>4</top>
+                    <bottom>4</bottom>
+                </margins>
+                <children/>
+                <!-- TextBox added programmatically for search -->
+            </flow-layout>
+
+            <!-- Action button row -->
+            <flow-layout direction="horizontal" id="action-row">
+                <sizing>
+                    <horizontal method="content"/>
+                    <vertical method="content"/>
+                </sizing>
+                <gap>4</gap>
+                <margins>
+                    <bottom>4</bottom>
+                </margins>
+                <children>
+                    <button id="btn-new-quest">
+                        <text>New Quest</text>
+                        <sizing>
+                            <horizontal method="fixed">70</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                    <button id="btn-interact">
+                        <text>Join</text>
+                        <sizing>
+                            <horizontal method="fixed">70</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                    <button id="btn-open">
+                        <text>Open</text>
+                        <sizing>
+                            <horizontal method="fixed">70</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                </children>
+            </flow-layout>
+
+        </children>
+    </flow-layout>
+    </components>
+
+</owo-ui>

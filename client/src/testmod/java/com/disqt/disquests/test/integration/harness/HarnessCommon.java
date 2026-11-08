@@ -12,8 +12,11 @@ import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
 import org.junit.platform.launcher.listeners.SummaryGeneratingListener;
 import org.junit.platform.launcher.listeners.TestExecutionSummary;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HarnessCommon {
+  private static final Logger LOG = LoggerFactory.getLogger("Disquests.E2E");
 
   private static final String TESTS_PACKAGE =
       System.getProperty("disquests.test.package", "com.disqt.disquests.test.integration.journeys");
@@ -32,6 +35,9 @@ public class HarnessCommon {
     if (shouldSkip(harnessName)) return;
 
     TestContext.set(context, playerRole);
+    if (role.equals("a")) {
+      startTileFixture();
+    }
     connectAndWait(context);
 
     boolean harness = Boolean.getBoolean("disquests.test.harness");
@@ -53,6 +59,19 @@ public class HarnessCommon {
         // In solo tests, Player B never runs, so this always times out -- that's fine.
       }
       System.exit(result.startsWith("PASS") ? 0 : 1);
+    }
+  }
+
+  /**
+   * Starts the BlueMap tile fixture the test server's config points at. A bind failure is not
+   * fatal: a second client or a stale process may already hold the port.
+   */
+  private static void startTileFixture() {
+    int port = Integer.getInteger("disquests.test.tilePort", 25580);
+    try {
+      TileFixtureServer.start(port);
+    } catch (IOException e) {
+      LOG.warn("Tile fixture could not bind port {}: {}", port, e.toString());
     }
   }
 

@@ -1,0 +1,78 @@
+<owo-ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/wisp-forest/owo-lib/1.21/owo-ui.xsd">
+
+    <components>
+    <flow-layout direction="vertical" id="root">
+        <sizing>
+            <horizontal method="fill">100</horizontal>
+            <vertical method="fill">100</vertical>
+        </sizing>
+        <surface>
+            <vanilla-translucent/>
+        </surface>
+        <horizontal-alignment>center</horizontal-alignment>
+
+        <children>
+
+            <!-- Map view added programmatically -->
+            <flow-layout direction="vertical" id="map-slot">
+                <sizing>
+                    <horizontal method="fill">100</horizontal>
+                    <vertical method="expand">100</vertical>
+                </sizing>
+                <children/>
+            </flow-layout>
+
+            <!-- Edit hint, replaced by the layer's notice while one is set -->
+            <label id="hint-label">
+                <text>Hint</text>
+                <shadow>true</shadow>
+                <sizing>
+                    <horizontal method="content"/>
+                    <vertical method="content"/>
+                </sizing>
+                <margins>
+                    <top>4</top>
+                </margins>
+            </label>
+
+            <flow-layout direction="horizontal" id="button-row">
+                <sizing>
+                    <horizontal method="content"/>
+                    <vertical method="content"/>
+                </sizing>
+                <gap>4</gap>
+                <margins>
+                    <top>4</top>
+                    <bottom>4</bottom>
+                </margins>
+                <children>
+                    <button id="btn-map-done">
+                        <text>Done</text>
+                        <sizing>
+                            <horizontal method="fixed">70</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                    <button id="btn-map-clear">
+                        <text>Clear location</text>
+                        <sizing>
+                            <horizontal method="fixed">70</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                    <button id="btn-map-cancel">
+                        <text>Cancel</text>
+                        <sizing>
+                            <horizontal method="fixed">70</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                </children>
+            </flow-layout>
+
+        </children>
+    </flow-layout>
+    </components>
+
+</owo-ui>

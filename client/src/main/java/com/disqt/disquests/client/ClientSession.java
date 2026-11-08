@@ -1,5 +1,7 @@
 package com.disqt.disquests.client;
 
+import com.disqt.disquests.client.gui.map.SharedTileCache;
+import com.disqt.disquests.common.ProtocolVersion;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +33,7 @@ public class ClientSession {
   private static String bluemapDefaultMap = "overworld";
   private static List<String> predefinedTags = List.of();
   private static List<String> serverTags = List.of();
+  private static int serverProtocolVersion = ProtocolVersion.V1;
 
   // UI state
   private static Tab activeTab = Tab.MY_QUESTS;
@@ -76,14 +79,28 @@ public class ClientSession {
     pinnedQuestIds.clear();
     requestedQuestIds.clear();
     pendingToast = null;
+    SharedTileCache.reset();
     playerUuid = null;
     bluemapMapNames = Map.of();
     bluemapDefaultMap = "overworld";
     predefinedTags = List.of();
     serverTags = List.of();
+    serverProtocolVersion = ProtocolVersion.V1;
     activeTab = Tab.MY_QUESTS;
     searchTerm = "";
     serverQuestsFilter = QuestFilter.ALL;
+  }
+
+  public static int getServerProtocolVersion() {
+    return serverProtocolVersion;
+  }
+
+  public static void setServerProtocolVersion(int version) {
+    serverProtocolVersion = version;
+  }
+
+  public static boolean supportsMap() {
+    return serverProtocolVersion >= ProtocolVersion.V2;
   }
 
   public static boolean isOnServer() {

@@ -1,7 +1,7 @@
 # In-Game World Map with Quest Regions Design
 
 **Date:** 2026-11-06
-**Status:** Designed, ready for planning
+**Status:** Implemented in 0.6.0 (branch feat/world-map)
 **Branch:** `feat/world-map` (off `main`, after inline images or independently; they do not
 touch the same files except lang files)
 
@@ -220,3 +220,13 @@ keyboard path. "Edit on map" opens a full-screen `MapEditScreen` on top of the e
 - Disk cache format (plain files named by hash plus a small index is fine).
 - How the list panel collapses on narrow windows (below 640 px GUI width, make it a toggle
   button).
+
+## Deviations recorded during implementation
+
+- **V1 downgrade uses the bounding box for both corners.** `coordinates` and `coordinates2` are the polygon's bounding-box min/max (not first vertex plus a corner), so the old BlueMap link lands on the region centre.
+- **Zoom is stepped.** Four discrete steps (0..3) mapped to lods; there is no continuous scale between levels.
+- **Handshake always writes the full form** plus a trailing `varint serverProtocolVersion`; the player-version gate was dropped.
+- **`MapView` takes mouse-click focus** while interactive, because owo delivers drag and key events only to the focused component.
+- **`unplaced-header` only appears when both groups are visible** (unplaced and placed quests).
+- **Mini-map height is capped on short screens** (`min(200, max(60, height/4))` in edit mode, `min(120, max(60, height/5))` in view mode; never below 60 px).
+- **The old coordinate editor is not kept** (Rollout 2). Against a V1 server the location card's vertex rows are the editor and "Edit on map" is hidden, with the `server_outdated` notice under the buttons. Quests read from a V1 server are normalised on arrival, so a legacy rectangle becomes its 4-corner polygon and saves back as the same bounding box.

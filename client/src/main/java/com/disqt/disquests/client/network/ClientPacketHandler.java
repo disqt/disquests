@@ -8,6 +8,8 @@ import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.common.ByteBufReader;
 import com.disqt.disquests.common.PacketCodec;
 import com.disqt.disquests.common.PacketType;
+import com.disqt.disquests.common.ProtocolVersion;
+import com.disqt.disquests.common.QuestLocation;
 import com.disqt.disquests.common.model.CollaborationRequestData;
 import com.disqt.disquests.common.model.QuestData;
 import java.util.ArrayList;
@@ -75,32 +77,47 @@ public class ClientPacketHandler {
         payload.bluemapMapNames(),
         payload.predefinedTags());
     ClientSession.setBluemapDefaultMap(payload.bluemapDefaultMap());
+    ClientSession.setServerProtocolVersion(payload.serverProtocolVersion());
     PacketSender.requestSync();
   }
 
+  /**
+   * A pre-V2 server sends no polygon, so a legacy rectangle would otherwise read as a pin and lose
+   * its second corner on the next save. Normalising turns it into its 4-corner polygon, whose
+   * bounding box (what a V1 server stores) is the original rectangle.
+   */
+  private static Quest toQuest(QuestData data) {
+    if (ClientSession.getServerProtocolVersion() < ProtocolVersion.V2) {
+      data = QuestLocation.normalize(data);
+    }
+    return Quest.fromNetwork(data);
+  }
+
   private static void handleSyncMyQuests(ByteBufReader r) {
-    List<QuestData> dataList = PacketCodec.readSyncMyQuests(r);
+    List<QuestData> dataList =
+        PacketCodec.readSyncMyQuests(r, ClientSession.getServerProtocolVersion());
     Map<UUID, Integer> counts = PacketCodec.readPendingCounts(r);
     List<Quest> quests = new ArrayList<>(dataList.size());
     for (QuestData data : dataList) {
-      quests.add(Quest.fromNetwork(data));
+      quests.add(toQuest(data));
     }
     ClientCache.setMyQuests(quests);
     ClientCache.setPendingCounts(counts);
   }
 
   private static void handleSyncServerQuests(ByteBufReader r) {
-    List<QuestData> dataList = PacketCodec.readSyncServerQuests(r);
+    List<QuestData> dataList =
+        PacketCodec.readSyncServerQuests(r, ClientSession.getServerProtocolVersion());
     List<Quest> quests = new ArrayList<>(dataList.size());
     for (QuestData data : dataList) {
-      quests.add(Quest.fromNetwork(data));
+      quests.add(toQuest(data));
     }
     ClientCache.setServerQuests(quests);
   }
 
   private static void handleUpdateQuest(ByteBufReader r) {
-    QuestData data = PacketCodec.readUpdateQuest(r);
-    Quest quest = Quest.fromNetwork(data);
+    QuestData data = PacketCodec.readUpdateQuest(r, ClientSession.getServerProtocolVersion());
+    Quest quest = toQuest(data);
     final UUID myUuid = ClientSession.getEffectivePlayerUuid();
     boolean isMine = quest.isOwner(myUuid) || quest.isContributor(myUuid);
 
@@ -166,9 +183,10 @@ public class ClientPacketHandler {
   }
 
   private static void handleCollaborationResponse(ByteBufReader r) {
-    PacketCodec.CollaborationResponsePayload payload = PacketCodec.readCollaborationResponse(r);
+    PacketCodec.CollaborationResponsePayload payload =
+        PacketCodec.readCollaborationResponse(r, ClientSession.getServerProtocolVersion());
     if (payload.approved() && payload.quest() != null) {
-      Quest quest = Quest.fromNetwork(payload.quest());
+      Quest quest = toQuest(payload.quest());
       ClientCache.addOrUpdateMyQuest(quest);
       ClientCache.removeFromServerQuests(payload.questId());
 
