@@ -60,7 +60,11 @@ public class MainScreen extends DisquestsBaseScreen {
   private LabelComponent titleLabel;
   private ButtonComponent tabMyQuests;
   private ButtonComponent tabQuestBoard;
+  private ButtonComponent tabArchived;
+  private FlowLayout tabRow;
   private FlowLayout filterRow;
+  // Holds tab-row and filter-row: side-panel in the map layout, root in the legacy one
+  private FlowLayout tabsParent;
   private ButtonComponent filterAll;
   private ButtonComponent filterOpen;
   private ButtonComponent filterClosed;
@@ -123,8 +127,7 @@ public class MainScreen extends DisquestsBaseScreen {
 
   @Override
   public NavEntry toNavEntry() {
-    return new NavEntry.MainNav(
-        currentTab == ClientSession.Tab.SERVER_QUESTS, searchTerm != null ? searchTerm : "");
+    return new NavEntry.MainNav(currentTab, searchTerm != null ? searchTerm : "");
   }
 
   @Override
@@ -138,6 +141,10 @@ public class MainScreen extends DisquestsBaseScreen {
     this.titleLabel = root.childById(LabelComponent.class, "title-label");
     this.tabMyQuests = root.childById(ButtonComponent.class, "tab-my-quests");
     this.tabQuestBoard = root.childById(ButtonComponent.class, "tab-quest-board");
+    this.tabArchived = root.childById(ButtonComponent.class, "tab-archived");
+    this.tabRow = root.childById(FlowLayout.class, "tab-row");
+    // parent() is only set once the tree is mounted, so look the holder up by id.
+    this.tabsParent = mapMode ? root.childById(FlowLayout.class, "side-panel") : root;
     this.filterRow = root.childById(FlowLayout.class, "filter-row");
     this.filterAll = root.childById(ButtonComponent.class, "filter-all");
     this.filterOpen = root.childById(ButtonComponent.class, "filter-open");
@@ -152,6 +159,8 @@ public class MainScreen extends DisquestsBaseScreen {
     // --- Wire tab button handlers ---
     this.tabMyQuests.onPress(ignored -> selectTab(ClientSession.Tab.MY_QUESTS));
     this.tabQuestBoard.onPress(ignored -> selectTab(ClientSession.Tab.SERVER_QUESTS));
+    this.tabArchived.setMessage(Component.translatable("gui.disquests.tab.archived"));
+    this.tabArchived.onPress(ignored -> selectTab(ClientSession.Tab.ARCHIVED));
 
     // --- Wire filter button handlers ---
     this.filterAll.onPress(ignored -> selectServerFilter(ClientSession.QuestFilter.ALL));
@@ -212,26 +221,28 @@ public class MainScreen extends DisquestsBaseScreen {
     ClientSession.setActiveTab(tab);
 
     boolean isMyQuests = tab == ClientSession.Tab.MY_QUESTS;
+    boolean isBoard = tab == ClientSession.Tab.SERVER_QUESTS;
 
     // Toggle tab active states (active selected tab appears pressed/disabled)
     tabMyQuests.active(!isMyQuests);
-    tabQuestBoard.active(isMyQuests);
+    tabQuestBoard.active(!isBoard);
+    tabArchived.active(tab != ClientSession.Tab.ARCHIVED);
 
     // Clear selection
     clearSelection();
 
-    // Filter row visibility: collapse to zero size when hidden
-    if (isMyQuests) {
-      filterRow.sizing(Sizing.fixed(0), Sizing.fixed(0));
-    } else {
-      filterRow.sizing(Sizing.content(), Sizing.content());
+    // Filter row only on the Quest Board: removed, not zero-sized, so its buttons do not render.
+    // It always sits right after the tab row.
+    tabsParent.removeChild(filterRow);
+    if (isBoard) {
+      tabsParent.child(tabsParent.children().indexOf(tabRow) + 1, filterRow);
       selectServerFilter(this.serverFilter);
     }
 
     // Action button visibility: hide/show by removing/adding
-    // New Quest only on My Quests; Interact only on Server Quests
+    // New Quest only on My Quests; Interact only on the Quest Board; Archived has Open alone
     btnNewQuest.active(isMyQuests);
-    btnInteract.active(!isMyQuests);
+    btnInteract.active(isBoard);
 
     // Hide/show buttons by removing/re-adding to parent flow
     actionRow.removeChild(btnNewQuest);
@@ -239,7 +250,7 @@ public class MainScreen extends DisquestsBaseScreen {
     if (isMyQuests) {
       // Insert New Quest before Open
       actionRow.child(0, btnNewQuest);
-    } else {
+    } else if (isBoard) {
       // Insert Interact before Open
       actionRow.child(0, btnInteract);
     }
@@ -362,7 +373,8 @@ public class MainScreen extends DisquestsBaseScreen {
     // every one is placed) there is nothing to separate, so no header is shown.
     boolean anyUnplaced = quests.stream().anyMatch(q -> !q.hasLocation());
     boolean anyPlaced = quests.stream().anyMatch(Quest::hasLocation);
-    if (mapMode && anyUnplaced && anyPlaced) {
+    boolean archived = currentTab == ClientSession.Tab.ARCHIVED;
+    if (mapMode && !archived && anyUnplaced && anyPlaced) {
       LabelComponent header =
           UIComponents.label(Component.translatable("gui.disquests.map.unplaced"));
       header.color(Color.ofArgb(Colors.TEXT_MUTED));
@@ -385,22 +397,32 @@ public class MainScreen extends DisquestsBaseScreen {
     LOGGER.debug("refreshListContents: added {} entries to questList", questList.children().size());
 
     if (polygonLayer != null) {
-      polygonLayer.setQuests(quests);
+      // The map only ever draws active quests: the Archived tab shows the active My Quests there.
+      polygonLayer.setQuests(QuestListOrder.active(archived ? ClientCache.getMyQuests() : quests));
     }
     updateActionButtons();
   }
 
   /**
-   * The quests the current tab, Open/Closed filter and search leave visible, in list order. The
-   * side panel and the map layer both draw from this list. In map mode unplaced quests come first.
+   * The quests the current tab, Open/Closed filter and search leave visible, in list order. My
+   * Quests and the Quest Board skip completed quests; Archived lists only the player's completed
+   * ones, newest completion first. On those two tabs the map layer draws from this list and, in map
+   * mode, unplaced quests come first; on Archived the map shows the active My Quests instead.
    */
   public List<Quest> visibleQuests() {
     List<Quest> quests;
 
     SearchQuery query = parseSearch(searchTerm);
 
-    if (currentTab == ClientSession.Tab.MY_QUESTS) {
-      quests = new ArrayList<>(ClientCache.getMyQuests());
+    if (currentTab == ClientSession.Tab.ARCHIVED) {
+      quests = QuestListOrder.archived(ClientCache.getMyQuests());
+      if (!searchTerm.isEmpty()) {
+        quests = quests.stream().filter(q -> matchesSearch(q, query)).collect(Collectors.toList());
+      }
+      // Keep the completion order: archived quests are never drawn on the map.
+      return quests;
+    } else if (currentTab == ClientSession.Tab.MY_QUESTS) {
+      quests = QuestListOrder.active(ClientCache.getMyQuests());
 
       // Filter by search term
       if (!searchTerm.isEmpty()) {
@@ -413,7 +435,7 @@ public class MainScreen extends DisquestsBaseScreen {
                   q -> ClientSession.isPinned(q.getId()), Comparator.reverseOrder())
               .thenComparing(Quest::getLastModified, Comparator.reverseOrder()));
     } else {
-      quests = new ArrayList<>(ClientCache.getServerQuests());
+      quests = QuestListOrder.active(ClientCache.getServerQuests());
 
       // Apply sub-filter
       if (serverFilter == ClientSession.QuestFilter.OPEN) {
@@ -659,7 +681,7 @@ public class MainScreen extends DisquestsBaseScreen {
   }
 
   private void updateActionButtons() {
-    if (currentTab == ClientSession.Tab.MY_QUESTS) {
+    if (currentTab != ClientSession.Tab.SERVER_QUESTS) {
       boolean hasSelection = getSelectedQuest() != null;
       btnOpen.active(hasSelection);
     } else {

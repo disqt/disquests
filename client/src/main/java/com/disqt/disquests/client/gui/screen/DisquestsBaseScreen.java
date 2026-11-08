@@ -48,7 +48,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   public sealed interface NavEntry {
     record QuestNav(UUID questId, boolean editing) implements NavEntry {}
 
-    record MainNav(boolean serverTab, String searchTerm) implements NavEntry {}
+    record MainNav(ClientSession.Tab tab, String searchTerm) implements NavEntry {}
   }
 
   public abstract NavEntry toNavEntry();
@@ -60,8 +60,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
       if (quest == null) return null;
       return new QuestScreen(this.parent, quest, qn.editing());
     } else if (entry instanceof NavEntry.MainNav mn) {
-      ClientSession.setActiveTab(
-          mn.serverTab() ? ClientSession.Tab.SERVER_QUESTS : ClientSession.Tab.MY_QUESTS);
+      ClientSession.setActiveTab(mn.tab());
       ClientSession.setSearchTerm(mn.searchTerm());
       return new MainScreen(this.parent);
     }

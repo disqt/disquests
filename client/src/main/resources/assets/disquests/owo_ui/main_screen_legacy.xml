@@ -76,6 +76,14 @@
                             <vertical method="fixed">20</vertical>
                         </sizing>
                     </button>
+                    <!-- Text set from a lang key in MainScreen -->
+                    <button id="tab-archived">
+                        <text>Archived</text>
+                        <sizing>
+                            <horizontal method="fixed">80</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
                 </children>
             </flow-layout>
 

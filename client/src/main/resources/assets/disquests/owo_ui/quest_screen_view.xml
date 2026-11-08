@@ -154,6 +154,22 @@
                             <vertical method="fixed">20</vertical>
                         </sizing>
                     </button>
+                    <!-- Complete and Reopen texts are set from lang keys in QuestScreen;
+                         each is removed when it does not apply -->
+                    <button id="btn-complete">
+                        <text>Complete</text>
+                        <sizing>
+                            <horizontal method="fixed">60</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
+                    <button id="btn-reopen">
+                        <text>Reopen</text>
+                        <sizing>
+                            <horizontal method="fixed">60</horizontal>
+                            <vertical method="fixed">20</vertical>
+                        </sizing>
+                    </button>
                     <button id="btn-delete">
                         <text>Delete</text>
                         <sizing>

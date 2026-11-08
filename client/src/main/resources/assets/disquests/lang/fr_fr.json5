@@ -31,6 +31,13 @@
     "cancel_map": "Annuler",
     "clear_location": "Effacer",
     "edit_on_map": "Modifier sur la map",
+    "complete": "Terminer",
+    "reopen": "Rouvrir",
+  },
+
+  // Onglets de l'accueil
+  "gui.disquests.tab.{}": {
+    "archived": "Archivées",
   },
 
   // Permissions des contributeurs
@@ -85,6 +92,8 @@
     "enter_to_create": "Appuie sur Entrée pour créer un tag",
     "vertex": "%d:",
     "region_summary": "Région : %d coins, X : %d à %d Z : %d à %d",
+    "completed_by": "Terminée le %s par %s",
+    "completed": "Terminée le %s",
   },
 
   // Dialogues de confirmation
@@ -93,6 +102,8 @@
     "leave": "Quitter cette quête ? Tu perdras l'accès contributeur.",
     "delete": "Supprimer la quête \"%s\" ?",
     "remove_contributor": "Retirer %s des contributeurs ?",
+    "complete": "Marquer cette quête comme terminée ? Elle passera dans l'onglet Archivées pour tous ceux qui y ont participé.",
+    "reopen": "Rouvrir cette quête ? Elle revient dans les listes actives, et sa date d'achèvement sera remplacée si elle est terminée à nouveau.",
   },
 
   // Sections repliables

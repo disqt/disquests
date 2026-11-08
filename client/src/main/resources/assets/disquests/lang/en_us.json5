@@ -31,6 +31,13 @@
     "cancel_map": "Cancel",
     "clear_location": "Clear location",
     "edit_on_map": "Edit on map",
+    "complete": "Complete",
+    "reopen": "Reopen",
+  },
+
+  // Home tabs
+  "gui.disquests.tab.{}": {
+    "archived": "Archived",
   },
 
   // Inline images in quest content
@@ -85,6 +92,8 @@
     "enter_to_create": "Press Enter to create new tag",
     "vertex": "%d:",
     "region_summary": "Region: %d corners, X:%d to %d Z:%d to %d",
+    "completed_by": "Completed on %s by %s",
+    "completed": "Completed on %s",
   },
 
   // Confirm dialogs
@@ -93,6 +102,8 @@
     "leave": "Leave this quest? You'll lose contributor access.",
     "delete": "Delete quest \"%s\"?",
     "remove_contributor": "Remove %s from contributors?",
+    "complete": "Mark this quest as completed? It moves to the Archived tab for everyone who worked on it.",
+    "reopen": "Reopen this quest? It goes back to the active lists, and its completion time will be replaced if it is completed again.",
   },
 
   // Collapsible sections

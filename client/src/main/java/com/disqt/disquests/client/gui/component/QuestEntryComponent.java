@@ -43,6 +43,8 @@ public class QuestEntryComponent extends BaseUIComponent {
   private final MutableComponent styledFirstLine;
   private final boolean isOwnedByPlayer;
   private final boolean isContributor;
+  // Members may pin active quests; the server refuses pins on completed ones.
+  private final boolean canPin;
   private final boolean hideContent;
 
   // Cached visibility badge (fix 1)
@@ -77,6 +79,7 @@ public class QuestEntryComponent extends BaseUIComponent {
     UUID playerUuid = ClientSession.getEffectivePlayerUuid();
     this.isOwnedByPlayer = quest.isOwner(playerUuid);
     this.isContributor = quest.isContributor(playerUuid);
+    this.canPin = (isOwnedByPlayer || isContributor) && !quest.isCompleted();
     this.hideContent = quest.isContentHidden(playerUuid);
 
     if (hideContent) {
@@ -291,7 +294,7 @@ public class QuestEntryComponent extends BaseUIComponent {
           textRenderer, HIDDEN_CONTENT_TEXT, entryX + 4, entryY + 14, Colors.TEXT_MUTED, false);
     } else if (styledFirstLine != null) {
       // Reserve space for pin icon if player can pin this quest
-      int pinReserve = (isOwnedByPlayer || isContributor) ? 18 : 0;
+      int pinReserve = canPin ? 18 : 0;
       int maxPreviewWidth = entryWidth - 8 - pinReserve;
       List<FormattedCharSequence> trimmed = textRenderer.split(styledFirstLine, maxPreviewWidth);
       if (!trimmed.isEmpty()) {
@@ -300,8 +303,8 @@ public class QuestEntryComponent extends BaseUIComponent {
       }
     }
 
-    // Only show pin icon for quests the player is part of
-    if (isOwnedByPlayer || isContributor) {
+    // Only show pin icon for active quests the player is part of
+    if (canPin) {
       int pinIconSize = 10;
       int pinIconX = entryX + entryWidth - pinIconSize - 4;
       int pinIconY = entryY + 14;
@@ -362,9 +365,8 @@ public class QuestEntryComponent extends BaseUIComponent {
 
     // Pin icon hit area: rightmost 20px, row 2 (y+12 to y+26)
     if (relX >= this.width() - 20 && relX <= this.width() && relY >= 12 && relY <= 26) {
-      if (!isOwnedByPlayer && !isContributor) {
-        LOGGER.debug(
-            "  -> PIN CLICK blocked: player is not owner or contributor of {}", quest.getTitle());
+      if (!canPin) {
+        LOGGER.debug("  -> PIN CLICK blocked: not a member of, or completed, {}", quest.getTitle());
         return true;
       }
       LOGGER.debug("  -> PIN CLICK detected, toggling pin for {}", quest.getTitle());

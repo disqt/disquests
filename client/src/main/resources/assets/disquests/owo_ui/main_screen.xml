@@ -140,13 +140,14 @@
                         </children>
                     </flow-layout>
 
-                    <!-- Tab row -->
+                    <!-- Tab row: three fixed 56 px tabs with 2 px gaps fill the 172 px inside
+                         the narrowest (180 px) panel -->
                     <flow-layout direction="horizontal" id="tab-row">
                         <sizing>
                             <horizontal method="content"/>
                             <vertical method="content"/>
                         </sizing>
-                        <gap>4</gap>
+                        <gap>2</gap>
                         <margins>
                             <bottom>2</bottom>
                         </margins>
@@ -154,14 +155,22 @@
                             <button id="tab-my-quests">
                                 <text>My Quests</text>
                                 <sizing>
-                                    <horizontal method="fixed">80</horizontal>
+                                    <horizontal method="fixed">56</horizontal>
                                     <vertical method="fixed">20</vertical>
                                 </sizing>
                             </button>
                             <button id="tab-quest-board">
                                 <text>Quest Board</text>
                                 <sizing>
-                                    <horizontal method="fixed">80</horizontal>
+                                    <horizontal method="fixed">56</horizontal>
+                                    <vertical method="fixed">20</vertical>
+                                </sizing>
+                            </button>
+                            <!-- Text set from a lang key in MainScreen -->
+                            <button id="tab-archived">
+                                <text>Archived</text>
+                                <sizing>
+                                    <horizontal method="fixed">56</horizontal>
                                     <vertical method="fixed">20</vertical>
                                 </sizing>
                             </button>
