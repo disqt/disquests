@@ -184,6 +184,8 @@ Channel: `disquests:main`. First byte = PacketType ID.
 ### Git & PR
 - **Never push to main** — always create a branch and PR. Exception: non-code changes (docs, CLAUDE.md, plans) can go directly to main to avoid unnecessary CI runs.
 - **PR target** — origin is `disqt/disquests`. No upstream remote.
+- **commitlint `subject-case`** — after the type prefix the subject must start lowercase (`feat: map button…`, not `feat: Map button…`); applies to every commit on a PR branch, not just the squash title.
+- **Rewording branch commits after merging `main`** — never `git filter-branch`/rebase across a merge commit from `main`: it rewrites main's squash commits too and the PR turns CONFLICTING. Rewrite only the range after the merge, or redo the merge.
 
 ### Minecraft API (26.1.2)
 - **ClickEvent API** — sealed classes, not enum. Use `new ClickEvent.OpenUrl(URI)` and `instanceof ClickEvent.OpenUrl openUrl` for pattern matching.
@@ -215,6 +217,8 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **Back/forward navigation uses `NavEntry` records** — `DisquestsBaseScreen` stores `Deque<NavEntry>` (not `Deque<Screen>`). Each screen implements `toNavEntry()` to serialize itself. On back/forward, screens are rebuilt from current cache state via `rebuildFromEntry()`. Never store screen instances in the stacks.
 - **No `clearAndInit()`** — to rebuild a screen after state change, reopen it: `client.setScreen(new MyScreen(parent))`.
 - **owo-config wrapper IDE errors** — `DisquestsConfigWrapper cannot be resolved` cascades false errors. IDE-only. Gradle compiles fine. Don't chase these.
+- **`parent()` is null inside `build()`** — owo sets it at mount (layout), after `build()`. Look parents up by id from `root` (`root.childById(FlowLayout.class, "map-toolbar").removeChild(...)`); a `parent() instanceof` check silently does nothing.
+- **Generated owo-config setters don't persist** — `CONFIG.sidePanelWidth(w)` updates memory only; call `CONFIG.save()` after.
 
 ### Wiki-links
 - **Dirty tracking has two entry points** — `enterEditMode()` passes `origContent` to the constructor, `buildEditMode()` has a fallback snapshot guarded by `if (originalTitle == null)`. Both must reverse-resolve wiki-link UUIDs. The constructor path is the one used in practice (view→edit mode switch).
@@ -244,6 +248,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **Logger names use `.` not `/`** — `LoggerFactory.getLogger("Disquests.MainScreen")` not `"Disquests/MainScreen"`. Log4j2 uses `.` for hierarchy.
 - **`javax.annotation` not on testmod classpath** — Don't use `@Nullable` etc. in testmod code. JUnit is also unresolvable in IDE (cosmetic, compiles fine via Gradle).
 - **`childById(Class, id)` is type-strict** — changing a component's container type (e.g., `OverlayContainer` to `FlowLayout`) breaks any test using `childById(OverlayContainer.class, id)`. Search testmod for the component ID before changing container types.
+- **Same-class screen rebuilds** — `waitForScreen(QuestScreen.class)` returns immediately when one `QuestScreen` replaces another; wait on a component only the new screen has (`btn-edit` = view mode, `btn-edit-on-map` = edit mode, `vertex-x-2`).
 
 ## Release
 
