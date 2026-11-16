@@ -7,6 +7,9 @@ world-map: true
 # Show each player's own position on the in-game map. Set to false to make players find their way by reading the map.
 player-marker: true
 
+# How many levels of subquests a quest may be nested in. 0 means no limit; a negative value uses the default.
+max-quest-depth: 3
+
 # Default map dimension used when a quest has no map set.
 # Must be a key in bluemap-map-names (e.g. "overworld").
 bluemap-default-map: "overworld"
