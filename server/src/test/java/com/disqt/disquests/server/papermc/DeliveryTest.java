@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import com.disqt.disquests.common.ByteBufReader;
 import com.disqt.disquests.common.PacketCodec;
 import com.disqt.disquests.common.ProtocolVersion;
+import com.disqt.disquests.common.graph.Plans;
 import com.disqt.disquests.common.graph.QuestGraph;
 import com.disqt.disquests.common.graph.QuestView;
 import com.disqt.disquests.common.model.QuestData;
@@ -212,7 +213,7 @@ class DeliveryTest {
       assertEquals(Set.of("Chapitre un"), titles(outbox.serverQuestsFor(OUTSIDER).get(0)));
       assertEquals(List.of(List.of("build")), outbox.tagsFor(OUTSIDER));
 
-      QuestGraph after = change(() -> dm.completeQuest(one, LEO, 5000L));
+      QuestGraph after = change(() -> dm.completeQuests(List.of(one), LEO, 5000L));
 
       QuestData unlocked = QuestView.forRecipient(after, OUTSIDER, two);
       assertEquals(List.of(atVersion(unlocked, ProtocolVersion.V3)), outbox.updatesFor(OUTSIDER));
@@ -277,7 +278,7 @@ class DeliveryTest {
     @Test
     void completedOpenQuest_isOnTheBoardOfAV4PlayerWithoutARole() {
       UUID done = quest(LEO, "Gare", Visibility.OPEN, List.of());
-      dm.completeQuest(done, LEO, 5000L);
+      dm.completeQuests(List.of(done), LEO, 5000L);
 
       delivery.sync(MEMBER, ProtocolVersion.V4);
 
@@ -289,7 +290,7 @@ class DeliveryTest {
     @Test
     void hubExample_completedInterieurs_staysListedForTheV4Member() {
       westenheim(Visibility.PRIVATE);
-      dm.completeQuest(interieurs, LEO, 5000L);
+      dm.completeQuests(List.of(interieurs), LEO, 5000L);
 
       delivery.sync(MEMBER, ProtocolVersion.V4);
 
@@ -410,7 +411,7 @@ class DeliveryTest {
     void completingAndReopeningAnOpenQuest_reachesAV4PlayerWithoutARole() {
       UUID gare = quest(LEO, "Gare", Visibility.OPEN, List.of());
 
-      change(() -> dm.completeQuest(gare, LEO, 5000L));
+      change(() -> dm.completeQuests(List.of(gare), LEO, 5000L));
       assertEquals(List.of(), outbox.deletesFor(MEMBER));
       List<QuestData> completed = outbox.updatesFor(MEMBER);
       assertEquals(List.of(gare), completed.stream().map(QuestData::id).toList());
@@ -427,7 +428,7 @@ class DeliveryTest {
     void hubExample_completingInterieurs_reachesTheV4MemberAsAnUpdate() {
       westenheim(Visibility.PRIVATE);
 
-      QuestGraph after = change(() -> dm.completeQuest(interieurs, LEO, 5000L));
+      QuestGraph after = change(() -> dm.completeQuests(List.of(interieurs), LEO, 5000L));
 
       assertEquals(
           List.of(QuestView.forRecipient(after, MEMBER, interieurs)), outbox.updatesFor(MEMBER));
@@ -475,7 +476,10 @@ class DeliveryTest {
       UUID two = quest(LEO, "Chapitre deux", Visibility.OPEN, List.of());
       dm.setPrerequisites(two, List.of(one));
 
-      change(() -> dm.deleteQuest(two));
+      change(
+          () ->
+              dm.applyDeletePlan(
+                  new Plans.DeletePlan(Set.of(two), Map.of(), Map.of(), Map.of()), 0L));
 
       assertEquals(List.of(), outbox.packetsFor(OUTSIDER));
       assertEquals(List.of(two), outbox.deletesFor(MEMBER));

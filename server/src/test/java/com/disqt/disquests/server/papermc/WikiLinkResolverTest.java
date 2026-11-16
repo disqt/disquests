@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.QuestData;
+import com.disqt.disquests.common.model.Role;
 import com.disqt.disquests.common.model.Visibility;
 import java.nio.file.Path;
 import java.util.List;
@@ -114,7 +115,7 @@ class WikiLinkResolverTest {
   void resolveForRecipient_privateQuestContributorCanSee() {
     UUID questId = UUID.randomUUID();
     dm.saveQuest(makeQuest(questId, OWNER, "Collab Private", Visibility.PRIVATE));
-    dm.addContributor(questId, PLAYER2, false);
+    dm.setRole(questId, PLAYER2, Role.READ);
 
     String result =
         resolver.resolveForRecipient(dm.loadGraph(), "[[Collab Private]] task.", PLAYER2);
@@ -276,7 +277,7 @@ class WikiLinkResolverTest {
   void reverseResolve_privateQuestContributorCanSee() {
     UUID questId = UUID.randomUUID();
     dm.saveQuest(makeQuest(questId, OWNER, "Collab Secret", Visibility.PRIVATE));
-    dm.addContributor(questId, PLAYER2, false);
+    dm.setRole(questId, PLAYER2, Role.READ);
 
     String result =
         resolver.reverseResolve(dm.loadGraph(), "[[" + questId + "|Collab Secret]] work.", PLAYER2);

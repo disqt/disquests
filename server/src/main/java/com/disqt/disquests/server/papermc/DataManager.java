@@ -319,12 +319,6 @@ public class DataManager {
     }
   }
 
-  public synchronized boolean deleteQuest(UUID id) {
-    boolean[] deleted = new boolean[1];
-    inTransaction("delete quest", () -> deleted[0] = deleteQuestRaw(id));
-    return deleted[0];
-  }
-
   /**
    * Deletes the quest; its people, links from it, pins, requests, tags and polygon cascade. Links
    * pointing at it stay, and quests that had it as their parent become top level.
@@ -363,82 +357,6 @@ public class DataManager {
 
   public synchronized QuestGraph loadGraph() {
     return QuestGraph.of(getAllQuests());
-  }
-
-  /** Not for delivery: returns unredacted quests. Use Delivery / QuestView. */
-  public synchronized List<QuestData> getQuestsForPlayer(UUID playerUuid) {
-    List<QuestData> quests = new ArrayList<>();
-    try (PreparedStatement stmt =
-        connection.prepareStatement(
-            QUEST_SELECT
-                + """
-                WHERE q.owner_uuid = ?
-                   OR q.id IN (SELECT quest_id FROM quest_people WHERE player_uuid = ?)
-                """)) {
-      stmt.setString(1, playerUuid.toString());
-      stmt.setString(2, playerUuid.toString());
-      ResultSet rs = stmt.executeQuery();
-      while (rs.next()) {
-        quests.add(mapQuestRow(rs));
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to get quests for player", e);
-    }
-    return hydrate(quests);
-  }
-
-  /** Not for delivery: returns unredacted quests. Use Delivery / QuestView. */
-  public synchronized List<QuestData> getServerQuests(UUID excludePlayerUuid) {
-    List<QuestData> quests = new ArrayList<>();
-    try (PreparedStatement stmt =
-        connection.prepareStatement(
-            QUEST_SELECT
-                + """
-                WHERE q.visibility IN ('OPEN', 'CLOSED')
-                  AND q.completed_at = 0
-                  AND q.owner_uuid != ?
-                  AND q.id NOT IN (SELECT quest_id FROM quest_people WHERE player_uuid = ?)
-                """)) {
-      stmt.setString(1, excludePlayerUuid.toString());
-      stmt.setString(2, excludePlayerUuid.toString());
-      ResultSet rs = stmt.executeQuery();
-      while (rs.next()) {
-        quests.add(mapQuestRow(rs));
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to get server quests", e);
-    }
-    return hydrate(quests);
-  }
-
-  /**
-   * Returns quests without their people or links.
-   *
-   * <p>Not for delivery: returns unredacted quests. Use Delivery / QuestView.
-   */
-  public synchronized Map<String, QuestData> findQuestsByTitlesIgnoreCase(List<String> titles) {
-    if (titles.isEmpty()) return Map.of();
-    Map<String, QuestData> result = new HashMap<>();
-    String placeholders = titles.stream().map(t -> "?").collect(Collectors.joining(","));
-    try (PreparedStatement stmt =
-        connection.prepareStatement(
-            QUEST_SELECT + "WHERE LOWER(q.title) IN (" + placeholders + ")")) {
-      for (int i = 0; i < titles.size(); i++) {
-        stmt.setString(i + 1, titles.get(i).toLowerCase());
-      }
-      ResultSet rs = stmt.executeQuery();
-      while (rs.next()) {
-        QuestData quest = mapQuestRow(rs);
-        String lowerTitle = quest.title().toLowerCase();
-        if (!result.containsKey(lowerTitle)
-            || quest.id().toString().compareTo(result.get(lowerTitle).id().toString()) < 0) {
-          result.put(lowerTitle, quest);
-        }
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to find quests by titles", e);
-    }
-    return result;
   }
 
   public synchronized void updateVisibility(UUID questId, Visibility visibility) {
@@ -484,46 +402,6 @@ public class DataManager {
   // Contributors
   // -------------------------------------------------------------------------
 
-  public synchronized void addContributor(UUID questId, UUID playerUuid, boolean canEdit) {
-    try {
-      // Never demotes an owner: a legacy caller only knows WRITE and READ.
-      update(
-          """
-              INSERT INTO quest_people (quest_id, player_uuid, role, added_at)
-              VALUES (?, ?, ?, ?)
-              ON CONFLICT(quest_id, player_uuid) DO UPDATE SET role = excluded.role
-              WHERE quest_people.role <> 'OWNER'
-              """,
-          questId.toString(),
-          playerUuid.toString(),
-          (canEdit ? Role.WRITE : Role.READ).name(),
-          nextAddedAt(questId));
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to add contributor", e);
-    }
-  }
-
-  public synchronized void leaveQuest(UUID questId, UUID playerUuid) {
-    removeContributor(questId, playerUuid);
-    unpinQuest(playerUuid, questId);
-  }
-
-  public synchronized void removeContributor(UUID questId, UUID playerUuid) {
-    try {
-      // The display owner is never removed this way.
-      update(
-          """
-              DELETE FROM quest_people WHERE quest_id = ? AND player_uuid = ?
-                AND player_uuid NOT IN (SELECT owner_uuid FROM quests WHERE id = ?)
-              """,
-          questId.toString(),
-          playerUuid.toString(),
-          questId.toString());
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to remove contributor", e);
-    }
-  }
-
   public synchronized void updateContributor(UUID questId, UUID playerUuid, boolean canEdit) {
     try {
       update(
@@ -547,22 +425,6 @@ public class DataManager {
       return getPeopleBatch(Map.of(questId, displayOwner)).get(questId);
     } catch (SQLException e) {
       throw new RuntimeException("Failed to get contributors", e);
-    }
-  }
-
-  public synchronized boolean isContributor(UUID questId, UUID playerUuid) {
-    try (PreparedStatement stmt =
-        connection.prepareStatement(
-            """
-                SELECT 1 FROM quest_people qp JOIN quests q ON q.id = qp.quest_id
-                WHERE qp.quest_id = ? AND qp.player_uuid = ? AND qp.player_uuid <> q.owner_uuid
-                """)) {
-      stmt.setString(1, questId.toString());
-      stmt.setString(2, playerUuid.toString());
-      ResultSet rs = stmt.executeQuery();
-      return rs.next();
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to check contributor", e);
     }
   }
 
@@ -914,14 +776,9 @@ public class DataManager {
   }
 
   /**
-   * Marks a quest completed and drops its pins and pending collaboration requests in one
+   * Marks each quest completed and drops its pins and pending collaboration requests, all in one
    * transaction.
    */
-  public synchronized void completeQuest(UUID questId, UUID completedBy, long completedAt) {
-    inTransaction("complete quest", () -> completeQuestRaw(questId, completedBy, completedAt));
-  }
-
-  /** Completes each quest like {@link #completeQuest}, all in one transaction. */
   public synchronized void completeQuests(Collection<UUID> questIds, UUID completedBy, long at) {
     inTransaction(
         "complete quests",
@@ -1154,15 +1011,6 @@ public class DataManager {
     }
   }
 
-  /** Stores why the quest was made private and sets it Private. */
-  public synchronized void setPrivatized(UUID quest, PrivatizeInfo info, long at) {
-    try {
-      setPrivatizedRaw(quest, info, at);
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to set privatized", e);
-    }
-  }
-
   private void setPrivatizedRaw(UUID quest, PrivatizeInfo info, long at) throws SQLException {
     String saw =
         info.ownersWhoSawIt().stream()
@@ -1181,17 +1029,6 @@ public class DataManager {
         at,
         saw,
         quest.toString());
-  }
-
-  public synchronized Set<UUID> privatizedSeenBy(UUID quest) {
-    try (PreparedStatement stmt =
-        connection.prepareStatement("SELECT priv_saw FROM quests WHERE id = ?")) {
-      stmt.setString(1, quest.toString());
-      ResultSet rs = stmt.executeQuery();
-      return rs.next() ? parseUuidSet(rs.getString("priv_saw")) : Set.of();
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to read who saw the deleted quest", e);
-    }
   }
 
   /** Forgets the privatization; the visibility stays as it is. */
@@ -1639,26 +1476,5 @@ public class DataManager {
     } catch (SQLException e) {
       throw new RuntimeException("Failed to count polygon rows", e);
     }
-  }
-
-  /**
-   * Returns all distinct tags from the DB merged with config seed tags, alphabetically sorted.
-   *
-   * <p>Not for delivery: returns the tags of every quest, unredacted. Use Delivery / QuestView.
-   */
-  public synchronized List<String> getAllDistinctTags(List<String> seedTags) {
-    java.util.TreeSet<String> tags = new java.util.TreeSet<>();
-    for (String seed : seedTags) {
-      tags.add(seed.toLowerCase());
-    }
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery("SELECT DISTINCT tag FROM quest_tags")) {
-      while (rs.next()) {
-        tags.add(rs.getString("tag"));
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to get distinct tags", e);
-    }
-    return new ArrayList<>(tags);
   }
 }

@@ -90,6 +90,14 @@ class DataManagerTreeTest {
     }
   }
 
+  private void delete(UUID id) {
+    dm.applyDeletePlan(new DeletePlan(Set.of(id), Map.of(), Map.of(), Map.of()), 1L);
+  }
+
+  private void privatize(UUID id, PrivatizeInfo info, long at) {
+    dm.applyDeletePlan(new DeletePlan(Set.of(), Map.of(), Map.of(id, info), Map.of()), at);
+  }
+
   private QuestData fromAll(UUID id) {
     return dm.getAllQuests().stream().filter(q -> q.id().equals(id)).findFirst().orElseThrow();
   }
@@ -158,7 +166,7 @@ class DataManagerTreeTest {
       UUID child = quest(ALICE, "child");
       dm.setPrerequisites(child, List.of(dep));
 
-      assertTrue(dm.deleteQuest(dep));
+      delete(dep);
 
       assertEquals(List.of(dep), dm.getQuest(child).prerequisites());
     }
@@ -170,10 +178,10 @@ class DataManagerTreeTest {
       dm.setPrerequisites(child, List.of(dep));
       dm.setRole(child, BOB, Role.READ);
 
-      dm.deleteQuest(child);
+      delete(child);
 
       assertNull(dm.getQuest(child));
-      assertEquals(List.of(), dm.getQuestsForPlayer(BOB));
+      assertTrue(dm.getAllQuests().stream().noneMatch(q -> q.roleOf(BOB) != null));
       assertEquals(List.of(), dm.getContributors(child));
       assertEquals(0, rows("SELECT COUNT(*) FROM quest_links WHERE from_id = '" + child + "'"));
       assertEquals(0, rows("SELECT COUNT(*) FROM quest_people WHERE quest_id = '" + child + "'"));
@@ -343,38 +351,28 @@ class DataManagerTreeTest {
     }
 
     @Test
-    void legacyContributorMethodsStillWorkOnRoles() {
+    void updateContributorWorksOnRoles() {
       UUID id = quest(ALICE, "q");
-
-      dm.addContributor(id, BOB, true);
-      dm.addContributor(id, CAROL, false);
-      assertEquals(Role.WRITE, dm.getQuest(id).roleOf(BOB));
-      assertEquals(Role.READ, dm.getQuest(id).roleOf(CAROL));
-      assertTrue(dm.isContributor(id, BOB));
-      assertFalse(dm.isContributor(id, ALICE));
+      dm.setRole(id, CAROL, Role.READ);
 
       dm.updateContributor(id, CAROL, true);
       assertEquals(Role.WRITE, dm.getQuest(id).roleOf(CAROL));
 
-      dm.leaveQuest(id, BOB);
-      assertFalse(dm.isContributor(id, BOB));
-      assertEquals(List.of(id), dm.getQuestsForPlayer(CAROL).stream().map(QuestData::id).toList());
-      assertEquals(List.of(), dm.getQuestsForPlayer(BOB));
-      assertEquals(List.of(id), dm.getServerQuests(BOB).stream().map(QuestData::id).toList());
+      dm.updateContributor(id, CAROL, false);
+      assertEquals(Role.READ, dm.getQuest(id).roleOf(CAROL));
     }
 
     @Test
-    void legacyContributorMethodsNeverDemoteAnOwner() {
+    void updateContributorNeverDemotesAnOwner() {
       UUID id = quest(ALICE, "q");
       dm.setRole(id, BOB, Role.OWNER);
 
-      dm.addContributor(id, BOB, false);
       dm.updateContributor(id, BOB, false);
-      dm.addContributor(id, ALICE, false);
-      dm.removeContributor(id, ALICE);
+      dm.updateContributor(id, ALICE, false);
 
       assertEquals(Role.OWNER, dm.getQuest(id).roleOf(BOB));
       assertEquals(Role.OWNER, dm.getQuest(id).roleOf(ALICE));
+      assertEquals(2, rows("SELECT COUNT(*) FROM quest_people WHERE role = 'OWNER'"));
     }
 
     @Test
@@ -397,10 +395,10 @@ class DataManagerTreeTest {
   @Nested
   class Privatization {
     @Test
-    void setPrivatizedStoresEverythingAndMakesTheQuestPrivate() {
+    void privatizingStoresEverythingAndMakesTheQuestPrivate() {
       UUID id = quest(ALICE, "q", Visibility.OPEN);
 
-      dm.setPrivatized(
+      privatize(
           id, new PrivatizeInfo(Visibility.OPEN, "Old parent", BOB, Set.of(ALICE, CAROL)), 9000L);
 
       QuestData stored = dm.getQuest(id);
@@ -408,26 +406,25 @@ class DataManagerTreeTest {
       assertEquals(
           new Privatized(Visibility.OPEN, "Old parent", "Bob", 9000L, Set.of(ALICE, CAROL)),
           stored.privatized());
-      assertEquals(Set.of(ALICE, CAROL), dm.privatizedSeenBy(id));
     }
 
     @Test
     void clearPrivatizedLeavesVisibilityAlone() {
       UUID id = quest(ALICE, "q", Visibility.CLOSED);
-      dm.setPrivatized(id, new PrivatizeInfo(Visibility.CLOSED, "P", BOB, Set.of()), 1L);
+      privatize(id, new PrivatizeInfo(Visibility.CLOSED, "P", BOB, Set.of()), 1L);
 
       dm.clearPrivatized(id);
 
       QuestData stored = dm.getQuest(id);
       assertNull(stored.privatized());
       assertEquals(Visibility.PRIVATE, stored.visibility());
-      assertEquals(Set.of(), dm.privatizedSeenBy(id));
+      assertEquals(0, rows("SELECT COUNT(*) FROM quests WHERE priv_saw IS NOT NULL"));
     }
 
     @Test
     void privatizedWithNoOneWhoSawItRoundTrips() {
       UUID id = quest(ALICE, "q", Visibility.OPEN);
-      dm.setPrivatized(id, new PrivatizeInfo(Visibility.OPEN, "P", BOB, Set.of()), 5L);
+      privatize(id, new PrivatizeInfo(Visibility.OPEN, "P", BOB, Set.of()), 5L);
 
       assertEquals(
           new Privatized(Visibility.OPEN, "P", "Bob", 5L, Set.of()), dm.getQuest(id).privatized());

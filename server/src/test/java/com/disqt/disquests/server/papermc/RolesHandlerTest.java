@@ -84,7 +84,7 @@ class RolesHandlerTest extends HandlerFixture {
     UUID before = quest(LEO, "Before", Visibility.OPEN);
     UUID mine = quest(JUJU, "Mine", Visibility.OPEN);
     UUID inside = subquest(hub, MAX, "Inside", Visibility.OPEN);
-    if (action == Action.REOPEN) dm.completeQuest(hub, LEO, 5000L);
+    if (action == Action.REOPEN) dm.completeQuests(List.of(hub), LEO, 5000L);
     outbox.clear();
 
     switch (action) {
@@ -122,7 +122,7 @@ class RolesHandlerTest extends HandlerFixture {
   @Test
   void aV3ContributorWhoCanEditNoLongerCompletes() {
     UUID hub = quest(LEO, "Hub", Visibility.PRIVATE);
-    dm.addContributor(hub, JUJU, true);
+    dm.setRole(hub, JUJU, Role.WRITE);
     register(JUJU, ProtocolVersion.V3);
     outbox.clear();
 
@@ -446,7 +446,7 @@ class RolesHandlerTest extends HandlerFixture {
     @ValueSource(booleans = {true, false})
     void makingAPrivatizedQuestVisibleClearsItsPrivatizedState(boolean throughSave) {
       UUID hub = quest(LEO, "Hub", Visibility.OPEN);
-      dm.setPrivatized(hub, new PrivatizeInfo(Visibility.OPEN, "Gone", MAX, Set.of(LEO)), 5000L);
+      privatize(hub, new PrivatizeInfo(Visibility.OPEN, "Gone", MAX, Set.of(LEO)), 5000L);
 
       if (throughSave) save(LEO, hub, "Hub", visibility(Visibility.CLOSED));
       else receive(LEO, PacketCodec.writeUpdateVisibility(hub, Visibility.CLOSED));

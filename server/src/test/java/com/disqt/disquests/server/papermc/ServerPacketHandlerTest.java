@@ -98,7 +98,7 @@ class ServerPacketHandlerTest {
   @Test
   void saveExistingQuest_reachesEveryViewer() {
     UUID questId = seedQuest(Visibility.OPEN);
-    dm.addContributor(questId, CONTRIBUTOR, true);
+    dm.setRole(questId, CONTRIBUTOR, Role.WRITE);
     for (UUID player : List.of(OWNER, CONTRIBUTOR, BYSTANDER)) register(player, ProtocolVersion.V4);
     outbox.clear();
 
@@ -121,7 +121,7 @@ class ServerPacketHandlerTest {
   @Test
   void saveByViewOnlyContributor_isIgnored() {
     UUID questId = seedQuest(Visibility.OPEN);
-    dm.addContributor(questId, CONTRIBUTOR, false);
+    dm.setRole(questId, CONTRIBUTOR, Role.READ);
     register(OWNER, ProtocolVersion.V4);
     outbox.clear();
 
@@ -265,7 +265,7 @@ class ServerPacketHandlerTest {
     register(CONTRIBUTOR, ProtocolVersion.V1);
     UUID id = UUID.randomUUID();
     send(OWNER, id, null, false, null, "overworld", TRIANGLE);
-    dm.addContributor(id, CONTRIBUTOR, true);
+    dm.setRole(id, CONTRIBUTOR, Role.WRITE);
     outbox.clear();
 
     receive(
@@ -387,7 +387,7 @@ class ServerPacketHandlerTest {
   @Test
   void complete_byViewOnlyContributor_isRefused() {
     UUID id = seedQuest(Visibility.OPEN);
-    dm.addContributor(id, CONTRIBUTOR, false);
+    dm.setRole(id, CONTRIBUTOR, Role.READ);
     register(CONTRIBUTOR, ProtocolVersion.V3);
     outbox.clear();
 
@@ -400,7 +400,7 @@ class ServerPacketHandlerTest {
   @Test
   void complete_byEditContributor_isRefused() {
     UUID id = seedQuest(Visibility.PRIVATE);
-    dm.addContributor(id, CONTRIBUTOR, true);
+    dm.setRole(id, CONTRIBUTOR, Role.WRITE);
     complete(CONTRIBUTOR, id);
     Assertions.assertFalse(dm.getQuest(id).isCompleted());
   }
@@ -426,7 +426,7 @@ class ServerPacketHandlerTest {
   @Test
   void complete_sendsDeleteToV2Contributor() {
     UUID id = seedQuest(Visibility.PRIVATE);
-    dm.addContributor(id, CONTRIBUTOR, true);
+    dm.setRole(id, CONTRIBUTOR, Role.WRITE);
     register(OWNER, ProtocolVersion.V3);
     register(CONTRIBUTOR, ProtocolVersion.V2);
     outbox.clear();
@@ -468,7 +468,7 @@ class ServerPacketHandlerTest {
   @Test
   void reopen_byOwner_restoresAndBroadcasts() {
     UUID id = seedQuest(Visibility.OPEN);
-    dm.completeQuest(id, OWNER, 5000L);
+    dm.completeQuests(List.of(id), OWNER, 5000L);
     register(OWNER, ProtocolVersion.V3);
     register(BYSTANDER, ProtocolVersion.V3);
     register(CONTRIBUTOR, ProtocolVersion.V3);
@@ -487,8 +487,8 @@ class ServerPacketHandlerTest {
   @Test
   void reopen_ofPrivateQuest_notifiesOnlyParticipants() {
     UUID id = seedQuest(Visibility.PRIVATE);
-    dm.addContributor(id, CONTRIBUTOR, true);
-    dm.completeQuest(id, OWNER, 5000L);
+    dm.setRole(id, CONTRIBUTOR, Role.WRITE);
+    dm.completeQuests(List.of(id), OWNER, 5000L);
     register(OWNER, ProtocolVersion.V3);
     register(CONTRIBUTOR, ProtocolVersion.V3);
     register(BYSTANDER, ProtocolVersion.V3);
@@ -505,8 +505,8 @@ class ServerPacketHandlerTest {
   @Test
   void reopen_byDemotedContributor_isRefused() {
     UUID id = seedQuest(Visibility.OPEN);
-    dm.addContributor(id, CONTRIBUTOR, true);
-    dm.completeQuest(id, CONTRIBUTOR, 5000L);
+    dm.setRole(id, CONTRIBUTOR, Role.WRITE);
+    dm.completeQuests(List.of(id), CONTRIBUTOR, 5000L);
     dm.updateContributor(id, CONTRIBUTOR, false);
 
     reopen(CONTRIBUTOR, id);
@@ -518,7 +518,7 @@ class ServerPacketHandlerTest {
   @Test
   void saveOnCompletedQuest_isIgnored() {
     UUID id = seedQuest(Visibility.PRIVATE);
-    dm.completeQuest(id, OWNER, 5000L);
+    dm.completeQuests(List.of(id), OWNER, 5000L);
 
     receive(
         OWNER,
@@ -533,30 +533,30 @@ class ServerPacketHandlerTest {
   @Test
   void joinCompletedQuest_isIgnored() {
     UUID id = seedQuest(Visibility.OPEN);
-    dm.completeQuest(id, OWNER, 5000L);
+    dm.completeQuests(List.of(id), OWNER, 5000L);
 
     receive(BYSTANDER, PacketCodec.writeJoinQuest(id));
 
-    Assertions.assertFalse(dm.isContributor(id, BYSTANDER));
+    Assertions.assertNull(dm.getQuest(id).roleOf(BYSTANDER));
     assertNothingSentTo(BYSTANDER);
   }
 
   @Test
   void leaveCompletedQuest_isIgnored() {
     UUID id = seedQuest(Visibility.OPEN);
-    dm.addContributor(id, CONTRIBUTOR, true);
-    dm.completeQuest(id, OWNER, 5000L);
+    dm.setRole(id, CONTRIBUTOR, Role.WRITE);
+    dm.completeQuests(List.of(id), OWNER, 5000L);
 
     receive(CONTRIBUTOR, PacketCodec.writeLeaveQuest(id));
 
-    Assertions.assertTrue(dm.isContributor(id, CONTRIBUTOR));
+    Assertions.assertEquals(Role.WRITE, dm.getQuest(id).roleOf(CONTRIBUTOR));
     assertNothingSentTo(CONTRIBUTOR);
   }
 
   @Test
   void contributorsVisibilityAndRequestOnCompletedQuest_areIgnored() {
     UUID id = seedQuest(Visibility.CLOSED);
-    dm.completeQuest(id, OWNER, 5000L);
+    dm.completeQuests(List.of(id), OWNER, 5000L);
 
     receive(OWNER, PacketCodec.writeUpdateVisibility(id, Visibility.OPEN));
     receive(BYSTANDER, PacketCodec.writeRequestCollaboration(id));
@@ -568,7 +568,7 @@ class ServerPacketHandlerTest {
   @Test
   void deleteCompletedQuest_byOwner_isAccepted() {
     UUID id = seedQuest(Visibility.PRIVATE);
-    dm.completeQuest(id, OWNER, 5000L);
+    dm.completeQuests(List.of(id), OWNER, 5000L);
     receive(OWNER, PacketCodec.writeDeleteQuest(id));
     Assertions.assertNull(dm.getQuest(id));
   }
@@ -591,8 +591,8 @@ class ServerPacketHandlerTest {
   @Test
   void sync_v2_excludesCompleted_v3_includesForParticipants() {
     UUID done = seedQuest(Visibility.OPEN);
-    dm.addContributor(done, CONTRIBUTOR, false);
-    dm.completeQuest(done, OWNER, 5000L);
+    dm.setRole(done, CONTRIBUTOR, Role.READ);
+    dm.completeQuests(List.of(done), OWNER, 5000L);
     UUID active = UUID.randomUUID();
     dm.saveQuest(
         new QuestData(
@@ -660,7 +660,7 @@ class ServerPacketHandlerTest {
   @Test
   void wikiLink_toCompletedQuest_stillResolves() {
     UUID id = seedQuest(Visibility.OPEN);
-    dm.completeQuest(id, OWNER, 5000L);
+    dm.completeQuests(List.of(id), OWNER, 5000L);
     WikiLinkResolver resolver = new WikiLinkResolver();
     Assertions.assertEquals(
         "See [[" + id + "|Gare]]",
@@ -700,7 +700,7 @@ class ServerPacketHandlerTest {
   @Test
   void pinCompletedQuest_isIgnored() {
     UUID id = seedQuest(Visibility.OPEN);
-    dm.completeQuest(id, OWNER, 5000L);
+    dm.completeQuests(List.of(id), OWNER, 5000L);
 
     receive(OWNER, PacketCodec.writePinQuest(id));
     receive(BYSTANDER, PacketCodec.writePinQuest(id));
@@ -727,7 +727,7 @@ class ServerPacketHandlerTest {
   @Test
   void leaveOpenQuest_movesItToTheLeaversBoard() {
     UUID id = seedQuest(Visibility.OPEN);
-    dm.addContributor(id, CONTRIBUTOR, false);
+    dm.setRole(id, CONTRIBUTOR, Role.READ);
     register(CONTRIBUTOR, ProtocolVersion.V4);
     outbox.clear();
 
@@ -771,7 +771,7 @@ class ServerPacketHandlerTest {
   @Test
   void removingAContributorFromAPrivateQuest_deletesItForThem() {
     UUID id = seedQuest(Visibility.PRIVATE);
-    dm.addContributor(id, CONTRIBUTOR, true);
+    dm.setRole(id, CONTRIBUTOR, Role.WRITE);
     register(OWNER, ProtocolVersion.V4);
     register(CONTRIBUTOR, ProtocolVersion.V4);
     outbox.clear();
@@ -808,7 +808,7 @@ class ServerPacketHandlerTest {
   @Test
   void settingAnOpenQuestPrivate_deletesItForNonParticipantsOnly() {
     UUID id = seedQuest(Visibility.OPEN);
-    dm.addContributor(id, CONTRIBUTOR, false);
+    dm.setRole(id, CONTRIBUTOR, Role.READ);
     for (UUID player : List.of(OWNER, CONTRIBUTOR, BYSTANDER)) register(player, ProtocolVersion.V4);
     outbox.clear();
 

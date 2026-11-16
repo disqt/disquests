@@ -1,5 +1,6 @@
 package com.disqt.disquests.common;
 
+import com.disqt.disquests.common.graph.LinkRules;
 import com.disqt.disquests.common.graph.Refusal;
 import com.disqt.disquests.common.model.CollaborationRequestData;
 import com.disqt.disquests.common.model.ContributorData;
@@ -28,7 +29,6 @@ public final class PacketCodec {
   private static final int MAX_CONTRIBUTORS = 256;
   private static final int MAX_OPS = 256;
   private static final int MAX_QUEST_LIST = 10000;
-  public static final int MAX_PREREQUISITES = 8;
   public static final int MAX_TREE_OPS = 64;
   public static final int DEFAULT_MAX_QUEST_DEPTH = 3;
 
@@ -728,7 +728,7 @@ public final class PacketCodec {
       }
       contributors = withRoles;
       parentId = readNullableUUID(buf);
-      prerequisites = readUuidList(buf, MAX_PREREQUISITES, "Prerequisite");
+      prerequisites = readUuidList(buf, LinkRules.MAX_PREREQUISITES, "Prerequisite");
       hiddenPrerequisites = buf.readBoolean();
       deletedPrerequisite = buf.readBoolean();
       hiddenParent = buf.readBoolean();
@@ -1094,8 +1094,8 @@ public final class PacketCodec {
       UUID target = readNullableUUID(buf);
       treeOps.add(new TreeOp(kind, quest, target));
     }
-    List<UUID> add = readUuidList(buf, MAX_PREREQUISITES, "Added prerequisite");
-    List<UUID> remove = readUuidList(buf, MAX_PREREQUISITES, "Removed prerequisite");
+    List<UUID> add = readUuidList(buf, LinkRules.MAX_PREREQUISITES, "Added prerequisite");
+    List<UUID> remove = readUuidList(buf, LinkRules.MAX_PREREQUISITES, "Removed prerequisite");
     boolean dropHidden = buf.readBoolean();
     boolean dropDeleted = buf.readBoolean();
     int autoJoinCode = buf.readByte() & 0xFF;

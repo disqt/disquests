@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.disqt.disquests.common.model.ContributorData;
+import com.disqt.disquests.common.model.PointData;
 import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.common.model.Role;
 import com.disqt.disquests.common.model.Visibility;
@@ -76,6 +77,15 @@ class MigrationFrom080Test {
     return cols;
   }
 
+  /** The ids of the quests the player holds a role on, sorted. */
+  private static List<UUID> questIdsOf(DataManager dm, UUID player) {
+    return dm.getAllQuests().stream()
+        .filter(q -> q.roleOf(player) != null)
+        .map(QuestData::id)
+        .sorted()
+        .toList();
+  }
+
   private DataManager migrate() {
     DataManager dm = new DataManager(tempDir);
     dm.initialize();
@@ -101,8 +111,12 @@ class MigrationFrom080Test {
       assertEquals(List.of(), a.prerequisites());
       assertFalse(a.autoJoin());
       assertNull(a.privatized());
-      assertEquals(3, a.polygon().size());
+      assertEquals(
+          List.of(new PointData(1.0, 2.0), new PointData(5.0, 2.0), new PointData(5.0, 8.0)),
+          a.polygon());
       assertEquals(List.of("building"), a.tags());
+      assertEquals("Walls first", a.content());
+      assertEquals("overworld", a.map());
 
       QuestData b = dm.getQuest(QUEST_B);
       assertEquals(EDITH, b.ownerUuid());
@@ -110,15 +124,16 @@ class MigrationFrom080Test {
       assertEquals(8000L, b.completedAt());
       assertEquals(EDITH, b.completedBy());
       assertEquals("Edith", b.completedByName());
+      assertEquals(List.of(), b.tags());
+      assertEquals(List.of(), b.polygon());
+      assertEquals(1, count("SELECT COUNT(*) FROM quest_tags"));
+      assertEquals(3, count("SELECT COUNT(*) FROM quest_polygons"));
 
       assertEquals(List.of(QUEST_A), dm.getPinnedQuestIds(EDITH));
       assertEquals(1, dm.getPendingRequestCount(OLIVE));
       assertEquals(RHEA, dm.getPendingRequestsForOwner(OLIVE).get(0).requesterUuid());
-      assertEquals(
-          List.of(QUEST_A, QUEST_B),
-          dm.getQuestsForPlayer(OLIVE).stream().map(QuestData::id).sorted().toList());
-      assertEquals(
-          List.of(QUEST_A), dm.getQuestsForPlayer(VIKTOR).stream().map(QuestData::id).toList());
+      assertEquals(List.of(QUEST_A, QUEST_B), questIdsOf(dm, OLIVE));
+      assertEquals(List.of(QUEST_A), questIdsOf(dm, VIKTOR));
     } finally {
       dm.close();
     }

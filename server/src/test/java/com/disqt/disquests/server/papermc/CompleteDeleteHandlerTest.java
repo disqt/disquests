@@ -47,7 +47,7 @@ class CompleteDeleteHandlerTest extends HandlerFixture {
     void completingACompletedQuestOrReopeningAnActiveOneDoesNothing() {
       UUID done = quest(LEO, "Done", Visibility.OPEN);
       UUID active = quest(LEO, "Active", Visibility.OPEN);
-      dm.completeQuest(done, MAX, 5000L);
+      dm.completeQuests(List.of(done), MAX, 5000L);
 
       receive(LEO, PacketCodec.writeCompleteQuest(done, false));
       receive(LEO, PacketCodec.writeReopenQuest(active));
@@ -119,7 +119,7 @@ class CompleteDeleteHandlerTest extends HandlerFixture {
       UUID first = quest(LEO, "First", Visibility.OPEN);
       UUID next = quest(LEO, "Next", Visibility.OPEN);
       dm.setPrerequisites(next, List.of(first));
-      dm.completeQuest(first, LEO, 5000L);
+      dm.completeQuests(List.of(first), LEO, 5000L);
       dm.setRole(next, JUJU, Role.READ);
       dm.pinQuest(JUJU, next);
       assertFalse(viewOf(JUJU, next).locked());
@@ -186,7 +186,7 @@ class CompleteDeleteHandlerTest extends HandlerFixture {
     @Test
     void keepingPrivateClearsTheBannerOnly() {
       UUID inside = quest(LEO, "Inside", Visibility.PRIVATE);
-      dm.setPrivatized(inside, new PrivatizeInfo(Visibility.OPEN, "Secret", MAX, Set.of()), 5000L);
+      privatize(inside, new PrivatizeInfo(Visibility.OPEN, "Secret", MAX, Set.of()), 5000L);
 
       receive(JUJU, PacketCodec.writeResolvePrivatized(inside, true));
       assertNotNull(stored(inside).privatized());
@@ -243,7 +243,7 @@ class CompleteDeleteHandlerTest extends HandlerFixture {
       UUID first = quest(MAX, "First", Visibility.OPEN);
       UUID next = quest(LEO, "Next", Visibility.OPEN);
       dm.setPrerequisites(next, List.of(first));
-      dm.completeQuest(first, MAX, 5000L);
+      dm.completeQuests(List.of(first), MAX, 5000L);
 
       receive(MAX, PacketCodec.writeDeleteQuest(first, false));
 

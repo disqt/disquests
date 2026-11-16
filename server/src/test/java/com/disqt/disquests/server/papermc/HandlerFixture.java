@@ -5,6 +5,7 @@ import static org.mockito.Mockito.when;
 
 import com.disqt.disquests.common.PacketCodec;
 import com.disqt.disquests.common.ProtocolVersion;
+import com.disqt.disquests.common.graph.Plans;
 import com.disqt.disquests.common.graph.QuestGraph;
 import com.disqt.disquests.common.graph.QuestView;
 import com.disqt.disquests.common.model.LinkChanges;
@@ -16,6 +17,7 @@ import com.disqt.disquests.common.model.Visibility;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -108,6 +110,11 @@ abstract class HandlerFixture {
     UUID id = quest(owner, title, visibility);
     dm.setParent(id, parent);
     return id;
+  }
+
+  /** Makes the quest Private as a delete would, remembering why, without deleting anything. */
+  void privatize(UUID quest, Plans.PrivatizeInfo info, long at) {
+    dm.applyDeletePlan(new Plans.DeletePlan(Set.of(), Map.of(), Map.of(quest, info), Map.of()), at);
   }
 
   QuestData stored(UUID id) {

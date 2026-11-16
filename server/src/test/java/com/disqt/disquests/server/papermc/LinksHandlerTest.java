@@ -276,7 +276,7 @@ class LinksHandlerTest extends HandlerFixture {
       UUID hub = quest(LEO, "Hub", Visibility.OPEN);
       UUID done = subquest(hub, LEO, "Done", Visibility.OPEN);
       UUID first = quest(LEO, "First", Visibility.OPEN);
-      dm.completeQuest(done, LEO, 5000L);
+      dm.completeQuests(List.of(done), LEO, 5000L);
 
       save(
           LEO,
@@ -297,7 +297,7 @@ class LinksHandlerTest extends HandlerFixture {
     void nothingGoesInsideACompletedQuest() {
       UUID done = quest(LEO, "Done", Visibility.OPEN);
       UUID mine = quest(LEO, "Mine", Visibility.OPEN);
-      dm.completeQuest(done, LEO, 5000L);
+      dm.completeQuests(List.of(done), LEO, 5000L);
 
       save(LEO, mine, "Mine", treeOps(attach(mine, done)));
 
