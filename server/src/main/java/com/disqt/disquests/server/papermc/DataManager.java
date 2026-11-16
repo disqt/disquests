@@ -361,6 +361,7 @@ public class DataManager {
     return QuestGraph.of(getAllQuests());
   }
 
+  /** Not for delivery: returns unredacted quests. Use Delivery / QuestView. */
   public synchronized List<QuestData> getQuestsForPlayer(UUID playerUuid) {
     List<QuestData> quests = new ArrayList<>();
     try (PreparedStatement stmt =
@@ -382,6 +383,7 @@ public class DataManager {
     return hydrate(quests);
   }
 
+  /** Not for delivery: returns unredacted quests. Use Delivery / QuestView. */
   public synchronized List<QuestData> getServerQuests(UUID excludePlayerUuid) {
     List<QuestData> quests = new ArrayList<>();
     try (PreparedStatement stmt =
@@ -405,7 +407,11 @@ public class DataManager {
     return hydrate(quests);
   }
 
-  /** Returns quests without their people or links. */
+  /**
+   * Returns quests without their people or links.
+   *
+   * <p>Not for delivery: returns unredacted quests. Use Delivery / QuestView.
+   */
   public synchronized Map<String, QuestData> findQuestsByTitlesIgnoreCase(List<String> titles) {
     if (titles.isEmpty()) return Map.of();
     Map<String, QuestData> result = new HashMap<>();
@@ -1536,7 +1542,11 @@ public class DataManager {
     }
   }
 
-  /** Returns all distinct tags from the DB merged with config seed tags, alphabetically sorted. */
+  /**
+   * Returns all distinct tags from the DB merged with config seed tags, alphabetically sorted.
+   *
+   * <p>Not for delivery: returns the tags of every quest, unredacted. Use Delivery / QuestView.
+   */
   public synchronized List<String> getAllDistinctTags(List<String> seedTags) {
     java.util.TreeSet<String> tags = new java.util.TreeSet<>();
     for (String seed : seedTags) {

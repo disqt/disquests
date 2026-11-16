@@ -320,32 +320,36 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
     if (quest == null || quest.isCompleted()) return;
     if (!quest.ownerUuid().equals(player)) return; // owner only
 
-    for (PacketCodec.ContributorOpEntry op : payload.ops()) {
-      switch (op.action()) {
-        case ADD -> {
-          UUID targetUuid = op.playerUuid();
-          if (targetUuid == null && op.playerName() != null) {
-            targetUuid = dataManager.getPlayerUuidByName(op.playerName());
+    // Each op is its own write: deliver what was written even if a later op fails.
+    try {
+      for (PacketCodec.ContributorOpEntry op : payload.ops()) {
+        switch (op.action()) {
+          case ADD -> {
+            UUID targetUuid = op.playerUuid();
+            if (targetUuid == null && op.playerName() != null) {
+              targetUuid = dataManager.getPlayerUuidByName(op.playerName());
+            }
+            if (targetUuid != null
+                && !targetUuid.equals(quest.ownerUuid())
+                && !dataManager.isContributor(payload.questId(), targetUuid)) {
+              dataManager.addContributor(payload.questId(), targetUuid, op.canEdit());
+            }
           }
-          if (targetUuid != null
-              && !targetUuid.equals(quest.ownerUuid())
-              && !dataManager.isContributor(payload.questId(), targetUuid)) {
-            dataManager.addContributor(payload.questId(), targetUuid, op.canEdit());
+          case REMOVE -> {
+            if (op.playerUuid() != null) {
+              dataManager.removeContributor(payload.questId(), op.playerUuid());
+            }
           }
-        }
-        case REMOVE -> {
-          if (op.playerUuid() != null) {
-            dataManager.removeContributor(payload.questId(), op.playerUuid());
-          }
-        }
-        case UPDATE -> {
-          if (op.playerUuid() != null) {
-            dataManager.updateContributor(payload.questId(), op.playerUuid(), op.canEdit());
+          case UPDATE -> {
+            if (op.playerUuid() != null) {
+              dataManager.updateContributor(payload.questId(), op.playerUuid(), op.canEdit());
+            }
           }
         }
       }
+    } finally {
+      delivery.deliver(before, dataManager.loadGraph());
     }
-    delivery.deliver(before, dataManager.loadGraph());
   }
 
   private void handleUpdateVisibility(UUID player, PacketCodec.UpdateVisibilityPayload payload) {

@@ -6,6 +6,7 @@ import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.common.model.Visibility;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -54,19 +55,20 @@ public class WikiLinkResolver {
    * Scans content for raw {@code [[Quest Name]]} patterns and resolves each for the recipient,
    * deciding with the graph: a quest the recipient cannot see, or sees as locked, becomes {@code
    * [[uuid|Private Quest]]}; a title that matches no quest becomes {@code [[|Quest Name]]}. Titles
-   * match ignoring case; when several quests share a title, the smallest id wins. At most {@value
-   * #MAX_WIKI_LINKS} links are processed; excess are left as-is.
+   * match ignoring case; when several quests share a title, one the recipient sees fully wins, and
+   * among equals the smallest id. At most {@value #MAX_WIKI_LINKS} links are processed; excess are
+   * left as-is.
    */
   public String resolveForRecipient(QuestGraph graph, String content, UUID recipientUuid) {
     Matcher matcher = RAW_PATTERN.matcher(content);
     Set<String> lowerTitles = new HashSet<>();
     int found = 0;
     while (matcher.find() && found < MAX_WIKI_LINKS) {
-      lowerTitles.add(matcher.group(1).toLowerCase());
+      lowerTitles.add(matcher.group(1).toLowerCase(Locale.ROOT));
       found++;
     }
     if (lowerTitles.isEmpty()) return content;
-    Map<String, QuestData> byTitle = byTitle(graph, lowerTitles);
+    Map<String, QuestData> byTitle = byTitle(graph, lowerTitles, recipientUuid);
 
     StringBuilder result = new StringBuilder();
     matcher.reset();
@@ -81,7 +83,7 @@ public class WikiLinkResolver {
       }
       processedCount++;
 
-      QuestData quest = byTitle.get(displayText.toLowerCase());
+      QuestData quest = byTitle.get(displayText.toLowerCase(Locale.ROOT));
       String replacement;
       if (quest == null) {
         // Quest not found — broken link
@@ -97,16 +99,26 @@ public class WikiLinkResolver {
     return result.toString();
   }
 
-  /** Quests whose lowercased title is in {@code lowerTitles}, smallest id first on a tie. */
-  private static Map<String, QuestData> byTitle(QuestGraph graph, Set<String> lowerTitles) {
+  /**
+   * The quest each lowercased title links to. On a tie, a quest the recipient sees fully beats one
+   * they do not, so a hidden namesake never breaks a working link; then the smallest id wins.
+   */
+  private static Map<String, QuestData> byTitle(
+      QuestGraph graph, Set<String> lowerTitles, UUID recipient) {
     Map<String, QuestData> result = new HashMap<>();
+    Set<UUID> visible = new HashSet<>();
     for (QuestData quest : graph.all()) {
-      String lowerTitle = quest.title().toLowerCase();
+      String lowerTitle = quest.title().toLowerCase(Locale.ROOT);
       if (!lowerTitles.contains(lowerTitle)) continue;
+      boolean questVisible = Delivery.fullyVisible(graph, recipient, quest.id());
+      if (questVisible) visible.add(quest.id());
       QuestData kept = result.get(lowerTitle);
-      if (kept == null || quest.id().toString().compareTo(kept.id().toString()) < 0) {
-        result.put(lowerTitle, quest);
-      }
+      boolean better =
+          kept == null
+              || (questVisible && !visible.contains(kept.id()))
+              || (questVisible == visible.contains(kept.id())
+                  && quest.id().toString().compareTo(kept.id().toString()) < 0);
+      if (better) result.put(lowerTitle, quest);
     }
     return result;
   }

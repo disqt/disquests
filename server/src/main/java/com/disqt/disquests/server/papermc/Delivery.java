@@ -9,6 +9,7 @@ import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.common.model.Visibility;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -20,9 +21,11 @@ import java.util.function.ToIntFunction;
  * live here and nowhere else:
  *
  * <ul>
+ *   <li>from V4 a client holds every quest it can see, locked or completed; the client decides what
+ *       it shows where;
  *   <li>below V4 a quest locked for the player is not sent (it arrives once it unlocks);
- *   <li>below V3 a completed quest is not sent;
- *   <li>a completed quest is listed only for players who hold a role on it: it leaves the board.
+ *   <li>at V3 a completed quest is held only by players with a role on it: it leaves the board;
+ *   <li>below V3 a completed quest is not sent.
  * </ul>
  *
  * A quest that a client should not hold is sent as {@code DELETE_QUEST_S2C} when it held it before.
@@ -78,8 +81,8 @@ final class Delivery {
 
   /**
    * The full state for one player: their quests (those they hold a role on), the board (other
-   * quests they can see that are neither Private nor completed), their pending join requests and,
-   * from V1, their tag suggestions.
+   * quests they can see that are not Private; below V4 not completed either), their pending join
+   * requests and, from V1, their tag suggestions.
    */
   void sync(UUID player, int version) {
     QuestGraph g = dataManager.loadGraph();
@@ -155,7 +158,8 @@ final class Delivery {
     if (view == null) return null;
     if (view.locked() && version < ProtocolVersion.V4) return null;
     if (view.isCompleted()
-        && (version < ProtocolVersion.V3 || g.get(view.id()).roleOf(player) == null)) {
+        && (version < ProtocolVersion.V3
+            || (version < ProtocolVersion.V4 && g.get(view.id()).roleOf(player) == null))) {
       return null;
     }
     return view;
@@ -169,7 +173,7 @@ final class Delivery {
   /** The predefined tags and the tags of every quest the player sees fully, sorted. */
   private List<String> tagsFor(QuestGraph g, UUID player) {
     TreeSet<String> tags = new TreeSet<>();
-    for (String tag : config.getPredefinedTags()) tags.add(tag.toLowerCase());
+    for (String tag : config.getPredefinedTags()) tags.add(tag.toLowerCase(Locale.ROOT));
     for (QuestData q : g.all()) {
       QuestData view = QuestView.forRecipient(g, player, q.id());
       if (view != null && !view.locked()) tags.addAll(view.tags());

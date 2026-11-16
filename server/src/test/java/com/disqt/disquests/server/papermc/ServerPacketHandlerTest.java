@@ -714,6 +714,35 @@ class ServerPacketHandlerTest {
   // ---- people and visibility ----
 
   @Test
+  void join_sendsTheJoinerTheirView() {
+    UUID id = seedQuest(Visibility.OPEN);
+    register(BYSTANDER, ProtocolVersion.V4);
+    outbox.clear();
+
+    receive(BYSTANDER, PacketCodec.writeJoinQuest(id));
+
+    QuestData view = onlyUpdate(BYSTANDER);
+    Assertions.assertEquals(QuestView.forRecipient(dm.loadGraph(), BYSTANDER, id), view);
+    Assertions.assertTrue(view.contributors().stream().anyMatch(c -> c.uuid().equals(BYSTANDER)));
+  }
+
+  @Test
+  void leaveOpenQuest_movesItToTheLeaversBoard() {
+    UUID id = seedQuest(Visibility.OPEN);
+    dm.addContributor(id, CONTRIBUTOR, false);
+    register(CONTRIBUTOR, ProtocolVersion.V4);
+    outbox.clear();
+
+    receive(CONTRIBUTOR, PacketCodec.writeLeaveQuest(id));
+
+    QuestData view = onlyUpdate(CONTRIBUTOR);
+    Assertions.assertEquals(QuestView.forRecipient(dm.loadGraph(), CONTRIBUTOR, id), view);
+    Assertions.assertTrue(
+        view.contributors().stream().noneMatch(c -> c.uuid().equals(CONTRIBUTOR)));
+    Assertions.assertEquals(List.of(), outbox.deletesFor(CONTRIBUTOR));
+  }
+
+  @Test
   void approvedRequest_carriesTheRequestersView() {
     UUID id = seedQuest(Visibility.CLOSED);
     UUID requestId = dm.createCollaborationRequest(id, BYSTANDER);

@@ -89,7 +89,11 @@ class DeliveryTest {
 
   private UUID quest(
       UUID owner, String title, Visibility visibility, List<String> tags, String content) {
-    UUID id = UUID.randomUUID();
+    return quest(UUID.randomUUID(), owner, title, visibility, tags, content);
+  }
+
+  private UUID quest(
+      UUID id, UUID owner, String title, Visibility visibility, List<String> tags, String content) {
     dm.saveQuest(
         new QuestData(
             id,
@@ -269,6 +273,46 @@ class DeliveryTest {
               .orElseThrow();
       assertEquals("Voir [[" + eglise + "|Private Quest]]", carnet.content());
     }
+
+    @Test
+    void completedOpenQuest_isOnTheBoardOfAV4PlayerWithoutARole() {
+      UUID done = quest(LEO, "Gare", Visibility.OPEN, List.of());
+      dm.completeQuest(done, LEO, 5000L);
+
+      delivery.sync(MEMBER, ProtocolVersion.V4);
+
+      assertEquals(
+          List.of(QuestView.forRecipient(dm.loadGraph(), MEMBER, done)),
+          outbox.serverQuestsFor(MEMBER).get(0));
+    }
+
+    @Test
+    void hubExample_completedInterieurs_staysListedForTheV4Member() {
+      westenheim(Visibility.PRIVATE);
+      dm.completeQuest(interieurs, LEO, 5000L);
+
+      delivery.sync(MEMBER, ProtocolVersion.V4);
+
+      assertEquals(Set.of("Intérieurs", "Wagons"), titles(outbox.serverQuestsFor(MEMBER).get(0)));
+    }
+
+    @Test
+    void wikiLinkTie_prefersTheQuestTheReaderCanSee() {
+      UUID hidden = UUID.fromString("00000000-0000-0000-0000-000000000001");
+      UUID visible = UUID.fromString("ffffffff-0000-0000-0000-000000000001");
+      quest(hidden, MAX, "Forge", Visibility.PRIVATE, List.of(), "");
+      quest(visible, LEO, "Forge", Visibility.OPEN, List.of(), "");
+      quest(LEO, "Carnet", Visibility.OPEN, List.of(), "Va a la [[forge]].");
+
+      delivery.sync(OUTSIDER, ProtocolVersion.V3);
+
+      QuestData carnet =
+          outbox.serverQuestsFor(OUTSIDER).get(0).stream()
+              .filter(q -> q.title().equals("Carnet"))
+              .findFirst()
+              .orElseThrow();
+      assertEquals("Va a la [[" + visible + "|forge]].", carnet.content());
+    }
   }
 
   // ---- deliver ----
@@ -360,6 +404,81 @@ class DeliveryTest {
       assertEquals("Rituel", outbox.updatesFor(MAX).get(0).title());
       assertEquals(
           List.of(List.of("build", "interieur", "rituel", "westenheim")), outbox.tagsFor(MAX));
+    }
+
+    @Test
+    void completingAndReopeningAnOpenQuest_reachesAV4PlayerWithoutARole() {
+      UUID gare = quest(LEO, "Gare", Visibility.OPEN, List.of());
+
+      change(() -> dm.completeQuest(gare, LEO, 5000L));
+      assertEquals(List.of(), outbox.deletesFor(MEMBER));
+      List<QuestData> completed = outbox.updatesFor(MEMBER);
+      assertEquals(List.of(gare), completed.stream().map(QuestData::id).toList());
+      assertEquals(5000L, completed.get(0).completedAt());
+
+      change(() -> dm.reopenQuest(gare));
+      assertEquals(List.of(), outbox.deletesFor(MEMBER));
+      List<QuestData> reopened = outbox.updatesFor(MEMBER);
+      assertEquals(List.of(gare), reopened.stream().map(QuestData::id).toList());
+      assertEquals(0L, reopened.get(0).completedAt());
+    }
+
+    @Test
+    void hubExample_completingInterieurs_reachesTheV4MemberAsAnUpdate() {
+      westenheim(Visibility.PRIVATE);
+
+      QuestGraph after = change(() -> dm.completeQuest(interieurs, LEO, 5000L));
+
+      assertEquals(
+          List.of(QuestView.forRecipient(after, MEMBER, interieurs)), outbox.updatesFor(MEMBER));
+      assertEquals(List.of(), outbox.deletesFor(MEMBER));
+      assertEquals(List.of(), outbox.packetsFor(OUTSIDER));
+    }
+
+    @Test
+    void changeToAnOpenSubquestOfAPrivateHub_reachesOnlyThoseWhoSeeTheHub() {
+      westenheim(Visibility.PRIVATE);
+      QuestData stored = dm.getQuest(wagons);
+
+      QuestGraph after =
+          change(
+              () ->
+                  dm.saveQuest(
+                      new QuestData(
+                          wagons,
+                          "Wagons neufs",
+                          stored.content(),
+                          LEO,
+                          null,
+                          stored.visibility(),
+                          List.of(),
+                          2000L,
+                          null,
+                          false,
+                          null,
+                          stored.map(),
+                          stored.tags())));
+
+      for (UUID player : List.of(LEO, MEMBER)) {
+        assertEquals(
+            List.of(QuestView.forRecipient(after, player, wagons)),
+            outbox.updatesFor(player),
+            "update for " + player);
+      }
+      assertEquals(List.of(), outbox.packetsFor(OUTSIDER));
+      assertEquals(List.of(), outbox.packetsFor(MAX));
+    }
+
+    @Test
+    void deletingAQuestLockedForAV3Player_sendsThemNothing() {
+      UUID one = quest(LEO, "Chapitre un", Visibility.OPEN, List.of());
+      UUID two = quest(LEO, "Chapitre deux", Visibility.OPEN, List.of());
+      dm.setPrerequisites(two, List.of(one));
+
+      change(() -> dm.deleteQuest(two));
+
+      assertEquals(List.of(), outbox.packetsFor(OUTSIDER));
+      assertEquals(List.of(two), outbox.deletesFor(MEMBER));
     }
 
     @Test
