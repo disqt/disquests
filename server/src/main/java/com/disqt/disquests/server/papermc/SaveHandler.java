@@ -15,8 +15,10 @@ import com.disqt.disquests.common.model.Role;
 import com.disqt.disquests.common.model.TreeOp;
 import com.disqt.disquests.common.model.Visibility;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.ToIntFunction;
@@ -74,18 +76,24 @@ final class SaveHandler {
     QuestData existing = before.get(payload.questId());
     LinkChanges links = payload.links();
 
-    if (existing == null) {
-      Visibility visibility = links.visibility() == null ? Visibility.PRIVATE : links.visibility();
-      dataManager.saveQuest(newQuest(player, name, payload, visibility));
-    } else {
+    if (existing != null) {
       Role role = existing.roleOf(player);
       if (role == null || !role.atLeast(Role.WRITE)) return; // silently ignore unauthorized edits
-      if (!existing.isCompleted()) dataManager.saveQuest(edited(player, existing, payload));
     }
 
-    applyOwnLinks(player, payload.questId(), links, existing == null);
-    applyTreeOps(player, links.treeOps());
-    outcomes.deliverWithUnlocks(before);
+    Outcomes.writeThenDeliver(
+        () -> {
+          if (existing == null) {
+            Visibility visibility =
+                links.visibility() == null ? Visibility.PRIVATE : links.visibility();
+            dataManager.saveQuest(newQuest(player, name, payload, visibility));
+          } else if (!existing.isCompleted()) {
+            dataManager.saveQuest(edited(player, existing, payload));
+          }
+          applyOwnLinks(player, payload.questId(), links, existing == null);
+          applyTreeOps(player, links.treeOps());
+        },
+        () -> outcomes.deliverWithUnlocks(before));
   }
 
   // --- text ---
@@ -198,7 +206,11 @@ final class SaveHandler {
 
   private void applyPrerequisites(UUID player, QuestGraph g, QuestData q, LinkChanges links) {
     List<UUID> kept = new ArrayList<>(q.prerequisites());
-    kept.removeAll(links.removePrerequisites());
+    // Only prerequisites the sender sees are removed by id; hidden and deleted ones go only
+    // through the drop-all flags, so naming an id cannot probe whether a hidden quest is one.
+    for (UUID removed : links.removePrerequisites()) {
+      if (g.get(removed) != null && g.canSee(player, removed)) kept.remove(removed);
+    }
     if (links.dropHidden()) kept.removeIf(p -> g.get(p) != null && !g.canSee(player, p));
     if (links.dropDeleted()) kept.removeIf(p -> g.get(p) == null);
     for (UUID added : links.addPrerequisites()) {
@@ -248,8 +260,10 @@ final class SaveHandler {
         case SWAP -> {
           // The subquest takes the container's place first, so no step makes a loop.
           QuestData place = g.get(g.get(op.quest()).parentId());
-          dataManager.setParent(op.target(), place == null ? null : place.id());
-          dataManager.setParent(op.quest(), op.target());
+          Map<UUID, UUID> parents = new LinkedHashMap<>();
+          parents.put(op.target(), place == null ? null : place.id());
+          parents.put(op.quest(), op.target());
+          dataManager.setParents(parents);
         }
       }
     }

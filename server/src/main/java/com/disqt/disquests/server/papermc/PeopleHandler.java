@@ -4,7 +4,6 @@ import com.disqt.disquests.common.PacketCodec;
 import com.disqt.disquests.common.graph.Plans;
 import com.disqt.disquests.common.graph.QuestGraph;
 import com.disqt.disquests.common.model.CollaborationRequestData;
-import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.PersonOp;
 import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.common.model.Role;
@@ -49,15 +48,21 @@ final class PeopleHandler {
 
   /**
    * {@code UPDATE_PEOPLE}: all the changes or none. A removal "with my subquests" also takes the
-   * player off the sender's own subquests, except where they are the last owner.
+   * player off the sender's own subquests, except where they are the last owner. An op adding a
+   * player the server has never seen (no recorded name) is dropped; the others still apply.
    */
   void updatePeople(UUID player, PacketCodec.UpdatePeoplePayload payload) {
     QuestGraph before = dataManager.loadGraph();
     QuestData quest = before.get(payload.questId());
     if (quest == null || quest.isCompleted() || !before.canSee(player, quest.id())) return;
+    List<PersonOp> ops = new ArrayList<>();
+    for (PersonOp op : payload.ops()) {
+      if (op.kind() == PersonOp.Kind.SET_ROLE && !addable(quest, op.player())) continue;
+      ops.add(op);
+    }
     Plans.PeopleResult result;
     try {
-      result = Plans.people(quest, player, payload.ops());
+      result = Plans.people(quest, player, ops);
     } catch (IllegalArgumentException e) {
       logger.warning("Malformed people change: " + e.getMessage());
       return;
@@ -66,25 +71,21 @@ final class PeopleHandler {
       outcomes.refused(player, before, quest.id(), result.refusal().get());
       return;
     }
-    dataManager.setPeople(quest.id(), named(result.people()), result.displayOwner());
-    for (PersonOp op : payload.ops()) {
-      if (op.kind() == PersonOp.Kind.REMOVE_WITH_MY_SUBQUESTS) {
-        removeFromMySubquests(before, player, quest.id(), op.player());
-      }
-    }
-    delivery.deliver(before, dataManager.loadGraph());
+    Outcomes.writeThenDeliver(
+        () -> {
+          dataManager.setPeople(quest.id(), result.people(), result.displayOwner());
+          for (PersonOp op : ops) {
+            if (op.kind() == PersonOp.Kind.REMOVE_WITH_MY_SUBQUESTS) {
+              removeFromMySubquests(before, player, quest.id(), op.player());
+            }
+          }
+        },
+        () -> delivery.deliver(before, dataManager.loadGraph()));
   }
 
-  /** People added by a change have no name yet. */
-  private List<ContributorData> named(List<ContributorData> people) {
-    List<ContributorData> named = new ArrayList<>();
-    for (ContributorData c : people) {
-      named.add(
-          c.name() != null
-              ? c
-              : new ContributorData(c.uuid(), dataManager.getPlayerName(c.uuid()), c.role()));
-    }
-    return named;
+  /** Already on the quest, or a player the server knows by name. */
+  private boolean addable(QuestData quest, UUID target) {
+    return quest.roleOf(target) != null || dataManager.getPlayerName(target) != null;
   }
 
   private void removeFromMySubquests(QuestGraph g, UUID actor, UUID quest, UUID player) {
@@ -102,51 +103,60 @@ final class PeopleHandler {
     QuestData quest = before.get(payload.questId());
     if (quest == null || quest.roleOf(player) != Role.OWNER) return;
     Map<UUID, Role> changes = Plans.roleDown(before, player, quest.id(), payload.player());
-    for (Map.Entry<UUID, Role> change : changes.entrySet()) {
-      dataManager.setRole(change.getKey(), payload.player(), change.getValue());
-    }
-    delivery.deliver(before, dataManager.loadGraph());
+    Outcomes.writeThenDeliver(
+        () -> {
+          for (Map.Entry<UUID, Role> change : changes.entrySet()) {
+            dataManager.setRole(change.getKey(), payload.player(), change.getValue());
+          }
+        },
+        () -> delivery.deliver(before, dataManager.loadGraph()));
   }
 
   /**
-   * {@code UPDATE_CONTRIBUTORS} from a client before V4, Owner only. ADD (a player without a role)
-   * and UPDATE (a player with one) give Write or Read from {@code canEdit}; REMOVE removes. Each op
-   * stands alone; one that would remove or demote the last owner is ignored.
+   * {@code UPDATE_CONTRIBUTORS} from a client before V4, Owner only. ADD (a known player without a
+   * role) and UPDATE (a player with a role below Owner) give Write or Read from {@code canEdit}:
+   * old clients show a co-owner as a contributor who can edit, so neither ever lowers an Owner.
+   * REMOVE removes anyone but the last owner. Each op stands alone.
    */
   void updateContributors(UUID player, PacketCodec.UpdateContributorsPayload payload) {
     QuestGraph before = dataManager.loadGraph();
     QuestData quest = before.get(payload.questId());
     if (quest == null || quest.isCompleted() || quest.roleOf(player) != Role.OWNER) return;
-    try {
-      for (PacketCodec.ContributorOpEntry op : payload.ops()) {
-        UUID target = op.playerUuid();
-        if (target == null && op.playerName() != null) {
-          target = dataManager.getPlayerUuidByName(op.playerName());
-        }
-        if (target == null) continue;
-        QuestData current = dataManager.getQuest(quest.id());
-        Role role = op.canEdit() ? Role.WRITE : Role.READ;
-        PersonOp personOp =
-            switch (op.action()) {
-              case ADD ->
-                  current.roleOf(target) == null
-                      ? new PersonOp(PersonOp.Kind.SET_ROLE, target, role)
-                      : null;
-              case UPDATE ->
-                  current.roleOf(target) != null
-                      ? new PersonOp(PersonOp.Kind.SET_ROLE, target, role)
-                      : null;
-              case REMOVE -> new PersonOp(PersonOp.Kind.REMOVE, target, null);
-            };
-        if (personOp == null) continue;
-        Plans.PeopleResult result = Plans.people(current, player, List.of(personOp));
-        if (result.refusal().isEmpty()) {
-          dataManager.setPeople(quest.id(), named(result.people()), result.displayOwner());
-        }
-      }
-    } finally {
-      // Each op is its own write: deliver what was written even if a later op fails.
-      delivery.deliver(before, dataManager.loadGraph());
+    // Each op is its own write: deliver what was written even if a later op fails.
+    Outcomes.writeThenDeliver(
+        () -> {
+          for (PacketCodec.ContributorOpEntry op : payload.ops()) {
+            UUID target = op.playerUuid();
+            if (target == null && op.playerName() != null) {
+              target = dataManager.getPlayerUuidByName(op.playerName());
+            }
+            if (target != null) applyContributorOp(player, quest.id(), op, target);
+          }
+        },
+        () -> delivery.deliver(before, dataManager.loadGraph()));
+  }
+
+  private void applyContributorOp(
+      UUID player, UUID questId, PacketCodec.ContributorOpEntry op, UUID target) {
+    QuestData current = dataManager.getQuest(questId);
+    Role held = current.roleOf(target);
+    Role role = op.canEdit() ? Role.WRITE : Role.READ;
+    PersonOp personOp =
+        switch (op.action()) {
+          case ADD ->
+              held == null && dataManager.getPlayerName(target) != null
+                  ? new PersonOp(PersonOp.Kind.SET_ROLE, target, role)
+                  : null;
+          case UPDATE ->
+              held != null && held != Role.OWNER
+                  ? new PersonOp(PersonOp.Kind.SET_ROLE, target, role)
+                  : null;
+          case REMOVE -> new PersonOp(PersonOp.Kind.REMOVE, target, null);
+        };
+    if (personOp == null) return;
+    Plans.PeopleResult result = Plans.people(current, player, List.of(personOp));
+    if (result.refusal().isEmpty()) {
+      dataManager.setPeople(questId, result.people(), result.displayOwner());
     }
   }
 
@@ -169,9 +179,13 @@ final class PeopleHandler {
     QuestGraph before = dataManager.loadGraph();
     QuestData quest = before.get(payload.questId());
     if (quest == null || quest.roleOf(player) != Role.OWNER || quest.privatized() == null) return;
-    if (payload.restore()) dataManager.changeVisibility(quest.id(), quest.privatized().previous());
-    dataManager.clearPrivatized(quest.id());
-    delivery.deliver(before, dataManager.loadGraph());
+    Visibility previous = quest.privatized().previous();
+    Outcomes.writeThenDeliver(
+        () -> {
+          if (payload.restore()) dataManager.changeVisibility(quest.id(), previous);
+          dataManager.clearPrivatized(quest.id());
+        },
+        () -> delivery.deliver(before, dataManager.loadGraph()));
   }
 
   // --- joining and leaving ---
@@ -225,21 +239,20 @@ final class PeopleHandler {
     QuestData quest = before.get(request.questId());
     if (quest == null || quest.roleOf(player) != Role.OWNER) return;
 
-    dataManager.deleteCollaborationRequest(payload.requestId());
     UUID requester = request.requesterUuid();
-    int requesterVersion = protocolVersion.applyAsInt(requester);
-    if (payload.approved()) {
-      if (quest.roleOf(requester) == null) dataManager.setRole(quest.id(), requester, Role.READ);
-      outbox.send(
-          requester,
-          PacketCodec.writeCollaborationResponse(
-              quest.id(), true, delivery.sendableView(requester, quest.id()), requesterVersion));
-      delivery.deliver(before, dataManager.loadGraph());
-    } else {
-      outbox.send(
-          requester,
-          PacketCodec.writeCollaborationResponse(quest.id(), false, null, requesterVersion));
-    }
+    Outcomes.writeThenDeliver(
+        () -> {
+          dataManager.deleteCollaborationRequest(payload.requestId());
+          if (payload.approved() && quest.roleOf(requester) == null) {
+            dataManager.setRole(quest.id(), requester, Role.READ);
+          }
+        },
+        () -> delivery.deliver(before, dataManager.loadGraph()));
+    QuestData view = payload.approved() ? delivery.sendableView(requester, quest.id()) : null;
+    outbox.send(
+        requester,
+        PacketCodec.writeCollaborationResponse(
+            quest.id(), payload.approved(), view, protocolVersion.applyAsInt(requester)));
     for (UUID owner : quest.owners()) {
       if (!owner.equals(player) && outbox.onlineModPlayers().contains(owner)) {
         delivery.handshake(owner);
@@ -254,8 +267,11 @@ final class PeopleHandler {
     if (quest == null || quest.isCompleted()) return;
     Role role = quest.roleOf(player);
     if (role == null || (role == Role.OWNER && quest.owners().size() == 1)) return;
-    dataManager.removePerson(questId, player);
-    dataManager.unpinQuest(player, questId);
-    delivery.deliver(before, dataManager.loadGraph());
+    Outcomes.writeThenDeliver(
+        () -> {
+          dataManager.removePerson(questId, player);
+          dataManager.unpinQuest(player, questId);
+        },
+        () -> delivery.deliver(before, dataManager.loadGraph()));
   }
 }

@@ -963,6 +963,23 @@ public class DataManager {
     }
   }
 
+  /**
+   * Sets several parents in one transaction, in the map's order; a null value makes the quest top
+   * level.
+   */
+  public synchronized void setParents(Map<UUID, UUID> parents) {
+    inTransaction(
+        "set parents",
+        () -> {
+          for (Map.Entry<UUID, UUID> move : parents.entrySet()) {
+            update(
+                "UPDATE quests SET parent_id = ? WHERE id = ?",
+                move.getValue() == null ? null : move.getValue().toString(),
+                move.getKey().toString());
+          }
+        });
+  }
+
   public synchronized void setPrerequisites(UUID quest, List<UUID> prerequisites) {
     inTransaction(
         "set prerequisites",

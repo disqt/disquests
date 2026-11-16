@@ -619,7 +619,7 @@ public final class PacketCodec {
     buf.writeVarInt(quest.contributors().size());
     for (ContributorData contributor : quest.contributors()) {
       buf.writeUUID(contributor.uuid());
-      buf.writeString(contributor.name());
+      buf.writeString(contributor.name() != null ? contributor.name() : "");
       buf.writeBoolean(contributor.canEdit());
     }
     buf.writeLong(quest.lastModified());

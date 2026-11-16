@@ -186,6 +186,88 @@ class RolesHandlerTest extends HandlerFixture {
 
       assertEquals(Role.OWNER, roleOf(hub, LEO));
     }
+
+    @ParameterizedTest(name = "canEdit {0}")
+    @ValueSource(booleans = {true, false})
+    void aV3UpdateNeverLowersACoOwner(boolean canEdit) {
+      UUID hub = quest(LEO, "Hub", Visibility.OPEN);
+      dm.setRole(hub, MAX, Role.OWNER);
+      register(LEO, ProtocolVersion.V3);
+
+      receive(
+          LEO,
+          PacketCodec.writeUpdateContributors(
+              hub,
+              List.of(
+                  new ContributorOpEntry(ContributorOp.UPDATE, MAX, null, canEdit),
+                  new ContributorOpEntry(ContributorOp.ADD, MAX, null, canEdit))));
+
+      assertEquals(Role.OWNER, roleOf(hub, MAX));
+    }
+
+    @Test
+    void aV3RemoveTakesACoOwnerOff() {
+      UUID hub = quest(LEO, "Hub", Visibility.OPEN);
+      dm.setRole(hub, MAX, Role.OWNER);
+      register(LEO, ProtocolVersion.V3);
+
+      receive(
+          LEO,
+          PacketCodec.writeUpdateContributors(
+              hub, List.of(new ContributorOpEntry(ContributorOp.REMOVE, MAX, null, false))));
+
+      assertNull(roleOf(hub, MAX));
+      assertEquals(Role.OWNER, roleOf(hub, LEO));
+    }
+  }
+
+  @Nested
+  class UnknownPlayers {
+
+    private final UUID stranger = UUID.fromString("00000000-0000-0000-0000-0000000000ff");
+
+    @Test
+    void aPlayerTheServerHasNeverSeenIsNotAddedAndTheOtherOpsApply() {
+      UUID hub = quest(LEO, "Hub", Visibility.PRIVATE);
+
+      receive(
+          LEO,
+          PacketCodec.writeUpdatePeople(
+              hub,
+              List.of(
+                  new PersonOp(PersonOp.Kind.SET_ROLE, stranger, Role.WRITE),
+                  new PersonOp(PersonOp.Kind.SET_ROLE, ANNA, Role.READ))));
+
+      assertNull(roleOf(hub, stranger));
+      assertEquals(Role.READ, roleOf(hub, ANNA));
+      assertQuestStillSyncs(hub);
+    }
+
+    @Test
+    void aV3AddOfAPlayerTheServerHasNeverSeenIsIgnored() {
+      UUID hub = quest(LEO, "Hub", Visibility.PRIVATE);
+      register(LEO, ProtocolVersion.V3);
+
+      receive(
+          LEO,
+          PacketCodec.writeUpdateContributors(
+              hub,
+              List.of(
+                  new ContributorOpEntry(ContributorOp.ADD, stranger, null, true),
+                  new ContributorOpEntry(ContributorOp.ADD, ANNA, null, false))));
+
+      assertNull(roleOf(hub, stranger));
+      assertEquals(Role.READ, roleOf(hub, ANNA));
+      assertQuestStillSyncs(hub);
+    }
+
+    private void assertQuestStillSyncs(UUID hub) {
+      outbox.clear();
+      register(LEO, ProtocolVersion.V4);
+      List<FakeOutbox.MyQuests> syncs = outbox.myQuestsFor(LEO);
+      assertEquals(1, syncs.size());
+      assertEquals(List.of(viewOf(LEO, hub)), syncs.get(0).quests());
+    }
   }
 
   @Nested

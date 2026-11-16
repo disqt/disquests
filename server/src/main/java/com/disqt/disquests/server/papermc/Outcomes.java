@@ -37,6 +37,25 @@ final class Outcomes {
   }
 
   /**
+   * Runs the writes, then the delivery, even when a write throws: players still receive what was
+   * written before the failure. The writes' exception wins; one from the delivery is attached to it
+   * as suppressed.
+   */
+  static void writeThenDeliver(Runnable writes, Runnable deliver) {
+    try {
+      writes.run();
+    } catch (RuntimeException | Error failure) {
+      try {
+        deliver.run();
+      } catch (RuntimeException | Error deliveryFailure) {
+        failure.addSuppressed(deliveryFailure);
+      }
+      throw failure;
+    }
+    deliver.run();
+  }
+
+  /**
    * For a change that can complete, reopen, delete or relink prerequisites: adds the auto-join
    * players of every quest it unlocked (offline players too), delivers the difference from {@code
    * before}, then tells who can see each unlocked quest, marking it for those who held a role on
@@ -45,15 +64,16 @@ final class Outcomes {
   void deliverWithUnlocks(QuestGraph before) {
     QuestGraph written = dataManager.loadGraph();
     List<Plans.Unlock> unlocks = Plans.unlocks(before, written, everyone());
-    boolean joined = false;
-    for (Plans.Unlock unlock : unlocks) {
-      for (UUID player : unlock.autoJoin()) {
-        dataManager.setRole(unlock.quest(), player, Role.READ);
-        joined = true;
-      }
-    }
-    QuestGraph after = joined ? dataManager.loadGraph() : written;
-    delivery.deliver(before, after);
+    writeThenDeliver(
+        () -> {
+          for (Plans.Unlock unlock : unlocks) {
+            for (UUID player : unlock.autoJoin()) {
+              dataManager.setRole(unlock.quest(), player, Role.READ);
+            }
+          }
+        },
+        () -> delivery.deliver(before, dataManager.loadGraph()));
+    QuestGraph after = dataManager.loadGraph();
     for (Plans.Unlock unlock : unlocks) {
       String title = after.get(unlock.quest()).title();
       for (UUID player : unlock.toNotify()) {

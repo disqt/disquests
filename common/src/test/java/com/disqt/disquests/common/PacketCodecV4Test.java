@@ -95,6 +95,17 @@ class PacketCodecV4Test {
       assertEquals(fixedQuest(), roundTrip(fixedQuest(), ProtocolVersion.V4));
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = {ProtocolVersion.V0, ProtocolVersion.V3, ProtocolVersion.V4})
+    void aMissingNameIsWrittenEmpty(int version) {
+      QuestData quest =
+          fixedQuest()
+              .withPeople(OWNER, null, List.of(new ContributorData(WRITER, null, Role.WRITE)));
+      QuestData read = roundTrip(quest, version);
+      assertEquals("", read.ownerName());
+      assertEquals("", read.contributors().get(0).name());
+    }
+
     @Test
     void v4RoundTripsHiddenParent() {
       QuestData quest = fixedQuest().withParent(null).withHiddenParent(true);

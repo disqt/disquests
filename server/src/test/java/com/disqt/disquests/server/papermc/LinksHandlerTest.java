@@ -14,6 +14,7 @@ import com.disqt.disquests.common.model.Notice;
 import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.common.model.Role;
 import com.disqt.disquests.common.model.Visibility;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -182,6 +183,18 @@ class LinksHandlerTest extends HandlerFixture {
     }
 
     @Test
+    void aReaderOfTheTargetCannotPutTheirOwnQuestInsideIt() {
+      UUID hub = quest(LEO, "Hub", Visibility.OPEN);
+      dm.setRole(hub, JUJU, Role.READ);
+      UUID mine = quest(JUJU, "Mine", Visibility.OPEN);
+
+      save(JUJU, mine, "Mine", treeOps(attach(mine, hub)));
+
+      assertNull(stored(mine).parentId());
+      assertEquals(List.of(refused(mine, "Mine", Refusal.NEED_WRITE_ON_TARGET)), notices(JUJU));
+    }
+
+    @Test
     void anOwnerOfTheParentDetachesAVisibleSubquestOfAnotherPlayer() {
       UUID hub = quest(LEO, "Hub", Visibility.OPEN);
       UUID maxs = subquest(hub, MAX, "Max's", Visibility.OPEN);
@@ -302,6 +315,62 @@ class LinksHandlerTest extends HandlerFixture {
           "Quest",
           new LinkChanges(null, List.of(), List.of(), List.of(), false, true, null));
       assertEquals(List.of(seen), stored(quest).prerequisites());
+    }
+
+    @Test
+    void aHiddenPrerequisiteCannotBeRemovedByNamingItsId() {
+      UUID quest = quest(LEO, "Quest", Visibility.OPEN);
+      UUID seen = quest(LEO, "Seen", Visibility.OPEN);
+      UUID hidden = quest(MAX, "Hidden", Visibility.PRIVATE);
+      dm.setPrerequisites(quest, List.of(seen, hidden));
+      QuestData seenBefore = viewOf(LEO, quest);
+
+      save(
+          LEO,
+          quest,
+          "Quest",
+          new LinkChanges(null, List.of(), List.of(), List.of(hidden), false, false, null));
+
+      assertEquals(List.of(seen, hidden), stored(quest).prerequisites());
+      assertEquals(List.of(), notices(LEO));
+      // The save itself touches the quest's time; its links, as Leo sees them, stay the same.
+      QuestData seenAfter = viewOf(LEO, quest);
+      assertEquals(seenBefore.prerequisites(), seenAfter.prerequisites());
+      assertTrue(seenAfter.hiddenPrerequisites());
+      assertEquals(List.of(seenAfter), outbox.updatesFor(LEO));
+
+      save(
+          LEO,
+          quest,
+          "Quest",
+          new LinkChanges(null, List.of(), List.of(), List.of(), true, false, null));
+      assertEquals(List.of(seen), stored(quest).prerequisites());
+    }
+
+    @Test
+    void theNinthPrerequisiteIsRefused() {
+      UUID quest = quest(LEO, "Quest", Visibility.OPEN);
+      List<UUID> eight = new ArrayList<>();
+      for (int i = 0; i < 8; i++) eight.add(quest(LEO, "P" + i, Visibility.OPEN));
+      dm.setPrerequisites(quest, eight);
+      UUID ninth = quest(LEO, "Ninth", Visibility.OPEN);
+
+      save(LEO, quest, "Quest", addPrerequisites(ninth));
+
+      assertEquals(eight, stored(quest).prerequisites());
+      assertEquals(List.of(refused(quest, "Quest", Refusal.TOO_MANY_PREREQUISITES)), notices(LEO));
+    }
+
+    @Test
+    void aWritersSaveAppliesTheTextAndRefusesTheLinks() {
+      UUID quest = quest(LEO, "Quest", Visibility.OPEN);
+      dm.setRole(quest, JUJU, Role.WRITE);
+
+      save(JUJU, quest, "Changed", visibility(Visibility.CLOSED));
+
+      assertEquals("Changed", stored(quest).title());
+      assertEquals(Visibility.OPEN, stored(quest).visibility());
+      assertEquals(List.of(refused(quest, "Changed", Refusal.NEED_OWNER)), notices(JUJU));
     }
 
     @Test
