@@ -178,6 +178,8 @@ final class GraphFixtures {
     private long completedAt;
     private boolean rich;
     private Privatized privatized;
+    private String content;
+    private long lastModified = 1L;
 
     private QuestBuilder(String title) {
       this.title = title;
@@ -246,6 +248,17 @@ final class GraphFixtures {
       return this;
     }
 
+    /** Replaces the description, rich or not. */
+    QuestBuilder content(String content) {
+      this.content = content;
+      return this;
+    }
+
+    QuestBuilder lastModified(long lastModified) {
+      this.lastModified = lastModified;
+      return this;
+    }
+
     QuestBuilder privatized(Privatized privatized) {
       this.privatized = privatized;
       return this;
@@ -255,12 +268,12 @@ final class GraphFixtures {
       return new QuestData(
           id(title),
           title,
-          rich ? "the text of " + title : "",
+          content != null ? content : rich ? "the text of " + title : "",
           owner,
           "p" + owner.getLeastSignificantBits(),
           visibility,
           List.copyOf(people),
-          1L,
+          lastModified,
           rich ? new CoordinatesData(1, 64, 2) : null,
           rich,
           rich ? new CoordinatesData(10, 64, 20) : null,
@@ -274,6 +287,7 @@ final class GraphFixtures {
           completedAt == 0L ? null : "p" + owner.getLeastSignificantBits(),
           parent,
           List.copyOf(prerequisites),
+          false,
           false,
           false,
           rich,

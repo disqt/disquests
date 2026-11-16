@@ -66,6 +66,7 @@ class PacketCodecV4Test {
         List.of(PREREQ_A, PREREQ_B),
         true,
         true,
+        false,
         true,
         false,
         new Privatized(Visibility.CLOSED, "Old quest", "someone", STAMP + 5));
@@ -95,12 +96,25 @@ class PacketCodecV4Test {
     }
 
     @Test
+    void v4RoundTripsHiddenParent() {
+      QuestData quest = fixedQuest().withParent(null).withHiddenParent(true);
+      assertEquals(quest, roundTrip(quest, ProtocolVersion.V4));
+    }
+
+    @Test
+    void v3DropsHiddenParent() {
+      QuestData quest = fixedQuest().withParent(null).withHiddenParent(true);
+      assertFalse(roundTrip(quest, ProtocolVersion.V3).hiddenParent());
+    }
+
+    @Test
     void v3DropsTreeFieldsAndKeepsCanEdit() {
       QuestData read = roundTrip(fixedQuest(), ProtocolVersion.V3);
       assertNull(read.parentId());
       assertEquals(List.of(), read.prerequisites());
       assertFalse(read.hiddenPrerequisites());
       assertFalse(read.autoJoin());
+      assertFalse(read.hiddenParent());
       assertNull(read.privatized());
       assertEquals(
           List.of(

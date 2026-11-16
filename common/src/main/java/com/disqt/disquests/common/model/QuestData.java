@@ -25,6 +25,7 @@ public record QuestData(
     List<UUID> prerequisites,
     boolean hiddenPrerequisites,
     boolean deletedPrerequisite,
+    boolean hiddenParent,
     boolean autoJoin,
     boolean locked,
     Privatized privatized) {
@@ -34,7 +35,10 @@ public record QuestData(
     if (prerequisites == null) prerequisites = List.of();
   }
 
-  /** Pre-tree signature: not a subquest, no prerequisites, not locked, not privatized. */
+  /**
+   * Pre-tree signature: not a subquest, no prerequisites, no hidden parent, not locked, not
+   * privatized.
+   */
   public QuestData(
       UUID id,
       String title,
@@ -73,6 +77,7 @@ public record QuestData(
         completedByName,
         null,
         List.of(),
+        false,
         false,
         false,
         false,
@@ -199,6 +204,7 @@ public record QuestData(
         prerequisites,
         hiddenPrerequisites,
         deletedPrerequisite,
+        hiddenParent,
         autoJoin,
         locked,
         privatized);
@@ -227,6 +233,7 @@ public record QuestData(
         prerequisites,
         hiddenPrerequisites,
         deletedPrerequisite,
+        hiddenParent,
         autoJoin,
         locked,
         privatized);
@@ -255,6 +262,7 @@ public record QuestData(
         prerequisites,
         hiddenPrerequisites,
         deletedPrerequisite,
+        hiddenParent,
         autoJoin,
         locked,
         privatized);
@@ -283,6 +291,7 @@ public record QuestData(
         prerequisites,
         hiddenPrerequisites,
         deletedPrerequisite,
+        hiddenParent,
         autoJoin,
         locked,
         privatized);
@@ -311,6 +320,7 @@ public record QuestData(
         prerequisites,
         hiddenPrerequisites,
         deletedPrerequisite,
+        hiddenParent,
         autoJoin,
         locked,
         privatized);
@@ -343,6 +353,7 @@ public record QuestData(
         prerequisites,
         hiddenPrerequisites,
         deletedPrerequisite,
+        hiddenParent,
         autoJoin,
         locked,
         privatized);
@@ -371,6 +382,7 @@ public record QuestData(
         prerequisites,
         hiddenPrerequisites,
         deletedPrerequisite,
+        hiddenParent,
         autoJoin,
         locked,
         privatized);
@@ -399,6 +411,7 @@ public record QuestData(
         newPrerequisites,
         hiddenPrerequisites,
         deletedPrerequisite,
+        hiddenParent,
         autoJoin,
         locked,
         privatized);
@@ -429,6 +442,7 @@ public record QuestData(
         prerequisites,
         hiddenPrerequisites,
         deletedPrerequisite,
+        hiddenParent,
         autoJoin,
         locked,
         privatized);
@@ -457,6 +471,7 @@ public record QuestData(
         prerequisites,
         hiddenPrerequisites,
         deletedPrerequisite,
+        hiddenParent,
         autoJoin,
         locked,
         privatized);
@@ -490,8 +505,39 @@ public record QuestData(
         newPrerequisites,
         newHiddenPrerequisites,
         newDeletedPrerequisite,
+        hiddenParent,
         autoJoin,
         newLocked,
+        privatized);
+  }
+
+  /** Whether an owner is told the quest sits inside a quest they cannot see. */
+  public QuestData withHiddenParent(boolean newHiddenParent) {
+    return new QuestData(
+        id,
+        title,
+        content,
+        ownerUuid,
+        ownerName,
+        visibility,
+        contributors,
+        lastModified,
+        coordinates,
+        isRegion,
+        coordinates2,
+        map,
+        tags,
+        polygon,
+        completedAt,
+        completedBy,
+        completedByName,
+        parentId,
+        prerequisites,
+        hiddenPrerequisites,
+        deletedPrerequisite,
+        newHiddenParent,
+        autoJoin,
+        locked,
         privatized);
   }
 
@@ -518,6 +564,7 @@ public record QuestData(
         prerequisites,
         hiddenPrerequisites,
         deletedPrerequisite,
+        hiddenParent,
         autoJoin,
         locked,
         newPrivatized);

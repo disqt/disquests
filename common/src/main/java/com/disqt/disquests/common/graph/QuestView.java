@@ -28,7 +28,9 @@ public final class QuestView {
    * The quest as {@code recipient} may have it, or null when they cannot see it.
    *
    * <ul>
-   *   <li>{@code parentId} only when the recipient can see the parent.
+   *   <li>{@code parentId} only when the recipient can see the parent. {@code hiddenParent} tells
+   *       an owner of the quest that it sits inside a quest they cannot see, so they can detach it;
+   *       nobody else learns that there is a parent.
    *   <li>{@code prerequisites} only those the recipient can see. {@code hiddenPrerequisites} says
    *       there are others, never how many. {@code deletedPrerequisite} says one of them no longer
    *       exists, and only to owners of the quest; for everyone else a deleted prerequisite counts
@@ -36,8 +38,9 @@ public final class QuestView {
    *   <li>{@code privatized} only for owners, without the deleted quest's title and its deleter's
    *       name for an owner who could not see it, and never with {@code sawDeleted}.
    *   <li>{@code locked} is whether the quest is locked for the recipient. A locked view keeps the
-   *       id, title, visibility, last change, the links above and the recipient's own entry if they
-   *       hold a role; everything else is emptied.
+   *       id, title, visibility, the links above and the recipient's own entry if they hold a role;
+   *       everything else is emptied, including the time of the last change, so an edit of the
+   *       hidden text does not reach them.
    * </ul>
    */
   public static QuestData forRecipient(QuestGraph g, UUID recipient, UUID quest) {
@@ -46,7 +49,9 @@ public final class QuestView {
     boolean owner = q.roleOf(recipient) == Role.OWNER;
 
     QuestData parent = g.get(q.parentId());
-    UUID parentId = parent != null && g.canSee(recipient, parent.id()) ? parent.id() : null;
+    boolean parentVisible = parent != null && g.canSee(recipient, parent.id());
+    UUID parentId = parentVisible ? parent.id() : null;
+    boolean hiddenParent = owner && parent != null && !parentVisible;
 
     List<UUID> visible = new ArrayList<>();
     boolean hidden = false;
@@ -67,6 +72,7 @@ public final class QuestView {
 
     return q.withParent(parentId)
         .withLinksView(List.copyOf(visible), hidden, deleted, false)
+        .withHiddenParent(hiddenParent)
         .withPrivatized(owner ? privatizedFor(q.privatized(), recipient) : null);
   }
 
@@ -87,7 +93,7 @@ public final class QuestView {
         "",
         q.visibility(),
         ownEntry,
-        q.lastModified(),
+        0L,
         null,
         false,
         null,
@@ -101,6 +107,7 @@ public final class QuestView {
         List.copyOf(prerequisites),
         hidden,
         deleted,
+        false,
         false,
         true,
         null);

@@ -652,6 +652,7 @@ public final class PacketCodec {
       }
       buf.writeBoolean(quest.hiddenPrerequisites());
       buf.writeBoolean(quest.deletedPrerequisite());
+      buf.writeBoolean(quest.hiddenParent());
       buf.writeBoolean(quest.autoJoin());
       buf.writeBoolean(quest.locked());
       Privatized privatized = quest.privatized();
@@ -716,6 +717,7 @@ public final class PacketCodec {
     List<UUID> prerequisites = List.of();
     boolean hiddenPrerequisites = false;
     boolean deletedPrerequisite = false;
+    boolean hiddenParent = false;
     boolean autoJoin = false;
     boolean locked = false;
     Privatized privatized = null;
@@ -729,6 +731,7 @@ public final class PacketCodec {
       prerequisites = readUuidList(buf, MAX_PREREQUISITES, "Prerequisite");
       hiddenPrerequisites = buf.readBoolean();
       deletedPrerequisite = buf.readBoolean();
+      hiddenParent = buf.readBoolean();
       autoJoin = buf.readBoolean();
       locked = buf.readBoolean();
       if (buf.readBoolean()) {
@@ -761,6 +764,7 @@ public final class PacketCodec {
         prerequisites,
         hiddenPrerequisites,
         deletedPrerequisite,
+        hiddenParent,
         autoJoin,
         locked,
         privatized);

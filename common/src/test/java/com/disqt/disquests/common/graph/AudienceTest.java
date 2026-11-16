@@ -91,6 +91,33 @@ class AudienceTest {
   }
 
   @Nested
+  class LockedQuestEdited {
+
+    /** "gate" waits on "first" and is locked for JUJU, who reads it; MAX writes on it. */
+    private QuestGraph withGate(String content, long lastModified) {
+      return graph(
+          quest("first").open(),
+          quest("gate")
+              .open()
+              .rich()
+              .content(content)
+              .lastModified(lastModified)
+              .after("first")
+              .reader(JUJU)
+              .writer(MAX));
+    }
+
+    @Test
+    void writersEditDoesNotReachAReaderWhoSeesItLocked() {
+      QuestGraph before = withGate("chapter one", 1L);
+      QuestGraph after = withGate("chapter one, revised", 2L);
+      assertEquals(
+          List.of(List.of(), List.of(new Change(id("gate"), after.get(id("gate"))))),
+          List.of(Audience.changes(before, after, JUJU), Audience.changes(before, after, MAX)));
+    }
+  }
+
+  @Nested
   class Listing {
 
     private final QuestGraph before =

@@ -71,7 +71,7 @@ class QuestViewTest {
               "",
               Visibility.OPEN,
               List.of(new ContributorData(JUJU, "p3", Role.READ)),
-              stored.lastModified(),
+              0L,
               null,
               false,
               null,
@@ -83,6 +83,7 @@ class QuestViewTest {
               null,
               id("hub"),
               List.of(id("first")),
+              false,
               false,
               false,
               false,
@@ -175,20 +176,31 @@ class QuestViewTest {
     private final QuestGraph g =
         graph(
             quest("max's hub").owner(MAX),
-            quest("leo's in max's").open().in("max's hub"),
+            quest("leo's in max's").open().in("max's hub").writer(JUJU).reader(ANNA),
             quest("open hub").open(),
             quest("in open hub").open().in("open hub"),
             quest("orphan").open().in("deleted hub"));
 
-    @ParameterizedTest(name = "{0} looks at [{1}]: parent {2}")
+    /** Only an owner who cannot see the parent is told that there is one. */
+    @ParameterizedTest(name = "{0} looks at [{1}]: parent {2}, hidden parent {3}")
     @CsvSource({
-      "leo,  leo's in max's, -",
-      "max,  leo's in max's, max's hub",
-      "juju, in open hub,    open hub",
-      "leo,  orphan,         -",
+      "leo,  leo's in max's, -,         true",
+      "juju, leo's in max's, -,         false",
+      "anna, leo's in max's, -,         false",
+      "max,  leo's in max's, max's hub, false",
+      "juju, in open hub,    open hub,  false",
+      "leo,  in open hub,    open hub,  false",
+      "leo,  orphan,         -,         false",
     })
-    void rows(String viewer, String quest, String parent) {
-      assertEquals(parent, links(g, QuestView.forRecipient(g, player(viewer), id(quest))).get(0));
+    void rows(String viewer, String quest, String parent, boolean hiddenParent) {
+      QuestData view = QuestView.forRecipient(g, player(viewer), id(quest));
+      assertEquals(
+          List.of(parent, hiddenParent), List.of(links(g, view).get(0), view.hiddenParent()));
+    }
+
+    @Test
+    void strangerGetsNothingOfAQuestInAnInvisibleParent() {
+      assertNull(QuestView.forRecipient(g, STRANGER, id("leo's in max's")));
     }
 
     @Test
@@ -267,27 +279,51 @@ class QuestViewTest {
           assertEquals(Role.OWNER, q.roleOf(player), "deleted flag for a non-owner: " + where);
         }
         assertEquals(g.lockedFor(player, q.id()), view.locked(), "lock: " + where);
+        QuestData parent = g.get(q.parentId());
+        assertEquals(
+            q.roleOf(player) == Role.OWNER && parent != null && !g.canSee(player, parent.id()),
+            view.hiddenParent(),
+            "hidden parent: " + where);
         if (view.locked()) {
-          assertEquals(
-              List.of("", List.of(), List.of(), NOBODY, "", false, 0L),
-              List.of(
-                  view.content(),
-                  view.tags(),
-                  view.polygon(),
-                  view.ownerUuid(),
-                  view.ownerName(),
-                  view.autoJoin(),
-                  view.completedAt()),
-              "locked content: " + where);
-          assertTrue(
-              view.coordinates() == null && view.coordinates2() == null && view.map() == null,
-              "locked location: " + where);
-          assertTrue(
-              view.contributors().stream().allMatch(c -> c.uuid().equals(player)),
-              "locked people: " + where);
+          assertEquals(lockedAllowlist(q, player, view), view, "locked view: " + where);
         }
       }
     }
+  }
+
+  /**
+   * What a locked view may carry, built with the positional constructor so that a component added
+   * to {@link QuestData} later fails to compile here until it is placed on this list: the id, title
+   * and visibility of the stored quest, the link fields of the view (checked separately), the
+   * recipient's own entry, and {@code locked}. Everything else is empty.
+   */
+  private static QuestData lockedAllowlist(QuestData stored, UUID player, QuestData view) {
+    return new QuestData(
+        stored.id(),
+        stored.title(),
+        "",
+        NOBODY,
+        "",
+        stored.visibility(),
+        stored.contributors().stream().filter(c -> c.uuid().equals(player)).toList(),
+        0L,
+        null,
+        false,
+        null,
+        null,
+        List.of(),
+        List.of(),
+        0L,
+        null,
+        null,
+        view.parentId(),
+        view.prerequisites(),
+        view.hiddenPrerequisites(),
+        view.deletedPrerequisite(),
+        false,
+        false,
+        true,
+        null);
   }
 
   /**
