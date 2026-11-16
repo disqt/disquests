@@ -72,7 +72,8 @@ class WikiLinkResolverTest {
     UUID questId = UUID.randomUUID();
     dm.saveQuest(makeQuest(questId, OWNER, "My Quest", Visibility.OPEN));
 
-    String result = resolver.resolveForRecipient("See [[My Quest]] for details.", PLAYER2);
+    String result =
+        resolver.resolveForRecipient(dm.loadGraph(), "See [[My Quest]] for details.", PLAYER2);
 
     assertEquals("See [[" + questId + "|My Quest]] for details.", result);
   }
@@ -82,7 +83,8 @@ class WikiLinkResolverTest {
     UUID questId = UUID.randomUUID();
     dm.saveQuest(makeQuest(questId, OWNER, "Closed Quest", Visibility.CLOSED));
 
-    String result = resolver.resolveForRecipient("Check [[Closed Quest]].", PLAYER2);
+    String result =
+        resolver.resolveForRecipient(dm.loadGraph(), "Check [[Closed Quest]].", PLAYER2);
 
     assertEquals("Check [[" + questId + "|Closed Quest]].", result);
   }
@@ -92,7 +94,8 @@ class WikiLinkResolverTest {
     UUID questId = UUID.randomUUID();
     dm.saveQuest(makeQuest(questId, OWNER, "Secret Quest", Visibility.PRIVATE));
 
-    String result = resolver.resolveForRecipient("Look at [[Secret Quest]] please.", PLAYER2);
+    String result =
+        resolver.resolveForRecipient(dm.loadGraph(), "Look at [[Secret Quest]] please.", PLAYER2);
 
     assertEquals("Look at [[" + questId + "|Private Quest]] please.", result);
   }
@@ -102,7 +105,7 @@ class WikiLinkResolverTest {
     UUID questId = UUID.randomUUID();
     dm.saveQuest(makeQuest(questId, OWNER, "My Secret", Visibility.PRIVATE));
 
-    String result = resolver.resolveForRecipient("[[My Secret]] is mine.", OWNER);
+    String result = resolver.resolveForRecipient(dm.loadGraph(), "[[My Secret]] is mine.", OWNER);
 
     assertEquals("[[" + questId + "|My Secret]] is mine.", result);
   }
@@ -113,14 +116,16 @@ class WikiLinkResolverTest {
     dm.saveQuest(makeQuest(questId, OWNER, "Collab Private", Visibility.PRIVATE));
     dm.addContributor(questId, PLAYER2, false);
 
-    String result = resolver.resolveForRecipient("[[Collab Private]] task.", PLAYER2);
+    String result =
+        resolver.resolveForRecipient(dm.loadGraph(), "[[Collab Private]] task.", PLAYER2);
 
     assertEquals("[[" + questId + "|Collab Private]] task.", result);
   }
 
   @Test
   void resolveForRecipient_nonexistentQuest_emptiesUuid() {
-    String result = resolver.resolveForRecipient("See [[Ghost Quest]] here.", PLAYER2);
+    String result =
+        resolver.resolveForRecipient(dm.loadGraph(), "See [[Ghost Quest]] here.", PLAYER2);
 
     assertEquals("See [[|Ghost Quest]] here.", result);
   }
@@ -130,7 +135,8 @@ class WikiLinkResolverTest {
     UUID questId = UUID.randomUUID();
     dm.saveQuest(makeQuest(questId, OWNER, "Dragon Slayer", Visibility.OPEN));
 
-    String result = resolver.resolveForRecipient("Do [[dragon slayer]] now.", PLAYER2);
+    String result =
+        resolver.resolveForRecipient(dm.loadGraph(), "Do [[dragon slayer]] now.", PLAYER2);
 
     // title in result should be the display text (what was typed in the link)
     assertEquals("Do [[" + questId + "|dragon slayer]] now.", result);
@@ -139,7 +145,7 @@ class WikiLinkResolverTest {
   @Test
   void resolveForRecipient_noLinks_unchanged() {
     String content = "No wiki links here. Just plain text.";
-    String result = resolver.resolveForRecipient(content, PLAYER2);
+    String result = resolver.resolveForRecipient(dm.loadGraph(), content, PLAYER2);
     assertEquals(content, result);
   }
 
@@ -150,7 +156,8 @@ class WikiLinkResolverTest {
     dm.saveQuest(makeQuest(questA, OWNER, "Alpha", Visibility.OPEN));
     dm.saveQuest(makeQuest(questB, OWNER, "Beta", Visibility.OPEN));
 
-    String result = resolver.resolveForRecipient("Do [[Alpha]] and [[Beta]].", PLAYER2);
+    String result =
+        resolver.resolveForRecipient(dm.loadGraph(), "Do [[Alpha]] and [[Beta]].", PLAYER2);
 
     assertEquals("Do [[" + questA + "|Alpha]] and [[" + questB + "|Beta]].", result);
   }
@@ -171,7 +178,7 @@ class WikiLinkResolverTest {
     }
     String content = sb.toString();
 
-    String result = resolver.resolveForRecipient(content, PLAYER2);
+    String result = resolver.resolveForRecipient(dm.loadGraph(), content, PLAYER2);
 
     // First 16 resolved links contain a pipe character
     // Count pipe-containing [[...]] patterns
@@ -198,7 +205,7 @@ class WikiLinkResolverTest {
     // A [[uuid|title]] pattern (already resolved) should not be re-processed by the raw pattern
     UUID questId = UUID.randomUUID();
     String alreadyResolved = "[[" + questId + "|Some Title]]";
-    String result = resolver.resolveForRecipient(alreadyResolved, PLAYER2);
+    String result = resolver.resolveForRecipient(dm.loadGraph(), alreadyResolved, PLAYER2);
     // Should not double-process; the raw pattern won't match [[uuid|title]] because it has a pipe
     assertEquals(alreadyResolved, result);
   }

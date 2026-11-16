@@ -1,11 +1,13 @@
 package com.disqt.disquests.server.papermc;
 
+import com.disqt.disquests.common.graph.QuestGraph;
 import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.common.model.Visibility;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -20,13 +22,9 @@ import java.util.regex.Pattern;
  *       Title]]}
  * </ul>
  *
- * Access rules:
- *
- * <ul>
- *   <li>Owner always has access.
- *   <li>OPEN and CLOSED quests are visible to everyone.
- *   <li>PRIVATE quests are visible only to owner and contributors.
- * </ul>
+ * Forward resolution decides with the quest graph, as {@link Delivery} does for the quest itself.
+ * Reverse resolution keeps its own access rule: the owner, a contributor, or anyone for an OPEN or
+ * CLOSED quest.
  */
 public class WikiLinkResolver {
 
@@ -53,22 +51,22 @@ public class WikiLinkResolver {
   // -------------------------------------------------------------------------
 
   /**
-   * Scans content for raw {@code [[Quest Name]]} patterns and resolves each per-recipient. At most
-   * {@value #MAX_WIKI_LINKS} links are processed; excess are left as-is.
+   * Scans content for raw {@code [[Quest Name]]} patterns and resolves each for the recipient,
+   * deciding with the graph: a quest the recipient cannot see, or sees as locked, becomes {@code
+   * [[uuid|Private Quest]]}; a title that matches no quest becomes {@code [[|Quest Name]]}. Titles
+   * match ignoring case; when several quests share a title, the smallest id wins. At most {@value
+   * #MAX_WIKI_LINKS} links are processed; excess are left as-is.
    */
-  public String resolveForRecipient(String content, UUID recipientUuid) {
+  public String resolveForRecipient(QuestGraph graph, String content, UUID recipientUuid) {
     Matcher matcher = RAW_PATTERN.matcher(content);
-    List<String> rawTitles = new ArrayList<>();
-    while (matcher.find()) {
-      if (rawTitles.size() < MAX_WIKI_LINKS) {
-        rawTitles.add(matcher.group(1));
-      }
+    Set<String> lowerTitles = new HashSet<>();
+    int found = 0;
+    while (matcher.find() && found < MAX_WIKI_LINKS) {
+      lowerTitles.add(matcher.group(1).toLowerCase());
+      found++;
     }
-    if (rawTitles.isEmpty()) return content;
-
-    // Batch-load all quests by title (case-insensitive)
-    List<String> lowerTitles = rawTitles.stream().map(String::toLowerCase).distinct().toList();
-    Map<String, QuestData> byTitle = dataManager.findQuestsByTitlesIgnoreCase(lowerTitles);
+    if (lowerTitles.isEmpty()) return content;
+    Map<String, QuestData> byTitle = byTitle(graph, lowerTitles);
 
     StringBuilder result = new StringBuilder();
     matcher.reset();
@@ -88,21 +86,29 @@ public class WikiLinkResolver {
       if (quest == null) {
         // Quest not found — broken link
         replacement = "[[|" + displayText + "]]";
+      } else if (!Delivery.fullyVisible(graph, recipientUuid, quest.id())) {
+        replacement = "[[" + quest.id() + "|Private Quest]]";
       } else {
-        // For PRIVATE quests, we need contributors to check access;
-        // findQuestsByTitlesIgnoreCase doesn't load them, so fetch fully.
-        QuestData questWithContribs =
-            (quest.visibility() == Visibility.PRIVATE) ? dataManager.getQuest(quest.id()) : quest;
-        if (questWithContribs == null || !hasAccess(questWithContribs, recipientUuid)) {
-          replacement = "[[" + quest.id() + "|Private Quest]]";
-        } else {
-          replacement = "[[" + quest.id() + "|" + displayText + "]]";
-        }
+        replacement = "[[" + quest.id() + "|" + displayText + "]]";
       }
       matcher.appendReplacement(result, Matcher.quoteReplacement(replacement));
     }
     matcher.appendTail(result);
     return result.toString();
+  }
+
+  /** Quests whose lowercased title is in {@code lowerTitles}, smallest id first on a tie. */
+  private static Map<String, QuestData> byTitle(QuestGraph graph, Set<String> lowerTitles) {
+    Map<String, QuestData> result = new HashMap<>();
+    for (QuestData quest : graph.all()) {
+      String lowerTitle = quest.title().toLowerCase();
+      if (!lowerTitles.contains(lowerTitle)) continue;
+      QuestData kept = result.get(lowerTitle);
+      if (kept == null || quest.id().toString().compareTo(kept.id().toString()) < 0) {
+        result.put(lowerTitle, quest);
+      }
+    }
+    return result;
   }
 
   // -------------------------------------------------------------------------
