@@ -1,11 +1,11 @@
 [versions]
 # Testing
-junit = "6.1.2"
-junit-platform = "6.1.2"
-mockito = "5.23.0"
+junit = "6.1.3"
+junit-platform = "6.1.3"
+mockito = "5.24.0"
 
 # Server
-sqlite-jdbc = "3.53.2.1"
+sqlite-jdbc = "3.54.1.0"
 
 # Client libs
 # Must match the LWJGL version Minecraft ships (26.3: 3.4.3). Bumping this alone drags
@@ -14,21 +14,20 @@ sqlite-jdbc = "3.53.2.1"
 #   NoSuchMethodError: org.lwjgl.system.Callback$Descriptor.<init>(...FFICIF)
 # Keep in lockstep with Minecraft's LWJGL, not with upstream releases.
 lwjgl-tinyfd = "3.4.3"
-commonmark = "0.29.0"
+commonmark = "0.32.0"
 autolink = "0.12.0"
 
 # Build quality
-errorprone-core = "2.50.0"
-nullaway = "0.13.8"
-jacoco = "0.8.14"
+errorprone-core = "2.52.0"
+nullaway = "0.14.3"
+jacoco = "0.8.16"
 
 # Gradle plugins
-fabric-loom = "1.15.5"
-spotless = "8.9.0"
-lefthook = "0.7.0"
-run-paper = "3.0.2"
-errorprone-plugin = "5.1.0"
-cyclonedx = "3.3.0"
+spotless = "8.11.0"
+lefthook = "0.7.1"
+run-paper = "3.1.0"
+errorprone-plugin = "5.2.0"
+cyclonedx = "3.6.1"
 
 [libraries]
 # Testing
@@ -52,7 +51,6 @@ errorprone-core = { module = "com.google.errorprone:error_prone_core", version.r
 nullaway = { module = "com.uber.nullaway:nullaway", version.ref = "nullaway" }
 
 [plugins]
-fabric-loom = { id = "fabric-loom", version.ref = "fabric-loom" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 lefthook = { id = "com.fizzpod.lefthook", version.ref = "lefthook" }
 run-paper = { id = "xyz.jpenilla.run-paper", version.ref = "run-paper" }
