@@ -20,10 +20,64 @@ public record QuestData(
     List<PointData> polygon,
     long completedAt,
     UUID completedBy,
-    String completedByName) {
+    String completedByName,
+    UUID parentId,
+    List<UUID> prerequisites,
+    boolean hiddenPrerequisites,
+    boolean deletedPrerequisite,
+    boolean autoJoin,
+    boolean locked,
+    Privatized privatized) {
 
   public QuestData {
     if (polygon == null) polygon = List.of();
+    if (prerequisites == null) prerequisites = List.of();
+  }
+
+  /** Pre-tree signature: not a subquest, no prerequisites, not locked, not privatized. */
+  public QuestData(
+      UUID id,
+      String title,
+      String content,
+      UUID ownerUuid,
+      String ownerName,
+      Visibility visibility,
+      List<ContributorData> contributors,
+      long lastModified,
+      CoordinatesData coordinates,
+      boolean isRegion,
+      CoordinatesData coordinates2,
+      String map,
+      List<String> tags,
+      List<PointData> polygon,
+      long completedAt,
+      UUID completedBy,
+      String completedByName) {
+    this(
+        id,
+        title,
+        content,
+        ownerUuid,
+        ownerName,
+        visibility,
+        contributors,
+        lastModified,
+        coordinates,
+        isRegion,
+        coordinates2,
+        map,
+        tags,
+        polygon,
+        completedAt,
+        completedBy,
+        completedByName,
+        null,
+        List.of(),
+        false,
+        false,
+        false,
+        false,
+        null);
   }
 
   /** Pre-polygon signature; polygon defaults to empty. */
@@ -101,6 +155,26 @@ public record QuestData(
     return completedAt != 0L;
   }
 
+  /** The player's role, or null when they are not on the quest. */
+  public Role roleOf(UUID player) {
+    if (player == null) return null;
+    if (player.equals(ownerUuid)) return Role.OWNER;
+    for (ContributorData c : contributors) {
+      if (player.equals(c.uuid())) return c.role();
+    }
+    return null;
+  }
+
+  /** The display owner first, then every contributor holding the OWNER role. */
+  public List<UUID> owners() {
+    List<UUID> owners = new java.util.ArrayList<>();
+    owners.add(ownerUuid);
+    for (ContributorData c : contributors) {
+      if (c.role() == Role.OWNER && !owners.contains(c.uuid())) owners.add(c.uuid());
+    }
+    return List.copyOf(owners);
+  }
+
   public QuestData withCompletion(
       long newCompletedAt, UUID newCompletedBy, String newCompletedByName) {
     return new QuestData(
@@ -120,7 +194,14 @@ public record QuestData(
         polygon,
         newCompletedAt,
         newCompletedBy,
-        newCompletedByName);
+        newCompletedByName,
+        parentId,
+        prerequisites,
+        hiddenPrerequisites,
+        deletedPrerequisite,
+        autoJoin,
+        locked,
+        privatized);
   }
 
   public QuestData withPolygon(List<PointData> newPolygon) {
@@ -141,7 +222,14 @@ public record QuestData(
         newPolygon,
         completedAt,
         completedBy,
-        completedByName);
+        completedByName,
+        parentId,
+        prerequisites,
+        hiddenPrerequisites,
+        deletedPrerequisite,
+        autoJoin,
+        locked,
+        privatized);
   }
 
   public QuestData withContributors(List<ContributorData> newContributors) {
@@ -162,7 +250,14 @@ public record QuestData(
         polygon,
         completedAt,
         completedBy,
-        completedByName);
+        completedByName,
+        parentId,
+        prerequisites,
+        hiddenPrerequisites,
+        deletedPrerequisite,
+        autoJoin,
+        locked,
+        privatized);
   }
 
   public QuestData withTags(List<String> newTags) {
@@ -183,7 +278,14 @@ public record QuestData(
         polygon,
         completedAt,
         completedBy,
-        completedByName);
+        completedByName,
+        parentId,
+        prerequisites,
+        hiddenPrerequisites,
+        deletedPrerequisite,
+        autoJoin,
+        locked,
+        privatized);
   }
 
   public QuestData withContent(String newContent) {
@@ -204,7 +306,14 @@ public record QuestData(
         polygon,
         completedAt,
         completedBy,
-        completedByName);
+        completedByName,
+        parentId,
+        prerequisites,
+        hiddenPrerequisites,
+        deletedPrerequisite,
+        autoJoin,
+        locked,
+        privatized);
   }
 
   public QuestData withLocation(
@@ -229,6 +338,188 @@ public record QuestData(
         newPolygon,
         completedAt,
         completedBy,
-        completedByName);
+        completedByName,
+        parentId,
+        prerequisites,
+        hiddenPrerequisites,
+        deletedPrerequisite,
+        autoJoin,
+        locked,
+        privatized);
+  }
+
+  public QuestData withParent(UUID newParentId) {
+    return new QuestData(
+        id,
+        title,
+        content,
+        ownerUuid,
+        ownerName,
+        visibility,
+        contributors,
+        lastModified,
+        coordinates,
+        isRegion,
+        coordinates2,
+        map,
+        tags,
+        polygon,
+        completedAt,
+        completedBy,
+        completedByName,
+        newParentId,
+        prerequisites,
+        hiddenPrerequisites,
+        deletedPrerequisite,
+        autoJoin,
+        locked,
+        privatized);
+  }
+
+  public QuestData withPrerequisites(List<UUID> newPrerequisites) {
+    return new QuestData(
+        id,
+        title,
+        content,
+        ownerUuid,
+        ownerName,
+        visibility,
+        contributors,
+        lastModified,
+        coordinates,
+        isRegion,
+        coordinates2,
+        map,
+        tags,
+        polygon,
+        completedAt,
+        completedBy,
+        completedByName,
+        parentId,
+        newPrerequisites,
+        hiddenPrerequisites,
+        deletedPrerequisite,
+        autoJoin,
+        locked,
+        privatized);
+  }
+
+  /** Replaces the display owner and everyone else; further owners live in the contributors. */
+  public QuestData withPeople(
+      UUID displayOwner, String name, List<ContributorData> newContributors) {
+    return new QuestData(
+        id,
+        title,
+        content,
+        displayOwner,
+        name,
+        visibility,
+        newContributors,
+        lastModified,
+        coordinates,
+        isRegion,
+        coordinates2,
+        map,
+        tags,
+        polygon,
+        completedAt,
+        completedBy,
+        completedByName,
+        parentId,
+        prerequisites,
+        hiddenPrerequisites,
+        deletedPrerequisite,
+        autoJoin,
+        locked,
+        privatized);
+  }
+
+  public QuestData withVisibility(Visibility newVisibility) {
+    return new QuestData(
+        id,
+        title,
+        content,
+        ownerUuid,
+        ownerName,
+        newVisibility,
+        contributors,
+        lastModified,
+        coordinates,
+        isRegion,
+        coordinates2,
+        map,
+        tags,
+        polygon,
+        completedAt,
+        completedBy,
+        completedByName,
+        parentId,
+        prerequisites,
+        hiddenPrerequisites,
+        deletedPrerequisite,
+        autoJoin,
+        locked,
+        privatized);
+  }
+
+  /** What a given viewer sees of the links: filtered prerequisites, the two flags and the lock. */
+  public QuestData withLinksView(
+      List<UUID> newPrerequisites,
+      boolean newHiddenPrerequisites,
+      boolean newDeletedPrerequisite,
+      boolean newLocked) {
+    return new QuestData(
+        id,
+        title,
+        content,
+        ownerUuid,
+        ownerName,
+        visibility,
+        contributors,
+        lastModified,
+        coordinates,
+        isRegion,
+        coordinates2,
+        map,
+        tags,
+        polygon,
+        completedAt,
+        completedBy,
+        completedByName,
+        parentId,
+        newPrerequisites,
+        newHiddenPrerequisites,
+        newDeletedPrerequisite,
+        autoJoin,
+        newLocked,
+        privatized);
+  }
+
+  public QuestData withPrivatized(Privatized newPrivatized) {
+    return new QuestData(
+        id,
+        title,
+        content,
+        ownerUuid,
+        ownerName,
+        visibility,
+        contributors,
+        lastModified,
+        coordinates,
+        isRegion,
+        coordinates2,
+        map,
+        tags,
+        polygon,
+        completedAt,
+        completedBy,
+        completedByName,
+        parentId,
+        prerequisites,
+        hiddenPrerequisites,
+        deletedPrerequisite,
+        autoJoin,
+        locked,
+        newPrivatized);
   }
 }

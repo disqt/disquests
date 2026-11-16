@@ -13,8 +13,11 @@ public final class ProtocolVersion {
   /** Completion protocol. Adds completedAt, completedBy and completedByName to quests. */
   public static final int V3 = 3;
 
+  /** Tree protocol. Adds roles, parent, prerequisites, auto-join, lock and privatized. */
+  public static final int V4 = 4;
+
   /** The current protocol version this build speaks. */
-  public static final int CURRENT = V3;
+  public static final int CURRENT = V4;
 
   private ProtocolVersion() {}
 }
