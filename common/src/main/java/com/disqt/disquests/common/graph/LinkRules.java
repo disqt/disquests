@@ -70,6 +70,10 @@ public final class LinkRules {
    * {@code descendant}, somewhere inside {@code container}, takes the container's place, and the
    * container goes directly inside it. Needs Owner on both and Write on the container's parent if
    * it has one. The resulting shape is checked like an attach.
+   *
+   * <p>Two unrelated quests are accepted too, as a combined move: {@code descendant} takes the
+   * container's place and the container goes inside it. A container whose parent is not in the
+   * graph counts as top-level, so {@code descendant} becomes top-level.
    */
   public static Optional<Refusal> swap(
       QuestGraph g, UUID actor, UUID container, UUID descendant, int maxDepth) {
@@ -87,7 +91,7 @@ public final class LinkRules {
     if (c.isCompleted() || d.isCompleted()) return Optional.of(Refusal.COMPLETED);
     if (place != null && place.isCompleted()) return Optional.of(Refusal.TARGET_COMPLETED);
     Map<UUID, UUID> parents = new HashMap<>();
-    parents.put(descendant, c.parentId());
+    parents.put(descendant, place == null ? null : place.id());
     parents.put(container, descendant);
     QuestGraph after = withParents(g, parents);
     return shape(after, List.of(descendant, container), descendant, maxDepth);

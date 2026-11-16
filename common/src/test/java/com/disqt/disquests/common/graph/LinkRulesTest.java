@@ -3,8 +3,6 @@ package com.disqt.disquests.common.graph;
 import static com.disqt.disquests.common.graph.GraphFixtures.JUJU;
 import static com.disqt.disquests.common.graph.GraphFixtures.LEO;
 import static com.disqt.disquests.common.graph.GraphFixtures.MAX;
-import static com.disqt.disquests.common.graph.GraphFixtures.attached;
-import static com.disqt.disquests.common.graph.GraphFixtures.detached;
 import static com.disqt.disquests.common.graph.GraphFixtures.expected;
 import static com.disqt.disquests.common.graph.GraphFixtures.graph;
 import static com.disqt.disquests.common.graph.GraphFixtures.id;
@@ -17,7 +15,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.disqt.disquests.common.model.QuestData;
-import com.disqt.disquests.common.model.Role;
 import com.disqt.disquests.common.model.Visibility;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -242,6 +239,7 @@ class LinkRulesTest {
       "result just fits,                   leo,  container, inner,     5, NONE",
       "descendant is really an ancestor,   leo,  inner,     container, 0, LOOP",
       "unknown descendant,                 leo,  container, nowhere,   0, NOT_VISIBLE",
+      "unrelated quests as a combined move, leo,  other,     inner,     0, NONE",
     })
     void rows(
         String why, String actor, String container, String descendant, int limit, String refusal) {
@@ -296,43 +294,10 @@ class LinkRulesTest {
   }
 
   private static void randomForest(int seed) {
-    Random random = new Random(seed);
     int size = 12;
     int limit = seed % 2 == 0 ? 3 : 0;
-    List<UUID> actors = List.of(LEO, MAX, JUJU);
-    List<Visibility> visibilities = List.of(Visibility.PRIVATE, Visibility.CLOSED, Visibility.OPEN);
-    List<Role> roles = List.of(Role.READ, Role.WRITE, Role.OWNER);
-    List<GraphFixtures.QuestBuilder> builders = new ArrayList<>();
-    for (int i = 0; i < size; i++) {
-      GraphFixtures.QuestBuilder b =
-          quest("q" + i)
-              .owner(actors.get(random.nextInt(2)))
-              .visibility(visibilities.get(random.nextInt(3)));
-      if (random.nextBoolean()) b.role(JUJU, roles.get(random.nextInt(3)));
-      builders.add(b);
-    }
-    QuestGraph g = graph(builders.toArray(GraphFixtures.QuestBuilder[]::new));
+    QuestGraph g = GraphFixtures.randomForest(new Random(seed), size, limit);
     List<UUID> ids = g.all().stream().map(QuestData::id).toList();
-
-    for (int step = 0; step < 150; step++) {
-      UUID actor = actors.get(random.nextInt(actors.size()));
-      UUID a = ids.get(random.nextInt(size));
-      UUID b = ids.get(random.nextInt(size));
-      switch (random.nextInt(4)) {
-        case 0 -> {
-          if (LinkRules.attach(g, actor, a, b, limit).isEmpty()) g = attached(g, a, b);
-        }
-        case 1 -> {
-          if (LinkRules.prerequisite(g, actor, a, b).isEmpty()) g = withPrerequisite(g, a, b);
-        }
-        case 2 -> {
-          if (LinkRules.detach(g, actor, a).isEmpty()) g = detached(g, a);
-        }
-        default -> {
-          if (LinkRules.swap(g, actor, a, b, limit).isEmpty()) g = swapped(g, a, b);
-        }
-      }
-    }
 
     for (UUID q : ids) {
       List<UUID> ancestors = g.ancestors(q).stream().map(QuestData::id).toList();

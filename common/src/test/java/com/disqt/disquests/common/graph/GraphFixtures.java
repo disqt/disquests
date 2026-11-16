@@ -1,6 +1,9 @@
 package com.disqt.disquests.common.graph;
 
 import com.disqt.disquests.common.model.ContributorData;
+import com.disqt.disquests.common.model.CoordinatesData;
+import com.disqt.disquests.common.model.PointData;
+import com.disqt.disquests.common.model.Privatized;
 import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.common.model.Role;
 import com.disqt.disquests.common.model.Visibility;
@@ -12,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
@@ -102,7 +106,8 @@ final class GraphFixtures {
   }
 
   static QuestGraph swapped(QuestGraph g, UUID container, UUID descendant) {
-    UUID place = g.get(container).parentId();
+    QuestData placeQuest = g.get(g.get(container).parentId());
+    UUID place = placeQuest == null ? null : placeQuest.id();
     QuestGraph moved = replace(g, descendant, q -> q.withParent(place));
     return replace(moved, container, q -> q.withParent(descendant));
   }
@@ -118,6 +123,50 @@ final class GraphFixtures {
         });
   }
 
+  /**
+   * A random forest of {@code size} quests named {@code q0..}, owned by LEO or MAX, with random
+   * visibilities and a random role for JUJU on about half of them, then shaped by 150 random
+   * attach, prerequisite, detach and swap attempts, each applied only when {@link LinkRules}
+   * accepts it.
+   */
+  static QuestGraph randomForest(Random random, int size, int limit) {
+    List<UUID> actors = List.of(LEO, MAX, JUJU);
+    List<Visibility> visibilities = List.of(Visibility.PRIVATE, Visibility.CLOSED, Visibility.OPEN);
+    List<Role> roles = List.of(Role.READ, Role.WRITE, Role.OWNER);
+    List<QuestBuilder> builders = new ArrayList<>();
+    for (int i = 0; i < size; i++) {
+      QuestBuilder b =
+          quest("q" + i)
+              .owner(actors.get(random.nextInt(2)))
+              .visibility(visibilities.get(random.nextInt(3)));
+      if (random.nextBoolean()) b.role(JUJU, roles.get(random.nextInt(3)));
+      builders.add(b);
+    }
+    QuestGraph g = graph(builders.toArray(QuestBuilder[]::new));
+    List<UUID> ids = g.all().stream().map(QuestData::id).toList();
+
+    for (int step = 0; step < 150; step++) {
+      UUID actor = actors.get(random.nextInt(actors.size()));
+      UUID a = ids.get(random.nextInt(size));
+      UUID b = ids.get(random.nextInt(size));
+      switch (random.nextInt(4)) {
+        case 0 -> {
+          if (LinkRules.attach(g, actor, a, b, limit).isEmpty()) g = attached(g, a, b);
+        }
+        case 1 -> {
+          if (LinkRules.prerequisite(g, actor, a, b).isEmpty()) g = withPrerequisite(g, a, b);
+        }
+        case 2 -> {
+          if (LinkRules.detach(g, actor, a).isEmpty()) g = detached(g, a);
+        }
+        default -> {
+          if (LinkRules.swap(g, actor, a, b, limit).isEmpty()) g = swapped(g, a, b);
+        }
+      }
+    }
+    return g;
+  }
+
   /** A quest under construction. Private and owned by {@link #LEO} unless told otherwise. */
   static final class QuestBuilder {
     private final String title;
@@ -127,6 +176,8 @@ final class GraphFixtures {
     private UUID parent;
     private final List<UUID> prerequisites = new ArrayList<>();
     private long completedAt;
+    private boolean rich;
+    private Privatized privatized;
 
     private QuestBuilder(String title) {
       this.title = title;
@@ -186,27 +237,48 @@ final class GraphFixtures {
       return this;
     }
 
+    /**
+     * Fills everything a locked view must withhold: description, tags, a pin and second corner, a
+     * polygon, a map and auto-join.
+     */
+    QuestBuilder rich() {
+      this.rich = true;
+      return this;
+    }
+
+    QuestBuilder privatized(Privatized privatized) {
+      this.privatized = privatized;
+      return this;
+    }
+
     QuestData build() {
-      QuestData base =
-          new QuestData(
-              id(title),
-              title,
-              "",
-              owner,
-              "p" + owner.getLeastSignificantBits(),
-              visibility,
-              List.copyOf(people),
-              1L,
-              null,
-              false,
-              null,
-              null,
-              List.of(),
-              List.of(),
-              completedAt,
-              completedAt == 0L ? null : owner,
-              null);
-      return base.withParent(parent).withPrerequisites(List.copyOf(prerequisites));
+      return new QuestData(
+          id(title),
+          title,
+          rich ? "the text of " + title : "",
+          owner,
+          "p" + owner.getLeastSignificantBits(),
+          visibility,
+          List.copyOf(people),
+          1L,
+          rich ? new CoordinatesData(1, 64, 2) : null,
+          rich,
+          rich ? new CoordinatesData(10, 64, 20) : null,
+          rich ? "world" : null,
+          rich ? List.of("tag of " + title) : List.of(),
+          rich
+              ? List.of(new PointData(1, 2), new PointData(10, 2), new PointData(10, 20))
+              : List.of(),
+          completedAt,
+          completedAt == 0L ? null : owner,
+          completedAt == 0L ? null : "p" + owner.getLeastSignificantBits(),
+          parent,
+          List.copyOf(prerequisites),
+          false,
+          false,
+          rich,
+          false,
+          privatized);
     }
   }
 }
