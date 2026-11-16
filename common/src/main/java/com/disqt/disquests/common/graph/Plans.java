@@ -67,17 +67,17 @@ public final class Plans {
   // --- delete ---
 
   /**
-   * Deletes the quest and, when {@code alsoMine}, every descendant the actor owns. Kept quests
-   * whose parent goes move to the nearest surviving ancestor, or to top level. A moved quest that
-   * any of {@code knownPlayers}, or a player with no role anywhere, would see after the move but
-   * not before is set to Private.
+   * Deletes the quest and, when {@code alsoMine}, every descendant the actor owns along a path they
+   * can see; one beyond a quest hidden from them is kept. Kept quests whose parent goes move to the
+   * nearest surviving ancestor, or to top level. A moved quest that any of {@code knownPlayers}, or
+   * a player with no role anywhere, would see after the move but not before is set to Private.
    */
   public static DeletePlan delete(
       QuestGraph g, UUID actor, UUID quest, boolean alsoMine, Collection<UUID> knownPlayers) {
     Set<UUID> deleted = new LinkedHashSet<>();
     deleted.add(quest);
     if (alsoMine) {
-      for (QuestData d : g.descendants(quest)) {
+      for (QuestData d : visibleDescendants(g, actor, quest)) {
         if (d.roleOf(actor) == Role.OWNER) deleted.add(d.id());
       }
     }
@@ -174,12 +174,15 @@ public final class Plans {
 
   // --- complete ---
 
-  /** The quest, then, when {@code alsoMine}, every unfinished descendant the actor owns. */
+  /**
+   * The quest, then, when {@code alsoMine}, every unfinished descendant the actor owns along a path
+   * they can see.
+   */
   public static List<UUID> completeTargets(QuestGraph g, UUID actor, UUID quest, boolean alsoMine) {
     List<UUID> targets = new ArrayList<>();
     targets.add(quest);
     if (alsoMine) {
-      for (QuestData d : g.descendants(quest)) {
+      for (QuestData d : visibleDescendants(g, actor, quest)) {
         if (d.roleOf(actor) == Role.OWNER && !d.isCompleted()) targets.add(d.id());
       }
     }
@@ -223,7 +226,7 @@ public final class Plans {
     for (UUID id : q.prerequisites()) {
       QuestData prerequisite = g.get(id);
       if (prerequisite == null || !seenByAnOwner(g, q, id)) continue;
-      for (UUID p : people(prerequisite)) {
+      for (UUID p : holders(prerequisite)) {
         if (q.roleOf(p) == null && g.canSee(p, q.id())) candidates.add(p);
       }
     }
@@ -246,11 +249,11 @@ public final class Plans {
   }
 
   /** The display owner, then every contributor, in list order. */
-  private static List<UUID> people(QuestData q) {
-    List<UUID> people = new ArrayList<>();
-    people.add(q.ownerUuid());
-    for (ContributorData c : q.contributors()) people.add(c.uuid());
-    return people;
+  private static List<UUID> holders(QuestData q) {
+    List<UUID> holders = new ArrayList<>();
+    holders.add(q.ownerUuid());
+    for (ContributorData c : q.contributors()) holders.add(c.uuid());
+    return holders;
   }
 
   private static QuestGraph withReaders(QuestGraph g, QuestData q, List<UUID> readers) {
@@ -265,16 +268,15 @@ public final class Plans {
   // --- subquest counts ---
 
   /**
-   * The quest's descendants the viewer can see, only the unfinished ones when {@code
-   * unfinishedOnly}: those the viewer owns, and the rest.
+   * The quest's descendants the viewer can see along a visible path, only the unfinished ones when
+   * {@code unfinishedOnly}: those the viewer owns, and the rest.
    */
   public static Counts subquestCounts(
       QuestGraph g, UUID viewer, UUID quest, boolean unfinishedOnly) {
     int mine = 0;
     int others = 0;
-    for (QuestData d : g.descendants(quest)) {
+    for (QuestData d : visibleDescendants(g, viewer, quest)) {
       if (unfinishedOnly && d.isCompleted()) continue;
-      if (!g.canSee(viewer, d.id())) continue;
       if (d.roleOf(viewer) == Role.OWNER) mine++;
       else others++;
     }
@@ -292,6 +294,11 @@ public final class Plans {
    * owner takes that place.
    */
   public static PeopleResult people(QuestData quest, UUID actor, List<PersonOp> ops) {
+    for (PersonOp op : ops) {
+      if (op.kind() == PersonOp.Kind.SET_ROLE && op.role() == null) {
+        throw new IllegalArgumentException("SET_ROLE without a role for " + op.player());
+      }
+    }
     if (quest.roleOf(actor) != Role.OWNER) return refused(quest, Refusal.NEED_OWNER);
 
     List<ContributorData> people = new ArrayList<>();
@@ -344,19 +351,40 @@ public final class Plans {
   // --- sharing a role down the tree ---
 
   /**
-   * The role the player holds on the quest, for each descendant the actor owns (completed ones
-   * included) where the player holds a lower role or none. Empty when the player holds no role on
-   * the quest.
+   * The role the player holds on the quest, for each descendant the actor owns along a path they
+   * can see (completed ones included) where the player holds a lower role or none. Empty when the
+   * player holds no role on the quest.
    */
   public static Map<UUID, Role> roleDown(QuestGraph g, UUID actor, UUID quest, UUID player) {
     Role role = g.get(quest).roleOf(player);
     if (role == null) return Map.of();
     Map<UUID, Role> changes = new LinkedHashMap<>();
-    for (QuestData d : g.descendants(quest)) {
+    for (QuestData d : visibleDescendants(g, actor, quest)) {
       if (d.roleOf(actor) != Role.OWNER) continue;
       Role current = d.roleOf(player);
       if (current == null || !current.atLeast(role)) changes.put(d.id(), role);
     }
     return changes;
+  }
+
+  /**
+   * The quest's descendants as the player knows them: those where every quest on the path down from
+   * {@code quest}, the descendant included, is visible to the player. Level by level, nearest
+   * first, at most {@link QuestGraph#MAX_WALK} levels.
+   */
+  private static List<QuestData> visibleDescendants(QuestGraph g, UUID player, UUID quest) {
+    List<QuestData> found = new ArrayList<>();
+    Set<UUID> seen = new LinkedHashSet<>();
+    List<QuestData> level = g.children(quest);
+    for (int depth = 0; !level.isEmpty() && depth < QuestGraph.MAX_WALK; depth++) {
+      List<QuestData> next = new ArrayList<>();
+      for (QuestData q : level) {
+        if (!seen.add(q.id()) || !g.canSee(player, q.id())) continue;
+        found.add(q);
+        next.addAll(g.children(q.id()));
+      }
+      level = next;
+    }
+    return found;
   }
 }

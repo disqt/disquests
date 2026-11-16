@@ -10,6 +10,7 @@ import static com.disqt.disquests.common.graph.GraphFixtures.id;
 import static com.disqt.disquests.common.graph.GraphFixtures.quest;
 import static com.disqt.disquests.common.graph.GraphFixtures.replace;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.disqt.disquests.common.graph.Plans.Counts;
@@ -72,6 +73,18 @@ class PlansTest {
     return Set.copyOf(Arrays.stream(titles).map(GraphFixtures::id).toList());
   }
 
+  /**
+   * LEO's Open hub (JUJU writes on it) holds MAX's Private {@code c}, which LEO cannot see; inside
+   * {@code c} are LEO's unfinished {@code f} and MAX's {@code g}, which LEO reads.
+   */
+  private static QuestGraph hiddenBetween() {
+    return graph(
+        quest("hub").open().writer(JUJU),
+        quest("c").owner(MAX).in("hub"),
+        quest("f").open().in("c"),
+        quest("g").owner(MAX).open().reader(LEO).in("c"));
+  }
+
   private static List<UUID> players(String names) {
     if (names == null || names.isBlank()) return List.of();
     return Arrays.stream(names.split(";")).map(String::trim).map(GraphFixtures::player).toList();
@@ -117,6 +130,13 @@ class PlansTest {
               Map.of(),
               Map.of()),
           Plans.delete(g, LEO, id("x"), true, KNOWN));
+    }
+
+    @Test
+    void tickedKeepsMyQuestBeyondAQuestIDoNotSee() {
+      assertEquals(
+          new DeletePlan(ids("hub"), Map.of(id("c"), Optional.empty()), Map.of(), Map.of()),
+          Plans.delete(hiddenBetween(), LEO, id("hub"), true, KNOWN));
     }
 
     @Test
@@ -278,6 +298,12 @@ class PlansTest {
           List.of(id("goal"), id("a"), id("d"), id("e")),
           Plans.completeTargets(G, LEO, id("goal"), true));
     }
+
+    @Test
+    void myQuestBeyondAQuestIDoNotSeeIsNotCompleted() {
+      assertEquals(
+          List.of(id("hub")), Plans.completeTargets(hiddenBetween(), LEO, id("hub"), true));
+    }
   }
 
   @Nested
@@ -406,6 +432,13 @@ class PlansTest {
     }
 
     @Test
+    void setRoleWithoutARoleIsRejected() {
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> Plans.people(Q, LEO, List.of(set(ANNA, Role.READ), set(JUJU, null))));
+    }
+
+    @Test
     void twoOwnersSwappingRolesInOneListIsAccepted() {
       assertEquals(
           new PeopleResult(
@@ -451,7 +484,7 @@ class PlansTest {
             quest("hub").writer(JUJU),
             quest("a").in("hub").reader(JUJU),
             quest("b").in("hub").coOwner(JUJU),
-            quest("c").owner(MAX).in("hub"),
+            quest("c").owner(MAX).open().in("hub"),
             quest("d").in("a").completed(),
             quest("e").in("c"));
 
@@ -460,6 +493,11 @@ class PlansTest {
       assertEquals(
           Map.of(id("a"), Role.WRITE, id("d"), Role.WRITE, id("e"), Role.WRITE),
           Plans.roleDown(G, LEO, id("hub"), JUJU));
+    }
+
+    @Test
+    void notGivenBeyondAQuestTheActorDoesNotSee() {
+      assertEquals(Map.of(), Plans.roleDown(hiddenBetween(), LEO, id("hub"), JUJU));
     }
 
     @Test
@@ -486,6 +524,11 @@ class PlansTest {
     void countsOnlyWhatTheViewerSees(boolean unfinishedOnly, int mine, int others) {
       assertEquals(
           new Counts(mine, others), Plans.subquestCounts(G, LEO, id("hub"), unfinishedOnly));
+    }
+
+    @Test
+    void questsBeyondAQuestTheViewerDoesNotSeeAreNotCounted() {
+      assertEquals(new Counts(0, 0), Plans.subquestCounts(hiddenBetween(), LEO, id("hub"), false));
     }
   }
 }
