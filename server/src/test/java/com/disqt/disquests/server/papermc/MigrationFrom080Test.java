@@ -233,6 +233,55 @@ class MigrationFrom080Test {
   }
 
   @Test
+  void aRuntimeExceptionMidMigrationLeavesNoNewTableOrColumn() throws Exception {
+    loadFixture();
+    DataManager failing = new DataManager(tempDir);
+    // The fault runs after the new columns and tables exist, before the backfill.
+    failing.migrationFault =
+        () -> {
+          throw new IllegalStateException("boom");
+        };
+    assertThrows(IllegalStateException.class, failing::initialize);
+    failing.close();
+
+    assertTrue(columns("quest_people").isEmpty());
+    assertTrue(columns("quest_links").isEmpty());
+    assertFalse(columns("quests").contains("parent_id"));
+    assertFalse(columns("quests").contains("priv_saw"));
+
+    DataManager retry = migrate();
+    try {
+      assertEquals(2, retry.getAllQuests().size());
+    } finally {
+      retry.close();
+    }
+  }
+
+  @Test
+  void ownerAlsoInLegacyContributorsGetsOneOwnerRow() throws Exception {
+    loadFixture();
+    try (Connection c = DriverManager.getConnection(url());
+        Statement st = c.createStatement()) {
+      st.executeUpdate("INSERT INTO contributors VALUES ('" + QUEST_A + "', '" + OLIVE + "', 0)");
+    }
+    DataManager dm = migrate();
+    try {
+      assertEquals(Role.OWNER, dm.getQuest(QUEST_A).roleOf(OLIVE));
+      assertEquals(2, dm.getQuest(QUEST_A).contributors().size());
+    } finally {
+      dm.close();
+    }
+    assertEquals(
+        1,
+        count(
+            "SELECT COUNT(*) FROM quest_people WHERE quest_id = '"
+                + QUEST_A
+                + "' AND player_uuid = '"
+                + OLIVE
+                + "' AND role = 'OWNER'"));
+  }
+
+  @Test
   void freshDatabaseGetsTheNewSchema() {
     DataManager dm = migrate();
     try {

@@ -79,6 +79,17 @@ class DataManagerTreeTest {
     return quest(owner, title, Visibility.OPEN);
   }
 
+  private int rows(String sql) {
+    try (java.sql.Connection c =
+            java.sql.DriverManager.getConnection("jdbc:sqlite:" + tempDir.resolve("disquests.db"));
+        java.sql.Statement st = c.createStatement();
+        java.sql.ResultSet rs = st.executeQuery(sql)) {
+      return rs.next() ? rs.getInt(1) : -1;
+    } catch (java.sql.SQLException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   private QuestData fromAll(UUID id) {
     return dm.getAllQuests().stream().filter(q -> q.id().equals(id)).findFirst().orElseThrow();
   }
@@ -164,6 +175,8 @@ class DataManagerTreeTest {
       assertNull(dm.getQuest(child));
       assertEquals(List.of(), dm.getQuestsForPlayer(BOB));
       assertEquals(List.of(), dm.getContributors(child));
+      assertEquals(0, rows("SELECT COUNT(*) FROM quest_links WHERE from_id = '" + child + "'"));
+      assertEquals(0, rows("SELECT COUNT(*) FROM quest_people WHERE quest_id = '" + child + "'"));
     }
 
     @Test
@@ -267,6 +280,17 @@ class DataManagerTreeTest {
       assertEquals(Role.READ, stored.roleOf(DAVE));
       assertNull(stored.roleOf(BOB));
       assertEquals(List.of(CAROL, ALICE), stored.owners());
+    }
+
+    @Test
+    void setPeopleRefusesADisplayOwnerWhoIsNotAnOwner() {
+      UUID id = quest(ALICE, "q");
+
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> dm.setPeople(id, List.of(new ContributorData(BOB, "Bob", Role.WRITE)), BOB));
+
+      assertEquals(ALICE, dm.getQuest(id).ownerUuid());
     }
 
     @Test

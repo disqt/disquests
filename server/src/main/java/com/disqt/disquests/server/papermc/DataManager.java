@@ -74,6 +74,10 @@ public class DataManager {
           """;
 
   private Connection connection;
+
+  /** Test seam: runs inside the roles migration after the schema changes, before the backfill. */
+  Runnable migrationFault;
+
   private final Path dataDir;
 
   public DataManager(Path dataDir) {
@@ -185,6 +189,10 @@ public class DataManager {
   // Quests
   // -------------------------------------------------------------------------
 
+  /**
+   * Saves the quest. Warning: this makes {@code quest.ownerUuid()} the display owner and an OWNER
+   * on every save, so callers must pass the stored display owner.
+   */
   public synchronized void saveQuest(QuestData rawQuest) {
     QuestData quest = QuestLocation.normalize(rawQuest);
     boolean previousAutoCommit = true;
@@ -308,11 +316,9 @@ public class DataManager {
   }
 
   public synchronized boolean deleteQuest(UUID id) {
-    try {
-      return deleteQuestRaw(id);
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to delete quest", e);
-    }
+    boolean[] deleted = new boolean[1];
+    inTransaction("delete quest", () -> deleted[0] = deleteQuestRaw(id));
+    return deleted[0];
   }
 
   /**
@@ -399,6 +405,7 @@ public class DataManager {
     return hydrate(quests);
   }
 
+  /** Returns quests without their people or links. */
   public synchronized Map<String, QuestData> findQuestsByTitlesIgnoreCase(List<String> titles) {
     if (titles.isEmpty()) return Map.of();
     Map<String, QuestData> result = new HashMap<>();
@@ -937,9 +944,17 @@ public class DataManager {
 
   /**
    * Replaces everyone on the quest: the display owner (stored as OWNER) and {@code people}, who
-   * keep the added-at of any role they already held. Does not check that an owner remains.
+   * keep the added-at of any role they already held. Does not check that an owner remains. {@code
+   * displayOwner} must be an OWNER: pass {@code Plans.PeopleResult.displayOwner()}. Throws {@link
+   * IllegalArgumentException} when {@code people} lists the display owner with another role.
    */
   public synchronized void setPeople(UUID quest, List<ContributorData> people, UUID displayOwner) {
+    for (ContributorData person : people) {
+      if (person.uuid().equals(displayOwner) && person.role() != Role.OWNER) {
+        throw new IllegalArgumentException(
+            "The display owner must be an OWNER, not " + person.role());
+      }
+    }
     inTransaction(
         "set people",
         () -> {
@@ -1178,48 +1193,43 @@ public class DataManager {
         ResultSet rs = stmt.executeQuery("PRAGMA table_info(quests)")) {
       while (rs.next()) columns.add(rs.getString("name"));
     }
-    boolean previousAutoCommit = connection.getAutoCommit();
-    connection.setAutoCommit(false);
-    try {
-      try (Statement stmt = connection.createStatement()) {
-        for (String[] column :
-            new String[][] {
-              {"parent_id", "TEXT"},
-              {"auto_join", "INTEGER NOT NULL DEFAULT 0"},
-              {"priv_previous", "TEXT"},
-              {"priv_title", "TEXT"},
-              {"priv_by", "TEXT"},
-              {"priv_at", "INTEGER"},
-              {"priv_saw", "TEXT"}
-            }) {
-          if (!columns.contains(column[0])) {
-            stmt.executeUpdate("ALTER TABLE quests ADD COLUMN " + column[0] + " " + column[1]);
+    inTransaction(
+        "migrate roles and quest tree",
+        () -> {
+          try (Statement stmt = connection.createStatement()) {
+            for (String[] column :
+                new String[][] {
+                  {"parent_id", "TEXT"},
+                  {"auto_join", "INTEGER NOT NULL DEFAULT 0"},
+                  {"priv_previous", "TEXT"},
+                  {"priv_title", "TEXT"},
+                  {"priv_by", "TEXT"},
+                  {"priv_at", "INTEGER"},
+                  {"priv_saw", "TEXT"}
+                }) {
+              if (!columns.contains(column[0])) {
+                stmt.executeUpdate("ALTER TABLE quests ADD COLUMN " + column[0] + " " + column[1]);
+              }
+            }
+            stmt.executeUpdate(PEOPLE_DDL);
+            stmt.executeUpdate(LINKS_DDL);
+            if (migrationFault != null) migrationFault.run();
+            if (!done) {
+              // Plain INSERTs, not OR IGNORE: that would also swallow a bad row and hide a failure.
+              // Owners first so an owner who is also in contributors stays OWNER.
+              stmt.executeUpdate(
+                  "INSERT INTO quest_people (quest_id, player_uuid, role, added_at)"
+                      + " SELECT id, owner_uuid, 'OWNER', 0 FROM quests");
+              stmt.executeUpdate(
+                  "INSERT INTO quest_people (quest_id, player_uuid, role, added_at)"
+                      + " SELECT c.quest_id, c.player_uuid,"
+                      + " CASE WHEN c.can_edit = 1 THEN 'WRITE' ELSE 'READ' END, 1"
+                      + " FROM contributors c WHERE c.quest_id IN (SELECT id FROM quests)"
+                      + " AND NOT EXISTS (SELECT 1 FROM quest_people p"
+                      + " WHERE p.quest_id = c.quest_id AND p.player_uuid = c.player_uuid)");
+            }
           }
-        }
-        stmt.executeUpdate(PEOPLE_DDL);
-        stmt.executeUpdate(LINKS_DDL);
-        if (!done) {
-          // Plain INSERTs, not OR IGNORE: that would also swallow a bad row and hide a failure.
-          // Owners first so an owner who is also in contributors stays OWNER.
-          stmt.executeUpdate(
-              "INSERT INTO quest_people (quest_id, player_uuid, role, added_at)"
-                  + " SELECT id, owner_uuid, 'OWNER', 0 FROM quests");
-          stmt.executeUpdate(
-              "INSERT INTO quest_people (quest_id, player_uuid, role, added_at)"
-                  + " SELECT c.quest_id, c.player_uuid,"
-                  + " CASE WHEN c.can_edit = 1 THEN 'WRITE' ELSE 'READ' END, 1"
-                  + " FROM contributors c WHERE c.quest_id IN (SELECT id FROM quests)"
-                  + " AND NOT EXISTS (SELECT 1 FROM quest_people p"
-                  + " WHERE p.quest_id = c.quest_id AND p.player_uuid = c.player_uuid)");
-        }
-      }
-      connection.commit();
-    } catch (SQLException e) {
-      connection.rollback();
-      throw e;
-    } finally {
-      connection.setAutoCommit(previousAutoCommit);
-    }
+        });
   }
 
   private boolean tableExists(String table) throws SQLException {
