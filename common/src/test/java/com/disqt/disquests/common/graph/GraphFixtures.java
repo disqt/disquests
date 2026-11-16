@@ -176,6 +176,7 @@ final class GraphFixtures {
     private UUID parent;
     private final List<UUID> prerequisites = new ArrayList<>();
     private long completedAt;
+    private boolean autoJoin;
     private boolean rich;
     private Privatized privatized;
     private String content;
@@ -239,6 +240,12 @@ final class GraphFixtures {
       return this;
     }
 
+    /** Ticks auto-join: the prerequisites' players are added when the quest unlocks. */
+    QuestBuilder autoJoin() {
+      this.autoJoin = true;
+      return this;
+    }
+
     /**
      * Fills everything a locked view must withhold: description, tags, a pin and second corner, a
      * polygon, a map and auto-join.
@@ -290,7 +297,7 @@ final class GraphFixtures {
           false,
           false,
           false,
-          rich,
+          rich || autoJoin,
           false,
           privatized);
     }
