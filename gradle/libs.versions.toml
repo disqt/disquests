@@ -23,7 +23,6 @@ nullaway = "0.14.3"
 jacoco = "0.8.16"
 
 # Gradle plugins
-fabric-loom = "1.15.5"
 spotless = "8.11.0"
 lefthook = "0.7.1"
 run-paper = "3.1.0"
@@ -52,7 +51,6 @@ errorprone-core = { module = "com.google.errorprone:error_prone_core", version.r
 nullaway = { module = "com.uber.nullaway:nullaway", version.ref = "nullaway" }
 
 [plugins]
-fabric-loom = { id = "fabric-loom", version.ref = "fabric-loom" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 lefthook = { id = "com.fizzpod.lefthook", version.ref = "lefthook" }
 run-paper = { id = "xyz.jpenilla.run-paper", version.ref = "run-paper" }
