@@ -1,11 +1,15 @@
 package com.disqt.disquests.server.papermc;
 
-import com.disqt.disquests.common.*;
-import com.disqt.disquests.common.TagConstraints;
+import com.disqt.disquests.common.ByteBufReader;
+import com.disqt.disquests.common.PacketCodec;
+import com.disqt.disquests.common.PacketType;
+import com.disqt.disquests.common.ProtocolVersion;
 import com.disqt.disquests.common.graph.QuestGraph;
-import com.disqt.disquests.common.model.*;
-import java.util.*;
+import com.disqt.disquests.common.model.QuestData;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -15,18 +19,19 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.messaging.PluginMessageListener;
 
 /**
- * Receives the client's packets and applies them. Every handler that changes quests loads the graph
- * before and after its writes and hands both to {@link Delivery}, which alone sends quests out.
+ * Receives the client's packets and hands each to the handler for its concern: {@link SaveHandler}
+ * for saves, {@link PeopleHandler} for roles, joining and visibility, {@link CompletionHandler} for
+ * completing, reopening and deleting. Every handler that changes quests loads the graph before and
+ * after its writes and hands both to {@link Delivery}, which alone sends quests out.
  */
 public class ServerPacketHandler implements PluginMessageListener, Listener {
-  private static final int MAX_TITLE_LENGTH = 256;
-  private static final int MAX_CONTENT_LENGTH = 65536;
-  private static final int MAX_MAP_LENGTH = 256;
   private final DisquestsPlugin plugin;
   private final DataManager dataManager;
   private final Outbox outbox;
-  private final WikiLinkResolver wikiLinkResolver;
   private final Delivery delivery;
+  private final SaveHandler saves;
+  private final PeopleHandler people;
+  private final CompletionHandler completion;
   private final Map<UUID, Integer> playerProtocolVersions = new ConcurrentHashMap<>();
 
   public ServerPacketHandler(
@@ -34,9 +39,16 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
     this.plugin = plugin;
     this.dataManager = dataManager;
     this.outbox = outbox;
-    this.wikiLinkResolver = new WikiLinkResolver(dataManager);
-    this.delivery =
-        new Delivery(dataManager, config, outbox, wikiLinkResolver, this::getProtocolVersion);
+    WikiLinkResolver wikiLinks = new WikiLinkResolver(dataManager);
+    this.delivery = new Delivery(dataManager, config, outbox, wikiLinks, this::getProtocolVersion);
+    Outcomes outcomes = new Outcomes(dataManager, delivery, outbox, this::getProtocolVersion);
+    Logger logger = plugin.getLogger();
+    this.saves =
+        new SaveHandler(dataManager, config, wikiLinks, outcomes, this::getProtocolVersion, logger);
+    this.people =
+        new PeopleHandler(
+            dataManager, delivery, outbox, outcomes, this::getProtocolVersion, logger);
+    this.completion = new CompletionHandler(dataManager, delivery, outbox, outcomes);
   }
 
   // --- Plugin Message Handling ---
@@ -55,21 +67,26 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
 
       switch (type) {
         case REQUEST_SYNC -> handleRequestSync(player, buf);
-        case SAVE_QUEST -> handleSaveQuest(player, name, PacketCodec.readSaveQuest(buf));
-        case DELETE_QUEST -> handleDeleteQuest(player, PacketCodec.readDeleteQuest(buf));
-        case JOIN_QUEST -> handleJoinQuest(player, PacketCodec.readJoinQuest(buf));
+        case SAVE_QUEST -> saves.save(player, name, PacketCodec.readSaveQuest(buf));
+        case DELETE_QUEST -> completion.delete(player, PacketCodec.readDeleteQuestAction(buf));
+        case COMPLETE_QUEST ->
+            completion.complete(player, PacketCodec.readCompleteQuestAction(buf));
+        case REOPEN_QUEST -> completion.reopen(player, PacketCodec.readReopenQuest(buf));
+        case JOIN_QUEST -> people.join(player, PacketCodec.readJoinQuest(buf));
         case REQUEST_COLLABORATION ->
-            handleRequestCollaboration(player, name, PacketCodec.readRequestCollaboration(buf));
+            people.request(player, name, PacketCodec.readRequestCollaboration(buf));
         case RESPOND_COLLABORATION ->
-            handleRespondCollaboration(player, PacketCodec.readRespondCollaboration(buf));
+            people.respond(player, PacketCodec.readRespondCollaboration(buf));
+        case LEAVE_QUEST -> people.leave(player, PacketCodec.readLeaveQuest(buf));
+        case UPDATE_PEOPLE -> people.updatePeople(player, PacketCodec.readUpdatePeople(buf));
+        case APPLY_ROLE_DOWN -> people.applyRoleDown(player, PacketCodec.readApplyRoleDown(buf));
         case UPDATE_CONTRIBUTORS ->
-            handleUpdateContributors(player, PacketCodec.readUpdateContributors(buf));
+            people.updateContributors(player, PacketCodec.readUpdateContributors(buf));
         case UPDATE_VISIBILITY ->
-            handleUpdateVisibility(player, PacketCodec.readUpdateVisibility(buf));
+            people.updateVisibility(player, PacketCodec.readUpdateVisibility(buf));
+        case RESOLVE_PRIVATIZED ->
+            people.resolvePrivatized(player, PacketCodec.readResolvePrivatized(buf));
         case PIN_QUEST -> handlePinQuest(player, PacketCodec.readPinQuest(buf));
-        case LEAVE_QUEST -> handleLeaveQuest(player, buf);
-        case COMPLETE_QUEST -> handleCompleteQuest(player, PacketCodec.readCompleteQuest(buf));
-        case REOPEN_QUEST -> handleReopenQuest(player, PacketCodec.readReopenQuest(buf));
         default -> plugin.getLogger().warning("Unknown C2S packet from " + name + ": " + type);
       }
     } catch (Exception e) {
@@ -116,252 +133,6 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
     delivery.sync(player, protocolVersion);
   }
 
-  private void handleSaveQuest(UUID player, String name, PacketCodec.SaveQuestPayload payload) {
-    if (payload.title().length() > MAX_TITLE_LENGTH
-        || payload.content().length() > MAX_CONTENT_LENGTH
-        || (payload.map() != null && payload.map().length() > MAX_MAP_LENGTH)) {
-      plugin.getLogger().warning("Quest field too long from " + name);
-      return;
-    }
-    if (!QuestLocation.isValid(payload.polygon())) {
-      plugin.getLogger().warning("Invalid quest polygon from " + name);
-      return;
-    }
-    List<String> tags =
-        payload.tags().stream()
-            .map(String::toLowerCase)
-            .filter(t -> !t.isEmpty() && t.length() <= TagConstraints.MAX_TAG_LENGTH)
-            .filter(t -> TagConstraints.TAG_PATTERN.matcher(t).matches())
-            .distinct()
-            .limit(TagConstraints.MAX_TAGS)
-            .toList();
-    String content = wikiLinkResolver.reverseResolve(payload.content(), player);
-    QuestGraph before = dataManager.loadGraph();
-    QuestData existing = before.get(payload.questId());
-
-    if (existing == null) {
-      // New quest - player becomes owner, default PRIVATE
-      QuestData newQuest =
-          new QuestData(
-              payload.questId(),
-              payload.title(),
-              content,
-              player,
-              name,
-              Visibility.PRIVATE,
-              List.of(),
-              System.currentTimeMillis() / 1000,
-              payload.coords(),
-              payload.isRegion(),
-              payload.coords2(),
-              DimensionKeys.normalize(payload.map()),
-              tags,
-              payload.polygon());
-      dataManager.saveQuest(newQuest);
-    } else {
-      // Existing quest - completed quests are locked; then check permission
-      if (existing.isCompleted()) return;
-      if (!canEdit(existing, player)) return; // silently ignore unauthorized edits
-
-      QuestData updated =
-          new QuestData(
-              existing.id(),
-              payload.title(),
-              content,
-              existing.ownerUuid(),
-              existing.ownerName(),
-              existing.visibility(),
-              existing.contributors(),
-              System.currentTimeMillis() / 1000,
-              payload.coords(),
-              payload.isRegion(),
-              payload.coords2(),
-              DimensionKeys.normalize(payload.map()),
-              tags,
-              payload.polygon());
-      updated = keepExistingPolygonForUnchangedRectangle(player, existing, updated);
-      dataManager.saveQuest(updated);
-    }
-    delivery.deliver(before, dataManager.loadGraph());
-  }
-
-  /** Owner or a contributor with edit rights, judged on the quest's current state. */
-  private boolean canEdit(QuestData quest, UUID playerUuid) {
-    return quest.ownerUuid().equals(playerUuid)
-        || quest.contributors().stream().anyMatch(c -> c.uuid().equals(playerUuid) && c.canEdit());
-  }
-
-  private void handleCompleteQuest(UUID player, UUID questId) {
-    QuestGraph before = dataManager.loadGraph();
-    QuestData quest = before.get(questId);
-    if (quest == null || quest.isCompleted()) return;
-    if (!canEdit(quest, player)) return;
-
-    int droppedRequests =
-        dataManager.getPendingCountByQuest(quest.ownerUuid()).getOrDefault(questId, 0);
-    dataManager.completeQuest(questId, player, System.currentTimeMillis());
-    delivery.deliver(before, dataManager.loadGraph());
-
-    // completeQuest dropped the quest's pending requests: refresh the owner's inbox count, which
-    // only the handshake carries (the client re-syncs its request list in response).
-    if (droppedRequests > 0 && outbox.onlineModPlayers().contains(quest.ownerUuid())) {
-      delivery.handshake(quest.ownerUuid());
-    }
-  }
-
-  private void handleReopenQuest(UUID player, UUID questId) {
-    QuestGraph before = dataManager.loadGraph();
-    QuestData quest = before.get(questId);
-    if (quest == null || !quest.isCompleted()) return;
-    if (!canEdit(quest, player)) return;
-
-    dataManager.reopenQuest(questId);
-    delivery.deliver(before, dataManager.loadGraph());
-  }
-
-  /**
-   * A pre-V2 client only sees the bounding rectangle of a polygon. If it saves that rectangle back
-   * unchanged, keep the stored polygon instead of flattening it to a rectangle.
-   */
-  private QuestData keepExistingPolygonForUnchangedRectangle(
-      UUID player, QuestData existing, QuestData updated) {
-    if (getProtocolVersion(player) >= ProtocolVersion.V2) return updated;
-    if (existing.polygon().size() < 2) return updated;
-    if (updated.coordinates() == null || updated.coordinates2() == null) return updated;
-    CoordinatesData[] box = QuestLocation.boundingBox(existing.polygon(), 0);
-    if (sameXZ(updated.coordinates(), box[0]) && sameXZ(updated.coordinates2(), box[1])) {
-      return updated.withPolygon(existing.polygon());
-    }
-    return updated;
-  }
-
-  private static boolean sameXZ(CoordinatesData a, CoordinatesData b) {
-    return Math.abs(a.x() - b.x()) <= 1e-6 && Math.abs(a.z() - b.z()) <= 1e-6;
-  }
-
-  private void handleDeleteQuest(UUID player, UUID questId) {
-    QuestGraph before = dataManager.loadGraph();
-    QuestData quest = before.get(questId);
-    if (quest == null) return;
-    if (!quest.ownerUuid().equals(player)) return; // owner only
-
-    dataManager.deleteQuest(questId);
-    delivery.deliver(before, dataManager.loadGraph());
-  }
-
-  private void handleJoinQuest(UUID player, UUID questId) {
-    QuestGraph before = dataManager.loadGraph();
-    QuestData quest = before.get(questId);
-    if (quest == null) return;
-    if (quest.isCompleted()) return;
-    if (quest.visibility() != Visibility.OPEN) return; // only open quests
-    if (quest.ownerUuid().equals(player)) return; // owner can't join own quest
-    if (dataManager.isContributor(questId, player)) return; // already contributor
-
-    dataManager.addContributor(questId, player, false); // view-only by default
-    delivery.deliver(before, dataManager.loadGraph());
-  }
-
-  private void handleRequestCollaboration(UUID player, String name, UUID questId) {
-    QuestData quest = dataManager.getQuest(questId);
-    if (quest == null) return;
-    if (quest.isCompleted()) return;
-    if (quest.visibility() != Visibility.CLOSED) return;
-    if (quest.ownerUuid().equals(player)) return;
-    if (dataManager.isContributor(questId, player)) return;
-
-    try {
-      UUID requestId = dataManager.createCollaborationRequest(questId, player);
-      // Notify quest owner if online
-      outbox.send(
-          quest.ownerUuid(),
-          PacketCodec.writeCollaborationRequest(requestId, questId, quest.title(), name));
-    } catch (RuntimeException e) {
-      if (e.getCause() instanceof java.sql.SQLException) {
-        // Duplicate request - silently ignore
-      } else {
-        plugin.getLogger().warning("Failed to create collaboration request: " + e.getMessage());
-      }
-    }
-  }
-
-  private void handleRespondCollaboration(
-      UUID player, PacketCodec.RespondCollaborationPayload payload) {
-    CollaborationRequestData request = dataManager.getCollaborationRequest(payload.requestId());
-    if (request == null) return;
-
-    QuestGraph before = dataManager.loadGraph();
-    QuestData quest = before.get(request.questId());
-    if (quest == null) return;
-    if (!quest.ownerUuid().equals(player)) return; // owner only
-
-    dataManager.deleteCollaborationRequest(payload.requestId());
-    UUID requester = request.requesterUuid();
-    int requesterVersion = getProtocolVersion(requester);
-
-    if (payload.approved()) {
-      dataManager.addContributor(quest.id(), requester, false);
-      outbox.send(
-          requester,
-          PacketCodec.writeCollaborationResponse(
-              quest.id(), true, delivery.sendableView(requester, quest.id()), requesterVersion));
-      delivery.deliver(before, dataManager.loadGraph());
-    } else {
-      outbox.send(
-          requester,
-          PacketCodec.writeCollaborationResponse(quest.id(), false, null, requesterVersion));
-    }
-  }
-
-  private void handleUpdateContributors(
-      UUID player, PacketCodec.UpdateContributorsPayload payload) {
-    QuestGraph before = dataManager.loadGraph();
-    QuestData quest = before.get(payload.questId());
-    if (quest == null || quest.isCompleted()) return;
-    if (!quest.ownerUuid().equals(player)) return; // owner only
-
-    // Each op is its own write: deliver what was written even if a later op fails.
-    try {
-      for (PacketCodec.ContributorOpEntry op : payload.ops()) {
-        switch (op.action()) {
-          case ADD -> {
-            UUID targetUuid = op.playerUuid();
-            if (targetUuid == null && op.playerName() != null) {
-              targetUuid = dataManager.getPlayerUuidByName(op.playerName());
-            }
-            if (targetUuid != null
-                && !targetUuid.equals(quest.ownerUuid())
-                && !dataManager.isContributor(payload.questId(), targetUuid)) {
-              dataManager.addContributor(payload.questId(), targetUuid, op.canEdit());
-            }
-          }
-          case REMOVE -> {
-            if (op.playerUuid() != null) {
-              dataManager.removeContributor(payload.questId(), op.playerUuid());
-            }
-          }
-          case UPDATE -> {
-            if (op.playerUuid() != null) {
-              dataManager.updateContributor(payload.questId(), op.playerUuid(), op.canEdit());
-            }
-          }
-        }
-      }
-    } finally {
-      delivery.deliver(before, dataManager.loadGraph());
-    }
-  }
-
-  private void handleUpdateVisibility(UUID player, PacketCodec.UpdateVisibilityPayload payload) {
-    QuestGraph before = dataManager.loadGraph();
-    QuestData quest = before.get(payload.questId());
-    if (quest == null || quest.isCompleted()) return;
-    if (!quest.ownerUuid().equals(player)) return; // owner only
-
-    dataManager.updateVisibility(payload.questId(), payload.visibility());
-    delivery.deliver(before, dataManager.loadGraph());
-  }
-
   /**
    * Pins a quest the player can see and that is not locked for them, or unpins it. Unpinning is
    * always allowed.
@@ -377,23 +148,6 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
     if (quest == null || quest.isCompleted()) return; // archived quests are never pinned
     if (!Delivery.fullyVisible(graph, player, questId)) return;
     dataManager.pinQuest(player, questId);
-  }
-
-  private void handleLeaveQuest(UUID player, ByteBufReader reader) {
-    UUID questId = PacketCodec.readLeaveQuest(reader);
-
-    QuestGraph before = dataManager.loadGraph();
-    QuestData quest = before.get(questId);
-    if (quest == null || quest.isCompleted()) return;
-
-    // Owner cannot leave, only delete
-    if (quest.ownerUuid().equals(player)) return;
-
-    // Must be a contributor
-    if (!dataManager.isContributor(questId, player)) return;
-
-    dataManager.leaveQuest(questId, player);
-    delivery.deliver(before, dataManager.loadGraph());
   }
 
   // --- Public API ---

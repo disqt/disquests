@@ -398,13 +398,11 @@ class ServerPacketHandlerTest {
   }
 
   @Test
-  void complete_byEditContributor_isAccepted() {
+  void complete_byEditContributor_isRefused() {
     UUID id = seedQuest(Visibility.PRIVATE);
     dm.addContributor(id, CONTRIBUTOR, true);
     complete(CONTRIBUTOR, id);
-    QuestData stored = dm.getQuest(id);
-    Assertions.assertTrue(stored.isCompleted());
-    Assertions.assertEquals(CONTRIBUTOR, stored.completedBy());
+    Assertions.assertFalse(dm.getQuest(id).isCompleted());
   }
 
   @Test

@@ -341,6 +341,12 @@ class PacketCodecV4Test {
         assertEquals(bare, PacketCodec.readNotice(body(PacketCodec.writeNotice(bare))));
       }
     }
+
+    @Test
+    void refusalAboutAQuestTheReceiverCannotSeeCarriesNoId() {
+      Notice anonymous = new Notice(Notice.Kind.CHANGE_REFUSED, null, "", Refusal.NOT_VISIBLE);
+      assertEquals(anonymous, PacketCodec.readNotice(body(PacketCodec.writeNotice(anonymous))));
+    }
   }
 
   @Nested

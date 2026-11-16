@@ -589,7 +589,7 @@ public final class PacketCodec {
     ByteBufWriter buf = new ByteBufWriter();
     buf.writeByte(PacketType.NOTICE.getId());
     buf.writeVarInt(notice.kind().ordinal());
-    buf.writeUUID(notice.questId());
+    writeNullableUUID(buf, notice.questId());
     writeNullableString(buf, notice.title());
     buf.writeByte(notice.reason() == null ? 0 : notice.reason().ordinal() + 1);
     return buf.toByteArray();
@@ -868,7 +868,7 @@ public final class PacketCodec {
 
   public static Notice readNotice(ByteBufReader buf) {
     Notice.Kind kind = readEnum(buf, Notice.Kind.class);
-    UUID questId = buf.readUUID();
+    UUID questId = readNullableUUID(buf);
     String title = readNullableString(buf);
     int reason = buf.readByte() & 0xFF;
     Refusal[] refusals = Refusal.values();

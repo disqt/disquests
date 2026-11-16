@@ -504,6 +504,17 @@ class PlansTest {
     void nothingForAPlayerWithoutARoleHere() {
       assertEquals(Map.of(), Plans.roleDown(G, LEO, id("hub"), ANNA));
     }
+
+    @Test
+    void mySubquestsAreTheOwnedDescendantsAlongAVisiblePath() {
+      assertEquals(
+          List.of(id("a"), id("b"), id("d"), id("e")), Plans.mySubquests(G, LEO, id("hub")));
+    }
+
+    @Test
+    void mySubquestsStopAtAQuestTheActorDoesNotSee() {
+      assertEquals(List.of(), Plans.mySubquests(hiddenBetween(), LEO, id("hub")));
+    }
   }
 
   @Nested

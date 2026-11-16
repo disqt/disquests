@@ -37,6 +37,11 @@ final class FakeOutbox implements Outbox {
     versions.put(player, protocolVersion);
   }
 
+  /** Takes the player offline: packets to them are dropped from now on. */
+  void leave(UUID player) {
+    online.remove(player);
+  }
+
   int protocolVersion(UUID player) {
     return versions.getOrDefault(player, ProtocolVersion.V0);
   }

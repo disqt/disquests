@@ -448,6 +448,34 @@ public class DataManager {
     }
   }
 
+  /**
+   * Sets the visibility as an owner's choice: a visibility other than Private also forgets the
+   * quest's privatization, since the owner has dealt with it.
+   */
+  public synchronized void changeVisibility(UUID questId, Visibility visibility) {
+    try {
+      update(
+          """
+          UPDATE quests SET visibility = ?,
+              priv_previous = CASE WHEN ? = 'PRIVATE' THEN priv_previous END,
+              priv_title = CASE WHEN ? = 'PRIVATE' THEN priv_title END,
+              priv_by = CASE WHEN ? = 'PRIVATE' THEN priv_by END,
+              priv_at = CASE WHEN ? = 'PRIVATE' THEN priv_at END,
+              priv_saw = CASE WHEN ? = 'PRIVATE' THEN priv_saw END
+          WHERE id = ?
+          """,
+          visibility.name(),
+          visibility.name(),
+          visibility.name(),
+          visibility.name(),
+          visibility.name(),
+          visibility.name(),
+          questId.toString());
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to change visibility", e);
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Contributors
   // -------------------------------------------------------------------------
@@ -759,6 +787,19 @@ public class DataManager {
     } catch (SQLException e) {
       throw new RuntimeException("Failed to get player name", e);
     }
+  }
+
+  /** Every player the server has recorded a name for. */
+  public synchronized List<UUID> getKnownPlayers() {
+    List<UUID> players = new ArrayList<>();
+    try (PreparedStatement stmt =
+        connection.prepareStatement("SELECT uuid FROM player_names ORDER BY uuid")) {
+      ResultSet rs = stmt.executeQuery();
+      while (rs.next()) players.add(UUID.fromString(rs.getString("uuid")));
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to list known players", e);
+    }
+    return players;
   }
 
   public synchronized UUID getPlayerUuidByName(String name) {

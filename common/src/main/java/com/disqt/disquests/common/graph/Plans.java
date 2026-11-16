@@ -368,6 +368,18 @@ public final class Plans {
   }
 
   /**
+   * The actor's subquests of the quest, as every dialog means them: the descendants the actor owns
+   * along a path they can see, completed ones included, nearest first.
+   */
+  public static List<UUID> mySubquests(QuestGraph g, UUID actor, UUID quest) {
+    List<UUID> mine = new ArrayList<>();
+    for (QuestData d : visibleDescendants(g, actor, quest)) {
+      if (d.roleOf(actor) == Role.OWNER) mine.add(d.id());
+    }
+    return mine;
+  }
+
+  /**
    * The quest's descendants as the player knows them: those where every quest on the path down from
    * {@code quest}, the descendant included, is visible to the player. Level by level, nearest
    * first, at most {@link QuestGraph#MAX_WALK} levels.
