@@ -127,6 +127,14 @@ public final class QuestGraph {
     return false;
   }
 
+  /**
+   * The player can see the quest and it is not locked for them: they may learn its title, text and
+   * people, link to it by name and join it.
+   */
+  public boolean seesFully(UUID player, UUID id) {
+    return canSee(player, id) && !lockedFor(player, id);
+  }
+
   /** The quests below this one grouped by level, nearest first, at most {@link #MAX_WALK}. */
   private List<List<QuestData>> levelsBelow(UUID id) {
     List<List<QuestData>> levels = new ArrayList<>();

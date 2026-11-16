@@ -88,12 +88,20 @@ final class PeopleHandler {
     return quest.roleOf(target) != null || dataManager.getPlayerName(target) != null;
   }
 
-  private void removeFromMySubquests(QuestGraph g, UUID actor, UUID quest, UUID player) {
-    for (UUID id : Plans.mySubquests(g, actor, quest)) {
-      QuestData sub = g.get(id);
-      Role role = sub.roleOf(player);
-      if (role == null || (role == Role.OWNER && sub.owners().size() == 1)) continue;
-      dataManager.removePerson(id, player);
+  /**
+   * The subquests are the actor's as the packet found them; each removal is decided by {@link
+   * Plans#people} against the subquest as stored now, so an earlier op of the same packet counts
+   * and the last owner always stays.
+   */
+  private void removeFromMySubquests(QuestGraph before, UUID actor, UUID quest, UUID player) {
+    PersonOp remove = new PersonOp(PersonOp.Kind.REMOVE, player, null);
+    for (UUID id : Plans.mySubquests(before, actor, quest)) {
+      QuestData sub = dataManager.getQuest(id);
+      if (sub == null || sub.roleOf(player) == null) continue;
+      Plans.PeopleResult result = Plans.people(sub, actor, List.of(remove));
+      if (result.refusal().isEmpty()) {
+        dataManager.setPeople(id, result.people(), result.displayOwner());
+      }
     }
   }
 
@@ -224,8 +232,7 @@ final class PeopleHandler {
         && !quest.isCompleted()
         && quest.visibility() == visibility
         && quest.roleOf(player) == null
-        && g.canSee(player, questId)
-        && !g.lockedFor(player, questId);
+        && g.seesFully(player, questId);
   }
 
   /**

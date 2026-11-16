@@ -79,6 +79,9 @@ final class SaveHandler {
     if (existing != null) {
       Role role = existing.roleOf(player);
       if (role == null || !role.atLeast(Role.WRITE)) return; // silently ignore unauthorized edits
+    } else if (dataManager.isPrerequisite(payload.questId())) {
+      // The id of a deleted prerequisite: a new quest with it would unlock its follow-ups.
+      return;
     }
 
     Outcomes.writeThenDeliver(
@@ -86,9 +89,9 @@ final class SaveHandler {
           if (existing == null) {
             Visibility visibility =
                 links.visibility() == null ? Visibility.PRIVATE : links.visibility();
-            dataManager.saveQuest(newQuest(player, name, payload, visibility));
+            dataManager.saveQuest(newQuest(player, name, payload, visibility, before));
           } else if (!existing.isCompleted()) {
-            dataManager.saveQuest(edited(player, existing, payload));
+            dataManager.saveQuest(edited(player, existing, payload, before));
           }
           applyOwnLinks(player, payload.questId(), links, existing == null);
           applyTreeOps(player, links.treeOps());
@@ -99,11 +102,15 @@ final class SaveHandler {
   // --- text ---
 
   private QuestData newQuest(
-      UUID player, String name, PacketCodec.SaveQuestPayload payload, Visibility visibility) {
+      UUID player,
+      String name,
+      PacketCodec.SaveQuestPayload payload,
+      Visibility visibility,
+      QuestGraph before) {
     return new QuestData(
         payload.questId(),
         payload.title(),
-        wikiLinks.reverseResolve(payload.content(), player),
+        wikiLinks.reverseResolve(before, payload.content(), player),
         player,
         name,
         visibility,
@@ -118,12 +125,13 @@ final class SaveHandler {
   }
 
   /** The stored quest with the saved text, location and tags; people and links as stored. */
-  private QuestData edited(UUID player, QuestData existing, PacketCodec.SaveQuestPayload payload) {
+  private QuestData edited(
+      UUID player, QuestData existing, PacketCodec.SaveQuestPayload payload, QuestGraph before) {
     QuestData updated =
         new QuestData(
             existing.id(),
             payload.title(),
-            wikiLinks.reverseResolve(payload.content(), player),
+            wikiLinks.reverseResolve(before, payload.content(), player),
             existing.ownerUuid(),
             existing.ownerName(),
             existing.visibility(),

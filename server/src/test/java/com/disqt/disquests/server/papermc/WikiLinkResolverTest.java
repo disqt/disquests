@@ -26,7 +26,7 @@ class WikiLinkResolverTest {
   void setUp() {
     dm = new DataManager(tempDir);
     dm.initialize();
-    resolver = new WikiLinkResolver(dm);
+    resolver = new WikiLinkResolver();
     dm.upsertPlayerName(OWNER, "Alice");
     dm.upsertPlayerName(PLAYER2, "Bob");
     dm.upsertPlayerName(PLAYER3, "Carol");
@@ -219,7 +219,8 @@ class WikiLinkResolverTest {
     UUID questId = UUID.randomUUID();
     dm.saveQuest(makeQuest(questId, OWNER, "Current Title", Visibility.OPEN));
 
-    String result = resolver.reverseResolve("See [[" + questId + "|Old Title]] here.", OWNER);
+    String result =
+        resolver.reverseResolve(dm.loadGraph(), "See [[" + questId + "|Old Title]] here.", OWNER);
 
     assertEquals("See [[Current Title]] here.", result);
   }
@@ -230,7 +231,7 @@ class WikiLinkResolverTest {
     dm.saveQuest(makeQuest(questId, OWNER, "Private Name", Visibility.PRIVATE));
 
     String resolved = "[[" + questId + "|Private Quest]]";
-    String result = resolver.reverseResolve(resolved, PLAYER2);
+    String result = resolver.reverseResolve(dm.loadGraph(), resolved, PLAYER2);
 
     assertEquals(resolved, result);
   }
@@ -239,7 +240,7 @@ class WikiLinkResolverTest {
   void reverseResolve_deletedQuest_preservesDisplayText() {
     UUID nonexistentId = UUID.randomUUID();
     String content = "[[" + nonexistentId + "|My Old Quest]]";
-    String result = resolver.reverseResolve(content, OWNER);
+    String result = resolver.reverseResolve(dm.loadGraph(), content, OWNER);
 
     // UUID not found → use display text as raw link
     assertEquals("[[My Old Quest]]", result);
@@ -248,14 +249,14 @@ class WikiLinkResolverTest {
   @Test
   void reverseResolve_noLinks_unchanged() {
     String content = "Plain text with no links at all.";
-    assertEquals(content, resolver.reverseResolve(content, OWNER));
+    assertEquals(content, resolver.reverseResolve(dm.loadGraph(), content, OWNER));
   }
 
   @Test
   void reverseResolve_emptyUuidBrokenLink_preservesDisplayText() {
     // [[|Quest Title]] -- broken forward link, UUID is empty string
     String content = "[[|Ghost Quest]]";
-    String result = resolver.reverseResolve(content, OWNER);
+    String result = resolver.reverseResolve(dm.loadGraph(), content, OWNER);
     // Empty UUID won't parse as valid UUID → treat as deleted → preserve display text
     assertEquals("[[Ghost Quest]]", result);
   }
@@ -265,7 +266,8 @@ class WikiLinkResolverTest {
     UUID questId = UUID.randomUUID();
     dm.saveQuest(makeQuest(questId, OWNER, "Owner Secret", Visibility.PRIVATE));
 
-    String result = resolver.reverseResolve("[[" + questId + "|Owner Secret]] done.", OWNER);
+    String result =
+        resolver.reverseResolve(dm.loadGraph(), "[[" + questId + "|Owner Secret]] done.", OWNER);
 
     assertEquals("[[Owner Secret]] done.", result);
   }
@@ -276,9 +278,37 @@ class WikiLinkResolverTest {
     dm.saveQuest(makeQuest(questId, OWNER, "Collab Secret", Visibility.PRIVATE));
     dm.addContributor(questId, PLAYER2, false);
 
-    String result = resolver.reverseResolve("[[" + questId + "|Collab Secret]] work.", PLAYER2);
+    String result =
+        resolver.reverseResolve(dm.loadGraph(), "[[" + questId + "|Collab Secret]] work.", PLAYER2);
 
     assertEquals("[[Collab Secret]] work.", result);
+  }
+
+  @Test
+  void reverseResolve_openQuestUnderAPrivateParentTheSenderIsNotOn_staysAsIs() {
+    UUID hub = UUID.randomUUID();
+    UUID inside = UUID.randomUUID();
+    dm.saveQuest(makeQuest(hub, OWNER, "Hub", Visibility.PRIVATE));
+    dm.saveQuest(makeQuest(inside, OWNER, "Hidden Plan", Visibility.OPEN));
+    dm.setParent(inside, hub);
+
+    String link = "[[" + inside + "|x]]";
+
+    assertEquals(link, resolver.reverseResolve(dm.loadGraph(), link, PLAYER2));
+    assertEquals("[[Hidden Plan]]", resolver.reverseResolve(dm.loadGraph(), link, OWNER));
+  }
+
+  @Test
+  void reverseResolve_questLockedForTheSender_staysAsIs() {
+    UUID first = UUID.randomUUID();
+    UUID next = UUID.randomUUID();
+    dm.saveQuest(makeQuest(first, OWNER, "First", Visibility.OPEN));
+    dm.saveQuest(makeQuest(next, OWNER, "Locked Plan", Visibility.OPEN));
+    dm.setPrerequisites(next, List.of(first));
+
+    String link = "[[" + next + "|x]]";
+
+    assertEquals(link, resolver.reverseResolve(dm.loadGraph(), link, PLAYER2));
   }
 
   @Test
@@ -286,7 +316,8 @@ class WikiLinkResolverTest {
     UUID questId = UUID.randomUUID();
     dm.saveQuest(makeQuest(questId, OWNER, "New Title", Visibility.OPEN));
 
-    String result = resolver.reverseResolve("Read [[" + questId + "|Old Title]].", OWNER);
+    String result =
+        resolver.reverseResolve(dm.loadGraph(), "Read [[" + questId + "|Old Title]].", OWNER);
 
     assertEquals("Read [[New Title]].", result);
   }

@@ -118,6 +118,27 @@ abstract class HandlerFixture {
     return stored(quest).roleOf(player);
   }
 
+  /**
+   * The players stored with the OWNER role on the quest, read from the table itself: a loaded quest
+   * always counts its display owner as an owner, even when its row is gone.
+   */
+  List<UUID> ownerRows(UUID quest) {
+    List<UUID> owners = new java.util.ArrayList<>();
+    try (java.sql.Connection c =
+            java.sql.DriverManager.getConnection("jdbc:sqlite:" + tempDir.resolve("disquests.db"));
+        java.sql.PreparedStatement st =
+            c.prepareStatement(
+                "SELECT player_uuid FROM quest_people WHERE quest_id = ? AND role = 'OWNER'"
+                    + " ORDER BY player_uuid")) {
+      st.setString(1, quest.toString());
+      java.sql.ResultSet rs = st.executeQuery();
+      while (rs.next()) owners.add(UUID.fromString(rs.getString(1)));
+    } catch (java.sql.SQLException e) {
+      throw new RuntimeException(e);
+    }
+    return owners;
+  }
+
   /** The quest as {@code player} may see it now. */
   QuestData viewOf(UUID player, UUID quest) {
     QuestGraph g = dm.loadGraph();

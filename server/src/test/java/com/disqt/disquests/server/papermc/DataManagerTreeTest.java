@@ -180,6 +180,32 @@ class DataManagerTreeTest {
     }
 
     @Test
+    void anIdIsAPrerequisiteWhileAnyQuestWaitsOnIt() {
+      UUID dep = quest(ALICE, "dep");
+      UUID child = quest(ALICE, "child");
+      UUID unrelated = quest(ALICE, "unrelated");
+      dm.setPrerequisites(child, List.of(dep));
+      dm.applyDeletePlan(new DeletePlan(Set.of(dep), Map.of(), Map.of(), Map.of()), 1L);
+
+      assertTrue(dm.isPrerequisite(dep));
+      assertFalse(dm.isPrerequisite(unrelated));
+      assertFalse(dm.isPrerequisite(child));
+
+      dm.setPrerequisites(child, List.of());
+      assertFalse(dm.isPrerequisite(dep));
+    }
+
+    @Test
+    void prerequisiteLinksAreStoredAsUnlocksAfter() {
+      UUID dep = quest(ALICE, "dep");
+      UUID child = quest(ALICE, "child");
+      dm.setPrerequisites(child, List.of(dep));
+
+      assertEquals(1, rows("SELECT COUNT(*) FROM quest_links WHERE kind = 'UNLOCKS_AFTER'"));
+      assertEquals(1, rows("SELECT COUNT(*) FROM quest_links"));
+    }
+
+    @Test
     void loadGraphBuildsTheGraphFromStoredTruth() {
       UUID root = quest(ALICE, "root");
       UUID child = quest(ALICE, "child");
@@ -249,6 +275,19 @@ class DataManagerTreeTest {
       QuestData stored = dm.getQuest(id);
       assertEquals(BOB, stored.ownerUuid());
       assertNull(stored.roleOf(ALICE));
+    }
+
+    @Test
+    void removePersonRefusesToRemoveTheLastOwner() {
+      UUID id = quest(ALICE, "q");
+      dm.setRole(id, BOB, Role.WRITE);
+
+      assertThrows(IllegalStateException.class, () -> dm.removePerson(id, ALICE));
+
+      QuestData stored = dm.getQuest(id);
+      assertEquals(ALICE, stored.ownerUuid());
+      assertEquals(Role.OWNER, stored.roleOf(ALICE));
+      assertEquals(Role.WRITE, stored.roleOf(BOB));
     }
 
     @Test

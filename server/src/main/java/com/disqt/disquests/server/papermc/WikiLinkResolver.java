@@ -1,9 +1,7 @@
 package com.disqt.disquests.server.papermc;
 
 import com.disqt.disquests.common.graph.QuestGraph;
-import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.QuestData;
-import com.disqt.disquests.common.model.Visibility;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
@@ -23,9 +21,8 @@ import java.util.regex.Pattern;
  *       Title]]}
  * </ul>
  *
- * Forward resolution decides with the quest graph, as {@link Delivery} does for the quest itself.
- * Reverse resolution keeps its own access rule: the owner, a contributor, or anyone for an OPEN or
- * CLOSED quest.
+ * Both directions decide with the quest graph and {@link QuestGraph#seesFully}, as {@link Delivery}
+ * does for the quest itself: a player learns a linked quest's title only when they see it fully.
  */
 public class WikiLinkResolver {
 
@@ -40,12 +37,6 @@ public class WikiLinkResolver {
    */
   private static final Pattern PIPE_PATTERN =
       Pattern.compile("\\[\\[([^|\\]]*?)\\|([^\\]]*)\\]\\]");
-
-  private final DataManager dataManager;
-
-  public WikiLinkResolver(DataManager dataManager) {
-    this.dataManager = dataManager;
-  }
 
   // -------------------------------------------------------------------------
   // Forward resolution: [[Quest Name]] → [[uuid|title]] or [[|title]] or [[uuid|Private Quest]]
@@ -88,7 +79,7 @@ public class WikiLinkResolver {
       if (quest == null) {
         // Quest not found — broken link
         replacement = "[[|" + displayText + "]]";
-      } else if (!Delivery.fullyVisible(graph, recipientUuid, quest.id())) {
+      } else if (!graph.seesFully(recipientUuid, quest.id())) {
         replacement = "[[" + quest.id() + "|Private Quest]]";
       } else {
         replacement = "[[" + quest.id() + "|" + displayText + "]]";
@@ -110,7 +101,7 @@ public class WikiLinkResolver {
     for (QuestData quest : graph.all()) {
       String lowerTitle = quest.title().toLowerCase(Locale.ROOT);
       if (!lowerTitles.contains(lowerTitle)) continue;
-      boolean questVisible = Delivery.fullyVisible(graph, recipient, quest.id());
+      boolean questVisible = graph.seesFully(recipient, quest.id());
       if (questVisible) visible.add(quest.id());
       QuestData kept = result.get(lowerTitle);
       boolean better =
@@ -128,10 +119,13 @@ public class WikiLinkResolver {
   // -------------------------------------------------------------------------
 
   /**
-   * Scans content for {@code [[uuid|title]]} patterns and converts back to canonical {@code
-   * [[Current Title]]} form when the sender has access to the linked quest.
+   * Scans content for {@code [[uuid|title]]} patterns and converts each back to the canonical
+   * {@code [[Current Title]]} form when the sender sees the linked quest fully in {@code graph}. A
+   * link to a quest they cannot see, or that is locked for them, is kept as it is, so a save never
+   * stores the title of a quest its sender may not read. A link with no id, or the id of a quest
+   * that no longer exists, keeps its display text.
    */
-  public String reverseResolve(String content, UUID senderUuid) {
+  public String reverseResolve(QuestGraph graph, String content, UUID senderUuid) {
     Matcher matcher = PIPE_PATTERN.matcher(content);
     if (!matcher.find()) return content;
 
@@ -139,27 +133,17 @@ public class WikiLinkResolver {
     matcher.reset();
 
     while (matcher.find()) {
-      String uuidStr = matcher.group(1);
       String displayTitle = matcher.group(2);
-
-      UUID questId = tryParseUuid(uuidStr);
+      UUID questId = tryParseUuid(matcher.group(1));
+      QuestData quest = graph.get(questId);
       String replacement;
-
-      if (questId == null) {
-        // Empty or invalid UUID — deleted/broken link → preserve display text
+      if (quest == null) {
+        // No id, a broken one, or a deleted quest: keep the display text.
         replacement = "[[" + displayTitle + "]]";
+      } else if (graph.seesFully(senderUuid, questId)) {
+        replacement = "[[" + quest.title() + "]]";
       } else {
-        QuestData quest = dataManager.getQuest(questId);
-        if (quest == null) {
-          // Quest deleted → preserve display text
-          replacement = "[[" + displayTitle + "]]";
-        } else if (hasAccess(quest, senderUuid)) {
-          // Use current canonical title
-          replacement = "[[" + quest.title() + "]]";
-        } else {
-          // No access → leave as-is
-          replacement = matcher.group(0);
-        }
+        replacement = matcher.group(0);
       }
       matcher.appendReplacement(result, Matcher.quoteReplacement(replacement));
     }
@@ -170,21 +154,6 @@ public class WikiLinkResolver {
   // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------
-
-  /**
-   * Returns true if the given player has access to the quest. Owner always has access. OPEN/CLOSED
-   * quests are visible to everyone. PRIVATE quests are visible only to owner and contributors.
-   */
-  private boolean hasAccess(QuestData quest, UUID playerUuid) {
-    if (quest.ownerUuid().equals(playerUuid)) return true;
-    if (quest.visibility() == Visibility.OPEN || quest.visibility() == Visibility.CLOSED)
-      return true;
-    // PRIVATE: check contributors
-    for (ContributorData contributor : quest.contributors()) {
-      if (contributor.uuid().equals(playerUuid)) return true;
-    }
-    return false;
-  }
 
   private UUID tryParseUuid(String s) {
     if (s == null || s.isEmpty()) return null;

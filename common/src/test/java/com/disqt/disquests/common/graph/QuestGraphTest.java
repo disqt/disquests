@@ -176,6 +176,41 @@ class QuestGraphTest {
   }
 
   @Nested
+  class SeesFully {
+
+    /** "next" waits on "first"; "hidden" is Open inside LEO's Private "secret". */
+    private final QuestGraph g =
+        graph(
+            quest("first").owner(LEO).open(),
+            quest("next")
+                .owner(LEO)
+                .open()
+                .after("first")
+                .role(JUJU, Role.READ)
+                .role(MAX, Role.WRITE),
+            quest("secret").owner(LEO),
+            quest("hidden").owner(LEO).open().in("secret"));
+
+    @ParameterizedTest(name = "{0} on {1}: {2}")
+    @CsvSource({
+      "anna, first,   true",
+      "anna, next,    false",
+      "juju, next,    false",
+      "max,  next,    true",
+      "leo,  next,    true",
+      "anna, hidden,  false",
+      "leo,  hidden,  true",
+      "anna, nothing, false",
+    })
+    void canSeeAndNotLockedFor(String viewer, String quest, boolean expected) {
+      UUID player = player(viewer);
+      UUID id = id(quest);
+      assertEquals(expected, g.seesFully(player, id));
+      assertEquals(g.canSee(player, id) && !g.lockedFor(player, id), g.seesFully(player, id));
+    }
+  }
+
+  @Nested
   class Shape {
 
     /** root > a > a1, root > a > a2, root > b; lone stands alone. */

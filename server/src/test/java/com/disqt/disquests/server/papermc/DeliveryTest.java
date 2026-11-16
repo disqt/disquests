@@ -73,7 +73,7 @@ class DeliveryTest {
     outbox.join(MEMBER, "Member", ProtocolVersion.V4);
     outbox.join(OUTSIDER, "Outsider", ProtocolVersion.V3);
     outbox.join(MAX, "Max", ProtocolVersion.V4);
-    delivery = new Delivery(dm, config, outbox, new WikiLinkResolver(dm), outbox::protocolVersion);
+    delivery = new Delivery(dm, config, outbox, new WikiLinkResolver(), outbox::protocolVersion);
   }
 
   @AfterEach
@@ -487,7 +487,7 @@ class DeliveryTest {
       FakeOutbox fewer = new FakeOutbox();
       fewer.join(LEO, "Leo", ProtocolVersion.V4);
       Delivery onlyLeo =
-          new Delivery(dm, config, fewer, new WikiLinkResolver(dm), fewer::protocolVersion);
+          new Delivery(dm, config, fewer, new WikiLinkResolver(), fewer::protocolVersion);
       QuestGraph before = dm.loadGraph();
       dm.updateVisibility(wagons, Visibility.OPEN);
 

@@ -217,6 +217,28 @@ class CompleteDeleteHandlerTest extends HandlerFixture {
     }
 
     @Test
+    void theIdOfADeletedUnfinishedPrerequisiteCannotBeTakenByANewQuest() {
+      UUID first = quest(MAX, "First", Visibility.OPEN);
+      UUID next = quest(LEO, "Next", Visibility.OPEN);
+      dm.setPrerequisites(next, List.of(first));
+      receive(MAX, PacketCodec.writeDeleteQuest(first, false));
+      outbox.clear();
+
+      save(JUJU, first, "First again", visibility(Visibility.OPEN));
+      receive(JUJU, PacketCodec.writeCompleteQuest(first, false));
+
+      assertNull(stored(first));
+      assertTrue(stored(next).prerequisites().contains(first));
+      assertTrue(viewOf(ANNA, next).locked());
+      assertEquals(List.of(), outbox.packetsFor(JUJU));
+      assertEquals(List.of(), outbox.packetsFor(ANNA));
+
+      UUID fresh = UUID.randomUUID();
+      saveText(JUJU, fresh, "Fresh");
+      assertEquals(JUJU, stored(fresh).ownerUuid());
+    }
+
+    @Test
     void deletingACompletedPrerequisiteDoesNotRelock() {
       UUID first = quest(MAX, "First", Visibility.OPEN);
       UUID next = quest(LEO, "Next", Visibility.OPEN);

@@ -99,6 +99,53 @@ class LinksHandlerTest extends HandlerFixture {
   }
 
   @Nested
+  class WikiLinksInASave {
+
+    private void saveContent(UUID player, UUID quest, String content) {
+      receive(
+          player,
+          PacketCodec.writeSaveQuest(
+              quest, "Notes", content, null, false, null, "overworld", List.of(), List.of()));
+    }
+
+    @Test
+    void anIdTheSaverCannotSeeStaysAnIdAndStoresNoTitle() {
+      UUID hub = quest(MAX, "Hub", Visibility.PRIVATE);
+      UUID inside = subquest(hub, MAX, "Secret plan", Visibility.OPEN);
+      UUID notes = quest(LEO, "Notes", Visibility.PRIVATE);
+      String link = "[[" + inside + "|x]]";
+
+      saveContent(LEO, notes, "See " + link);
+
+      assertEquals("See " + link, stored(notes).content());
+    }
+
+    @Test
+    void anIdOfAQuestLockedForTheSaverStaysAnId() {
+      UUID first = quest(MAX, "First", Visibility.OPEN);
+      UUID next = quest(MAX, "Locked plan", Visibility.OPEN);
+      dm.setPrerequisites(next, List.of(first));
+      UUID notes = quest(LEO, "Notes", Visibility.PRIVATE);
+      String link = "[[" + next + "|x]]";
+
+      saveContent(LEO, notes, link);
+
+      assertEquals(link, stored(notes).content());
+    }
+
+    @Test
+    void anIdTheSaverSeesFullyBecomesItsCurrentTitle() {
+      UUID hub = quest(MAX, "Hub", Visibility.OPEN);
+      UUID inside = subquest(hub, MAX, "Open plan", Visibility.OPEN);
+      UUID notes = quest(LEO, "Notes", Visibility.PRIVATE);
+
+      saveContent(LEO, notes, "See [[" + inside + "|x]]");
+
+      assertEquals("See [[Open plan]]", stored(notes).content());
+    }
+  }
+
+  @Nested
   class TreeMoves {
 
     @Test

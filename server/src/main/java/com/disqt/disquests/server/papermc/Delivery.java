@@ -6,7 +6,6 @@ import com.disqt.disquests.common.graph.Audience;
 import com.disqt.disquests.common.graph.QuestGraph;
 import com.disqt.disquests.common.graph.QuestView;
 import com.disqt.disquests.common.model.QuestData;
-import com.disqt.disquests.common.model.Visibility;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -91,11 +90,9 @@ final class Delivery {
     for (QuestData q : g.all()) {
       QuestData view = held(g, player, QuestView.forRecipient(g, player, q.id()), version);
       if (view == null) continue;
-      if (q.roleOf(player) != null) {
-        mine.add(resolved(g, view, player));
-      } else if (view.visibility() != Visibility.PRIVATE) {
-        board.add(resolved(g, view, player));
-      }
+      // A quest seen without a role is never Private (canSee), so the rest is the board.
+      if (q.roleOf(player) != null) mine.add(resolved(g, view, player));
+      else board.add(resolved(g, view, player));
     }
     outbox.send(
         player,
@@ -114,7 +111,7 @@ final class Delivery {
     QuestGraph g = dataManager.loadGraph();
     List<UUID> pins =
         dataManager.getPinnedQuestIds(player).stream()
-            .filter(id -> fullyVisible(g, player, id))
+            .filter(id -> g.seesFully(player, id))
             .toList();
     outbox.send(
         player,
@@ -147,12 +144,6 @@ final class Delivery {
     return view == null ? null : resolved(g, view, player);
   }
 
-  /** The player can see the quest and it is not locked for them. */
-  static boolean fullyVisible(QuestGraph g, UUID player, UUID quest) {
-    QuestData view = QuestView.forRecipient(g, player, quest);
-    return view != null && !view.locked();
-  }
-
   /** The view when a client at {@code version} holds the quest, else null. */
   private static QuestData held(QuestGraph g, UUID player, QuestData view, int version) {
     if (view == null) return null;
@@ -175,8 +166,7 @@ final class Delivery {
     TreeSet<String> tags = new TreeSet<>();
     for (String tag : config.getPredefinedTags()) tags.add(tag.toLowerCase(Locale.ROOT));
     for (QuestData q : g.all()) {
-      QuestData view = QuestView.forRecipient(g, player, q.id());
-      if (view != null && !view.locked()) tags.addAll(view.tags());
+      if (g.seesFully(player, q.id())) tags.addAll(q.tags());
     }
     return List.copyOf(tags);
   }

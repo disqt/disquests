@@ -51,7 +51,10 @@ public class DataManager {
               FOREIGN KEY (quest_id) REFERENCES quests(id) ON DELETE CASCADE
           )""";
 
-  /** to_id has no foreign key on purpose: a deleted prerequisite must stay as a dangling id. */
+  /**
+   * One row per link; kind is {@link #UNLOCKS_AFTER} (from_id waits on to_id), the only kind so
+   * far. to_id has no foreign key on purpose: a deleted prerequisite must stay as a dangling id.
+   */
   private static final String LINKS_DDL =
       """
           CREATE TABLE IF NOT EXISTS quest_links (
@@ -62,7 +65,8 @@ public class DataManager {
               FOREIGN KEY (from_id) REFERENCES quests(id) ON DELETE CASCADE
           )""";
 
-  private static final String PREREQUISITE = "PREREQUISITE";
+  /** The kind of a prerequisite link: from_id unlocks after to_id is completed. */
+  private static final String UNLOCKS_AFTER = "UNLOCKS_AFTER";
 
   private static final String QUEST_SELECT =
       """
@@ -987,15 +991,30 @@ public class DataManager {
           update(
               "DELETE FROM quest_links WHERE from_id = ? AND kind = ?",
               quest.toString(),
-              PREREQUISITE);
+              UNLOCKS_AFTER);
           for (UUID prerequisite : prerequisites) {
             update(
                 "INSERT OR IGNORE INTO quest_links (from_id, to_id, kind) VALUES (?, ?, ?)",
                 quest.toString(),
                 prerequisite.toString(),
-                PREREQUISITE);
+                UNLOCKS_AFTER);
           }
         });
+  }
+
+  /**
+   * Some quest waits on this id, whether or not a quest with the id exists: the id of a deleted,
+   * unfinished prerequisite stays taken.
+   */
+  public synchronized boolean isPrerequisite(UUID id) {
+    try (PreparedStatement stmt =
+        connection.prepareStatement("SELECT 1 FROM quest_links WHERE to_id = ? AND kind = ?")) {
+      stmt.setString(1, id.toString());
+      stmt.setString(2, UNLOCKS_AFTER);
+      return stmt.executeQuery().next();
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to check prerequisite links", e);
+    }
   }
 
   public synchronized void setAutoJoin(UUID quest, boolean autoJoin) {
@@ -1062,16 +1081,38 @@ public class DataManager {
         });
   }
 
+  /**
+   * Takes the player off the quest. Throws {@link IllegalStateException}, changing nothing, when
+   * they hold the quest's last OWNER row: a quest always keeps an owner.
+   */
   public synchronized void removePerson(UUID quest, UUID player) {
     inTransaction(
         "remove person",
         () -> {
+          if (isLastOwnerRow(quest, player)) {
+            throw new IllegalStateException(player + " is the last owner of " + quest);
+          }
           update(
               "DELETE FROM quest_people WHERE quest_id = ? AND player_uuid = ?",
               quest.toString(),
               player.toString());
           moveDisplayOwnerIfNeeded(quest);
         });
+  }
+
+  /** The player holds an OWNER row on the quest and nobody else does. */
+  private boolean isLastOwnerRow(UUID quest, UUID player) throws SQLException {
+    try (PreparedStatement stmt =
+        connection.prepareStatement(
+            """
+            SELECT COUNT(*), SUM(player_uuid = ?) FROM quest_people
+            WHERE quest_id = ? AND role = 'OWNER'
+            """)) {
+      stmt.setString(1, player.toString());
+      stmt.setString(2, quest.toString());
+      ResultSet rs = stmt.executeQuery();
+      return rs.next() && rs.getInt(1) == 1 && rs.getInt(2) == 1;
+    }
   }
 
   /** When the display owner no longer holds OWNER, the earliest remaining owner takes the place. */
@@ -1191,7 +1232,7 @@ public class DataManager {
                   "DELETE FROM quest_links WHERE from_id = ? AND to_id = ? AND kind = ?",
                   entry.getKey().toString(),
                   prerequisite.toString(),
-                  PREREQUISITE);
+                  UNLOCKS_AFTER);
             }
           }
           for (UUID id : plan.deleted()) {
@@ -1482,7 +1523,7 @@ public class DataManager {
     String placeholders = String.join(",", questIds.stream().map(id -> "?").toList());
     String sql =
         "SELECT from_id, to_id FROM quest_links WHERE kind = '"
-            + PREREQUISITE
+            + UNLOCKS_AFTER
             + "' AND from_id IN ("
             + placeholders
             + ") ORDER BY rowid";

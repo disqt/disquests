@@ -92,7 +92,7 @@ final class Outcomes {
    * see and names nothing.
    */
   void refused(UUID player, QuestGraph g, UUID quest, Refusal reason) {
-    boolean named = reason != Refusal.NOT_VISIBLE && Delivery.fullyVisible(g, player, quest);
+    boolean named = reason != Refusal.NOT_VISIBLE && g.seesFully(player, quest);
     QuestData q = named ? g.get(quest) : null;
     send(
         player,

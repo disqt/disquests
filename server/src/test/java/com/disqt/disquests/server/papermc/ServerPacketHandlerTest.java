@@ -661,7 +661,7 @@ class ServerPacketHandlerTest {
   void wikiLink_toCompletedQuest_stillResolves() {
     UUID id = seedQuest(Visibility.OPEN);
     dm.completeQuest(id, OWNER, 5000L);
-    WikiLinkResolver resolver = new WikiLinkResolver(dm);
+    WikiLinkResolver resolver = new WikiLinkResolver();
     Assertions.assertEquals(
         "See [[" + id + "|Gare]]",
         resolver.resolveForRecipient(dm.loadGraph(), "See [[Gare]]", BYSTANDER));

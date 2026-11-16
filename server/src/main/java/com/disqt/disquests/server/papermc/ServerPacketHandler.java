@@ -39,7 +39,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
     this.plugin = plugin;
     this.dataManager = dataManager;
     this.outbox = outbox;
-    WikiLinkResolver wikiLinks = new WikiLinkResolver(dataManager);
+    WikiLinkResolver wikiLinks = new WikiLinkResolver();
     this.delivery = new Delivery(dataManager, config, outbox, wikiLinks, this::getProtocolVersion);
     Outcomes outcomes = new Outcomes(dataManager, delivery, outbox, this::getProtocolVersion);
     Logger logger = plugin.getLogger();
@@ -146,7 +146,7 @@ public class ServerPacketHandler implements PluginMessageListener, Listener {
     QuestGraph graph = dataManager.loadGraph();
     QuestData quest = graph.get(questId);
     if (quest == null || quest.isCompleted()) return; // archived quests are never pinned
-    if (!Delivery.fullyVisible(graph, player, questId)) return;
+    if (!graph.seesFully(player, questId)) return;
     dataManager.pinQuest(player, questId);
   }
 

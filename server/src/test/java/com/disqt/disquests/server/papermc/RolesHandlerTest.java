@@ -342,6 +342,27 @@ class RolesHandlerTest extends HandlerFixture {
       assertEquals(Role.OWNER, roleOf(alone, LEO));
     }
 
+    @ParameterizedTest(name = "removing Max first: {0}")
+    @ValueSource(booleans = {true, false})
+    void twoRemovalsWithMySubquestsInOnePacketLeaveASubquestOneOwner(boolean maxFirst) {
+      UUID hub = quest(LEO, "Hub", Visibility.OPEN);
+      dm.setRole(hub, MAX, Role.OWNER);
+      dm.setRole(hub, JUJU, Role.OWNER);
+      UUID shared = subquest(hub, LEO, "Shared", Visibility.OPEN);
+      dm.setRole(shared, MAX, Role.OWNER);
+      PersonOp max = new PersonOp(PersonOp.Kind.REMOVE_WITH_MY_SUBQUESTS, MAX, null);
+      PersonOp leo = new PersonOp(PersonOp.Kind.REMOVE_WITH_MY_SUBQUESTS, LEO, null);
+
+      receive(
+          LEO,
+          PacketCodec.writeUpdatePeople(hub, maxFirst ? List.of(max, leo) : List.of(leo, max)));
+
+      assertEquals(List.of(JUJU), ownerRows(hub));
+      List<UUID> sharedOwners = ownerRows(shared);
+      assertEquals(1, sharedOwners.size());
+      assertEquals(sharedOwners.get(0), stored(shared).ownerUuid());
+    }
+
     @Test
     void applyRoleDownGivesTheRoleOnTheSendersSubquestsWithoutLoweringAnyone() {
       UUID hub = quest(LEO, "Hub", Visibility.PRIVATE);
