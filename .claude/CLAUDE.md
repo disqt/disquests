@@ -114,12 +114,12 @@ Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with physical input via
 
 Channel: `disquests:main`. First byte = PacketType ID.
 
-**C2S**: REQUEST_SYNC, SAVE_QUEST, DELETE_QUEST, JOIN_QUEST, REQUEST_COLLABORATION, RESPOND_COLLABORATION, UPDATE_CONTRIBUTORS, UPDATE_VISIBILITY, PIN_QUEST, LEAVE_QUEST, COMPLETE_QUEST (0x0B), REOPEN_QUEST (0x0C)
+**C2S**: REQUEST_SYNC, SAVE_QUEST, DELETE_QUEST, JOIN_QUEST, REQUEST_COLLABORATION, RESPOND_COLLABORATION, UPDATE_CONTRIBUTORS (legacy clients), UPDATE_VISIBILITY (legacy clients), PIN_QUEST, LEAVE_QUEST, COMPLETE_QUEST (0x0B), REOPEN_QUEST (0x0C), UPDATE_PEOPLE (0x0D), APPLY_ROLE_DOWN (0x0E), RESOLVE_PRIVATIZED (0x0F)
 
-**S2C**: HANDSHAKE, SYNC_MY_QUESTS, SYNC_SERVER_QUESTS, UPDATE_QUEST, DELETE_QUEST_S2C, COLLABORATION_REQUEST, COLLABORATION_RESPONSE, SYNC_PENDING_REQUESTS, SYNC_TAGS
+**S2C**: HANDSHAKE, SYNC_MY_QUESTS, SYNC_SERVER_QUESTS, UPDATE_QUEST, DELETE_QUEST_S2C, COLLABORATION_REQUEST, COLLABORATION_RESPONSE, SYNC_PENDING_REQUESTS, SYNC_TAGS, NOTICE (0x19)
 
 ### Protocol Versioning
-- `ProtocolVersion.java`: V0 (legacy, pre-tags), V1 (tags), V2 (polygon), V3 (current, completion). Client sends version in REQUEST_SYNC.
+- `ProtocolVersion.java`: V0 (legacy, pre-tags), V1 (tags), V2 (polygon), V3 (completion), V4 (current: roles, quest tree, prerequisites). Client sends version in REQUEST_SYNC.
 - Server tracks per-player version in `ServerPacketHandler`. V0 clients get packets without tag fields.
 - **All new packet fields must be trailing-optional** with `buf.remaining() > 0` guards on the reader side.
 - When adding new fields: append at end, never insert mid-packet. Update `ProtocolVersion.CURRENT`.
@@ -127,7 +127,11 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **V3 completion block** — quests carry `long completedAt` (0 = active), nullable UUID `completedBy`, nullable string `completedByName`, after the polygon block. SAVE_QUEST does not carry them: completion changes only through COMPLETE_QUEST / REOPEN_QUEST (payload = quest UUID).
 - **HANDSHAKE always writes the full form** (tags, default map) followed by a trailing `varint serverProtocolVersion` (V1 assumed when absent), then a trailing `boolean worldMapEnabled` (true when absent, so older servers read as enabled), then a trailing `boolean playerMarkerEnabled` (true when absent). The client keeps it in `ClientSession.getServerProtocolVersion()` and reads every quest packet with that version (`PacketCodec.readQuest(buf, version)` and the version overloads), because `remaining()` guards cannot work for quests inside a list. `ClientSession.supportsMap()` = `>= V2`.
 - **V1 downgrade** — `writeQuest` for `< V2` and `DataManager.saveQuest` use `QuestLocation.normalize`: polygon of >= 2 vertices becomes `coordinates`/`coordinates2` = bounding-box min/max (y 64 unless a pin y exists) with `isRegion` true; 1 vertex becomes a pin. A V1 client re-saving a polygon quest with an unchanged rectangle keeps the polygon.
-- **Save broadcast scoping** — `handleSaveQuest` sends `UPDATE_QUEST` only to owner + contributors (not all mod players). Other handlers like `handleUpdateVisibility` still use `broadcastQuestUpdate()` which sends to all mod players for Open/Closed quests.
+- **V4 quest block** — after the completion block: one role byte per contributor, nullable `parentId`, prerequisite ids (max 8), booleans `hiddenPrerequisites`, `deletedPrerequisite`, `hiddenParent`, `autoJoin`, `locked`, then the optional `Privatized` record. Below V4 it is not written and contributors carry `canEdit` only (Write and Owner both read as can-edit). `ownerUuid` is the display owner; further owners are contributors with role OWNER.
+- **V4 SAVE_QUEST links block** — trailing-optional `LinkChanges` (visibility, tree ops ATTACH/DETACH/SWAP, prerequisites to add and remove, `dropHidden`, `dropDeleted`, `autoJoin`); nulls mean unchanged. A save without the block changes no link, so an old client's save never clears parent, prerequisites or auto-join. COMPLETE_QUEST and DELETE_QUEST take a trailing-optional `alsoMySubquests` boolean; HANDSHAKE ends with a trailing varint `maxQuestDepth` (3 when absent).
+- **One delivery path** — nothing sends `UPDATE_QUEST`, `DELETE_QUEST_S2C` or a sync list except `Delivery`, and it only sends `QuestView.forRecipient` results. Every handler loads the graph before its writes and calls `Outcomes.writeThenDeliver` / `deliverWithUnlocks`, which send each online player the difference in their own view (`Audience.changes`). Never send a stored `QuestData` directly, and never add a per-handler recipient loop.
+- **Version rules live in `Delivery.held`** — V4+ clients hold every non-null view (locked and completed included); below V4 a locked view is withheld (sent as a delete, then as an update once unlocked); V3 holds a completed quest only with a role; below V3 never.
+- **Locked view** — title, visibility, link flags and the recipient's own contributor entry only; owner is `QuestView.NO_OWNER` with name `""`, `lastModified` 0, no content.
 
 ## Key Files
 
@@ -139,7 +143,8 @@ Channel: `disquests:main`. First byte = PacketType ID.
 | `common/src/main/java/com/disqt/disquests/common/QuestLocation.java` | Pin/polygon geometry, bounding box and V1 `normalize` downgrade |
 | `common/src/main/java/com/disqt/disquests/common/DimensionKeys.java` | `normalize` maps `nether`/`end` to `the_nether`/`the_end` (config keys, saves, migration) |
 | `common/src/main/java/com/disqt/disquests/common/BlueMapUrlBuilder.java` | BlueMap URL construction with coords |
-| `common/src/main/java/com/disqt/disquests/common/model/` | QuestData, Visibility, ContributorData, ContributorOp, CoordinatesData, CollaborationRequestData |
+| `common/src/main/java/com/disqt/disquests/common/model/` | QuestData, Visibility, Role, ContributorData, ContributorOp, PersonOp, TreeOp, LinkChanges, Notice, Privatized, CoordinatesData, CollaborationRequestData |
+| `common/src/main/java/com/disqt/disquests/common/graph/` | Pure rules, no Bukkit or Minecraft: `QuestGraph` (canSee, locked, lockedFor), `LinkRules` (attach, detach, swap, prerequisite) with `Refusal`, `QuestView` (what a recipient learns), `Audience` (view changes), `Plans` (delete, complete, unlock, people, role-down) |
 | `client/src/main/java/com/disqt/disquests/client/DisquestsClient.java` | Fabric mod entrypoint, keybinds, channel registration |
 | `client/src/main/java/com/disqt/disquests/client/ClientSession.java` | Tracks connection state, dispatches S2C packets |
 | `client/src/main/java/com/disqt/disquests/client/ClientCache.java` | Client-side quest cache |
@@ -151,7 +156,9 @@ Channel: `disquests:main`. First byte = PacketType ID.
 | `client/.../gui/helper/` | Colors, Theme, TagColors, HoverPreviewRenderer, DisquestsConfigModel (owo-config) |
 | `client/src/main/resources/assets/disquests/owo_ui/*.xml` | XML UI models for all screens (hot-reloadable) |
 | `server/src/main/java/com/disqt/disquests/server/papermc/DisquestsPlugin.java` | Plugin entry, channel registration |
-| `server/src/main/java/com/disqt/disquests/server/papermc/ServerPacketHandler.java` | Handles C2S, broadcasts S2C |
+| `server/src/main/java/com/disqt/disquests/server/papermc/ServerPacketHandler.java` | C2S dispatcher; work is in `SaveHandler`, `PeopleHandler`, `CompletionHandler`, `Outcomes` |
+| `server/src/main/java/com/disqt/disquests/server/papermc/Delivery.java` | The only sender of quest data: per-recipient views, sync lists, pins, tags, version rules |
+| `server/src/main/java/com/disqt/disquests/server/papermc/Outbox.java` | Bukkit-free seam for sending packets (`BukkitOutbox` in production, `FakeOutbox` in tests) |
 | `server/src/main/java/com/disqt/disquests/server/papermc/DataManager.java` | SQLite persistence |
 | `server/src/main/java/com/disqt/disquests/server/papermc/PlayerNameTracker.java` | Tracks online player display names |
 | `server/src/main/java/com/disqt/disquests/server/papermc/Commands.java` | `/disquests reload` and `/disquests reset` (debug mode) |
@@ -235,8 +242,8 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **Server config `player-marker`** (default `true`) — `Config.isPlayerMarkerEnabled()`, sent in the HANDSHAKE, read as `ClientSession.isPlayerMarkerEnabled()`. When false: no `PlayerMarkerLayer` on `MainScreen`/`MapEditScreen`, `btn-centre-me` is removed, and maps open on the camera remembered this session (`ClientSession.rememberCamera`/`rememberedCamera`, a per-dimension `MapCameraMemory`, saved in `removed()` of both map screens, cleared on `leaveServer`) else `MapCameraMemory.WORLD_VIEW` ((0,0) zoom 0) in the default map's dimension. When true the board still opens on the player. `btn-set-pos` is unaffected.
 
 ### Quest completion
-- **Archive lock is server-side** — every edit handler (save, contributors, visibility, join, request, pin, leave) returns early when `quest.isCompleted()`; COMPLETE/REOPEN need `canEdit`. Completing drops the quest's pins and pending requests. Only REOPEN unlocks it.
-- **Clients < V3 never receive completed quests** — syncs filter them out, and a completion sends those clients DELETE_QUEST_S2C; reopen sends the quest back. Completed Open/Closed quests leave every board.
+- **Archive lock is server-side** — every edit handler (save, contributors, visibility, join, request, pin, leave) returns early when `quest.isCompleted()`; COMPLETE/REOPEN need the OWNER role (since V4 rules; a can-edit contributor can no longer complete). Completing drops the quest's pins and pending requests. Only REOPEN unlocks it.
+- **Clients < V3 never receive completed quests** — syncs filter them out, and a completion sends those clients DELETE_QUEST_S2C; reopen sends the quest back. V3 clients get a completed quest only when they hold a role on it; V4+ clients get every completed quest they can see and keep it off the board themselves.
 - **Stale-editor guard** — `DisquestsBaseScreen.archivedMeanwhile(id)` returns the cached quest when it was completed after a screen took its copy. `QuestScreen` save and `ContributorScreen` edits check it and call `showArchivedInstead` (toast + view of the archived quest) instead of sending an edit the server would silently drop.
 - **Archived tab** — `tab-archived` (`ClientSession.Tab.ARCHIVED`) lists `QuestListOrder.archived(ClientCache.getMyQuests())`, newest completion first; completed quests stay in `myQuests`, so filter with `Quest.isCompleted()`. View ids: `btn-complete` (active), `btn-reopen` + `completed-label` (completed; no `btn-edit`/`btn-leave`). Complete navigates back to the parent; Reopen rebuilds the open `QuestScreen` via `ClientPacketHandler`, so wait for `btn-complete`, not `waitForScreen`.
 - **`ClientSession.activeTab` persists across journey classes** — reset it (and the search term) at the start of a journey that relies on My Quests.
