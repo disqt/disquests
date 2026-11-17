@@ -35,7 +35,7 @@
     "reopen": "Rouvrir",
     "manage_people": "Gérer les joueurs",
     "restore_visibility": "Repasser en %s",
-    "keep_private": "Garder en Private",
+    "keep_private": "Garder Privée",
   },
 
   // Notifications
@@ -46,7 +46,7 @@
   // Notifications du serveur
   "gui.disquests.notice.{}": {
     "unlocked": "Nouvelle quête : %s",
-    "set_private": "\"%s\" est passée en Private : la quête qui la contenait a été supprimée. Ouvre-la pour décider.",
+    "set_private": "\"%s\" est passée en Privée : la quête qui la contenait a été supprimée. Ouvre-la pour décider.",
     "refused_titled": "\"%s\" : %s",
     "refused": "Ce changement est impossible : %s",
   },
@@ -94,8 +94,8 @@
 
   // Bandeaux sur la page d'une quête, pour ses owners
   "gui.disquests.banner.{}": {
-    "privatized_titled": "Passée en Private le %s. La quête qui la contenait, \"%s\", a été supprimée par %s. Elle était %s avant.",
-    "privatized": "Passée en Private le %s. La quête qui la contenait a été supprimée. Elle était %s avant.",
+    "privatized_titled": "Passée en Privée le %s. La quête qui la contenait, \"%s\", a été supprimée par %s. Elle était %s avant.",
+    "privatized": "Passée en Privée le %s. La quête qui la contenait a été supprimée. Elle était %s avant.",
     "deleted_prerequisite": "Cette quête attend une quête supprimée et reste verrouillée. Clique sur Edit pour retirer ce lien.",
   },
 

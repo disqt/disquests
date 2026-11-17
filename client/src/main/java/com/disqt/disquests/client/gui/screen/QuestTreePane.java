@@ -19,6 +19,7 @@ import io.wispforest.owo.ui.core.Sizing;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * The reading view's left pane, "where this sits": the rows of {@link QuestTreeRows#whereThisSits},
@@ -36,23 +37,29 @@ final class QuestTreePane {
   static final String DIVIDER_ID = "quest-pane-divider";
 
   private static final int MIN_WIDTH = 100;
+  private static final int SCROLLBAR_WIDTH = 3;
 
   private final QuestScreen screen;
   private final UUID questId;
   private final FlowLayout list;
+  private final ScrollContainer<FlowLayout> scroll;
+  private boolean revealPending = true;
 
-  private QuestTreePane(QuestScreen screen, UUID questId, FlowLayout list) {
+  private QuestTreePane(
+      QuestScreen screen, UUID questId, FlowLayout list, ScrollContainer<FlowLayout> scroll) {
     this.screen = screen;
     this.questId = questId;
     this.list = list;
+    this.scroll = scroll;
   }
 
   /**
-   * Adds the pane and its divider before {@code quest-column} when there is something to show.
-   * {@code guiWidth} bounds the pane's width.
+   * Adds the pane and its divider before {@code quest-column} when there is something to show, and
+   * returns it; null when there is none.
    */
-  static void attach(QuestScreen screen, FlowLayout root, UUID questId, int guiWidth) {
-    if (!ClientSession.supportsTrees() || rows(questId).isEmpty()) return;
+  @Nullable
+  static QuestTreePane attach(QuestScreen screen, FlowLayout root, UUID questId) {
+    if (!ClientSession.supportsTrees() || rows(questId).isEmpty()) return null;
     FlowLayout body = root.childById(FlowLayout.class, "quest-body");
 
     FlowLayout pane = UIContainers.verticalFlow(Sizing.fixed(MIN_WIDTH), Sizing.fill(100));
@@ -62,14 +69,19 @@ final class QuestTreePane {
     screen.applyThemePanel(pane);
 
     LabelComponent header = UIComponents.label(Component.translatable(QuestPage.WHERE_THIS_SITS));
+    header.horizontalSizing(Sizing.fill(100));
     header.color(Color.ofArgb(Colors.TEXT_MUTED));
     header.shadow(true);
     pane.child(header);
 
     FlowLayout list = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
     list.id(LIST_ID);
+    // owo draws the bar inside the scroll's content box and forwards a press on it to the child:
+    // pad the rows clear of it so pressing the bar never opens a quest.
+    list.padding(Insets.right(SCROLLBAR_WIDTH + 2));
     ScrollContainer<FlowLayout> scroll =
         UIContainers.verticalScroll(Sizing.fill(100), Sizing.expand(100), list);
+    scroll.scrollbarThiccness(SCROLLBAR_WIDTH);
     pane.child(scroll);
 
     PaneSplit split =
@@ -79,11 +91,14 @@ final class QuestTreePane {
             DIVIDER_ID,
             DisquestsClient.CONFIG::questPaneWidth,
             DisquestsClient.CONFIG::questPaneWidth,
-            requested -> PaneWidth.clamp(requested, MIN_WIDTH, guiWidth * 2 / 5));
+            // The screen's width as it is now, not when the pane was built
+            requested -> PaneWidth.clamp(requested, MIN_WIDTH, screen.width * 2 / 5));
     body.child(0, pane);
     body.child(1, split.divider());
 
-    new QuestTreePane(screen, questId, list).fill();
+    QuestTreePane treePane = new QuestTreePane(screen, questId, list, scroll);
+    treePane.fill();
+    return treePane;
   }
 
   private static List<QuestTreeRows.Row> rows(UUID questId) {
@@ -118,13 +133,34 @@ final class QuestTreePane {
     }
   }
 
+  /**
+   * Once the rows are laid out, scrolls the current quest's row into view when it lies below the
+   * visible part of a long pane.
+   */
+  void tick() {
+    if (!revealPending) return;
+    TreeRowComponent current =
+        list.childById(TreeRowComponent.class, "tree-row-" + questId.toString());
+    if (current == null || !current.hasParent()) return;
+    revealPending = false;
+    if (current.y() + current.height() > scroll.y() + scroll.height()) {
+      scroll.scrollTo(current);
+    }
+  }
+
   /** The current quest's row does nothing; any other opens that quest, back returning here. */
   private void open(UUID id) {
     if (!id.equals(questId)) screen.openOther(id);
   }
 
+  /**
+   * Expands or collapses a row. The current quest's subquests always show, so its toggle is ignored
+   * rather than changing the shared expanded set for nothing.
+   */
   private void toggle(UUID id) {
+    if (id.equals(questId)) return;
     ClientSession.toggleExpanded(id);
     fill();
+    screen.rememberShownPage();
   }
 }

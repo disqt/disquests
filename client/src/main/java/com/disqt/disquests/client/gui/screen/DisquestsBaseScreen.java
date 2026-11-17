@@ -91,8 +91,13 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     if (entry instanceof NavEntry.QuestNav qn) {
       Quest quest = ClientCache.getQuestById(qn.questId());
       if (quest == null) return null;
-      // A quest that became locked meanwhile reopens on its locked page, never in the editor.
-      return new QuestScreen(this.parent, quest, qn.editing() && !quest.isLocked());
+      // Back into the editor only while the player may still edit and the quest is not locked
+      // for them; otherwise the reading view (the locked page for a locked quest).
+      boolean edit =
+          qn.editing()
+              && !quest.isLocked()
+              && quest.canEdit(ClientSession.getEffectivePlayerUuid());
+      return new QuestScreen(this.parent, quest, edit);
     } else if (entry instanceof NavEntry.MainNav mn) {
       ClientSession.setActiveTab(mn.tab());
       ClientSession.setSearchTerm(mn.searchTerm());

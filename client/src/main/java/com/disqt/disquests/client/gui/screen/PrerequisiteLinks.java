@@ -6,6 +6,7 @@ import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.tree.WaitingText;
 import com.disqt.disquests.common.graph.QuestGraph;
 import com.disqt.disquests.common.model.QuestData;
+import com.mojang.blaze3d.platform.InputConstants;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
@@ -43,7 +44,10 @@ final class PrerequisiteLinks {
       return block;
     }
     block.child(text(Component.translatable(QuestPage.WAITING_PREREQUISITES), true));
-    for (UUID id : waiting.visible()) block.child(link(screen, graph, id));
+    for (UUID id : waiting.visible()) {
+      QuestData q = graph.get(id);
+      block.child(link(screen, new QuestPage.Link(id, q.title(), q.isCompleted())));
+    }
     if (waiting.somethingElse()) {
       block.child(text(Component.translatable(QuestPage.WAITING_SOMETHING_ELSE), true));
     }
@@ -51,23 +55,22 @@ final class PrerequisiteLinks {
   }
 
   /**
-   * The Prerequisites section: one line per visible prerequisite, then the lines for hidden and
-   * deleted ones, then a muted line when auto-join is on.
+   * The Prerequisites section, lines from {@link QuestPage#prerequisites}: the visible
+   * prerequisites, then "… and something you don't have access to", "a deleted quest" and the
+   * auto-join line when they apply.
    */
   static FlowLayout section(QuestScreen screen, Quest quest) {
-    QuestGraph graph = QuestGraphs.current();
+    QuestPage.Prerequisites lines = QuestPage.prerequisites(quest.toData(), QuestGraphs.current());
     FlowLayout block = block(screen, SECTION_ID);
     block.child(text(Component.translatable(QuestPage.PREREQUISITES), true));
-    for (UUID id : quest.getPrerequisites()) {
-      if (graph.get(id) != null) block.child(link(screen, graph, id));
-    }
-    if (quest.hasHiddenPrerequisites()) {
+    for (QuestPage.Link link : lines.links()) block.child(link(screen, link));
+    if (lines.somethingHidden()) {
       block.child(text(Component.translatable(QuestPage.PREREQUISITE_HIDDEN), true));
     }
-    if (quest.hasDeletedPrerequisite()) {
+    if (lines.deleted()) {
       block.child(text(Component.translatable(QuestPage.PREREQUISITE_DELETED), true));
     }
-    if (quest.isAutoJoin()) {
+    if (lines.autoJoin()) {
       block.child(text(Component.translatable(QuestPage.PREREQUISITE_AUTO_JOIN), true));
     }
     return block;
@@ -91,23 +94,24 @@ final class PrerequisiteLinks {
     return label;
   }
 
-  private static LabelComponent link(QuestScreen screen, QuestGraph graph, UUID id) {
-    QuestData q = graph.get(id);
+  private static LabelComponent link(QuestScreen screen, QuestPage.Link link) {
     MutableComponent text = Component.empty();
-    if (q.isCompleted()) {
+    if (link.completed()) {
       text.append(Component.literal("✔ ").withColor(Colors.TREE_COMPLETED & 0xFFFFFF));
     }
-    String title = q.title() != null ? q.title() : "";
+    String title = link.title() != null ? link.title() : "";
     text.append(
         Component.literal(title).withStyle(s -> s.withUnderlined(true).withColor(LINK_COLOR)));
     LabelComponent label = UIComponents.label(text);
-    label.id(LINE_PREFIX + id);
+    label.id(LINE_PREFIX + link.id());
+    label.horizontalSizing(Sizing.fill(100));
     label.shadow(true);
     label
         .mouseDown()
         .subscribe(
             (click, doubled) -> {
-              screen.openOther(id);
+              if (click.button() != InputConstants.MOUSE_BUTTON_LEFT) return false;
+              screen.openOther(link.id());
               return true;
             });
     return label;

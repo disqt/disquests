@@ -5,6 +5,7 @@ import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.NoticeText;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.data.QuestGraphs;
+import com.disqt.disquests.client.gui.component.MinHeightScroll;
 import com.disqt.disquests.client.gui.component.SuggestionDropdown;
 import com.disqt.disquests.client.gui.component.TagChipComponent;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
@@ -28,11 +29,13 @@ import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.CollapsibleContainer;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.Color;
 import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.ParentUIComponent;
 import io.wispforest.owo.ui.core.Sizing;
+import io.wispforest.owo.ui.core.Surface;
 import io.wispforest.owo.ui.core.UIComponent;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -73,6 +76,14 @@ public class QuestScreen extends DisquestsBaseScreen {
   private boolean isOwner;
   private boolean hideContent;
   private QuestPage.Actions actions;
+
+  /** The content scroll never shrinks below this, even when the sections above it are tall. */
+  private static final int MIN_CONTENT_HEIGHT = 40;
+
+  // What the reading view draws, to rebuild it when that changes (see tick)
+  @Nullable private QuestPage.PageSignature shownPage;
+  private long seenCacheVersion;
+  @Nullable private QuestTreePane treePane;
 
   // Widget references for edit mode
   private TextFieldComponent titleFieldComponent;
@@ -133,6 +144,7 @@ public class QuestScreen extends DisquestsBaseScreen {
   @Override
   protected void build(FlowLayout root) {
     applyThemeRoot(root);
+    if (!editing) installContentScroll(root);
 
     // View mode panels
     ParentUIComponent contentScroll = root.childById(ParentUIComponent.class, "content-scroll");
@@ -172,7 +184,7 @@ public class QuestScreen extends DisquestsBaseScreen {
 
   private void buildViewMode(FlowLayout root) {
     FlowLayout column = root.childById(FlowLayout.class, "quest-column");
-    QuestTreePane.attach(this, root, quest.getId(), this.width);
+    this.treePane = QuestTreePane.attach(this, root, quest.getId());
 
     // Title
     root.childById(LabelComponent.class, "title-label")
@@ -187,6 +199,39 @@ public class QuestScreen extends DisquestsBaseScreen {
     QuestBanners.attach(root, quest, actions);
     buildButtons(root, column);
     wireBackButton(root);
+    rememberShownPage();
+  }
+
+  /**
+   * The content scroll ({@code content-scroll}, holding {@code content-area}) takes the height the
+   * header, banners, sections, location card, people and buttons leave, down to a minimum, so the
+   * button row stays on screen.
+   */
+  private void installContentScroll(FlowLayout root) {
+    FlowLayout area = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
+    area.id("content-area");
+    area.gap(2);
+    MinHeightScroll<FlowLayout> scroll =
+        new MinHeightScroll<>(Sizing.fill(85), Sizing.expand(100), area, MIN_CONTENT_HEIGHT);
+    scroll.id("content-scroll");
+    scroll.surface(Surface.DARK_PANEL);
+    scroll.padding(Insets.of(4));
+    replaceSlot(root.childById(FlowLayout.class, "quest-column"), "content-scroll-slot", scroll);
+  }
+
+  /** Records what the page now draws; later cache changes are compared against it. */
+  void rememberShownPage() {
+    this.shownPage = pageSignature(quest);
+    this.seenCacheVersion = ClientCache.getVersion();
+  }
+
+  private static QuestPage.PageSignature pageSignature(Quest shown) {
+    return QuestPage.signature(
+        shown.toData(),
+        QuestGraphs.current(),
+        ClientSession.getEffectivePlayerUuid(),
+        ClientSession.getExpandedQuests(),
+        ClientSession.supportsTrees());
   }
 
   /**
@@ -268,6 +313,8 @@ public class QuestScreen extends DisquestsBaseScreen {
                 quest.getTags(),
                 quest.getPolygon());
             ClientCache.addOrUpdateMyQuest(quest);
+            // The page already shows the toggle: do not rebuild it for this change.
+            rememberShownPage();
           });
     }
 
@@ -335,21 +382,23 @@ public class QuestScreen extends DisquestsBaseScreen {
 
     // Interact button: Join (OPEN), Request (CLOSED); absent otherwise
     ButtonComponent interactBtn = root.childById(ButtonComponent.class, "btn-interact");
-    if (actions.joinOrRequest() && quest.getVisibility() == Visibility.OPEN) {
-      interactBtn.setMessage(Component.translatable("gui.disquests.btn.join"));
-      interactBtn.onPress(ignored -> joinQuest());
-    } else if (actions.joinOrRequest() && quest.getVisibility() == Visibility.CLOSED) {
-      if (ClientSession.isRequested(quest.getId())) {
-        interactBtn.setMessage(Component.translatable("gui.disquests.btn.requested"));
-        interactBtn.active(false);
-        interactBtn.tooltip(Component.translatable("gui.disquests.tooltip.already_requested"));
-      } else {
-        interactBtn.setMessage(Component.translatable("gui.disquests.btn.request"));
-        interactBtn.onPress(ignored -> requestAccess());
+    switch (QuestPage.interact(actions, quest.getVisibility())) {
+      case JOIN -> {
+        interactBtn.setMessage(Component.translatable("gui.disquests.btn.join"));
+        interactBtn.onPress(ignored -> joinQuest());
       }
-    } else {
+      case REQUEST -> {
+        if (ClientSession.isRequested(quest.getId())) {
+          interactBtn.setMessage(Component.translatable("gui.disquests.btn.requested"));
+          interactBtn.active(false);
+          interactBtn.tooltip(Component.translatable("gui.disquests.tooltip.already_requested"));
+        } else {
+          interactBtn.setMessage(Component.translatable("gui.disquests.btn.request"));
+          interactBtn.onPress(ignored -> requestAccess());
+        }
+      }
       // A member, an archived or locked quest, or a Private quest seen without a role
-      buttonRow.removeChild(interactBtn);
+      case NONE -> buttonRow.removeChild(interactBtn);
     }
 
     wire(buttonRow, "btn-edit", actions.edit(), this::enterEditMode);
@@ -1039,8 +1088,30 @@ public class QuestScreen extends DisquestsBaseScreen {
   public void tick() {
     super.tick();
     if (isNewQuest) return;
-    if (ClientCache.getQuestById(quest.getId()) == null) {
+    Quest cached = ClientCache.getQuestById(quest.getId());
+    if (cached == null) {
       this.onClose();
+      return;
+    }
+    if (treePane != null) treePane.tick();
+    refreshIfPageChanged(cached);
+  }
+
+  /**
+   * Rebuilds the reading view, in place and without a history entry, when the cache changed what it
+   * draws: the quest itself (role, people, visibility, completion, lock, banners), the quests in
+   * the pane or the prerequisites. While a confirm dialog is open the check waits until it closes,
+   * so the player's answer is never thrown away. The editor is never rebuilt.
+   */
+  private void refreshIfPageChanged(Quest cached) {
+    if (editing || shownPage == null || minecraft == null) return;
+    long version = ClientCache.getVersion();
+    if (version == seenCacheVersion) return;
+    FlowLayout root = getRootComponent();
+    if (root != null && root.childById(OverlayContainer.class, CONFIRM_OVERLAY_ID) != null) return;
+    seenCacheVersion = version;
+    if (!pageSignature(cached).equals(shownPage)) {
+      minecraft.gui.setScreen(new QuestScreen(this.parent, cached));
     }
   }
 

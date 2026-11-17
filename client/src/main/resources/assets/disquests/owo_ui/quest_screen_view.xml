@@ -76,13 +76,15 @@
                                 <children/>
                             </flow-layout>
 
-                            <!-- Content scroll area (MarkdownWidget added programmatically) -->
-                            <template name="scrollable-list@disquests:templates">
-                                <scroll-id>content-scroll</scroll-id>
-                                <list-id>content-area</list-id>
-                                <width>85</width>
-                                <height>55</height>
-                            </template>
+                            <!-- Content scroll slot: QuestScreen puts content-scroll (a ScrollContainer
+                                 taking the height left, with a minimum) holding content-area here -->
+                            <flow-layout direction="vertical" id="content-scroll-slot">
+                                <sizing>
+                                    <horizontal method="fixed">0</horizontal>
+                                    <vertical method="fixed">0</vertical>
+                                </sizing>
+                                <children/>
+                            </flow-layout>
 
                             <!-- Location card (mini map, coords, map, BlueMap button), zero-sized when unlocated -->
                             <flow-layout direction="horizontal" id="location-card">

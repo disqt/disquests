@@ -59,7 +59,8 @@ final class QuestBanners {
     ButtonComponent keep =
         UIComponents.button(Component.translatable(QuestPage.KEEP_PRIVATE), b -> {});
     keep.id(KEEP_PRIVATE_ID);
-    // The server answers with UPDATE_QUEST; the open screen is then rebuilt without the banner.
+    // Both grey out after a press. The server answers with UPDATE_QUEST and the page is rebuilt,
+    // without the banner, or with fresh enabled buttons if the banner is still due.
     for (ButtonComponent button : List.of(restore, keep)) {
       boolean restoring = button == restore;
       button.sizing(Sizing.content(), Sizing.fixed(20));
@@ -70,7 +71,8 @@ final class QuestBanners {
             PacketSender.resolvePrivatized(quest.getId(), restoring);
           });
     }
-    FlowLayout buttons = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+    // A text flow: in a narrow column the second button goes onto its own row
+    FlowLayout buttons = UIContainers.ltrTextFlow(Sizing.fill(100), Sizing.content());
     buttons.gap(4);
     buttons.child(restore);
     buttons.child(keep);

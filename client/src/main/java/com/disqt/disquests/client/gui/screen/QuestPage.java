@@ -1,7 +1,9 @@
 package com.disqt.disquests.client.gui.screen;
 
 import com.disqt.disquests.client.data.NoticeText.Message;
+import com.disqt.disquests.client.gui.tree.QuestTreeRows;
 import com.disqt.disquests.common.graph.Plans.Counts;
+import com.disqt.disquests.common.graph.QuestGraph;
 import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.Privatized;
 import com.disqt.disquests.common.model.QuestData;
@@ -11,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -134,6 +137,75 @@ public final class QuestPage {
     if (n <= 0) return null;
     return new Message(
         "gui.disquests.confirm." + key + (n == 1 ? "_one" : "_many"), List.<Object>of(n));
+  }
+
+  /** Which interact button a player without a role gets. */
+  public enum Interact {
+    NONE,
+    JOIN,
+    REQUEST
+  }
+
+  /** Join on an Open quest, Request on a Closed one, nothing otherwise or with a role. */
+  public static Interact interact(Actions actions, Visibility visibility) {
+    if (!actions.joinOrRequest()) return Interact.NONE;
+    if (visibility == Visibility.OPEN) return Interact.JOIN;
+    if (visibility == Visibility.CLOSED) return Interact.REQUEST;
+    return Interact.NONE;
+  }
+
+  /** One prerequisite the player can see: a link, ticked when completed. */
+  public record Link(UUID id, String title, boolean completed) {}
+
+  /**
+   * The lines of the Prerequisites section: the visible prerequisites in the view's order, then "…
+   * and something you don't have access to" when the server hid some or the client does not have
+   * one of them, "a deleted quest", and the auto-join line.
+   */
+  public record Prerequisites(
+      List<Link> links, boolean somethingHidden, boolean deleted, boolean autoJoin) {}
+
+  public static Prerequisites prerequisites(QuestData q, QuestGraph graph) {
+    List<Link> links = new ArrayList<>();
+    boolean missing = false;
+    for (UUID id : q.prerequisites()) {
+      QuestData p = graph.get(id);
+      if (p == null) {
+        missing = true;
+      } else {
+        links.add(new Link(id, p.title(), p.isCompleted()));
+      }
+    }
+    return new Prerequisites(
+        List.copyOf(links),
+        q.hiddenPrerequisites() || missing,
+        q.deletedPrerequisite(),
+        q.autoJoin());
+  }
+
+  /** One line of the "where this sits" pane as drawn. */
+  public record PaneLine(QuestTreeRows.Row row, String title, boolean completed) {}
+
+  /**
+   * Everything the reading view draws for a quest and a viewer: the quest's own view (so role,
+   * people, visibility, completion, lock, banners and prerequisite flags), the pane's lines, and
+   * the prerequisite lines (which also drive the locked page's waiting text). Two equal signatures
+   * draw the same page; the open page is rebuilt when its signature changes. The dialog counts are
+   * not part of it: the dialogs read them when they open.
+   */
+  public record PageSignature(QuestData quest, List<PaneLine> pane, Prerequisites prerequisites) {}
+
+  /** {@code trees}: the server supports quest trees, so the pane is drawn. */
+  public static PageSignature signature(
+      QuestData quest, QuestGraph graph, UUID me, Set<UUID> expanded, boolean trees) {
+    List<PaneLine> pane = new ArrayList<>();
+    if (trees) {
+      for (QuestTreeRows.Row row : QuestTreeRows.whereThisSits(graph, me, quest.id(), expanded)) {
+        QuestData q = graph.get(row.id());
+        if (q != null) pane.add(new PaneLine(row, q.title(), q.isCompleted()));
+      }
+    }
+    return new PageSignature(quest, List.copyOf(pane), prerequisites(quest, graph));
   }
 
   /** "Owner", "Write", "Read", or "not joined" without a role. */
