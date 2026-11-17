@@ -6,6 +6,7 @@ import com.disqt.disquests.client.gui.tree.SuggestionText;
 import com.disqt.disquests.client.gui.tree.Suggestions.Suggestion;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.core.UIComponent;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -75,31 +76,29 @@ public class QuestSearchField extends TextFieldComponent {
   /** Lists the suggestions for the current text again (after the caller's data changed). */
   public void refresh() {
     shownFor = getText();
-    dropdown.width(this.width()).show(source.apply(shownFor), this);
+    dropdown.minWidth(this.width()).show(source.apply(shownFor), this);
   }
 
+  /** After a key: only a changed text reopens the list, so Escape and caret moves leave it shut. */
   private void refreshIfChanged() {
-    if (!Objects.equals(shownFor, getText()) || !dropdown.isVisible()) refresh();
+    if (!Objects.equals(shownFor, getText())) refresh();
   }
 
   private static SuggestionDropdown.Entry entry(Suggestion s) {
     SuggestionText.Line line = SuggestionText.of(s, ClientSession.getMaxQuestDepth());
     return new SuggestionDropdown.Entry(
-        Messages.toComponent(line.text()),
+        line.title(),
+        line.reason() != null ? Messages.toComponent(line.reason()) : null,
         line.enabled(),
         line.note() != null ? Messages.toComponent(line.note()) : null);
   }
 
+  /** The dropdown gives the focus back to the field after this. */
   private void picked(Suggestion s) {
     onPick.accept(s.id());
+    if (!hasParent()) return; // the caller rebuilt its pane without this field
     getDelegate().setText("");
-    var focus = focusHandler();
-    if (focus != null && focus.focused() != this) {
-      focus.focus(this, FocusSource.MOUSE_CLICK); // refreshes through onFocusGained
-    } else {
-      getDelegate().setFocused(true); // setText drops the delegate's focus
-      refresh();
-    }
+    refresh();
   }
 
   @Override
@@ -112,11 +111,19 @@ public class QuestSearchField extends TextFieldComponent {
   public void onFocusLost() {
     super.onFocusLost();
     // Deferred: a click on a dropdown row takes the focus before the row sees the click, so
-    // closing right away would remove the row under the cursor. A pick focuses the field again.
+    // closing right away would remove the row under the cursor; a pick or a click on a greyed row
+    // focuses the field again. The dropdown's own scrollbar may hold the focus meanwhile.
     root.queue(
         () -> {
-          var focus = focusHandler();
-          if (focus == null || focus.focused() != this) dropdown.hide();
+          var focus = root.focusHandler();
+          UIComponent focused = focus != null ? focus.focused() : null;
+          if (focused != this && !dropdown.owns(focused)) dropdown.hide();
         });
+  }
+
+  @Override
+  public void dismount(DismountReason reason) {
+    super.dismount(reason);
+    if (reason == DismountReason.REMOVED) dropdown.hide();
   }
 }

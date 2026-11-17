@@ -156,6 +156,15 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
 
   @Override
   public boolean keyPressed(KeyEvent keyInput) {
+    // Escape closes an open confirm dialog, not the screen. The overlay's own Escape handler sits
+    // on the root and stops firing once a component inside it (the checkbox) has the focus.
+    if (keyInput.isEscape() && this.uiAdapter != null) {
+      if (this.uiAdapter.rootComponent.childById(OverlayContainer.class, CONFIRM_OVERLAY_ID)
+          != null) {
+        dismissOverlay();
+        return true;
+      }
+    }
     // Toggle: pressing the open-GUI key while a Disquests screen is open closes it.
     // Check that no text field is focused (avoid closing while typing).
     if (KeyBinds.openGuiKey.matches(keyInput)) {
@@ -256,9 +265,10 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   }
 
   /**
-   * A confirm dialog with an optional muted line under the question ({@code confirm-extra}) and an
-   * optional checkbox ({@code confirm-checkbox}), unticked; Yes passes whether it is ticked (false
-   * without one). Null or empty {@code extraLine} / {@code checkboxLabel} leave them out.
+   * A confirm dialog with an optional checkbox ({@code confirm-checkbox}), unticked, under the
+   * question, and an optional muted line under that ({@code confirm-extra}); Yes passes whether it
+   * is ticked (false without one). Null or empty {@code extraLine} / {@code checkboxLabel} leave
+   * them out.
    */
   protected void showConfirmOverlay(
       String text,
@@ -330,6 +340,9 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     panel.surface(Surface.DARK_PANEL);
     panel.horizontalAlignment(HorizontalAlignment.CENTER);
     panel.child(messageLabel);
+    if (checkbox != null) {
+      panel.child(checkbox);
+    }
     if (extraLine != null) {
       LabelComponent extraLabel = UIComponents.label(extraLine);
       extraLabel.id(CONFIRM_EXTRA_ID);
@@ -338,9 +351,6 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
       extraLabel.maxWidth(250);
       extraLabel.horizontalTextAlignment(HorizontalAlignment.CENTER);
       panel.child(extraLabel);
-    }
-    if (checkbox != null) {
-      panel.child(checkbox);
     }
     panel.child(buttonRow);
 

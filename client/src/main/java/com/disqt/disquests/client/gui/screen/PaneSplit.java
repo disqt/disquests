@@ -49,8 +49,7 @@ public final class PaneSplit {
     divider.onDrag(
         totalDx -> {
           // The divider follows the cursor: dragging away from the pane widens it.
-          double dx = side == Side.RIGHT ? -totalDx : totalDx;
-          int requested = clamp.applyAsInt((int) Math.round(startWidth + dx));
+          int requested = PaneWidth.afterDrag(startWidth, totalDx, side == Side.RIGHT, clamp);
           if (requested != width) {
             width = requested;
             pane.horizontalSizing(Sizing.fixed(requested));

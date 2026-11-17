@@ -1,5 +1,8 @@
 package com.disqt.disquests.client.gui.component;
 
+import static com.disqt.disquests.client.gui.component.DropdownLayout.PADDING;
+import static com.disqt.disquests.client.gui.component.DropdownLayout.SCROLLBAR;
+
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.mojang.blaze3d.platform.InputConstants;
 import io.wispforest.owo.ui.base.BaseUIComponent;
@@ -22,31 +25,36 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.FormattedCharSequence;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * A list of suggestions under (or above) a text field. The rows live in a {@link FlowLayout} (id
  * given by the caller) inside a vertical scroll that is mounted on the screen root with absolute
  * positioning while open; not an {@code OverlayContainer}, which would centre it. The list is never
- * cut: past {@link #MAX_VISIBLE_ROWS} it scrolls.
+ * cut: past {@link DropdownLayout#MAX_VISIBLE_ROWS} it scrolls. The panel is at least as wide as
+ * its anchor and wide enough for its widest row, up to the screen width; a row that still does not
+ * fit shortens its title, never its "(reason)" or its note ({@link TextFit}).
  *
  * <p>Rows ({@code suggestion-<index>}) are reused when the items change, so typing and the arrow
  * keys do not rebuild the panel. Greyed rows show but cannot be picked or selected. The owning
  * field forwards its keys to {@link #onKey}; {@code DisquestsBaseScreen} closes the dropdown on a
- * click outside it and its anchor (the click still goes through).
+ * click outside it and its anchor (the click still goes through). After a pick the anchor gets the
+ * focus back.
  */
 public class SuggestionDropdown<T> {
 
-  /** How one item reads: its text, whether it can be picked, and an optional right-aligned note. */
-  public record Entry(Component text, boolean enabled, @Nullable Component note) {}
+  /**
+   * How one item reads: a title (shortened when needed), an optional suffix drawn after it and
+   * always kept whole (the bracketed reason of a greyed row), whether it can be picked, and an
+   * optional right-aligned note.
+   */
+  public record Entry(
+      String title, @Nullable Component suffix, boolean enabled, @Nullable Component note) {}
 
-  public static final int ROW_HEIGHT = 13;
-  public static final int MAX_VISIBLE_ROWS = 10;
-  private static final int PADDING = 2;
-  private static final int SCROLLBAR = 3;
+  public static final int ROW_HEIGHT = DropdownLayout.ROW_HEIGHT;
   private static final int TEXT_INSET = 4;
   private static final int NOTE_GAP = 8;
+  private static final int TEXT_Y = 2;
 
   private final FlowLayout root;
   private final Function<T, Entry> renderer;
@@ -60,7 +68,7 @@ public class SuggestionDropdown<T> {
   private int selected = SuggestionSelection.NONE;
   private boolean pickOnTab;
   private boolean preferAbove;
-  private int fixedWidth;
+  private int minWidth;
   @Nullable private UIComponent anchor;
 
   /**
@@ -98,9 +106,9 @@ public class SuggestionDropdown<T> {
     return this;
   }
 
-  /** Fixed panel width, for example the field's; 0 (default) fits the longest row. */
-  public SuggestionDropdown<T> width(int width) {
-    this.fixedWidth = width;
+  /** Minimum panel width, for example the field's; 0 (default) fits the longest row. */
+  public SuggestionDropdown<T> minWidth(int minWidth) {
+    this.minWidth = minWidth;
     return this;
   }
 
@@ -112,7 +120,7 @@ public class SuggestionDropdown<T> {
   /**
    * Shows {@code items} next to a line of text whose top-left corner is ({@code x}, {@code y}) in
    * screen coordinates; an empty list closes the dropdown. A click on {@code anchor} (if any) does
-   * not close it.
+   * not close it, and it gets the focus back after a pick.
    */
   public void show(List<T> items, int x, int y, int lineHeight, @Nullable UIComponent anchor) {
     if (items.isEmpty()) {
@@ -125,44 +133,45 @@ public class SuggestionDropdown<T> {
 
     int n = this.items.size();
     this.enabled = new boolean[n];
-    int naturalWidth = 0;
+    int widest = 0;
     for (int i = 0; i < n; i++) {
       Entry entry = renderer.apply(this.items.get(i));
       enabled[i] = entry.enabled();
       Row row = row(i);
       row.set(entry);
-      naturalWidth = Math.max(naturalWidth, row.naturalWidth(font));
+      widest = Math.max(widest, row.naturalWidth(font));
     }
     while (rows.size() > n) {
       list.removeChild(rows.removeLast());
     }
-    boolean scrolls = n > MAX_VISIBLE_ROWS;
-    // Rows stop short of the scrollbar, which owo draws inside the padding box on the right.
-    int chrome = 2 * PADDING + (scrolls ? SCROLLBAR + 1 : 0);
-    int width = Math.min(fixedWidth > 0 ? fixedWidth : naturalWidth + chrome, root.width());
-    int height = Math.min(Math.min(n, MAX_VISIBLE_ROWS) * ROW_HEIGHT + 2 * PADDING, root.height());
-    for (Row row : rows) {
-      row.sizing(Sizing.fixed(Math.max(0, width - chrome)), Sizing.fixed(ROW_HEIGHT));
-    }
 
-    int below = y + lineHeight + 1;
-    int above = y - height - 1;
-    boolean fitsBelow = below + height <= root.y() + root.height();
-    boolean fitsAbove = above >= root.y();
-    int top =
-        preferAbove
-            ? (fitsAbove || !fitsBelow ? above : below)
-            : (fitsBelow || !fitsAbove ? below : above);
-    top = clamp(top, root.y(), root.y() + root.height() - height);
-    int left = clamp(x, root.x(), root.x() + root.width() - width);
+    int width = DropdownLayout.width(minWidth, widest, n, root.width());
+    int height = DropdownLayout.height(n, root.height());
+    // Rows stop short of the scrollbar, which owo draws inside the padding box on the right.
+    int rowWidth = Math.max(0, width - DropdownLayout.chrome(n));
+    for (Row row : rows) {
+      row.sizing(Sizing.fixed(rowWidth), Sizing.fixed(ROW_HEIGHT));
+    }
+    Insets pad = root.padding().get();
+    DropdownLayout.Placement place =
+        DropdownLayout.place(
+            x,
+            y,
+            lineHeight,
+            width,
+            height,
+            new DropdownLayout.Root(
+                root.x(), root.y(), root.width(), root.height(), pad.left(), pad.top()),
+            preferAbove);
 
     panel.sizing(Sizing.fixed(width), Sizing.fixed(height));
-    panel.positioning(Positioning.absolute(left - root.x(), top - root.y()));
-    panel.scrollTo(0.0);
-    select(SuggestionSelection.first(enabled));
+    panel.positioning(Positioning.absolute(place.x(), place.y()));
     if (!isVisible()) {
       root.child(panel);
     }
+    // Mounted (and laid out) first, so the selected row can be scrolled into view
+    panel.scrollTo(0.0);
+    select(SuggestionSelection.first(enabled));
   }
 
   public void hide() {
@@ -173,6 +182,14 @@ public class SuggestionDropdown<T> {
 
   public boolean isVisible() {
     return root.children().contains(panel);
+  }
+
+  /** Whether {@code component} is this dropdown's panel or inside it. */
+  public boolean owns(@Nullable UIComponent component) {
+    for (UIComponent c = component; c != null; c = c.parent()) {
+      if (c == panel) return true;
+    }
+    return false;
   }
 
   /** Arrow keys, Enter (and Tab when enabled) and Escape while open; true when consumed. */
@@ -231,10 +248,22 @@ public class SuggestionDropdown<T> {
     T item = items.get(index);
     hide();
     onPick.accept(item);
+    refocusAnchor();
   }
 
-  private static int clamp(int value, int min, int max) {
-    return Math.max(min, Math.min(max, value));
+  /**
+   * Gives the focus back to the anchor (a click on a row, which cannot take focus, cleared it), if
+   * it is still on screen.
+   */
+  private void refocusAnchor() {
+    if (anchor == null || !anchor.hasParent()) return;
+    var focus = root.focusHandler();
+    if (focus == null) return;
+    if (focus.focused() != anchor) {
+      focus.focus(anchor, UIComponent.FocusSource.MOUSE_CLICK);
+    } else if (anchor instanceof TextFieldComponent field) {
+      field.getDelegate().setFocused(true); // a setText in onPick drops the widget's own focus
+    }
   }
 
   /**
@@ -261,14 +290,23 @@ public class SuggestionDropdown<T> {
     }
   }
 
-  /** One suggestion: a leaf that draws its text, greyed or not, and its note right-aligned. */
+  /**
+   * One suggestion: a leaf that draws its title (shortened if needed), its kept suffix, greyed or
+   * not, and its note right-aligned.
+   */
   public static final class Row extends BaseUIComponent {
     private final SuggestionDropdown<?> owner;
     private final int index;
-    private Component text = Component.empty();
+    private String title = "";
+    @Nullable private Component suffix;
+    private String suffixText = "";
     private boolean enabled;
     @Nullable private Component note;
     private boolean selected;
+
+    // The title as drawn, recomputed only when the text or the room for it changes
+    private int fittedFor = -1;
+    private String fittedTitle = "";
 
     Row(SuggestionDropdown<?> owner, int index) {
       this.owner = owner;
@@ -276,9 +314,12 @@ public class SuggestionDropdown<T> {
     }
 
     void set(Entry entry) {
-      this.text = entry.text();
+      this.title = entry.title() != null ? entry.title() : "";
+      this.suffix = entry.suffix();
+      this.suffixText = suffix != null ? suffix.getString() : "";
       this.enabled = entry.enabled();
       this.note = entry.note();
+      this.fittedFor = -1;
     }
 
     /** Whether this row can be picked. */
@@ -286,13 +327,13 @@ public class SuggestionDropdown<T> {
       return enabled;
     }
 
-    /** The row's text as shown (without its note). */
+    /** The row's full text (title and suffix, without the note). */
     public String text() {
-      return text.getString();
+      return suffixText.isEmpty() ? title : title + " " + suffixText;
     }
 
     int naturalWidth(Font font) {
-      int w = font.width(text) + 2 * TEXT_INSET;
+      int w = font.width(text()) + 2 * TEXT_INSET;
       if (note != null) w += NOTE_GAP + font.width(note);
       return w;
     }
@@ -320,21 +361,34 @@ public class SuggestionDropdown<T> {
       int textRight = x + w - TEXT_INSET;
       if (note != null) {
         int noteWidth = font.width(note);
-        context.text(font, note, textRight - noteWidth, y + 2, Colors.TEXT_MUTED, true);
+        context.text(font, note, textRight - noteWidth, y + TEXT_Y, Colors.TEXT_MUTED, true);
         textRight -= noteWidth + NOTE_GAP;
       }
-      int available = Math.max(0, textRight - (x + TEXT_INSET));
-      List<FormattedCharSequence> lines = font.split(text, Math.max(1, available));
-      if (!lines.isEmpty()) {
-        int color = enabled ? Colors.DROPDOWN_TEXT : Colors.TEXT_DISABLED;
-        context.text(font, lines.getFirst(), x + TEXT_INSET, y + 2, color, true);
+      int left = x + TEXT_INSET;
+      int available = textRight - left;
+      if (available != fittedFor) {
+        fittedTitle = TextFit.title(title, suffixText, available, font::width);
+        fittedFor = available;
+      }
+      int color = enabled ? Colors.DROPDOWN_TEXT : Colors.TEXT_DISABLED;
+      int textEnd = left;
+      if (!fittedTitle.isEmpty()) {
+        context.text(font, fittedTitle, left, y + TEXT_Y, color, true);
+        textEnd += font.width(fittedTitle + " ");
+      }
+      if (suffix != null) {
+        context.text(font, suffix, textEnd, y + TEXT_Y, color, true);
       }
     }
 
     @Override
     public boolean onMouseDown(MouseButtonEvent click, boolean doubled) {
       if (click.button() != InputConstants.MOUSE_BUTTON_LEFT) return false;
-      owner.pick(index);
+      if (enabled) {
+        owner.pick(index);
+      } else {
+        owner.refocusAnchor(); // the press cleared the field's focus; a greyed row keeps it open
+      }
       return true;
     }
   }

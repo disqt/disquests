@@ -52,7 +52,7 @@
   "gui.disquests.refusal.{}": {
     "self": "une quête ne peut pas se contenir ni s'attendre elle-même",
     "loop": "ça ferait une boucle",
-    "too_deep": "trop profond (limite : %d niveaux)",
+    "too_deep": "trop profond, limite de %d niveaux",
     "completed": "elle est terminée",
     "target_completed": "cette quête est terminée",
     "linked_by_prerequisite": "l'une se débloque après l'autre",
@@ -67,8 +67,7 @@
 
   // Listes de recherche de quêtes (« ajouter une sous-quête... », « Prérequis »)
   "gui.disquests.suggestion.{}": {
-    "title": "%s",
-    "refused": "%s (%s)",
+    "reason": "(%s)",
     "with_role": "%s, %s",
     "role_read": "tu as Read",
     "role_write": "tu as Write",

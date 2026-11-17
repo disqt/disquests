@@ -147,4 +147,43 @@ class DropTrackerTest {
       assertNull(tracker.current());
     }
   }
+
+  @Nested
+  class Clipped {
+    // The list shows only rows a and b (y 0 to 24); row c is scrolled out of view, and the strip
+    // sits right under the list, where c's layout box still is.
+    private final DropTracker.Zone strip =
+        DropTracker.area(
+            "out", () -> 10, () -> 24, () -> 100, () -> 10, on -> log.add(on ? "out+" : "out-"));
+    private final DropTracker tracker =
+        new DropTracker(
+            List.of(a, b, c), List.of(strip), () -> new DropTracker.Bounds(10, 0, 100, 24));
+
+    static Stream<Arguments> points() {
+      return Stream.of(
+          Arguments.of("visible row", 50, 15, "b"),
+          Arguments.of("hidden row under the strip: the strip wins", 50, 28, "out"),
+          Arguments.of("hidden row below the strip: nothing", 50, 35, null),
+          Arguments.of("strip outside the list is not clipped", 50, 33, "out"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("points")
+    void hiddenPartsOfRowsTakeNoDrop(String name, int x, int y, String expected) {
+      DropTracker.Zone hit = tracker.zoneAt(null, x, y);
+      assertEquals(expected, hit == null ? null : hit.id());
+    }
+
+    @Test
+    void dropOnTheStripOverAHiddenRow() {
+      tracker.moved(a, 50, 28);
+      assertSame(strip, tracker.dropped(a, 50, 28));
+      assertEquals(List.of("out+", "out-"), log);
+    }
+
+    @Test
+    void unclippedTrackerStillSeesTheRow() {
+      assertSame(c, new DropTracker(List.of(a, b, c, strip)).zoneAt(null, 50, 28));
+    }
+  }
 }

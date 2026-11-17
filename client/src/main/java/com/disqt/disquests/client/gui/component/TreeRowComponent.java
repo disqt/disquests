@@ -1,19 +1,18 @@
 package com.disqt.disquests.client.gui.component;
 
+import com.disqt.disquests.client.gui.component.TreeRowGeometry.Part;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.mojang.blaze3d.platform.InputConstants;
 import io.wispforest.owo.ui.base.BaseUIComponent;
 import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.UIComponent;
-import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.FormattedCharSequence;
 
 /**
  * One line of a quest tree, drawn by itself: a single leaf, because owo delivers drags only to the
@@ -21,23 +20,21 @@ import net.minecraft.util.FormattedCharSequence;
  *
  * <p>From the left: the expand toggle (when the quest has listed subquests), a lock or a tick, the
  * title and the subquest count; at the right, the "not saved" marker and, when removable, the
- * remove hit zone. Locks and ticks are drawn only, never clickable.
+ * remove hit zone. Locks and ticks are drawn only, never clickable. Layout and hit zones come from
+ * {@link TreeRowGeometry}.
  *
  * <p>Read mode: a click opens the quest, the toggle expands or collapses it. Edit mode: nothing
- * navigates; the remove zone removes, and a press on a draggable row that moves more than {@link
- * #DRAG_THRESHOLD} px starts a drag reported to the screen's {@link DragTarget} in absolute
- * coordinates (the screen hit-tests with {@link DropTracker} and calls {@link #highlighted}).
+ * navigates; the remove zone removes, and a left press on a draggable row that moves more than
+ * {@link #DRAG_THRESHOLD} px starts a drag reported to the screen's {@link DragTarget} in absolute
+ * coordinates (the screen hit-tests with {@link DropTracker} and calls {@link #highlighted}). A
+ * completed quest never drags and never shows the remove zone.
  */
 public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zone {
 
   public static final int ROW_HEIGHT = 12;
-  public static final int INDENT = 10;
   public static final int DRAG_THRESHOLD = 4;
-  private static final int LEFT = 2;
-  private static final int TOGGLE_WIDTH = 9;
-  private static final int ICON_WIDTH = 10;
-  private static final int REMOVE_WIDTH = 12;
   private static final int GAP = 6;
+  private static final int COUNT_GAP = 4;
   private static final int TEXT_Y = 2;
 
   /**
@@ -60,13 +57,6 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
       int childCount,
       boolean expanded) {}
 
-  /** The clickable parts of a row, for {@link #pointFor}. */
-  public enum Part {
-    BODY,
-    TOGGLE,
-    REMOVE
-  }
-
   /** The screen side of a drag; positions are absolute GUI coordinates. */
   public interface DragTarget {
     void dragMoved(TreeRowComponent source, int absX, int absY);
@@ -77,8 +67,9 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
   }
 
   private final Line line;
+  private final String title;
   private final Component marker;
-  private final Component count;
+  private final String count;
 
   private boolean editMode;
   private Consumer<UUID> onOpen = id -> {};
@@ -92,13 +83,18 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
   private double pressX;
   private double pressY;
 
+  // The title as drawn, recomputed only when the room for it changes
+  private int fittedFor = -1;
+  private String fittedTitle = "";
+
   public TreeRowComponent(Line line) {
     this.line = line;
+    this.title = line.title() != null ? line.title() : "";
     this.marker =
         line.takenOut()
             ? Component.translatable("gui.disquests.tree.taken_out")
             : line.changed() ? Component.translatable("gui.disquests.tree.not_saved") : null;
-    this.count = line.childCount() > 0 ? Component.literal("(" + line.childCount() + ")") : null;
+    this.count = line.childCount() > 0 ? "(" + line.childCount() + ")" : "";
     this.id("tree-row-" + line.questId());
     this.sizing(Sizing.fill(100), Sizing.fixed(ROW_HEIGHT));
   }
@@ -157,40 +153,31 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
    * row does not have that part in its current mode.
    */
   public double[] pointFor(Part part) {
+    TreeRowGeometry g = geometry();
     double cy = y() + ROW_HEIGHT / 2.0;
     return switch (part) {
-      case BODY -> new double[] {x() + titleX() + 4, cy};
-      case TOGGLE -> hasToggle() ? new double[] {x() + toggleX() + TOGGLE_WIDTH / 2.0, cy} : null;
-      case REMOVE -> hasRemove() ? new double[] {x() + width() - REMOVE_WIDTH / 2.0, cy} : null;
+      case BODY -> new double[] {x() + g.titleX() + 4, cy};
+      case TOGGLE ->
+          g.hasToggle()
+              ? new double[] {x() + g.toggleX() + TreeRowGeometry.TOGGLE_WIDTH / 2.0, cy}
+              : null;
+      case REMOVE ->
+          g.hasRemove()
+              ? new double[] {x() + g.removeX() + TreeRowGeometry.REMOVE_WIDTH / 2.0, cy}
+              : null;
     };
   }
 
-  // --- geometry, relative to the row ---
-
-  private boolean hasToggle() {
-    return !editMode && line.childCount() > 0;
-  }
-
-  private boolean hasRemove() {
-    return editMode && line.removable();
-  }
-
-  private int toggleX() {
-    return LEFT + line.depth() * INDENT;
-  }
-
-  private int iconX() {
-    return toggleX() + TOGGLE_WIDTH;
-  }
-
-  private int titleX() {
-    return iconX() + (line.locked() || line.completed() ? ICON_WIDTH : 0);
-  }
-
-  private Part partAt(double relX) {
-    if (hasRemove() && relX >= width() - REMOVE_WIDTH) return Part.REMOVE;
-    if (hasToggle() && relX >= toggleX() && relX < toggleX() + TOGGLE_WIDTH) return Part.TOGGLE;
-    return Part.BODY;
+  private TreeRowGeometry geometry() {
+    return new TreeRowGeometry(
+        line.depth(),
+        editMode,
+        line.childCount(),
+        line.locked(),
+        line.completed(),
+        line.removable(),
+        line.draggable(),
+        width());
   }
 
   // --- size ---
@@ -198,7 +185,7 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
   @Override
   protected int determineHorizontalContentSize(Sizing sizing) {
     Font font = Minecraft.getInstance().font;
-    return titleX() + font.width(line.title() != null ? line.title() : "") + REMOVE_WIDTH;
+    return geometry().titleX() + font.width(title) + TreeRowGeometry.REMOVE_WIDTH;
   }
 
   @Override
@@ -211,67 +198,68 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
   @Override
   public void draw(OwoUIGraphics context, int mouseX, int mouseY, float partialTicks, float delta) {
     Font font = Minecraft.getInstance().font;
+    TreeRowGeometry g = geometry();
     int x = x();
     int y = y();
     int w = width();
     boolean hovered = isInBoundingBox(mouseX, mouseY);
+    Part hoveredPart = hovered ? g.partAt(mouseX - x) : null;
 
     if (highlighted) {
       context.fill(x, y, x + w, y + ROW_HEIGHT, Colors.TREE_DROP_TARGET);
       context.drawRectOutline(x, y, w, ROW_HEIGHT, Colors.TEXT_PRIMARY);
     } else if (line.current() || dragging) {
       context.fill(x, y, x + w, y + ROW_HEIGHT, Colors.ENTRY_SELECTED);
-    } else if (hovered && (!editMode || line.draggable())) {
+    } else if (hovered && (!editMode || g.canDrag())) {
       context.fill(x, y, x + w, y + ROW_HEIGHT, Colors.ENTRY_HOVER);
     }
 
-    if (hasToggle()) {
-      boolean toggleHovered = hovered && partAt(mouseX - x) == Part.TOGGLE;
+    if (g.hasToggle()) {
       context.text(
           font,
           line.expanded() ? "▾" : "▸",
-          x + toggleX() + 1,
+          x + g.toggleX() + 1,
           y + TEXT_Y,
-          toggleHovered ? Colors.TEXT_PRIMARY : Colors.TEXT_MUTED,
+          hoveredPart == Part.TOGGLE ? Colors.TEXT_PRIMARY : Colors.TEXT_MUTED,
           false);
     }
     if (line.completed()) {
-      context.text(font, "✔", x + iconX(), y + TEXT_Y, Colors.TREE_COMPLETED, false);
+      context.text(font, "✔", x + g.iconX(), y + TEXT_Y, Colors.TREE_COMPLETED, false);
     } else if (line.locked()) {
-      drawLock(context, x + iconX(), y + 1);
+      drawLock(context, x + g.iconX(), y + 1);
     }
 
-    int right = x + w - (hasRemove() ? REMOVE_WIDTH : 0) - LEFT;
-    if (hasRemove()) {
-      boolean removeHovered = hovered && partAt(mouseX - x) == Part.REMOVE;
+    if (g.hasRemove()) {
       context.text(
           font,
           "×",
-          x + w - REMOVE_WIDTH + 3,
+          x + g.removeX() + 3,
           y + TEXT_Y,
-          removeHovered ? Colors.BADGE_RED : Colors.TEXT_MUTED,
+          hoveredPart == Part.REMOVE ? Colors.BADGE_RED : Colors.TEXT_MUTED,
           false);
     }
+    int right = x + g.removeX() - TreeRowGeometry.LEFT;
     if (marker != null) {
-      int markerWidth = font.width(marker);
-      right -= markerWidth;
+      right -= font.width(marker);
       context.text(font, marker, right, y + TEXT_Y, Colors.AMBER, false);
       right -= GAP;
     }
 
-    int titleLeft = x + titleX();
-    int countWidth = count != null ? font.width(count) + 4 : 0;
-    int available = Math.max(1, right - titleLeft - countWidth);
-    String title = line.title() != null ? line.title() : "";
-    List<FormattedCharSequence> lines = font.split(Component.literal(title), available);
-    int titleColor = line.locked() || line.completed() ? Colors.TEXT_MUTED : Colors.TEXT_PRIMARY;
-    int titleEnd = titleLeft;
-    if (!lines.isEmpty()) {
-      context.text(font, lines.getFirst(), titleLeft, y + TEXT_Y, titleColor, false);
-      titleEnd += font.width(lines.getFirst());
+    int titleLeft = x + g.titleX();
+    int available = right - titleLeft;
+    if (available != fittedFor) {
+      // The count is kept whole; the title gives way, down to nothing
+      fittedTitle = TextFit.title(title, count, available, font::width);
+      fittedFor = available;
     }
-    if (count != null) {
-      context.text(font, count, titleEnd + 4, y + TEXT_Y, Colors.TEXT_MUTED, false);
+    int titleColor = line.locked() || line.completed() ? Colors.TEXT_MUTED : Colors.TEXT_PRIMARY;
+    int textEnd = titleLeft;
+    if (!fittedTitle.isEmpty()) {
+      context.text(font, fittedTitle, titleLeft, y + TEXT_Y, titleColor, false);
+      textEnd += font.width(fittedTitle) + COUNT_GAP;
+    }
+    if (!count.isEmpty() && font.width(count) <= right - textEnd) {
+      context.text(font, count, textEnd, y + TEXT_Y, Colors.TEXT_MUTED, false);
     }
   }
 
@@ -294,7 +282,8 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
   @Override
   public boolean onMouseDown(MouseButtonEvent click, boolean doubled) {
     if (click.button() != InputConstants.MOUSE_BUTTON_LEFT) return false;
-    Part part = partAt(click.x());
+    TreeRowGeometry g = geometry();
+    Part part = g.partAt(click.x());
     if (!editMode) {
       if (part == Part.TOGGLE) {
         onToggle.accept(line.questId());
@@ -307,7 +296,7 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
       onRemove.accept(line.questId());
       return true;
     }
-    if (line.draggable() && dragTarget != null) {
+    if (g.canDrag() && dragTarget != null) {
       pressed = true;
       pressX = click.x();
       pressY = click.y();
@@ -331,6 +320,8 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
 
   @Override
   public boolean onMouseUp(MouseButtonEvent click) {
+    // Only the button that started the drag ends it
+    if (click.button() != InputConstants.MOUSE_BUTTON_LEFT) return false;
     boolean wasPressed = pressed;
     pressed = false;
     if (dragging) {

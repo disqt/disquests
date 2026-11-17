@@ -3,6 +3,7 @@ package com.disqt.disquests.client.gui.component;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.IntSupplier;
+import java.util.function.Supplier;
 
 /**
  * The screen side of a tree-row drag: finds the row or drop area under the cursor and keeps exactly
@@ -27,12 +28,34 @@ public final class DropTracker {
     void highlighted(boolean highlighted);
   }
 
-  private final List<Zone> zones;
+  /** A rectangle in absolute GUI coordinates. */
+  public record Bounds(int x, int y, int width, int height) {
+    public boolean contains(int px, int py) {
+      return px >= x && px < x + width && py >= y && py < y + height;
+    }
+  }
+
+  private final List<Zone> rows;
+  private final List<Zone> extras;
+  private final Supplier<Bounds> visible;
   private Zone current;
 
-  /** Zones are hit-tested in list order; the first one containing the point wins. */
+  /** Zones are hit-tested in list order, unclipped; the first one containing the point wins. */
   public DropTracker(List<? extends Zone> zones) {
-    this.zones = List.copyOf(zones);
+    this(zones, List.of(), null);
+  }
+
+  /**
+   * Rows inside a scrolling list and extra areas outside it. A row only counts where it is visible,
+   * inside {@code visible} (the scroll container's bounds, read at each test; null for no
+   * clipping), so a row scrolled out of view never takes a drop; {@code extras} are never clipped.
+   * Rows are tested before extras, each list in order.
+   */
+  public DropTracker(
+      List<? extends Zone> rows, List<? extends Zone> extras, Supplier<Bounds> visible) {
+    this.rows = List.copyOf(rows);
+    this.extras = List.copyOf(extras);
+    this.visible = visible;
   }
 
   /** A drop area whose bounds are read when tested, so it follows layout changes. */
@@ -85,9 +108,18 @@ public final class DropTracker {
     return null;
   }
 
+  /** The zone under the point for this tracker: a visible part of a row, else an extra area. */
+  public Zone zoneAt(Zone source, int x, int y) {
+    if (visible == null || visible.get().contains(x, y)) {
+      Zone row = at(rows, source, x, y);
+      if (row != null) return row;
+    }
+    return at(extras, source, x, y);
+  }
+
   /** The cursor moved during a drag: highlights the zone now under it, returns it (or null). */
   public Zone moved(Zone source, int x, int y) {
-    Zone under = at(zones, source, x, y);
+    Zone under = zoneAt(source, x, y);
     if (under != current) {
       if (current != null) current.highlighted(false);
       if (under != null) under.highlighted(true);
@@ -98,7 +130,7 @@ public final class DropTracker {
 
   /** The zone under the cursor at the drop, or null; clears the highlight. */
   public Zone dropped(Zone source, int x, int y) {
-    Zone under = at(zones, source, x, y);
+    Zone under = zoneAt(source, x, y);
     clear();
     return under;
   }

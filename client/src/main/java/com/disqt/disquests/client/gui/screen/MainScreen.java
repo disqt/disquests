@@ -230,7 +230,7 @@ public class MainScreen extends DisquestsBaseScreen {
         new SuggestionDropdown<String>(
                 root,
                 "tag-autocomplete-overlay",
-                tag -> new SuggestionDropdown.Entry(Component.literal("#" + tag), true, null),
+                tag -> new SuggestionDropdown.Entry("#" + tag, null, true, null),
                 tag -> {
                   // Replace the current #partial with #tagname
                   String current = searchField.getValue();

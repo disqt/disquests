@@ -43,7 +43,7 @@ class NoticeLangKeysTest {
       for (Refusal r : new Refusal[] {null, Refusal.NEED_OWNER}) {
         SuggestionText.Line line =
             SuggestionText.of(new Suggestions.Suggestion(UUID.randomUUID(), "t", r, note), 3);
-        collect(line.text(), keys);
+        if (line.reason() != null) collect(line.reason(), keys);
         if (line.note() != null) collect(line.note(), keys);
       }
     }

@@ -15,8 +15,12 @@ public final class SuggestionText {
 
   private static final String KEY = "gui.disquests.suggestion.";
 
-  /** The line's text, whether it can be picked, and the right-aligned note (null for none). */
-  public record Line(Message text, boolean enabled, Message note) {}
+  /**
+   * The title; the bracketed reason drawn after it, kept whole when the title has to be shortened
+   * (null when the quest can be added); whether it can be picked; the right-aligned note (null for
+   * none).
+   */
+  public record Line(String title, Message reason, boolean enabled, Message note) {}
 
   private SuggestionText() {}
 
@@ -27,14 +31,14 @@ public final class SuggestionText {
           Suggestions.INSIDE_ANOTHER.equals(s.note())
               ? new Message(KEY + "inside_another", List.of())
               : null;
-      return new Line(new Message(KEY + "title", List.of(title)), true, note);
+      return new Line(title, null, true, note);
     }
     Message reason = NoticeText.refusal(s.reason(), maxQuestDepth);
     String role = s.reason() == Refusal.NEED_OWNER ? roleKey(s.note()) : null;
     if (role != null) {
       reason = new Message(KEY + "with_role", List.of(reason, new Message(role, List.of())));
     }
-    return new Line(new Message(KEY + "refused", List.of(title, reason)), false, null);
+    return new Line(title, new Message(KEY + "reason", List.of(reason)), false, null);
   }
 
   /** The "you have ..." key for the role the note names ("" = none); null when it names none. */

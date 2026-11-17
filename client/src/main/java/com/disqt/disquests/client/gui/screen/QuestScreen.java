@@ -420,7 +420,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         new SuggestionDropdown<String>(
             root,
             "autocomplete-overlay",
-            title -> new SuggestionDropdown.Entry(Component.literal(title), true, null),
+            title -> new SuggestionDropdown.Entry(title, null, true, null),
             title -> {
               // Replace the partial query after [[ with the full title + ]]
               String current = contentFieldComponent.getText();
@@ -432,14 +432,20 @@ public class QuestScreen extends DisquestsBaseScreen {
                 contentFieldComponent.getDelegate().setText(before + title + "]]" + after);
               }
             });
+    // The text the list was last shown for: caret moves and Escape leave the list as it is
+    String[] shownFor = {null};
     contentFieldComponent.setAutocomplete(
         autocomplete,
         () -> {
+          String text = contentFieldComponent.getText();
           String query = contentFieldComponent.wikiLinkQuery();
           if (query == null) {
             autocomplete.hide();
+            shownFor[0] = text;
             return;
           }
+          if (text.equals(shownFor[0])) return;
+          shownFor[0] = text;
           autocomplete.show(
               wikiLinkTitles(query),
               contentFieldComponent.cursorScreenX(),

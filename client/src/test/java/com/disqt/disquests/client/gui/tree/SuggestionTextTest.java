@@ -29,21 +29,21 @@ class SuggestionTextTest {
     @Test
     void titleOnly() {
       assertEquals(
-          new Line(msg(K + "title", "Wagons"), true, null),
+          new Line("Wagons", null, true, null),
           SuggestionText.of(new Suggestion(ID, "Wagons", null, null), 3));
     }
 
     @Test
     void insideAnotherQuestNote() {
       assertEquals(
-          new Line(msg(K + "title", "Wagons"), true, msg(K + "inside_another")),
+          new Line("Wagons", null, true, msg(K + "inside_another")),
           SuggestionText.of(new Suggestion(ID, "Wagons", null, Suggestions.INSIDE_ANOTHER), 3));
     }
 
     @Test
     void missingTitleReadsEmpty() {
       assertEquals(
-          new Line(msg(K + "title", ""), true, null),
+          new Line("", null, true, null),
           SuggestionText.of(new Suggestion(ID, null, null, null), 3));
     }
   }
@@ -87,7 +87,7 @@ class SuggestionTextTest {
     void reasonInBracketsAfterTheTitle(
         String name, Refusal reason, String note, Message expectedReason) {
       assertEquals(
-          new Line(msg(K + "refused", "Les wagons", expectedReason), false, null),
+          new Line("Les wagons", msg(K + "reason", expectedReason), false, null),
           SuggestionText.of(new Suggestion(ID, "Les wagons", reason, note), 4));
     }
   }

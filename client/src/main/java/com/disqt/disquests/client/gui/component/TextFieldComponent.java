@@ -47,7 +47,8 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
 
   /**
    * Attaches a dropdown: while it is open it gets the arrow keys, Enter and Escape first, and
-   * {@code onEdit} runs after every other key or character typed (to refresh the suggestions).
+   * {@code onEdit} runs after every other key (except Escape) or character typed, to refresh the
+   * suggestions.
    */
   public void setAutocomplete(SuggestionDropdown<?> dropdown, Runnable onEdit) {
     this.dropdown = dropdown;
@@ -144,7 +145,8 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
     }
     delegate.setFocused(true);
     boolean result = delegate.keyPressed(keyInput);
-    if (onEdit != null) onEdit.run();
+    // Escape never reopens a dismissed dropdown; unconsumed, it closes the screen as usual
+    if (onEdit != null && !keyInput.isEscape()) onEdit.run();
     return result;
   }
 
@@ -161,16 +163,7 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
    * null when the cursor is not inside one.
    */
   public String wikiLinkQuery() {
-    String text = delegate.getText();
-    if (text == null || text.isEmpty()) return null;
-    int cursorPos = delegate.getCursorAbsolute();
-    if (cursorPos < 2) return null;
-    // Find the last [[ before cursor
-    int openBracket = text.lastIndexOf("[[", cursorPos - 1);
-    if (openBracket < 0 || openBracket + 2 > cursorPos) return null;
-    // Ensure there is no closing ]] between the [[ and cursor
-    String afterOpen = text.substring(openBracket + 2, cursorPos);
-    return afterOpen.contains("]]") ? null : afterOpen;
+    return WikiLinkQuery.at(delegate.getText(), delegate.getCursorAbsolute());
   }
 
   /** Screen x of the cursor. */
