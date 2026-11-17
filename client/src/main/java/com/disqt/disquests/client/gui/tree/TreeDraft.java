@@ -4,6 +4,7 @@ import com.disqt.disquests.common.graph.LinkRules;
 import com.disqt.disquests.common.graph.QuestGraph;
 import com.disqt.disquests.common.graph.Refusal;
 import com.disqt.disquests.common.model.QuestData;
+import com.disqt.disquests.common.model.Role;
 import com.disqt.disquests.common.model.TreeOp;
 import com.disqt.disquests.common.model.TreeOp.Kind;
 import java.util.ArrayList;
@@ -29,14 +30,22 @@ import java.util.UUID;
  *
  * <p>A quest whose parent the player cannot see shows as top level, but on the server it still has
  * that parent. The draft tracks it as "in a hidden quest", so moving it away and back out is a real
- * change, and a swap with it puts the subquest into that hidden quest, as the server does.
+ * change, and a swap with it puts the subquest into that hidden quest, as the server does. {@link
+ * #detachFromHiddenParent} takes such a quest out of the parent it cannot see.
+ *
+ * <p>After each change the shortened list becomes the draft's history, so the cost of shortening
+ * does not grow with every move.
  */
 public final class TreeDraft {
 
   /** Stands for a parent the player cannot see when comparing parents. */
   private static final UUID HIDDEN = new UUID(0, 0);
 
-  private record Step(TreeOp op, UUID actor, int maxDepth) {}
+  /**
+   * One accepted change. {@code fromHidden}: a DETACH out of a parent the player cannot see,
+   * checked by {@link #hiddenDetachRefusal} instead of {@link LinkRules#detach}.
+   */
+  private record Step(TreeOp op, UUID actor, int maxDepth, boolean fromHidden) {}
 
   private final QuestGraph base;
   private final List<Step> steps = new ArrayList<>();
@@ -56,12 +65,21 @@ public final class TreeDraft {
   public Optional<Refusal> move(UUID quest, UUID target, UUID me, int maxDepth) {
     boolean inside = effective.descendants(quest).stream().anyMatch(q -> q.id().equals(target));
     TreeOp op = new TreeOp(inside ? Kind.SWAP : Kind.ATTACH, quest, target);
-    return record(new Step(op, me, maxDepth));
+    return record(new Step(op, me, maxDepth, false));
   }
 
   /** Takes {@code quest} out to the top level. A refusal leaves the draft as it was. */
   public Optional<Refusal> detach(UUID quest, UUID me) {
-    return record(new Step(new TreeOp(Kind.DETACH, quest, null), me, 0));
+    return record(new Step(new TreeOp(Kind.DETACH, quest, null), me, 0, false));
+  }
+
+  /**
+   * Takes {@code quest} out of a parent the player cannot see (the "This quest sits inside a quest
+   * you can't see" Detach button). Needs Owner on the quest, which must not be completed; refused
+   * as ALREADY_THERE when the quest is not inside a hidden quest, or no longer is in this draft.
+   */
+  public Optional<Refusal> detachFromHiddenParent(UUID quest, UUID me) {
+    return record(new Step(new TreeOp(Kind.DETACH, quest, null), me, 0, true));
   }
 
   /** The base tree with the draft applied. */
@@ -77,7 +95,8 @@ public final class TreeDraft {
   /**
    * The quests under {@code treeRoot} in the base tree that are no longer in its tree: under the
    * top of the tree that holds {@code treeRoot} now (which is another quest after a swap at the
-   * top). Level by level, nearest first.
+   * top), only the topmost of them: one line per quest the player took out. Level by level, nearest
+   * first.
    */
   public List<UUID> takenOut(UUID treeRoot) {
     List<QuestData> above = effective.ancestors(treeRoot);
@@ -85,11 +104,16 @@ public final class TreeDraft {
     Set<UUID> now = new HashSet<>();
     now.add(top);
     for (QuestData q : effective.descendants(top)) now.add(q.id());
-    List<UUID> out = new ArrayList<>();
+    Set<UUID> out = new LinkedHashSet<>();
     for (QuestData q : base.descendants(treeRoot)) {
       if (!now.contains(q.id())) out.add(q.id());
     }
-    return out;
+    // Only the topmost: a quest that went along inside another taken-out quest is not listed.
+    List<UUID> topmost = new ArrayList<>();
+    for (UUID id : out) {
+      if (!out.contains(effective.get(id).parentId())) topmost.add(id);
+    }
+    return topmost;
   }
 
   /** What to send on Save, in order. */
@@ -109,17 +133,30 @@ public final class TreeDraft {
     if (refusal.isPresent()) return refusal;
     steps.add(step);
     effective = apply(effective, step.op());
-    ops = minimise();
+    List<Step> kept = minimise();
+    steps.clear();
+    steps.addAll(kept);
+    ops = steps.stream().map(Step::op).toList();
     return Optional.empty();
   }
 
   private static Optional<Refusal> check(QuestGraph g, Step step) {
+    if (step.fromHidden()) return hiddenDetachRefusal(g, step.actor(), step.op().quest());
     TreeOp op = step.op();
     return switch (op.kind()) {
       case ATTACH -> LinkRules.attach(g, step.actor(), op.quest(), op.target(), step.maxDepth());
       case DETACH -> LinkRules.detach(g, step.actor(), op.quest());
       case SWAP -> LinkRules.swap(g, step.actor(), op.quest(), op.target(), step.maxDepth());
     };
+  }
+
+  private static Optional<Refusal> hiddenDetachRefusal(QuestGraph g, UUID actor, UUID quest) {
+    QuestData q = g.get(quest);
+    if (q == null) return Optional.of(Refusal.NOT_VISIBLE);
+    if (q.roleOf(actor) != Role.OWNER) return Optional.of(Refusal.NEED_OWNER);
+    if (q.parentId() != null || !q.hiddenParent()) return Optional.of(Refusal.ALREADY_THERE);
+    if (q.isCompleted()) return Optional.of(Refusal.COMPLETED);
+    return Optional.empty();
   }
 
   /** The tree after one op; a quest given a parent is no longer in a hidden one. */
@@ -150,7 +187,8 @@ public final class TreeDraft {
 
   // --- what to send ---
 
-  private List<TreeOp> minimise() {
+  /** The recorded steps without the ones later steps made redundant. */
+  private List<Step> minimise() {
     Map<UUID, UUID> wanted = parents(effective);
     if (wanted.equals(parents(base))) return List.of();
     List<Step> current = List.copyOf(steps);
@@ -177,7 +215,7 @@ public final class TreeDraft {
         }
       }
     }
-    return current.stream().map(Step::op).toList();
+    return current;
   }
 
   private boolean replaysTo(List<Step> candidate, Map<UUID, UUID> wanted) {

@@ -1,7 +1,5 @@
 package com.disqt.disquests.client.gui.tree;
 
-import com.disqt.disquests.client.ClientSession.QuestFilter;
-import com.disqt.disquests.client.ClientSession.Tab;
 import com.disqt.disquests.common.graph.QuestGraph;
 import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.common.model.Visibility;
@@ -30,6 +28,24 @@ import java.util.function.Predicate;
  */
 public final class QuestTreeRows {
 
+  /**
+   * The list tabs, mirroring {@code ClientSession.Tab}. This package keeps its own enums because
+   * {@code ClientSession} reaches Minecraft classes (through {@code SharedTileCache}), and the
+   * classes here must load in plain unit tests.
+   */
+  public enum Tab {
+    MY_QUESTS,
+    QUEST_BOARD,
+    ARCHIVED
+  }
+
+  /** The Quest Board's Open/Closed filter, mirroring {@code ClientSession.QuestFilter}. */
+  public enum BoardFilter {
+    ALL,
+    OPEN,
+    CLOSED
+  }
+
   /** Rows indent at most this many levels; deeper quests line up with the sixth level. */
   public static final int MAX_INDENT = 6;
 
@@ -46,8 +62,8 @@ public final class QuestTreeRows {
    * The list settings kept by the main screen: pinned quests (My Quests only), the Open/Closed
    * filter (Quest Board only) and whether unplaced quests come first (map layout).
    */
-  public record ListOptions(Set<UUID> pinned, QuestFilter filter, boolean unplacedFirst) {
-    public static final ListOptions DEFAULT = new ListOptions(Set.of(), QuestFilter.ALL, false);
+  public record ListOptions(Set<UUID> pinned, BoardFilter filter, boolean unplacedFirst) {
+    public static final ListOptions DEFAULT = new ListOptions(Set.of(), BoardFilter.ALL, false);
   }
 
   private QuestTreeRows() {}
@@ -58,8 +74,9 @@ public final class QuestTreeRows {
   }
 
   /**
-   * The rows of a tab. My Quests: the active quests the player holds a role on and the active
-   * quests below them. Quest Board: the active quests that are not Private and that the player
+   * The rows of a tab. My Quests: the active quests the player holds a role on, and an active quest
+   * they hold no role on only when its parent is listed in My Quests (so it always nests under
+   * something of theirs). Quest Board: the active quests that are not Private and that the player
    * holds no role on, as today. A quest whose parent is not listed is top level. Without a search,
    * a quest's subquests show only when it is in {@code expanded} (and its own parent is shown
    * expanded); with one, the matches show with every listed ancestor expanded and nothing else.
@@ -72,7 +89,9 @@ public final class QuestTreeRows {
 
     Map<UUID, QuestData> listed = new LinkedHashMap<>();
     for (QuestData q : graph.all()) {
-      if (inTab(graph, me, tab, options.filter(), q)) listed.put(q.id(), q);
+      boolean in =
+          tab == Tab.MY_QUESTS ? inMyQuests(graph, me, q) : onBoard(me, options.filter(), q);
+      if (in) listed.put(q.id(), q);
     }
     Map<UUID, List<QuestData>> children = new HashMap<>();
     List<QuestData> roots = new ArrayList<>();
@@ -123,11 +142,15 @@ public final class QuestTreeRows {
     Builder builder = new Builder(me, childrenOf(graph), order);
     List<QuestData> ancestors = new ArrayList<>(graph.ancestors(quest));
     Collections.reverse(ancestors);
-    int depth = 0;
-    for (QuestData ancestor : ancestors) builder.line(ancestor, depth++, true);
-
     List<QuestData> level =
         new ArrayList<>(parent == null ? List.of(q) : graph.children(parent.id()));
+    // Each ancestor shows only the next one down, and the parent shows the quest's level.
+    int depth = 0;
+    for (QuestData ancestor : ancestors) {
+      int shown = depth == ancestors.size() - 1 ? level.size() : 1;
+      builder.line(ancestor, depth++, true, shown);
+    }
+
     level.sort(order);
     Set<UUID> open = new HashSet<>(expanded);
     open.add(quest);
@@ -152,16 +175,21 @@ public final class QuestTreeRows {
 
   // --- tabs ---
 
-  private static boolean inTab(
-      QuestGraph graph, UUID me, Tab tab, QuestFilter filter, QuestData q) {
-    if (q.isCompleted()) return false;
-    if (tab == Tab.MY_QUESTS) {
+  /**
+   * Active, and either held by the player or directly inside a quest that is itself in My Quests.
+   * Walks up until it meets a quest the player holds, a completed one or the top.
+   */
+  private static boolean inMyQuests(QuestGraph graph, UUID me, QuestData q) {
+    for (int step = 0; q != null && step <= QuestGraph.MAX_WALK; step++) {
+      if (q.isCompleted()) return false;
       if (q.roleOf(me) != null) return true;
-      for (QuestData above : graph.ancestors(q.id())) {
-        if (above.roleOf(me) != null && !above.isCompleted()) return true;
-      }
-      return false;
+      q = graph.get(q.parentId());
     }
+    return false;
+  }
+
+  private static boolean onBoard(UUID me, BoardFilter filter, QuestData q) {
+    if (q.isCompleted()) return false;
     if (q.visibility() == Visibility.PRIVATE || q.roleOf(me) != null) return false;
     return switch (filter) {
       case ALL -> true;
@@ -233,8 +261,11 @@ public final class QuestTreeRows {
     }
 
     void line(QuestData q, int depth, boolean expanded) {
+      line(q, depth, expanded, children.getOrDefault(q.id(), List.of()).size());
+    }
+
+    void line(QuestData q, int depth, boolean expanded, int childCount) {
       seen.add(q.id());
-      int childCount = children.getOrDefault(q.id(), List.of()).size();
       rows.add(
           new Row(
               q.id(),

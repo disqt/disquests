@@ -8,10 +8,10 @@ import static com.disqt.disquests.client.gui.tree.TreeFixtures.id;
 import static com.disqt.disquests.client.gui.tree.TreeFixtures.quest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.disqt.disquests.client.ClientSession.QuestFilter;
-import com.disqt.disquests.client.ClientSession.Tab;
+import com.disqt.disquests.client.gui.tree.QuestTreeRows.BoardFilter;
 import com.disqt.disquests.client.gui.tree.QuestTreeRows.ListOptions;
 import com.disqt.disquests.client.gui.tree.QuestTreeRows.Row;
+import com.disqt.disquests.client.gui.tree.QuestTreeRows.Tab;
 import com.disqt.disquests.common.graph.QuestGraph;
 import java.util.Arrays;
 import java.util.List;
@@ -98,15 +98,31 @@ class QuestTreeRowsTest {
     }
 
     @Test
-    void anActiveQuestUnderACompletedSubquestIsTopLevel() {
+    void aStrangersQuestUnderACompletedSubquestIsOnlyOnTheBoard() {
       QuestGraph g =
           graph(
               quest("hub"),
               quest("Wagons").owner(MAX).in("hub").completed(),
               quest("Roues").owner(MAX).in("Wagons").modified(5));
       assertEquals(
-          List.of(row("Roues", 0, 0, false), mine("hub", 0, 0, false)),
+          List.of(mine("hub", 0, 0, false)),
           QuestTreeRows.forTab(g, LEO, Tab.MY_QUESTS, "", Set.of()));
+      assertEquals(
+          List.of(row("Roues", 0, 0, false)),
+          QuestTreeRows.forTab(g, LEO, Tab.QUEST_BOARD, "", Set.of()));
+    }
+
+    @Test
+    void myQuestUnderACompletedSubquestIsTopLevel() {
+      QuestGraph g =
+          graph(
+              quest("hub"),
+              quest("Wagons").owner(MAX).in("hub").completed(),
+              quest("Roues").owner(MAX).in("Wagons").reader(LEO).modified(5),
+              quest("Rayons").owner(MAX).in("Roues"));
+      assertEquals(
+          List.of(mine("Roues", 0, 1, true), row("Rayons", 1, 0, false), mine("hub", 0, 0, false)),
+          QuestTreeRows.forTab(g, LEO, Tab.MY_QUESTS, "", Set.of(id("Roues"))));
     }
 
     @Test
@@ -123,7 +139,7 @@ class QuestTreeRowsTest {
               Tab.MY_QUESTS,
               "",
               expanded("hub"),
-              new ListOptions(expanded("hub", "Wagons"), QuestFilter.ALL, false)));
+              new ListOptions(expanded("hub", "Wagons"), BoardFilter.ALL, false)));
     }
 
     @Test
@@ -141,7 +157,7 @@ class QuestTreeRowsTest {
               Tab.MY_QUESTS,
               "",
               Set.of(),
-              new ListOptions(Set.of(), QuestFilter.ALL, true)));
+              new ListOptions(Set.of(), BoardFilter.ALL, true)));
     }
 
     @Test
@@ -230,7 +246,7 @@ class QuestTreeRowsTest {
     void listsActiveQuestsWithoutARoleNestedAndCollapsed() {
       assertEquals(
           List.of(row("Under mine", 0, 0, false), row("hub", 0, 2, false)),
-          QuestTreeRows.forTab(BOARD, JUJU, Tab.SERVER_QUESTS, "", Set.of()));
+          QuestTreeRows.forTab(BOARD, JUJU, Tab.QUEST_BOARD, "", Set.of()));
     }
 
     @Test
@@ -241,7 +257,7 @@ class QuestTreeRowsTest {
               row("hub", 0, 2, true),
               row("Wagons", 1, 1, false),
               new Row(id("Quai"), 1, 0, false, true, false)),
-          QuestTreeRows.forTab(BOARD, JUJU, Tab.SERVER_QUESTS, "", expanded("hub")));
+          QuestTreeRows.forTab(BOARD, JUJU, Tab.QUEST_BOARD, "", expanded("hub")));
     }
 
     @Test
@@ -251,10 +267,10 @@ class QuestTreeRowsTest {
           QuestTreeRows.forTab(
               BOARD,
               JUJU,
-              Tab.SERVER_QUESTS,
+              Tab.QUEST_BOARD,
               "",
               Set.of(),
-              new ListOptions(Set.of(), QuestFilter.CLOSED, false)));
+              new ListOptions(Set.of(), BoardFilter.CLOSED, false)));
     }
 
     @Test
@@ -264,10 +280,10 @@ class QuestTreeRowsTest {
           QuestTreeRows.forTab(
               BOARD,
               JUJU,
-              Tab.SERVER_QUESTS,
+              Tab.QUEST_BOARD,
               "",
               Set.of(),
-              new ListOptions(expanded("hub"), QuestFilter.ALL, false)));
+              new ListOptions(expanded("hub"), BoardFilter.ALL, false)));
     }
   }
 
@@ -300,7 +316,7 @@ class QuestTreeRowsTest {
   @Nested
   class WhereThisSits {
 
-    /** top > mid > (quest, sibling, done) ; quest > child > grandchild */
+    /** top > (mid, uncle) ; mid > (quest, sibling, done) ; quest > child > grandchild */
     private static final QuestGraph TREE =
         graph(
             quest("top"),
@@ -311,6 +327,7 @@ class QuestTreeRowsTest {
             quest("child").in("quest"),
             quest("grandchild").in("child"),
             quest("cousin").in("sibling"),
+            quest("uncle").in("top"),
             quest("alone"));
 
     @Test
@@ -320,6 +337,7 @@ class QuestTreeRowsTest {
 
     @Test
     void ancestorsThenSiblingsWithTheQuestThenItsSubquests() {
+      // top counts only mid, the one line shown under it here, not uncle.
       assertEquals(
           List.of(
               mine("top", 0, 1, true),
@@ -350,7 +368,7 @@ class QuestTreeRowsTest {
     @Test
     void aTopLevelQuestWithSubquestsShowsItselfAndThem() {
       assertEquals(
-          List.of(mine("top", 0, 1, true), mine("mid", 1, 3, false)),
+          List.of(mine("top", 0, 2, true), mine("mid", 1, 3, false), mine("uncle", 1, 0, false)),
           QuestTreeRows.whereThisSits(TREE, LEO, id("top"), Set.of()));
     }
 
@@ -358,14 +376,15 @@ class QuestTreeRowsTest {
     void wholeTreeShowsEverythingUnderTheTopAncestorExpanded() {
       assertEquals(
           List.of(
-              mine("top", 0, 1, true),
+              mine("top", 0, 2, true),
               mine("mid", 1, 3, true),
               row("sibling", 2, 1, true),
               mine("cousin", 3, 0, false),
               mine("quest", 2, 1, true),
               mine("child", 3, 1, true),
               mine("grandchild", 4, 0, false),
-              mine("done", 2, 0, false)),
+              mine("done", 2, 0, false),
+              mine("uncle", 1, 0, false)),
           QuestTreeRows.wholeTree(TREE, LEO, id("child")));
     }
 

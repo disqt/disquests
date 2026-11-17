@@ -211,6 +211,26 @@ class SuggestionsTest {
           Suggestions.prerequisites(G, LEO, null, eight, "verrou"));
     }
 
+    @ParameterizedTest(name = "hidden={0} deleted={1}: {2}")
+    @CsvSource({
+      "false,false,",
+      "true,false,TOO_MANY_PREREQUISITES",
+      "false,true,TOO_MANY_PREREQUISITES"
+    })
+    void unseenPrerequisitesCountOnceTowardTheLimit(
+        boolean hidden, boolean deleted, Refusal expected) {
+      TreeFixtures.Q edited = quest("E");
+      if (hidden) edited.hiddenPrerequisites();
+      if (deleted) edited.deletedPrerequisite();
+      List<TreeFixtures.Q> quests = new ArrayList<>(List.of(edited));
+      for (int i = 1; i <= 8; i++) quests.add(quest("c" + i));
+      QuestGraph g = graph(quests.toArray(TreeFixtures.Q[]::new));
+      List<UUID> seven = ids("c1", "c2", "c3", "c4", "c5", "c6", "c7");
+      assertEquals(
+          List.of(new Suggestion(id("c8"), "c8", expected, null)),
+          Suggestions.prerequisites(g, LEO, id("E"), seven, "c8"));
+    }
+
     @Test
     void aQuestNotSavedYetCanWaitOnAnything() {
       assertEquals(14, Suggestions.prerequisites(G, LEO, null, List.of(), "").size());

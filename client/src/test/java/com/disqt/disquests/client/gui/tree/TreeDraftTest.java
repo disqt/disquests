@@ -63,7 +63,11 @@ class TreeDraftTest {
    * Replaying the draft's ops on the base tree is accepted op by op and gives its effective tree.
    */
   private static void assertReplays(TreeDraft draft) {
-    QuestGraph replayed = replay(BASE, LEO, DEPTH, draft.ops());
+    assertReplays(BASE, draft);
+  }
+
+  private static void assertReplays(QuestGraph base, TreeDraft draft) {
+    QuestGraph replayed = replay(base, LEO, DEPTH, draft.ops());
     assertEquals(parents(draft.effective()), parents(replayed));
   }
 
@@ -189,6 +193,55 @@ class TreeDraftTest {
       assertEquals(Optional.empty(), d.detach(id("A"), LEO));
       assertEquals(List.of(attach("A", "B"), detach("A")), d.ops());
       assertTrue(d.isChanged(id("A")));
+      assertReplays(g, d);
+    }
+
+    @Test
+    void detachingFromAHiddenParentIsSent() {
+      QuestGraph g = graph(quest("A").hiddenParent(), quest("B"));
+      TreeDraft d = new TreeDraft(g);
+      assertEquals(Optional.of(Refusal.ALREADY_THERE), d.detach(id("A"), LEO));
+      assertEquals(Optional.empty(), d.detachFromHiddenParent(id("A"), LEO));
+      assertEquals(List.of(detach("A")), d.ops());
+      assertTrue(d.isChanged(id("A")));
+      assertFalse(d.effective().get(id("A")).hiddenParent());
+      assertReplays(g, d);
+    }
+
+    @Test
+    void detachingFromAHiddenParentTwiceIsRefused() {
+      QuestGraph g = graph(quest("A").hiddenParent());
+      TreeDraft d = new TreeDraft(g);
+      d.detachFromHiddenParent(id("A"), LEO);
+      assertEquals(Optional.of(Refusal.ALREADY_THERE), d.detachFromHiddenParent(id("A"), LEO));
+      assertEquals(List.of(detach("A")), d.ops());
+      assertReplays(g, d);
+    }
+
+    @Test
+    void detachingFromAHiddenParentNeedsAnOwnerAndAnActiveQuest() {
+      QuestGraph g =
+          graph(
+              quest("A").hiddenParent().owner(MAX).writer(LEO),
+              quest("B").hiddenParent().completed(),
+              quest("C"));
+      TreeDraft d = new TreeDraft(g);
+      assertEquals(Optional.of(Refusal.NEED_OWNER), d.detachFromHiddenParent(id("A"), LEO));
+      assertEquals(Optional.of(Refusal.COMPLETED), d.detachFromHiddenParent(id("B"), LEO));
+      assertEquals(Optional.of(Refusal.ALREADY_THERE), d.detachFromHiddenParent(id("C"), LEO));
+      assertTrue(d.isEmpty());
+    }
+
+    @Test
+    void movingAQuestAfterDetachingItFromAHiddenParent() {
+      QuestGraph g = graph(quest("A").hiddenParent(), quest("B"));
+      TreeDraft d = new TreeDraft(g);
+      d.detachFromHiddenParent(id("A"), LEO);
+      assertEquals(Optional.empty(), d.move(id("A"), id("B"), LEO, DEPTH));
+      assertEquals(id("B"), parentIn(d.effective(), "A"));
+      assertTrue(d.isChanged(id("A")));
+      assertFalse(d.isEmpty());
+      assertReplays(g, d);
     }
 
     @Test
@@ -200,6 +253,7 @@ class TreeDraftTest {
       assertTrue(d.effective().get(id("Y")).hiddenParent());
       assertFalse(d.effective().get(id("X")).hiddenParent());
       assertEquals(id("Y"), parentIn(d.effective(), "X"));
+      assertReplays(g, d);
     }
   }
 
@@ -238,9 +292,17 @@ class TreeDraftTest {
   class TakenOut {
 
     @Test
-    void detachedQuestsAndWhatIsInsideThemAreTakenOut() {
+    void onlyTheDetachedQuestIsListedNotWhatIsInsideIt() {
       TreeDraft d = draft();
       d.detach(id("X"), LEO);
+      assertEquals(ids("X"), d.takenOut(id("P")));
+    }
+
+    @Test
+    void aQuestTakenOutOfATakenOutQuestIsListedToo() {
+      TreeDraft d = draft();
+      d.detach(id("X"), LEO);
+      d.move(id("Y"), id("A"), LEO, DEPTH);
       assertEquals(ids("X", "Y"), d.takenOut(id("P")));
     }
 

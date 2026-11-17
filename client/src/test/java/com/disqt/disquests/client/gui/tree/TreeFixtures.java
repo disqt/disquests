@@ -48,10 +48,15 @@ final class TreeFixtures {
     return QuestGraph.of(Arrays.stream(quests).map(Q::build).toList());
   }
 
-  /** Every quest's parent, by id. */
+  /** Stands for a parent the player cannot see. */
+  static final UUID HIDDEN = new UUID(0, 0);
+
+  /** Every quest's parent, by id: {@link #HIDDEN} for one the player cannot see. */
   static Map<UUID, UUID> parents(QuestGraph g) {
     Map<UUID, UUID> parents = new HashMap<>();
-    for (QuestData q : g.all()) parents.put(q.id(), q.parentId());
+    for (QuestData q : g.all()) {
+      parents.put(q.id(), q.parentId() == null && q.hiddenParent() ? HIDDEN : q.parentId());
+    }
     return parents;
   }
 
@@ -64,7 +69,7 @@ final class TreeFixtures {
       Optional<Refusal> refused =
           switch (op.kind()) {
             case ATTACH -> LinkRules.attach(g, actor, op.quest(), op.target(), maxDepth);
-            case DETACH -> LinkRules.detach(g, actor, op.quest());
+            case DETACH -> detachRefusal(g, actor, op.quest());
             case SWAP -> LinkRules.swap(g, actor, op.quest(), op.target(), maxDepth);
           };
       if (refused.isPresent()) throw new AssertionError(op + " refused: " + refused.get());
@@ -73,20 +78,45 @@ final class TreeFixtures {
     return g;
   }
 
+  /**
+   * The server detaches a quest from a parent the player cannot see; on the client graph that is a
+   * quest with no parent and the hidden-parent flag, for which only Owner and completion matter.
+   */
+  private static Optional<Refusal> detachRefusal(QuestGraph g, UUID actor, UUID quest) {
+    QuestData q = g.get(quest);
+    if (q == null || q.parentId() != null || !q.hiddenParent()) {
+      return LinkRules.detach(g, actor, quest);
+    }
+    if (q.roleOf(actor) != Role.OWNER) return Optional.of(Refusal.NEED_OWNER);
+    if (q.isCompleted()) return Optional.of(Refusal.COMPLETED);
+    return Optional.empty();
+  }
+
+  /** As the server applies it; a hidden place is kept as the hidden-parent flag. */
   private static QuestGraph applied(QuestGraph g, TreeOp op) {
     Map<UUID, UUID> newParents = new HashMap<>();
     switch (op.kind()) {
       case ATTACH -> newParents.put(op.quest(), op.target());
       case DETACH -> newParents.put(op.quest(), null);
       case SWAP -> {
-        QuestData place = g.get(g.get(op.quest()).parentId());
-        newParents.put(op.target(), place == null ? null : place.id());
+        QuestData container = g.get(op.quest());
+        QuestData place = g.get(container.parentId());
+        newParents.put(
+            op.target(), place != null ? place.id() : container.hiddenParent() ? HIDDEN : null);
         newParents.put(op.quest(), op.target());
       }
     }
     List<QuestData> quests = new ArrayList<>();
     for (QuestData q : g.all()) {
-      quests.add(newParents.containsKey(q.id()) ? q.withParent(newParents.get(q.id())) : q);
+      if (!newParents.containsKey(q.id())) {
+        quests.add(q);
+        continue;
+      }
+      UUID parent = newParents.get(q.id());
+      quests.add(
+          HIDDEN.equals(parent)
+              ? q.withParent(null).withHiddenParent(true)
+              : q.withParent(parent).withHiddenParent(false));
     }
     return QuestGraph.of(quests);
   }

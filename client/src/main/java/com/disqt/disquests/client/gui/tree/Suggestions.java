@@ -116,15 +116,27 @@ public final class Suggestions {
     return null;
   }
 
+  /**
+   * The graph with the quest waiting on the editor's list. When its view says there are
+   * prerequisites the player cannot see (or deleted ones), one stand-in is added, so they count
+   * toward the limit at least once; the stand-in is not in the graph and takes no part in the loop
+   * checks. Best effort: the server knows the real number.
+   */
   private static QuestGraph withPrerequisites(
       QuestGraph g, UUID quest, Collection<UUID> prerequisites) {
-    if (quest == null || g.get(quest) == null) return g;
+    QuestData edited = g.get(quest);
+    if (edited == null) return g;
+    List<UUID> list = new ArrayList<>(prerequisites);
+    if (edited.hiddenPrerequisites() || edited.deletedPrerequisite()) list.add(UNSEEN);
     List<QuestData> quests = new ArrayList<>();
     for (QuestData q : g.all()) {
-      quests.add(q.id().equals(quest) ? q.withPrerequisites(List.copyOf(prerequisites)) : q);
+      quests.add(q.id().equals(quest) ? q.withPrerequisites(List.copyOf(list)) : q);
     }
     return QuestGraph.of(quests);
   }
+
+  /** Stands for the prerequisites of the edited quest the player cannot see. */
+  private static final UUID UNSEEN = new UUID(0, 0);
 
   private static String normalise(String typed) {
     return typed == null ? "" : typed.strip().toLowerCase(Locale.ROOT);
