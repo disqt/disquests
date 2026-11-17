@@ -680,7 +680,8 @@ public class MainScreen extends DisquestsBaseScreen {
   private void setWorldMap(boolean enabled) {
     DisquestsClient.CONFIG.worldMap(enabled);
     DisquestsClient.CONFIG.save();
-    this.minecraft.gui.setScreen(new MainScreen(this.parent));
+    // The private constructor: a layout switch is not a new opening of the board
+    this.minecraft.gui.setScreen(new MainScreen(this.parent, ClientSession.mapAvailable()));
   }
 
   /** Explains why the map is off (outdated server, BlueMap unreachable); none when switched off. */

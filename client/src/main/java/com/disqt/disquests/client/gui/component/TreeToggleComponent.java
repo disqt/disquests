@@ -12,17 +12,21 @@ import net.minecraft.client.input.MouseButtonEvent;
 
 /**
  * The expand toggle left of a quest list entry that has subquests: "▸" collapsed, "▾" expanded,
- * level with the entry's title. Its id is {@code toggle-<questId>}.
+ * level with the entry's title. Its id is {@code toggle-<questId>}. An inactive toggle (while a
+ * search forces the expansion) shows its state without a hover highlight and ignores clicks.
  */
 public class TreeToggleComponent extends BaseUIComponent {
 
   private final UUID questId;
   private final boolean expanded;
+  private final boolean active;
   private final Consumer<UUID> onToggle;
 
-  public TreeToggleComponent(UUID questId, boolean expanded, Consumer<UUID> onToggle) {
+  public TreeToggleComponent(
+      UUID questId, boolean expanded, boolean active, Consumer<UUID> onToggle) {
     this.questId = questId;
     this.expanded = expanded;
+    this.active = active;
     this.onToggle = onToggle;
     this.id("toggle-" + questId);
     this.sizing(
@@ -54,14 +58,14 @@ public class TreeToggleComponent extends BaseUIComponent {
         expanded ? "▾" : "▸",
         x() + 1,
         y() + QuestEntryLayout.TITLE_Y,
-        isInBoundingBox(mouseX, mouseY) ? Colors.TEXT_PRIMARY : Colors.TEXT_MUTED,
+        active && isInBoundingBox(mouseX, mouseY) ? Colors.TEXT_PRIMARY : Colors.TEXT_MUTED,
         false);
   }
 
   @Override
   public boolean onMouseDown(MouseButtonEvent click, boolean doubled) {
     if (click.button() != InputConstants.MOUSE_BUTTON_LEFT) return false;
-    onToggle.accept(questId);
+    if (active) onToggle.accept(questId);
     return true;
   }
 }

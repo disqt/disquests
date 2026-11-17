@@ -5,8 +5,9 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Quests the player has not looked at yet. A mark goes when its quest is opened or after the board
- * has been opened three times since it was set.
+ * Quests the player has not looked at yet. A mark goes when its quest is opened, or once the board
+ * has been opened three times since it was set: it shows on those three openings and is gone on the
+ * fourth.
  */
 public final class NewMarks {
 
@@ -26,10 +27,13 @@ public final class NewMarks {
     if (questId != null) boardOpeningsSeen.remove(questId);
   }
 
-  /** Counts one board opening for every current mark and drops marks that have seen three. */
+  /**
+   * Counts one board opening for every current mark and drops marks that have now seen more than
+   * three, so a mark still shows on the third opening.
+   */
   public void boardOpened() {
     boardOpeningsSeen.replaceAll((id, seen) -> seen + 1);
-    boardOpeningsSeen.values().removeIf(seen -> seen >= BOARD_OPENINGS_BEFORE_FADE);
+    boardOpeningsSeen.values().removeIf(seen -> seen > BOARD_OPENINGS_BEFORE_FADE);
   }
 
   public void clear() {

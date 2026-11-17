@@ -239,7 +239,21 @@ public class QuestEntryComponent extends BaseUIComponent {
 
   private QuestEntryLayout layout() {
     return QuestEntryLayout.of(
-        this.width(), marks.locked(), rightSideWidth(), newWidth, warningWidth);
+        this.width(), marks.locked(), rightSideWidth(), pendingWidth(), newWidth, warningWidth);
+  }
+
+  /** The owner's "(n pending)" badge width, 0 without one; caches its text (fix 8). */
+  private int pendingWidth() {
+    if (!isOwnedByPlayer) return 0;
+    int pendingCount = ClientCache.getPendingCount(quest.getId());
+    if (pendingCount <= 0) return 0;
+    // Rebuild only when the count changes
+    if (pendingCount != lastPendingCount) {
+      cachedPendingText = Component.literal(" (" + pendingCount + " pending)");
+      cachedPendingWidth = Minecraft.getInstance().font.width(cachedPendingText);
+      lastPendingCount = pendingCount;
+    }
+    return cachedPendingWidth;
   }
 
   /** The visibility and owner text at the right of the first line, with their gap. */
@@ -357,18 +371,10 @@ public class QuestEntryComponent extends BaseUIComponent {
       rightX -= cachedOwnerWidth;
       context.text(textRenderer, cachedOwnerText, rightX, entryY + 4, Colors.TEXT_MUTED, false);
     }
-    if (isOwnedByPlayer) {
-      int pendingCount = ClientCache.getPendingCount(quest.getId());
-      if (pendingCount > 0) {
-        // Cache pending text (fix 8): rebuild only when count changes
-        if (pendingCount != lastPendingCount) {
-          cachedPendingText = Component.literal(" (" + pendingCount + " pending)");
-          cachedPendingWidth = textRenderer.width(cachedPendingText);
-          lastPendingCount = pendingCount;
-        }
-        rightX -= cachedPendingWidth;
-        context.text(textRenderer, cachedPendingText, rightX, entryY + 4, Colors.AMBER, false);
-      }
+    int pendingWidth = pendingWidth();
+    if (pendingWidth > 0) {
+      rightX -= pendingWidth;
+      context.text(textRenderer, cachedPendingText, rightX, entryY + 4, Colors.AMBER, false);
     }
     if (cachedVisibilityText != null) {
       rightX -= cachedVisibilityWidth;

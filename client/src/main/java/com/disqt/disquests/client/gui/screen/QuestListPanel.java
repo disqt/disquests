@@ -9,6 +9,8 @@ import com.disqt.disquests.client.gui.component.QuestEntryComponent;
 import com.disqt.disquests.client.gui.component.QuestEntryLayout;
 import com.disqt.disquests.client.gui.component.TreeToggleComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.tree.ListedQuests;
+import com.disqt.disquests.client.gui.tree.NewMarkRows;
 import com.disqt.disquests.client.gui.tree.QuestTreeRows;
 import com.disqt.disquests.client.gui.tree.QuestTreeRows.Row;
 import com.disqt.disquests.common.graph.QuestGraph;
@@ -62,7 +64,8 @@ public final class QuestListPanel {
    * @param onEntryClicked a click selected this quest
    * @param onOpen a double click asks to open the selected quest
    * @param onPinToggle an entry's pin was toggled
-   * @param onSelectionLost a rebuild dropped the selected quest's row
+   * @param onSelectionLost a toggle collapsed the selected quest's row away (rebuilds asked for by
+   *     the screen report it through their return value instead)
    */
   QuestListPanel(
       FlowLayout list,
@@ -83,7 +86,10 @@ public final class QuestListPanel {
 
   // --- what the list shows ---
 
-  /** Shows the rows for these settings; the selection stays when its row is still listed. */
+  /**
+   * Shows the rows for these settings; the selection stays when its row is still listed. The caller
+   * refreshes what depends on the selection afterwards.
+   */
   void show(ClientSession.Tab tab, ClientSession.QuestFilter filter, String search) {
     this.tab = tab;
     this.filter = filter;
@@ -91,8 +97,11 @@ public final class QuestListPanel {
     rebuild();
   }
 
-  /** Rebuilds the rows with the current settings, the cache and the expanded quests. */
-  void rebuild() {
+  /**
+   * Rebuilds the rows with the current settings, the cache and the expanded quests. Returns true
+   * when the selected quest's row is gone, in which case the selection has been cleared.
+   */
+  private boolean rebuild() {
     QuestGraph graph = QuestGraphs.current();
     UUID me = ClientSession.getEffectivePlayerUuid();
     rows =
@@ -104,17 +113,24 @@ public final class QuestListPanel {
     boolean toggles = rows.stream().anyMatch(r -> r.childCount() > 0);
     boolean selectedListed = false;
     NewMarks newMarks = ClientSession.newMarks();
+    // A new quest marks its own row and every listed row above it, collapsed or not
+    Set<UUID> showingNew =
+        NewMarkRows.showingNew(
+            graph,
+            ListedQuests.fullyExpanded(graph, me, treeTab(tab), search, listOptions()),
+            newMarks::isNew);
     for (Row row : rows) {
       Quest quest = ClientCache.getQuestById(row.id());
       if (quest == null) continue;
       boolean selected = row.id().equals(selectedId);
       selectedListed |= selected;
-      list.child(rowFor(row, quest, toggles, selected, newMarks.isNew(row.id()), me));
+      list.child(rowFor(row, quest, toggles, selected, showingNew.contains(row.id()), me));
     }
     if (selectedId != null && !selectedListed) {
       selectedId = null;
-      onSelectionLost.run();
+      return true;
     }
+    return false;
   }
 
   /**
@@ -160,7 +176,7 @@ public final class QuestListPanel {
     entry.selected(selected);
 
     if (row.childCount() > 0) {
-      line.child(new TreeToggleComponent(row.id(), row.expanded(), this::toggle));
+      line.child(new TreeToggleComponent(row.id(), row.expanded(), search.isBlank(), this::toggle));
     } else if (toggles) {
       entry.margins(Insets.left(QuestEntryLayout.toggleSlot(true)));
     }
@@ -175,7 +191,7 @@ public final class QuestListPanel {
   private void toggle(UUID questId) {
     if (!search.isBlank()) return;
     ClientSession.toggleExpanded(questId);
-    rebuild();
+    if (rebuild()) onSelectionLost.run();
   }
 
   // --- selection ---
@@ -204,7 +220,8 @@ public final class QuestListPanel {
 
   /**
    * Selects the quest and makes its row visible: its ancestors are expanded (in the stored set) and
-   * the list scrolls to it on the next tick, once laid out.
+   * the list scrolls to it on the next tick, once laid out. When the tab does not list it, nothing
+   * stays selected. Either way the caller refreshes what depends on the selection afterwards.
    */
   void reveal(UUID questId) {
     for (QuestData ancestor : QuestGraphs.current().ancestors(questId)) {

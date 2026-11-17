@@ -28,13 +28,19 @@ public record QuestEntryLayout(int titleX, int titleRoom, int newX, int warningX
    * @param width the entry's width
    * @param locked whether the lock is drawn before the title
    * @param rightSideWidth the visibility and owner text plus their gap, 0 when there is none
+   * @param pendingWidth the owner's "(n pending)" badge, drawn left of that text; 0 when absent
    * @param newWidth the "NEW" mark's width, 0 when it is not shown
    * @param warningWidth the warning mark's width, 0 when it is not shown
    */
   public static QuestEntryLayout of(
-      int width, boolean locked, int rightSideWidth, int newWidth, int warningWidth) {
+      int width,
+      boolean locked,
+      int rightSideWidth,
+      int pendingWidth,
+      int newWidth,
+      int warningWidth) {
     int titleX = PAD + (locked ? LOCK_WIDTH : 0);
-    int right = width - PAD - rightSideWidth;
+    int right = width - PAD - rightSideWidth - pendingWidth;
     int warningX = NONE;
     if (warningWidth > 0) {
       warningX = right - warningWidth;

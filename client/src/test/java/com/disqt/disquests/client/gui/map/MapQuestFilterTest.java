@@ -24,7 +24,8 @@ class MapQuestFilterTest {
 
   /**
    * Leo's hub with two of Max's subquests, one with a sub-subquest; Leo's Gare with a subquest Leo
-   * reads and a subquest locked for him; Max's top-level quests on the board, one of them locked.
+   * reads and a subquest locked for him; Max's top-level quests on the board, one of them locked,
+   * one Closed with an Open subquest.
    */
   private static final QuestGraph WORLD =
       graph(
@@ -37,6 +38,7 @@ class MapQuestFilterTest {
           quest("Cave").owner(MAX).in("Gare").locked(),
           quest("Tour").owner(MAX).modified(7),
           quest("Phare").owner(MAX).closed().modified(8),
+          quest("Lanterne").owner(MAX).in("Phare").modified(6),
           quest("Mur").owner(MAX).locked(),
           quest("Grenier").owner(MAX).privateQuest().reader(LEO).in("Tour").modified(2));
 
@@ -57,8 +59,10 @@ class MapQuestFilterTest {
     }
 
     @Test
-    void theBoardDrawsItsTopLevelQuestsButNeverALockedOne() {
-      assertEquals(titled("Tour", "Phare"), visible(null, Tab.QUEST_BOARD));
+    void theBoardDrawsItsTopLevelRowsButNeverALockedOne() {
+      // Intérieurs and Wagons sit in Leo's hub, which is not on the board: top level there.
+      // Cave is top level on the board too, but locked.
+      assertEquals(titled("Intérieurs", "Wagons", "Tour", "Phare"), visible(null, Tab.QUEST_BOARD));
     }
 
     @Test
@@ -87,13 +91,14 @@ class MapQuestFilterTest {
     @Test
     void theSelectedTreeIsLimitedToTheTabsQuests() {
       // Tour is on the board; Grenier, inside it, is Leo's and not on the board
-      assertEquals(titled("Tour", "Phare"), visible(id("Tour"), Tab.QUEST_BOARD));
+      assertEquals(
+          titled("Intérieurs", "Wagons", "Tour", "Phare"), visible(id("Tour"), Tab.QUEST_BOARD));
     }
 
     @Test
     void onTheBoardSelectingASubquestDrawsItsTree() {
       assertEquals(
-          titled("Tour", "Phare", "Intérieurs", "Wagons", "Roues"),
+          titled("Intérieurs", "Wagons", "Roues", "Tour", "Phare"),
           visible(id("Roues"), Tab.QUEST_BOARD));
     }
   }
@@ -103,9 +108,19 @@ class MapQuestFilterTest {
 
     @Test
     void theOpenClosedFilterNarrowsTheBoard() {
+      ListOptions closed = new ListOptions(Set.of(), BoardFilter.CLOSED, false);
+      assertEquals(
+          List.of(id("Phare")),
+          MapQuestFilter.visible(WORLD, LEO, null, Tab.QUEST_BOARD, "", closed));
+    }
+
+    @Test
+    void aSubquestWhoseParentTheFilterTookOutIsTopLevel() {
+      // Open only: Closed Phare goes, its Open subquest Lanterne becomes a top-level row
       ListOptions open = new ListOptions(Set.of(), BoardFilter.OPEN, false);
       assertEquals(
-          List.of(id("Tour")), MapQuestFilter.visible(WORLD, LEO, null, Tab.QUEST_BOARD, "", open));
+          ids("Intérieurs", "Wagons", "Tour", "Lanterne"),
+          MapQuestFilter.visible(WORLD, LEO, null, Tab.QUEST_BOARD, "", open));
     }
 
     @Test

@@ -29,12 +29,12 @@ class NewMarksTest {
   }
 
   @Test
-  void markGoesAfterTheThirdBoardOpening() {
+  void markShowsOnThreeBoardOpeningsAndGoesOnTheFourth() {
     marks.mark(quest);
-    marks.boardOpened();
-    assertTrue(marks.isNew(quest));
-    marks.boardOpened();
-    assertTrue(marks.isNew(quest));
+    for (int opening = 1; opening <= 3; opening++) {
+      marks.boardOpened();
+      assertTrue(marks.isNew(quest), "opening " + opening);
+    }
     marks.boardOpened();
     assertFalse(marks.isNew(quest));
   }
@@ -45,6 +45,7 @@ class NewMarksTest {
     marks.boardOpened();
     marks.boardOpened();
     marks.mark(other);
+    marks.boardOpened();
     marks.boardOpened();
     assertFalse(marks.isNew(quest));
     assertTrue(marks.isNew(other));
