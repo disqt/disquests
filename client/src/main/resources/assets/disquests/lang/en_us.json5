@@ -91,6 +91,7 @@
     "prerequisite_field": "type to add an existing quest...",
     "prerequisite_hidden": "something you don't have access to",
     "open_only": "(Open quests only)",
+    "now_inside": "now inside %s",
   },
 
   // Quest tree rows

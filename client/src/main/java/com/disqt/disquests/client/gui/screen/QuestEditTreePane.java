@@ -31,15 +31,18 @@ import java.util.function.Supplier;
 import net.minecraft.network.chat.Component;
 
 /**
- * The editor's left pane: the whole tree the quest belongs to, from {@link QuestEditDraft#rows},
- * with nothing applied until Save. Rows drag onto other rows ({@code TreeDraft.move}: attach, or
- * swap with a subquest) or onto the dashed {@code tree-drop-out} area ({@code TreeDraft.detach}); a
- * row's remove button detaches it too. Directly under the edited quest's line, the {@code
- * add-subquest-field} brings in a quest from outside the tree. Below the tree, the quests taken out
- * of it ("taken out, not saved") and a hint. A refused change shows a toast and changes nothing.
+ * The editor's left pane: the tree the quest was in when the editor opened, from {@link
+ * QuestEditDraft#rows}, with nothing applied until Save. Rows drag onto other rows ({@code
+ * TreeDraft.move}: attach, or swap with a subquest) or onto the dashed {@code tree-drop-out} area
+ * ({@code TreeDraft.detach}); a row's remove button detaches it too. Directly under the edited
+ * quest's line, the {@code add-subquest-field} brings in a quest from outside the tree. Below the
+ * tree, the quests taken out of it ("taken out, not saved"; the edited quest among them while it is
+ * outside the tree, with the field under its line) and a hint. A refused change shows a toast and
+ * changes nothing.
  *
- * <p>After an accepted change only the pane's contents are rebuilt (the scroll position stays) and
- * {@code onChanged} lets the form follow.
+ * <p>After an accepted change only the pane's contents are rebuilt, in one layout pass so the
+ * scroll position stays, and {@code onChanged} lets the form follow. The field and its holder are
+ * built once and moved, never rebuilt, so they keep the focus, the typed text and the dropdown.
  */
 final class QuestEditTreePane implements TreeRowComponent.DragTarget {
 
@@ -49,6 +52,7 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
   static final String DROP_OUT_ID = "tree-drop-out";
   static final String TAKEN_OUT_ID = "tree-taken-out";
   static final String HINT_ID = "tree-hint";
+  static final String NOW_INSIDE_ID = "tree-now-inside";
 
   private static final int DASH = 3;
 
@@ -62,11 +66,14 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
   private final ScrollContainer<FlowLayout> scroll;
   private final FlowLayout takenOutList;
   private final DropTracker.Zone dropOutZone;
+  private final QuestSearchField field;
+  private final FlowLayout fieldHolder;
 
   private List<TreeRowComponent> rows = List.of();
   private DropTracker tracker;
   private boolean dropOutHighlighted;
   private boolean revealPending = true;
+  private String shownTitle;
 
   private QuestEditTreePane(
       QuestScreen screen,
@@ -84,6 +91,9 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
     this.onChanged = onChanged;
     this.list = shell.list();
     this.scroll = shell.scroll();
+    this.field = addSubquestField();
+    this.fieldHolder = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+    fieldHolder.child(field);
 
     FlowLayout dropOut = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
     dropOut.id(DROP_OUT_ID);
@@ -135,12 +145,29 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
     return pane;
   }
 
-  /** Rebuilds the rows, the field and the taken-out lines from the draft. */
+  /**
+   * Rebuilds the rows and the taken-out lines from the draft, moving the field under the edited
+   * quest's line wherever it is. One layout pass, so the scroll keeps its place.
+   */
   void fill() {
+    list.<FlowLayout>configure(l -> takenOutList.<FlowLayout>configure(t -> fillRowsAndTakenOut()));
+    tracker =
+        new DropTracker(
+            rows,
+            List.of(dropOutZone),
+            () -> new DropTracker.Bounds(scroll.x(), scroll.y(), scroll.width(), scroll.height()));
+    // The list follows the draft; shown again where the field now sits
+    if (field.dropdown().isVisible()) field.refresh();
+  }
+
+  private void fillRowsAndTakenOut() {
     UUID me = ClientSession.getEffectivePlayerUuid();
     QuestGraph g = draft.tree().effective();
     UUID questId = draft.questId();
     list.clearChildren();
+    takenOutList.clearChildren();
+    shownTitle = currentTitle.get();
+
     List<TreeRowComponent> built = new ArrayList<>();
     for (QuestTreeRows.Row row : draft.rows(me)) {
       QuestData q = g.get(row.id());
@@ -149,7 +176,7 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
       TreeRowComponent.Line line =
           new TreeRowComponent.Line(
               row.id(),
-              current && isNewQuest ? newQuestTitle() : q.title(),
+              title(q),
               row.depth(),
               current,
               row.locked(),
@@ -157,55 +184,75 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
               draft.tree().isChanged(row.id()),
               false,
               draft.canRemove(row.id(), me),
-              !q.isCompleted(),
+              draft.canDrag(row.id()),
               row.childCount(),
               row.expanded());
       TreeRowComponent component = new TreeRowComponent(line).editMode(this::remove, this);
       built.add(component);
       list.child(component);
-      if (current) list.child(addSubquestField(row.depth() + 1));
+      if (current) list.child(placeField(row.depth() + 1));
     }
     rows = built;
 
-    takenOutList.clearChildren();
-    for (UUID id : draft.takenOut(me)) {
-      QuestData q = g.get(id);
+    for (QuestEditDraft.TakenOut out : draft.takenOut(me)) {
+      QuestData q = g.get(out.id());
       if (q == null) continue;
+      boolean current = out.id().equals(questId);
+      // Its subquests went along; they stay folded under this line
       TreeRowComponent.Line line =
           new TreeRowComponent.Line(
-              id,
-              q.title(),
+              out.id(),
+              title(q),
               0,
-              false,
+              current,
               false,
               q.isCompleted(),
               false,
               true,
               false,
-              !q.isCompleted(),
-              0,
+              draft.canDrag(out.id()),
+              g.children(out.id()).size(),
               false);
       takenOutList.child(new TreeRowComponent(line).editMode(this::remove, this));
+      QuestData container = g.get(out.nowInside());
+      if (container != null) takenOutList.child(nowInside(container));
+      if (current) takenOutList.child(placeField(1));
     }
-
-    tracker =
-        new DropTracker(
-            rows,
-            List.of(dropOutZone),
-            () -> new DropTracker.Bounds(scroll.x(), scroll.y(), scroll.width(), scroll.height()));
   }
 
-  private String newQuestTitle() {
-    String title = currentTitle.get();
-    return title == null || title.isBlank()
+  /** The edited quest's title: for a quest not saved yet, the title field as typed. */
+  private String title(QuestData q) {
+    if (!isNewQuest || !q.id().equals(draft.questId())) return q.title();
+    return shownTitle == null || shownTitle.isBlank()
         ? Component.translatable(EditorText.NEW_QUEST).getString()
-        : title;
+        : shownTitle;
   }
 
-  /** The "add a subquest..." field, indented one level under the edited quest. */
-  private FlowLayout addSubquestField(int depth) {
+  /** "now inside X", under a taken-out line that sits in another quest. */
+  private LabelComponent nowInside(QuestData container) {
+    LabelComponent label =
+        UIComponents.label(
+            Component.translatable(
+                EditorText.NOW_INSIDE, container.title() != null ? container.title() : "?"));
+    label.id(NOW_INSIDE_ID);
+    label.horizontalSizing(Sizing.fill(100));
+    label.color(Color.ofArgb(Colors.TEXT_MUTED));
+    label.margins(Insets.left(TreeRowGeometry.LEFT + TreeRowGeometry.INDENT));
+    return label;
+  }
+
+  /** The field's holder, indented to {@code depth}. */
+  private FlowLayout placeField(int depth) {
+    int indent =
+        TreeRowGeometry.LEFT + Math.min(depth, QuestTreeRows.MAX_INDENT) * TreeRowGeometry.INDENT;
+    fieldHolder.padding(Insets.of(1, 1, indent, 0));
+    return fieldHolder;
+  }
+
+  /** The "add a subquest..." field, built once. */
+  private QuestSearchField addSubquestField() {
     UUID me = ClientSession.getEffectivePlayerUuid();
-    QuestSearchField field =
+    QuestSearchField searchField =
         new QuestSearchField(
             root,
             ADD_SUBQUEST_ID,
@@ -218,22 +265,19 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
                     draft.questId(),
                     typed,
                     ClientSession.getMaxQuestDepth()));
-    field.sizing(Sizing.fill(100), Sizing.fixed(QuestSearchField.HEIGHT));
-    field.onPick(
+    searchField.sizing(Sizing.fill(100), Sizing.fixed(QuestSearchField.HEIGHT));
+    searchField.onPick(
         picked ->
             apply(
                 picked,
                 draft.tree().move(picked, draft.questId(), me, ClientSession.getMaxQuestDepth())));
-    FlowLayout holder = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
-    int indent =
-        TreeRowGeometry.LEFT + Math.min(depth, QuestTreeRows.MAX_INDENT) * TreeRowGeometry.INDENT;
-    holder.padding(Insets.of(1, 1, indent, 0));
-    holder.child(field);
-    return holder;
+    return searchField;
   }
 
   /** Once laid out, scrolls the edited quest's row into view when it is below the visible part. */
   void tick() {
+    // A new quest's own line follows the title field as the player types
+    if (isNewQuest && !java.util.Objects.equals(shownTitle, currentTitle.get())) fill();
     if (!revealPending) return;
     TreeRowComponent current =
         list.childById(TreeRowComponent.class, "tree-row-" + draft.questId());
@@ -261,6 +305,7 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
         () -> {
           fill();
           onChanged.run();
+          screen.dropStaleFocus();
         });
   }
 

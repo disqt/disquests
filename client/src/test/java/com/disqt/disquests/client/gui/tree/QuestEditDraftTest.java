@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.disqt.disquests.client.gui.tree.QuestEditDraft.HiddenParent;
+import com.disqt.disquests.client.gui.tree.QuestEditDraft.TakenOut;
 import com.disqt.disquests.common.graph.QuestGraph;
 import com.disqt.disquests.common.graph.Refusal;
 import com.disqt.disquests.common.model.LinkChanges;
@@ -369,20 +370,84 @@ class QuestEditDraftTest {
       assertTrue(draftOf(g, "E").canRemove(id("X"), LEO));
     }
 
+    private List<UUID> rowIds(QuestEditDraft d) {
+      return d.rows(LEO).stream().map(QuestTreeRows.Row::id).toList();
+    }
+
     @Test
     void aSubquestTakenOutIsListedBelowTheTree() {
       QuestEditDraft d = draft();
       d.tree().detach(id("T"), LEO);
-      assertEquals(ids("T"), d.takenOut(LEO));
-      assertFalse(d.rows(LEO).stream().anyMatch(r -> r.id().equals(id("T"))));
+      assertEquals(List.of(new TakenOut(id("T"), null)), d.takenOut(LEO));
+      assertFalse(rowIds(d).contains(id("T")));
     }
 
     @Test
-    void theEditedQuestMovedToAnotherTreeIsNotListedAsTakenOut() {
+    void theEditedQuestTakenOutStaysListedAndTheOriginalTreeStays() {
+      QuestEditDraft d = draft();
+      d.tree().detach(id("E"), LEO);
+      assertEquals(List.of(new TakenOut(id("E"), null)), d.takenOut(LEO));
+      assertEquals(id("Hub"), rowIds(d).get(0));
+      assertFalse(rowIds(d).contains(id("E")));
+      assertFalse(rowIds(d).contains(id("S")));
+      assertFalse(d.editedQuestInTree(LEO));
+    }
+
+    @Test
+    void theEditedQuestMovedToAnotherTreeSaysWhereItIsNow() {
       QuestEditDraft d = draft();
       d.tree().move(id("E"), id("C"), LEO, DEPTH);
+      assertEquals(List.of(new TakenOut(id("E"), id("C"))), d.takenOut(LEO));
+      assertEquals(id("Hub"), rowIds(d).get(0));
+      assertFalse(rowIds(d).contains(id("C")));
+    }
+
+    @Test
+    void otherUnsavedMovesInTheOriginalTreeStayVisible() {
+      QuestEditDraft d = draft();
+      d.tree().detach(id("E"), LEO);
+      assertEquals(Optional.empty(), d.tree().move(id("C"), id("Hub"), LEO, DEPTH));
+      assertTrue(d.tree().isChanged(id("C")));
+      assertTrue(rowIds(d).contains(id("C")));
+    }
+
+    @Test
+    void theEditedQuestDraggedBackIsInTheTreeAgain() {
+      QuestEditDraft d = draft();
+      d.tree().detach(id("E"), LEO);
+      d.tree().move(id("E"), id("Hub"), LEO, DEPTH);
       assertEquals(List.of(), d.takenOut(LEO));
-      assertEquals(ids("C", "E", "S"), d.rows(LEO).stream().map(QuestTreeRows.Row::id).toList());
+      assertTrue(d.editedQuestInTree(LEO));
+      assertFalse(d.isDirty());
+    }
+
+    @Test
+    void theEditedQuestInsideATakenOutQuestIsListedToo() {
+      QuestGraph g = graph(quest("Hub"), quest("X").in("Hub"), quest("E").in("X"));
+      QuestEditDraft d = draftOf(g, "E");
+      d.tree().detach(id("X"), LEO);
+      assertEquals(
+          List.of(new TakenOut(id("X"), null), new TakenOut(id("E"), id("X"))), d.takenOut(LEO));
+      assertFalse(d.editedQuestInTree(LEO));
+    }
+
+    @Test
+    void aQuestAloneAtOpenIsItsOwnTreeWhereverItGoes() {
+      QuestGraph g = graph(quest("E"), quest("C"));
+      QuestEditDraft d = draftOf(g, "E");
+      assertEquals(ids("E"), rowIds(d));
+      d.tree().move(id("E"), id("C"), LEO, DEPTH);
+      assertEquals(ids("C", "E"), rowIds(d));
+      assertEquals(List.of(), d.takenOut(LEO));
+      assertTrue(d.editedQuestInTree(LEO));
+    }
+
+    @Test
+    void onlyActiveQuestsDrag() {
+      QuestEditDraft d = draft();
+      assertTrue(d.canDrag(id("S")));
+      assertTrue(d.canDrag(id("E")));
+      assertFalse(d.canDrag(id("Done")));
     }
 
     @Test
@@ -392,6 +457,72 @@ class QuestEditDraftTest {
       d.tree().detach(id("E"), LEO);
       assertFalse(d.hasParent());
     }
+  }
+
+  @Nested
+  class AutoJoinBox {
+
+    @Test
+    void shownWithPrerequisitesAndUsableOnlyWhileOpen() {
+      QuestEditDraft d = draft();
+      assertTrue(d.autoJoinShown());
+      assertTrue(d.autoJoinUsable());
+      d.visibility(Visibility.CLOSED);
+      assertFalse(d.autoJoinUsable());
+    }
+
+    @Test
+    void hiddenWithoutPrerequisites() {
+      QuestEditDraft d = draftOf(graph(quest("E")), "E");
+      assertFalse(d.autoJoinShown());
+    }
+
+    @Test
+    void removingTheLastPrerequisiteDropsAHiddenTick() {
+      QuestEditDraft d = draftOf(graph(quest("E").after("A"), quest("A")), "E");
+      d.autoJoin(true);
+      d.removePrerequisite(id("A"));
+      assertFalse(d.autoJoinShown());
+      assertFalse(d.autoJoin());
+      assertEquals(
+          links(null, List.of(), List.of(), ids("A"), false, false, null), d.toLinkChanges());
+    }
+
+    @Test
+    void droppingTheLastFlaggedChipDropsAHiddenTick() {
+      QuestEditDraft d = draftOf(graph(quest("E").hiddenPrerequisites()), "E");
+      d.autoJoin(true);
+      d.dropHidden();
+      assertEquals(
+          links(null, List.of(), List.of(), List.of(), true, false, null), d.toLinkChanges());
+    }
+
+    @Test
+    void visibilityLeavingOpenWithAutoJoinOnSendsOnlyTheVisibility() {
+      QuestEditDraft d = draftOf(graph(quest("E").after("A").autoJoin(), quest("A")), "E");
+      d.visibility(Visibility.PRIVATE);
+      assertFalse(d.autoJoinUsable());
+      assertEquals(
+          links(Visibility.PRIVATE, List.of(), List.of(), List.of(), false, false, null),
+          d.toLinkChanges());
+    }
+  }
+
+  @Test
+  void aWriteOnlyPlayersTreeMoveSendsOnlyTheTreeOp() {
+    QuestGraph g = graph(quest("E").owner(MAX).writer(LEO), quest("C"));
+    QuestEditDraft d = draftOf(g, "E");
+    assertEquals(Optional.empty(), d.tree().move(id("C"), id("E"), LEO, DEPTH));
+    assertEquals(
+        links(
+            null,
+            List.of(new TreeOp(Kind.ATTACH, id("C"), id("E"))),
+            List.of(),
+            List.of(),
+            false,
+            false,
+            null),
+        d.toLinkChanges());
   }
 
   @Nested

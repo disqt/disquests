@@ -5,7 +5,9 @@ import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.NoticeText;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.data.QuestGraphs;
+import com.disqt.disquests.client.gui.component.MinHeightFlow;
 import com.disqt.disquests.client.gui.component.MinHeightScroll;
+import com.disqt.disquests.client.gui.component.QuestSearchField;
 import com.disqt.disquests.client.gui.component.SuggestionDropdown;
 import com.disqt.disquests.client.gui.component.TagChipComponent;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
@@ -91,6 +93,9 @@ public class QuestScreen extends DisquestsBaseScreen {
 
   /** The content scroll never shrinks below this, even when the sections above it are tall. */
   private static final int MIN_CONTENT_HEIGHT = 40;
+
+  /** The editor's text area never shrinks below this. */
+  private static final int MIN_EDITOR_HEIGHT = 48;
 
   // What the reading view draws, to rebuild it when that changes (see tick)
   @Nullable private QuestPage.PageSignature shownPage;
@@ -493,6 +498,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     if (editDraft == null) {
       editDraft = newEditDraft();
     }
+    installContentRow(root);
 
     // Title field
     FlowLayout titleRow = root.childById(FlowLayout.class, "title-row");
@@ -670,6 +676,25 @@ public class QuestScreen extends DisquestsBaseScreen {
                       .withStyle(s -> s.withUnderlined(true).withColor(0xe8a86d))));
   }
 
+  /**
+   * {@code content-row} (the text editor beside the formatting help) takes the height the rest of
+   * the form leaves, down to a minimum, so the form fits and Save and Cancel stay on screen.
+   */
+  private static void installContentRow(FlowLayout root) {
+    FlowLayout column = root.childById(FlowLayout.class, "quest-column");
+    FlowLayout fromXml = root.childById(FlowLayout.class, "content-row");
+    MinHeightFlow row = new MinHeightFlow(Sizing.fill(85), Sizing.expand(100), MIN_EDITOR_HEIGHT);
+    row.id("content-row");
+    row.gap(4);
+    row.margins(Insets.top(2));
+    List<UIComponent> panels = List.copyOf(fromXml.children());
+    fromXml.clearChildren();
+    for (UIComponent panel : panels) row.child(panel);
+    int index = column.children().indexOf(fromXml);
+    column.removeChild(fromXml);
+    column.child(index, row);
+  }
+
   private void buildTagEditor(FlowLayout root) {
     FlowLayout tagEditor = root.childById(FlowLayout.class, "tag-editor");
     if (tagEditor == null) return;
@@ -789,6 +814,23 @@ public class QuestScreen extends DisquestsBaseScreen {
   private void treeChanged() {
     if (editPane != null) editPane.fill();
     if (linksForm != null) linksForm.refresh();
+    dropStaleFocus();
+  }
+
+  /**
+   * Clears the focus when it sits on a component a refresh just removed (a dragged row, a pressed
+   * button or chip), so Enter or Space cannot press it again. The quest search fields are kept
+   * (they are never removed, and their focus-lost handler queues on the root, which must not happen
+   * while the root runs its queue).
+   */
+  void dropStaleFocus() {
+    FlowLayout root = getRootComponent();
+    if (root == null || root.focusHandler() == null) return;
+    UIComponent focused = root.focusHandler().focused();
+    if (focused == null || focused instanceof QuestSearchField) return;
+    UIComponent top = focused;
+    while (top.parent() != null) top = top.parent();
+    if (top != root) root.focusHandler().focus(null, UIComponent.FocusSource.MOUSE_CLICK);
   }
 
   /** A toast for a change the draft refused, worded like the server's refusal notices. */
@@ -1147,6 +1189,7 @@ public class QuestScreen extends DisquestsBaseScreen {
   @Override
   public void tick() {
     super.tick();
+    if (editPane != null) editPane.tick();
     if (isNewQuest) return;
     Quest cached = ClientCache.getQuestById(quest.getId());
     if (cached == null) {
@@ -1157,7 +1200,6 @@ public class QuestScreen extends DisquestsBaseScreen {
     // The carried place wins over the pane's automatic reveal of the current row
     if (carriedPlace != null && applyCarriedPlace(carriedPlace)) carriedPlace = null;
     if (treePane != null) treePane.tick();
-    if (editPane != null) editPane.tick();
     refreshIfPageChanged(cached);
   }
 

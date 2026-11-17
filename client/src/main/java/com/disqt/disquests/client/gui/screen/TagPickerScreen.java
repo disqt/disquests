@@ -7,6 +7,7 @@ import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.common.TagConstraints;
+import com.mojang.blaze3d.platform.InputConstants;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Set;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
@@ -88,6 +90,19 @@ public class TagPickerScreen extends DisquestsBaseScreen {
     // Cancel button
     root.childById(ButtonComponent.class, "btn-cancel")
         .onPress(b -> navigateToScreen(returnScreen));
+  }
+
+  /**
+   * Mouse back returns to the editor that opened the picker, the same instance, so its unsaved
+   * drafts are kept (history would rebuild a fresh editor).
+   */
+  @Override
+  public boolean mouseClicked(MouseButtonEvent click, boolean simulated) {
+    if (click.button() == InputConstants.MOUSE_BUTTON_4) {
+      goBackTo(returnScreen);
+      return true;
+    }
+    return super.mouseClicked(click, simulated);
   }
 
   @Override

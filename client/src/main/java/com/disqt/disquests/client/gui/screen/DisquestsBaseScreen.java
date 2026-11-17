@@ -151,6 +151,19 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     leave.run();
   }
 
+  /**
+   * Back to {@code screen} as the back button would go back: the history entry this screen was
+   * opened from is used up and this screen becomes the forward entry. For a screen that must return
+   * to a particular instance rather than one rebuilt from history.
+   */
+  protected void goBackTo(Screen screen) {
+    if (this.minecraft == null) return;
+    if (!backStack.isEmpty()) backStack.pop();
+    forwardStack.push(this.toNavEntry());
+    if (forwardStack.size() > MAX_HISTORY) forwardStack.removeLast();
+    this.minecraft.gui.setScreen(screen);
+  }
+
   private void goBack() {
     if (this.minecraft == null) return;
     while (!backStack.isEmpty()) {
@@ -189,6 +202,11 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
         dismissOverlay();
         return true;
       }
+      // Escape while a dropdown's own scrollbar holds the focus closes the dropdown first
+      if (SuggestionDropdown.closeIfFocusedInside(
+          this.uiAdapter.rootComponent, this.uiAdapter.rootComponent.focusHandler().focused())) {
+        return true;
+      }
     }
     // Toggle: pressing the open-GUI key while a Disquests screen is open closes it.
     // Check that no text field is focused (avoid closing while typing).
@@ -199,9 +217,11 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
         textFieldFocused = focused instanceof GreedyInputUIComponent;
       }
       if (!textFieldFocused) {
-        if (this.minecraft != null) {
-          this.minecraft.gui.setScreen(null);
-        }
+        // Same as Escape: a screen with unsaved changes asks first
+        confirmLeave(
+            () -> {
+              if (this.minecraft != null) this.minecraft.gui.setScreen(null);
+            });
         return true;
       }
     }

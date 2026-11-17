@@ -108,6 +108,7 @@ public final class QuestEditDraft {
 
   public void removePrerequisite(UUID quest) {
     prerequisites.remove(quest);
+    chipRemoved();
   }
 
   /** The "something you don't have access to" chip shows. */
@@ -123,11 +124,18 @@ public final class QuestEditDraft {
   /** Removes the "something you don't have access to" chip. */
   public void dropHidden() {
     if (hiddenPrerequisites) dropHidden = true;
+    chipRemoved();
   }
 
   /** Removes the "a deleted quest" chip. */
   public void dropDeleted() {
     if (deletedPrerequisite) dropDeleted = true;
+    chipRemoved();
+  }
+
+  /** The last chip gone hides the auto-join box: a tick nobody can see is never sent. */
+  private void chipRemoved() {
+    if (!hasPrerequisites()) autoJoin = originalAutoJoin;
   }
 
   /** At least one chip of any kind: the auto-join checkbox shows. */
@@ -145,11 +153,38 @@ public final class QuestEditDraft {
     this.autoJoin = autoJoin;
   }
 
+  /** The auto-join box shows next to a non-empty Prerequisites field. */
+  public boolean autoJoinShown() {
+    return hasPrerequisites();
+  }
+
+  /** The auto-join box can be ticked only while the draft's visibility is Open. */
+  public boolean autoJoinUsable() {
+    return visibility == Visibility.OPEN;
+  }
+
   // --- the pane ---
 
-  /** The edit pane's rows: the whole tree the quest is in now, from its top. */
+  /**
+   * A line under the pane's tree: a quest taken out of it, not saved yet. {@code nowInside} is the
+   * quest it was moved into, or null when it is now on its own.
+   */
+  public record TakenOut(UUID id, UUID nowInside) {}
+
+  /**
+   * The edit pane's rows, for the whole editing session the tree the edited quest was in when the
+   * editor opened (from the top of the tree that holds its top quest of then), on the draft's tree.
+   */
   public List<QuestTreeRows.Row> rows(UUID me) {
-    return QuestTreeRows.wholeTree(tree.effective(), me, questId);
+    return QuestTreeRows.wholeTree(tree.effective(), me, treeRoot);
+  }
+
+  /** The edited quest's line is in the tree; otherwise it is among the taken-out lines. */
+  public boolean editedQuestInTree(UUID me) {
+    for (QuestTreeRows.Row row : rows(me)) {
+      if (row.id().equals(questId)) return true;
+    }
+    return false;
   }
 
   /**
@@ -162,19 +197,33 @@ public final class QuestEditDraft {
     return LinkRules.detach(tree.effective(), me, quest).isEmpty();
   }
 
+  /** A completed quest's links are frozen: its row never drags. */
+  public boolean canDrag(UUID quest) {
+    QuestData q = tree.effective().get(quest);
+    return q != null && !q.isCompleted();
+  }
+
   /**
-   * The quests taken out of the tree the edited quest started in, topmost only, listed below the
-   * pane; a quest the pane still shows (the edited quest moved to another tree, with its subquests)
-   * is left out.
+   * The quests taken out of the tree the pane shows, topmost only, and the edited quest whenever it
+   * is outside that tree (even inside another taken-out quest), last, so its line and the "add a
+   * subquest..." field always show somewhere.
    */
-  public List<UUID> takenOut(UUID me) {
+  public List<TakenOut> takenOut(UUID me) {
     Set<UUID> shown = new HashSet<>();
     for (QuestTreeRows.Row row : rows(me)) shown.add(row.id());
-    List<UUID> out = new ArrayList<>();
+    List<TakenOut> out = new ArrayList<>();
     for (UUID id : tree.takenOut(treeRoot)) {
-      if (!shown.contains(id)) out.add(id);
+      if (!shown.contains(id)) out.add(takenOutLine(id));
+    }
+    if (!shown.contains(questId) && out.stream().noneMatch(t -> t.id().equals(questId))) {
+      out.add(takenOutLine(questId));
     }
     return out;
+  }
+
+  private TakenOut takenOutLine(UUID id) {
+    QuestData q = tree.effective().get(id);
+    return new TakenOut(id, q != null ? q.parentId() : null);
   }
 
   /** The edited quest sits inside a visible quest in the draft. */

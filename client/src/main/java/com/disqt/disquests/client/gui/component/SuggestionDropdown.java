@@ -228,6 +228,21 @@ public class SuggestionDropdown<T> {
     }
   }
 
+  /**
+   * Closes the open dropdown that holds {@code focused} (its own scrollbar can take the focus);
+   * true when one was closed.
+   */
+  public static boolean closeIfFocusedInside(FlowLayout root, UIComponent focused) {
+    if (focused == null) return false;
+    for (UIComponent child : List.copyOf(root.children())) {
+      if (child instanceof Panel p && p.owner.owns(focused)) {
+        p.owner.hide();
+        return true;
+      }
+    }
+    return false;
+  }
+
   private Row row(int index) {
     if (index < rows.size()) return rows.get(index);
     Row row = new Row(this, index);

@@ -130,7 +130,12 @@ final class QuestTreePane {
         ClientSession.getExpandedQuests());
   }
 
+  /** One layout pass for the clear and the refill, so the scroll keeps its place. */
   private void fill() {
+    list.<FlowLayout>configure(l -> fillRows());
+  }
+
+  private void fillRows() {
     list.clearChildren();
     QuestGraph graph = QuestGraphs.current();
     for (QuestTreeRows.Row row : rows(questId)) {

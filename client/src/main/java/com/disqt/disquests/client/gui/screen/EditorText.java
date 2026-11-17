@@ -24,6 +24,7 @@ public final class EditorText {
   public static final String PREREQUISITE_DELETED = QuestPage.PREREQUISITE_DELETED;
   public static final String AUTO_JOIN = QuestPage.PREREQUISITE_AUTO_JOIN;
   public static final String OPEN_ONLY = "gui.disquests.edit.open_only";
+  public static final String NOW_INSIDE = "gui.disquests.edit.now_inside";
   public static final String NOT_SAVED = "gui.disquests.tree.not_saved";
   public static final String TAKEN_OUT = "gui.disquests.tree.taken_out";
 
@@ -59,6 +60,7 @@ public final class EditorText {
             PREREQUISITE_DELETED,
             AUTO_JOIN,
             OPEN_ONLY,
+            NOW_INSIDE,
             NOT_SAVED,
             TAKEN_OUT));
     for (Visibility v : Visibility.values()) {

@@ -53,6 +53,7 @@ final class QuestLinksForm {
   private final Runnable onTreeChanged;
   private final FlowLayout hiddenParentRow;
   private final FlowLayout visibilityRow;
+  private final LabelComponent visibilityHint;
   private final FlowLayout chips;
   private final FlowLayout autoJoinRow;
 
@@ -77,6 +78,12 @@ final class QuestLinksForm {
     visibilityRow.id("visibility-row");
     form.child(visibilityRow);
 
+    // On its own full-width line: beside the buttons it wrapped into a tall column
+    visibilityHint = label(Component.empty(), true);
+    visibilityHint.id("visibility-hint");
+    visibilityHint.horizontalSizing(Sizing.fill(100));
+    form.child(visibilityHint);
+
     if (trees) {
       FlowLayout prerequisiteRow = row();
       prerequisiteRow.id("prerequisite-row");
@@ -95,7 +102,12 @@ final class QuestLinksForm {
       field.onPick(
           picked -> {
             draft.addPrerequisite(picked);
-            root.queue(this::refresh);
+            // The new chip moves the field: show its list again once the form has changed
+            root.queue(
+                () -> {
+                  refresh();
+                  if (field.dropdown().isVisible()) field.refresh();
+                });
           });
       prerequisiteRow.child(field);
       form.child(prerequisiteRow);
@@ -141,6 +153,12 @@ final class QuestLinksForm {
     fillVisibility();
     fillChips();
     fillAutoJoin();
+  }
+
+  /** After a press on something the refresh removes: Enter or Space must not press it again. */
+  private void refreshAndDropStaleFocus() {
+    refresh();
+    screen.dropStaleFocus();
   }
 
   private void fillHiddenParent() {
@@ -190,7 +208,7 @@ final class QuestLinksForm {
               Component.translatable(EditorText.visibility(v)),
               ignored -> {
                 draft.visibility(v);
-                root.queue(this::refresh);
+                root.queue(this::refreshAndDropStaleFocus);
               });
       button.id("vis-" + v.name().toLowerCase(Locale.ROOT));
       button.sizing(Sizing.content(), Sizing.fixed(16));
@@ -203,10 +221,7 @@ final class QuestLinksForm {
       hint.append(Component.literal(" "))
           .append(Component.translatable(EditorText.VISIBILITY_IN_PARENT));
     }
-    LabelComponent hintLabel = label(hint, true);
-    hintLabel.id("visibility-hint");
-    hintLabel.horizontalSizing(Sizing.expand(100));
-    visibilityRow.child(hintLabel);
+    visibilityHint.text(hint);
   }
 
   private void fillChips() {
@@ -239,7 +254,7 @@ final class QuestLinksForm {
             .onRemove(
                 ignored -> {
                   remove.run();
-                  root.queue(this::refresh);
+                  root.queue(this::refreshAndDropStaleFocus);
                 });
     chip.id(id);
     return chip;
@@ -247,8 +262,8 @@ final class QuestLinksForm {
 
   private void fillAutoJoin() {
     autoJoinRow.clearChildren();
-    if (!trees || !draft.hasPrerequisites()) return;
-    boolean usable = draft.visibility() == Visibility.OPEN;
+    if (!trees || !draft.autoJoinShown()) return;
+    boolean usable = draft.autoJoinUsable();
     MutableComponent text = Component.translatable(EditorText.AUTO_JOIN);
     if (!usable) {
       text.append(Component.literal(" ")).append(Component.translatable(EditorText.OPEN_ONLY));
