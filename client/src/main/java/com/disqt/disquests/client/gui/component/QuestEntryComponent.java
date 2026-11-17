@@ -119,7 +119,7 @@ public class QuestEntryComponent extends BaseUIComponent {
     this.theme = DisquestsClient.CONFIG.theme();
 
     // Cache owner text + width (fix 2)
-    if (!isOwnedByPlayer && quest.getOwnerName() != null) {
+    if (!isOwnedByPlayer && quest.getOwnerName() != null && !quest.getOwnerName().isBlank()) {
       this.cachedOwnerText =
           Component.literal(" by " + quest.getOwnerName()).withStyle(ChatFormatting.GRAY);
       this.cachedOwnerWidth = Minecraft.getInstance().font.width(cachedOwnerText);

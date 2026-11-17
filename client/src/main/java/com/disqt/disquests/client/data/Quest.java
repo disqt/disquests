@@ -1,8 +1,11 @@
 package com.disqt.disquests.client.data;
 
+import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.PointData;
+import com.disqt.disquests.common.model.Privatized;
 import com.disqt.disquests.common.model.QuestData;
+import com.disqt.disquests.common.model.Role;
 import com.disqt.disquests.common.model.Visibility;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +30,14 @@ public class Quest {
   private long completedAt;
   private UUID completedBy;
   private String completedByName;
+  private UUID parentId;
+  private List<UUID> prerequisites = new ArrayList<>();
+  private boolean hiddenPrerequisites;
+  private boolean deletedPrerequisite;
+  private boolean hiddenParent;
+  private boolean autoJoin;
+  private boolean locked;
+  private Privatized privatized;
 
   public static Quest fromNetwork(QuestData data) {
     Quest quest = new Quest();
@@ -50,7 +61,51 @@ public class Quest {
     quest.completedAt = data.completedAt();
     quest.completedBy = data.completedBy();
     quest.completedByName = data.completedByName();
+    quest.parentId = data.parentId();
+    quest.prerequisites = new ArrayList<>(data.prerequisites());
+    quest.hiddenPrerequisites = data.hiddenPrerequisites();
+    quest.deletedPrerequisite = data.deletedPrerequisite();
+    quest.hiddenParent = data.hiddenParent();
+    quest.autoJoin = data.autoJoin();
+    quest.locked = data.locked();
+    quest.privatized = data.privatized();
     return quest;
+  }
+
+  /** The wire form of this quest: what {@link #fromNetwork} was given, plus any local edits. */
+  public QuestData toData() {
+    List<ContributorData> people = new ArrayList<>();
+    if (contributors != null) {
+      for (Contributor c : contributors) {
+        people.add(new ContributorData(c.getUuid(), c.getName(), c.getRole()));
+      }
+    }
+    return new QuestData(
+        id,
+        title,
+        content,
+        ownerUuid,
+        ownerName,
+        visibility,
+        people,
+        lastModified,
+        coordinates,
+        isRegion,
+        coordinates2,
+        map,
+        getTags(),
+        polygon,
+        completedAt,
+        completedBy,
+        completedByName,
+        parentId,
+        prerequisites,
+        hiddenPrerequisites,
+        deletedPrerequisite,
+        hiddenParent,
+        autoJoin,
+        locked,
+        privatized);
   }
 
   public UUID getId() {
@@ -177,6 +232,43 @@ public class Quest {
     return completedByName;
   }
 
+  public UUID getParentId() {
+    return parentId;
+  }
+
+  public List<UUID> getPrerequisites() {
+    return prerequisites;
+  }
+
+  /** True when the server hid some prerequisites from this viewer. */
+  public boolean hasHiddenPrerequisites() {
+    return hiddenPrerequisites;
+  }
+
+  /** True when a prerequisite was deleted and the link is still to be dropped. */
+  public boolean hasDeletedPrerequisite() {
+    return deletedPrerequisite;
+  }
+
+  /** True when an owner is told the quest sits inside a quest they cannot see. */
+  public boolean hasHiddenParent() {
+    return hiddenParent;
+  }
+
+  public boolean isAutoJoin() {
+    return autoJoin;
+  }
+
+  /** True for a locked view: the viewer sees the title and links only. */
+  public boolean isLocked() {
+    return locked;
+  }
+
+  /** Set when a deletion forced the quest to Private; null otherwise. */
+  public Privatized getPrivatized() {
+    return privatized;
+  }
+
   /** True when the quest has been marked completed (archived). */
   public boolean isCompleted() {
     return completedAt != 0L;
@@ -193,19 +285,33 @@ public class Quest {
 
   // --- Permission helpers ---
 
-  public boolean isOwner(UUID playerUuid) {
-    return playerUuid != null && playerUuid.equals(ownerUuid);
+  /** The player's role on this quest, or null when they hold none. */
+  public Role roleOf(UUID playerUuid) {
+    if (playerUuid == null) return null;
+    if (playerUuid.equals(ownerUuid)) return Role.OWNER;
+    if (contributors != null) {
+      for (Contributor c : contributors) {
+        if (playerUuid.equals(c.getUuid())) return c.getRole();
+      }
+    }
+    return null;
   }
 
+  /** True for the display owner and for every co-owner. */
+  public boolean isOwner(UUID playerUuid) {
+    return roleOf(playerUuid) == Role.OWNER;
+  }
+
+  /** True when the player is listed as a contributor (any role). */
   public boolean isContributor(UUID playerUuid) {
     return contributors != null
         && contributors.stream().anyMatch(c -> c.getUuid().equals(playerUuid));
   }
 
+  /** WRITE or OWNER. */
   public boolean canEdit(UUID playerUuid) {
-    return isOwner(playerUuid)
-        || (contributors != null
-            && contributors.stream().anyMatch(c -> c.getUuid().equals(playerUuid) && c.canEdit()));
+    Role role = roleOf(playerUuid);
+    return role != null && role.atLeast(Role.WRITE);
   }
 
   public boolean isContentHidden(UUID playerUuid) {

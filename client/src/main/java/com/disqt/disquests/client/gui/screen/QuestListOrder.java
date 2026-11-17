@@ -14,11 +14,14 @@ final class QuestListOrder {
 
   private QuestListOrder() {}
 
-  /** Completed quests only, most recently completed first. */
+  /**
+   * Completed quests only, most recently completed first. Locked views are skipped: the player can
+   * see their title but not open them, and the list has no row for that yet.
+   */
   static List<Quest> archived(List<Quest> mine) {
     List<Quest> result = new ArrayList<>();
     for (Quest q : mine) {
-      if (q.isCompleted()) {
+      if (q.isCompleted() && !q.isLocked()) {
         result.add(q);
       }
     }
@@ -26,11 +29,14 @@ final class QuestListOrder {
     return result;
   }
 
-  /** Drops completed quests; the rest keep the incoming order. */
+  /**
+   * Drops completed quests and locked views (no row for them until the tree UI exists); the rest
+   * keep the incoming order.
+   */
   static List<Quest> active(List<Quest> quests) {
     List<Quest> result = new ArrayList<>();
     for (Quest q : quests) {
-      if (!q.isCompleted()) {
+      if (!q.isCompleted() && !q.isLocked()) {
         result.add(q);
       }
     }

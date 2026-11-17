@@ -161,8 +161,11 @@ public class QuestScreen extends DisquestsBaseScreen {
         .text(Component.literal(quest.getTitle() != null ? quest.getTitle() : "Untitled"));
 
     // Owner + visibility info (built programmatically so content sizing measures real text)
+    // A locked view has no owner name: show only the visibility.
+    boolean hasOwnerName = quest.getOwnerName() != null && !quest.getOwnerName().isBlank();
     MutableComponent ownerText =
-        Component.literal("by " + quest.getOwnerName()).withColor(Colors.TEXT_MUTED);
+        Component.literal(hasOwnerName ? "by " + quest.getOwnerName() : "")
+            .withColor(Colors.TEXT_MUTED);
     if (quest.getVisibility() != null) {
       int visColor =
           switch (quest.getVisibility()) {

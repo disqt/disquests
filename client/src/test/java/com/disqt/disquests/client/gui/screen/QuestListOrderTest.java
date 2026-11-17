@@ -47,6 +47,22 @@ class QuestListOrderTest {
   }
 
   @Test
+  void lockedViewsAreNeverListed() {
+    Quest open = quest("open");
+    Quest locked =
+        Quest.fromNetwork(
+            quest("locked")
+                .toData()
+                .withLinksView(List.of(), false, false, true)
+                .withCompletion(5L, null, null));
+    Quest lockedActive =
+        Quest.fromNetwork(quest("locked").toData().withLinksView(List.of(), false, false, true));
+
+    assertEquals(List.of(open), QuestListOrder.active(List.of(open, lockedActive, locked)));
+    assertEquals(List.of(), QuestListOrder.archived(List.of(locked)));
+  }
+
+  @Test
   void shouldCollapseList_below640() {
     assertTrue(QuestListOrder.shouldCollapseList(0));
     assertTrue(QuestListOrder.shouldCollapseList(639));

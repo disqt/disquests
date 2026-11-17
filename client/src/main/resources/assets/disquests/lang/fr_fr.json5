@@ -40,6 +40,31 @@
     "quest_archived": "Cette quête a été terminée par un coéquipier ; tes modifications n'ont pas été enregistrées.",
   },
 
+  // Notifications du serveur
+  "gui.disquests.notice.{}": {
+    "unlocked": "Nouvelle quête : %s",
+    "set_private": "\"%s\" est passée en Private : la quête qui la contenait a été supprimée. Ouvre-la pour décider.",
+    "refused_titled": "\"%s\" : %s",
+    "refused": "Ce changement est impossible : %s",
+  },
+
+  // Raisons d'un refus
+  "gui.disquests.refusal.{}": {
+    "self": "une quête ne peut pas se contenir ni s'attendre elle-même",
+    "loop": "ça ferait une boucle",
+    "too_deep": "trop profond (limite : %d niveaux)",
+    "completed": "elle est terminée",
+    "target_completed": "cette quête est terminée",
+    "linked_by_prerequisite": "l'une se débloque après l'autre",
+    "need_owner": "tu dois être Owner dessus",
+    "need_write_on_target": "tu dois avoir Write sur la quête qui la reçoit",
+    "not_visible": "tu ne peux pas voir cette quête",
+    "too_many_prerequisites": "8 prérequis au maximum",
+    "already_there": "c'est déjà là",
+    "last_owner": "une quête garde toujours au moins un owner",
+    "unknown": "pas autorisé",
+  },
+
   // Onglets de l'accueil
   "gui.disquests.tab.{}": {
     "archived": "Archivées",

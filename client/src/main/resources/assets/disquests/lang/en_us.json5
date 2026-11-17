@@ -40,6 +40,31 @@
     "quest_archived": "This quest was completed by a teammate; your changes were not saved.",
   },
 
+  // Server notices
+  "gui.disquests.notice.{}": {
+    "unlocked": "New quest: %s",
+    "set_private": "\"%s\" was set to Private: the quest it was in was deleted. Open it to decide.",
+    "refused_titled": "\"%s\": %s",
+    "refused": "That change isn't possible: %s",
+  },
+
+  // Why a change was refused
+  "gui.disquests.refusal.{}": {
+    "self": "a quest can't contain or wait on itself",
+    "loop": "it would make a loop",
+    "too_deep": "too deep (limit %d levels)",
+    "completed": "it is completed",
+    "target_completed": "that quest is completed",
+    "linked_by_prerequisite": "one unlocks after the other",
+    "need_owner": "you need Owner on it",
+    "need_write_on_target": "you need Write on the quest it goes into",
+    "not_visible": "you can't see that quest",
+    "too_many_prerequisites": "at most 8 prerequisites",
+    "already_there": "it is already there",
+    "last_owner": "a quest always keeps at least one owner",
+    "unknown": "not allowed",
+  },
+
   // Home tabs
   "gui.disquests.tab.{}": {
     "archived": "Archived",

@@ -1,5 +1,6 @@
 package com.disqt.disquests.client;
 
+import com.disqt.disquests.client.data.NewMarks;
 import com.disqt.disquests.client.gui.map.MapCameraMemory;
 import com.disqt.disquests.client.gui.map.MapMath;
 import com.disqt.disquests.client.gui.map.SharedTileCache;
@@ -13,6 +14,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ClientSession {
+
+  /** Used when the server's handshake carries no depth limit. */
+  public static final int DEFAULT_MAX_QUEST_DEPTH = 3;
 
   public enum Tab {
     MY_QUESTS,
@@ -39,6 +43,8 @@ public class ClientSession {
   private static int serverProtocolVersion = ProtocolVersion.V1;
   private static boolean serverWorldMapEnabled = true;
   private static boolean serverPlayerMarkerEnabled = true;
+  private static int maxQuestDepth = DEFAULT_MAX_QUEST_DEPTH;
+  private static final NewMarks newMarks = new NewMarks();
   private static final MapCameraMemory cameraMemory = new MapCameraMemory();
 
   // UI state
@@ -95,6 +101,8 @@ public class ClientSession {
     serverWorldMapEnabled = true;
     serverPlayerMarkerEnabled = true;
     cameraMemory.clear();
+    maxQuestDepth = DEFAULT_MAX_QUEST_DEPTH;
+    newMarks.clear();
     activeTab = Tab.MY_QUESTS;
     searchTerm = "";
     serverQuestsFilter = QuestFilter.ALL;
@@ -115,6 +123,25 @@ public class ClientSession {
   /** True when the server understands quest completion (protocol V3 or later). */
   public static boolean supportsCompletion() {
     return getServerProtocolVersion() >= ProtocolVersion.V3;
+  }
+
+  /** True when the server understands roles, quest trees and prerequisites (protocol V4+). */
+  public static boolean supportsTrees() {
+    return getServerProtocolVersion() >= ProtocolVersion.V4;
+  }
+
+  /** The server's {@code max-quest-depth} (0 = no limit); 3 when the server sent none. */
+  public static int getMaxQuestDepth() {
+    return maxQuestDepth;
+  }
+
+  public static void setMaxQuestDepth(int depth) {
+    maxQuestDepth = depth;
+  }
+
+  /** Quests the player has not looked at yet; cleared on {@link #leaveServer}. */
+  public static NewMarks newMarks() {
+    return newMarks;
   }
 
   /** The server's {@code world-map} switch from the handshake (true when the server sent none). */

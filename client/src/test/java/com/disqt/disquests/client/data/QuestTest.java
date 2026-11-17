@@ -2,14 +2,23 @@ package com.disqt.disquests.client.data;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.disqt.disquests.common.graph.QuestView;
 import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.PointData;
+import com.disqt.disquests.common.model.Privatized;
 import com.disqt.disquests.common.model.QuestData;
+import com.disqt.disquests.common.model.Role;
 import com.disqt.disquests.common.model.Visibility;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 class QuestTest {
 
@@ -225,5 +234,119 @@ class QuestTest {
     assertEquals(0L, active.getCompletedAt());
     assertNull(active.getCompletedBy());
     assertNull(active.getCompletedByName());
+  }
+
+  @Nested
+  class Trees {
+
+    private final UUID co = UUID.randomUUID();
+    private final UUID writer = UUID.randomUUID();
+    private final UUID reader = UUID.randomUUID();
+    private final UUID parent = UUID.randomUUID();
+    private final UUID pre = UUID.randomUUID();
+
+    private QuestData full() {
+      return new QuestData(
+          UUID.randomUUID(),
+          "Title",
+          "Body",
+          OWNER,
+          "OwnerName",
+          Visibility.CLOSED,
+          List.of(
+              new ContributorData(co, "Co", Role.OWNER),
+              new ContributorData(writer, "Writer", Role.WRITE),
+              new ContributorData(reader, "Reader", Role.READ)),
+          77L,
+          new CoordinatesData(1, 2, 3),
+          false,
+          null,
+          "overworld",
+          List.of("a"),
+          List.of(new PointData(1, 2)),
+          5L,
+          co,
+          "Co",
+          parent,
+          List.of(pre),
+          true,
+          true,
+          true,
+          true,
+          true,
+          new Privatized(Visibility.OPEN, "Gone", "Bob", 9L));
+    }
+
+    @Test
+    void fromNetworkCopiesTheLinkFields() {
+      Quest q = Quest.fromNetwork(full());
+      assertEquals(parent, q.getParentId());
+      assertEquals(List.of(pre), q.getPrerequisites());
+      assertTrue(q.hasHiddenPrerequisites());
+      assertTrue(q.hasDeletedPrerequisite());
+      assertTrue(q.isAutoJoin());
+      assertTrue(q.isLocked());
+      assertEquals(new Privatized(Visibility.OPEN, "Gone", "Bob", 9L), q.getPrivatized());
+    }
+
+    @Test
+    void toDataRoundTripsWhatTheServerSent() {
+      QuestData data = full();
+      assertEquals(data, Quest.fromNetwork(data).toData());
+    }
+
+    @Test
+    void toDataRoundTripsALockedView() {
+      QuestData locked =
+          new QuestData(
+                  UUID.randomUUID(),
+                  "Title",
+                  "",
+                  QuestView.NO_OWNER,
+                  "",
+                  Visibility.OPEN,
+                  List.of(new ContributorData(reader, "Reader", Role.READ)),
+                  0L,
+                  null,
+                  false,
+                  null,
+                  null,
+                  List.of())
+              .withLinksView(List.of(pre), false, false, true);
+      assertEquals(locked, Quest.fromNetwork(locked).toData());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("expectations")
+    void roleAccessors(
+        String who, Function<Trees, UUID> player, Role role, boolean owner, boolean edit) {
+      Quest q = Quest.fromNetwork(full());
+      UUID id = player.apply(this);
+      assertEquals(role, q.roleOf(id));
+      assertEquals(owner, q.isOwner(id));
+      assertEquals(edit, q.canEdit(id));
+    }
+
+    static Stream<Arguments> expectations() {
+      return Stream.of(
+          Arguments.of("display owner", (Function<Trees, UUID>) t -> OWNER, Role.OWNER, true, true),
+          Arguments.of("co-owner", (Function<Trees, UUID>) t -> t.co, Role.OWNER, true, true),
+          Arguments.of("writer", (Function<Trees, UUID>) t -> t.writer, Role.WRITE, false, true),
+          Arguments.of("reader", (Function<Trees, UUID>) t -> t.reader, Role.READ, false, false),
+          Arguments.of("stranger", (Function<Trees, UUID>) t -> STRANGER, null, false, false));
+    }
+
+    @Test
+    void roleOfNullPlayerIsNull() {
+      assertNull(Quest.fromNetwork(full()).roleOf(null));
+    }
+
+    @Test
+    void contributorKeepsItsRole() {
+      Quest q = Quest.fromNetwork(full());
+      assertEquals(Role.OWNER, q.getContributors().get(0).getRole());
+      assertTrue(q.getContributors().get(0).canEdit());
+      assertFalse(q.getContributors().get(2).canEdit());
+    }
   }
 }
