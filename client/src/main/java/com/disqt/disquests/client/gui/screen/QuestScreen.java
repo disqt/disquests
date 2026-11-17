@@ -3,7 +3,7 @@ package com.disqt.disquests.client.gui.screen;
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
-import com.disqt.disquests.client.gui.component.AutocompleteDropdown;
+import com.disqt.disquests.client.gui.component.SuggestionDropdown;
 import com.disqt.disquests.client.gui.component.TagChipComponent;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
@@ -38,6 +38,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -50,6 +51,9 @@ import org.jetbrains.annotations.Nullable;
  * re-opening with different state.
  */
 public class QuestScreen extends DisquestsBaseScreen {
+
+  /** The [[ autocomplete lists at most this many titles. */
+  private static final int WIKI_LINK_SUGGESTIONS = 5;
 
   private final Quest quest;
   private final boolean editing;
@@ -412,21 +416,37 @@ public class QuestScreen extends DisquestsBaseScreen {
     titleFieldComponent.tabTarget(contentFieldComponent);
 
     // Attach autocomplete dropdown for wiki-link syntax ([[Quest Name]])
-    AutocompleteDropdown autocomplete = new AutocompleteDropdown();
-    autocomplete.setOnSelect(
-        title -> {
-          // Replace the partial query after [[ with the full title + ]]
-          String current = contentFieldComponent.getText();
-          int cursorPos = contentFieldComponent.getDelegate().getCursorAbsolute();
-          int openBracket = current.lastIndexOf("[[", cursorPos - 1);
-          if (openBracket >= 0) {
-            String before = current.substring(0, openBracket + 2);
-            String after = current.substring(cursorPos);
-            contentFieldComponent.getDelegate().setText(before + title + "]]" + after);
+    SuggestionDropdown<String> autocomplete =
+        new SuggestionDropdown<String>(
+            root,
+            "autocomplete-overlay",
+            title -> new SuggestionDropdown.Entry(Component.literal(title), true, null),
+            title -> {
+              // Replace the partial query after [[ with the full title + ]]
+              String current = contentFieldComponent.getText();
+              int cursorPos = contentFieldComponent.getDelegate().getCursorAbsolute();
+              int openBracket = current.lastIndexOf("[[", cursorPos - 1);
+              if (openBracket >= 0) {
+                String before = current.substring(0, openBracket + 2);
+                String after = current.substring(cursorPos);
+                contentFieldComponent.getDelegate().setText(before + title + "]]" + after);
+              }
+            });
+    contentFieldComponent.setAutocomplete(
+        autocomplete,
+        () -> {
+          String query = contentFieldComponent.wikiLinkQuery();
+          if (query == null) {
+            autocomplete.hide();
+            return;
           }
+          autocomplete.show(
+              wikiLinkTitles(query),
+              contentFieldComponent.cursorScreenX(),
+              contentFieldComponent.cursorScreenY(),
+              contentFieldComponent.getDelegate().getLineHeight(),
+              contentFieldComponent);
         });
-    contentFieldComponent.setAutocomplete(autocomplete);
-    autocomplete.setRootComponent(root);
 
     // Location card
     vertexRows = LocationCard.buildEdit(this, root, quest);
@@ -938,5 +958,18 @@ public class QuestScreen extends DisquestsBaseScreen {
     if (ClientCache.getQuestById(quest.getId()) == null) {
       this.onClose();
     }
+  }
+
+  /**
+   * Wiki-link suggestions, as before: my quests then the board's, titles starting with the query.
+   */
+  private static List<String> wikiLinkTitles(String query) {
+    String lower = query.toLowerCase(Locale.ROOT);
+    return Stream.concat(ClientCache.getMyQuests().stream(), ClientCache.getServerQuests().stream())
+        .map(Quest::getTitle)
+        .filter(Objects::nonNull)
+        .filter(title -> lower.isEmpty() || title.toLowerCase(Locale.ROOT).startsWith(lower))
+        .limit(WIKI_LINK_SUGGESTIONS)
+        .toList();
   }
 }

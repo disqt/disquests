@@ -14,6 +14,9 @@ public class DisquestsConfigModel {
   /** Width of the map home's quest list, set by dragging its divider; clamped to the screen. */
   public int sidePanelWidth = 216;
 
+  /** Width of the quest screen's tree pane, set by dragging its divider; clamped to the screen. */
+  public int questPaneWidth = 220;
+
   @SectionHeader("hud")
   public boolean pinnedVisible = true;
 

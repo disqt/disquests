@@ -6,7 +6,7 @@ import com.disqt.disquests.client.DisquestsClient;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.QuestEntryComponent;
 import com.disqt.disquests.client.gui.component.SplitterComponent;
-import com.disqt.disquests.client.gui.component.TagAutocompleteDropdown;
+import com.disqt.disquests.client.gui.component.SuggestionDropdown;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.map.BannerLayer;
 import com.disqt.disquests.client.gui.map.MapCameraMemory;
@@ -39,6 +39,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -60,6 +61,9 @@ public class MainScreen extends DisquestsBaseScreen {
   private static final List<ClientTooltipComponent> NO_TOOLTIP = Collections.emptyList();
   private static final List<String> DIMENSIONS = List.of("overworld", "the_nether", "the_end");
   private static final int INITIAL_ZOOM = 2;
+
+  /** The search box's #tag autocomplete lists at most this many tags. */
+  private static final int TAG_SUGGESTIONS = 8;
 
   // Component references (looked up by ID from XML model)
   private FlowLayout rootLayout;
@@ -87,7 +91,6 @@ public class MainScreen extends DisquestsBaseScreen {
   @Nullable private QuestPolygonLayer polygonLayer;
   @Nullable private FlowLayout sidePanel;
   @Nullable private SplitterComponent panelDivider;
-  private int sidePanelWidth = QuestListOrder.MIN_PANEL_WIDTH;
   @Nullable private ButtonComponent dimensionButton;
   // Popup under btn-dimension, added to the root with absolute positioning while open
   @Nullable private FlowLayout dimensionMenu;
@@ -100,7 +103,7 @@ public class MainScreen extends DisquestsBaseScreen {
   // Search
   private TextBoxComponent searchField;
   private String searchTerm;
-  private TagAutocompleteDropdown tagDropdown;
+  private SuggestionDropdown<String> tagDropdown;
 
   // State
   private ClientSession.Tab currentTab;
@@ -223,16 +226,20 @@ public class MainScreen extends DisquestsBaseScreen {
     this.searchRow.child(this.searchField);
 
     // --- Tag autocomplete dropdown ---
-    tagDropdown = new TagAutocompleteDropdown();
-    tagDropdown.setRootComponent(root);
-    tagDropdown.setOnSelect(
-        tag -> {
-          // Replace the current #partial with #tagname
-          String current = searchField.getValue();
-          int hashIndex = current.lastIndexOf('#');
-          String before = hashIndex >= 0 ? current.substring(0, hashIndex) : current;
-          searchField.text(before + "#" + tag + " ");
-        });
+    tagDropdown =
+        new SuggestionDropdown<String>(
+                root,
+                "tag-autocomplete-overlay",
+                tag -> new SuggestionDropdown.Entry(Component.literal("#" + tag), true, null),
+                tag -> {
+                  // Replace the current #partial with #tagname
+                  String current = searchField.getValue();
+                  int hashIndex = current.lastIndexOf('#');
+                  String before = hashIndex >= 0 ? current.substring(0, hashIndex) : current;
+                  searchField.text(before + "#" + tag + " ");
+                })
+            .pickOnTab(true)
+            .preferAbove(true);
 
     // Cache title width
     this.titleWidth = Minecraft.getInstance().font.width("Disquests");
@@ -371,10 +378,13 @@ public class MainScreen extends DisquestsBaseScreen {
       tagDropdown.hide();
       return;
     }
-    // Position dropdown above the search box
-    int anchorX = searchField.x();
-    int anchorY = searchField.y();
-    tagDropdown.update(partial, anchorX, anchorY, true);
+    String lower = partial.toLowerCase(Locale.ROOT);
+    List<String> tags =
+        ClientCache.getAllKnownTags().stream()
+            .filter(t -> lower.isEmpty() || t.toLowerCase(Locale.ROOT).contains(lower))
+            .limit(TAG_SUGGESTIONS)
+            .toList();
+    tagDropdown.show(tags, searchField);
   }
 
   @Override
@@ -385,10 +395,8 @@ public class MainScreen extends DisquestsBaseScreen {
       return true;
     }
     // Intercept arrow/enter/tab/escape for the tag autocomplete dropdown
-    if (tagDropdown != null && tagDropdown.isVisible()) {
-      if (tagDropdown.onKeyDown(keyInput)) {
-        return true;
-      }
+    if (tagDropdown != null && tagDropdown.onKey(keyInput)) {
+      return true;
     }
     return super.keyPressed(keyInput);
   }
@@ -578,32 +586,15 @@ public class MainScreen extends DisquestsBaseScreen {
 
   /** Inserts the draggable divider before the side panel and applies the saved panel width. */
   private void buildPanelDivider(FlowLayout root) {
-    this.sidePanelWidth =
-        QuestListOrder.clampPanelWidth(DisquestsClient.CONFIG.sidePanelWidth(), this.width);
-    sidePanel.horizontalSizing(Sizing.fixed(sidePanelWidth));
-    // Width at the press: only drags change it, and each commit re-anchors it.
-    int[] startWidth = {sidePanelWidth};
-    this.panelDivider = new SplitterComponent();
-    panelDivider.id("panel-divider");
-    panelDivider.onDrag(
-        totalDx -> {
-          // Dragging left widens the panel, so the divider follows the cursor.
-          int width =
-              QuestListOrder.clampPanelWidth((int) Math.round(startWidth[0] - totalDx), this.width);
-          if (width != sidePanelWidth) {
-            sidePanelWidth = width;
-            sidePanel.horizontalSizing(Sizing.fixed(width));
-          }
-        });
-    panelDivider.onCommit(
-        () -> {
-          startWidth[0] = sidePanelWidth;
-          if (DisquestsClient.CONFIG.sidePanelWidth() != sidePanelWidth) {
-            DisquestsClient.CONFIG.sidePanelWidth(sidePanelWidth);
-            // Option#set does not write the file.
-            DisquestsClient.CONFIG.save();
-          }
-        });
+    PaneSplit split =
+        new PaneSplit(
+            sidePanel,
+            PaneSplit.Side.RIGHT,
+            "panel-divider",
+            DisquestsClient.CONFIG::sidePanelWidth,
+            DisquestsClient.CONFIG::sidePanelWidth,
+            requested -> QuestListOrder.clampPanelWidth(requested, this.width));
+    this.panelDivider = split.divider();
     root.child(root.children().indexOf(sidePanel), panelDivider);
   }
 

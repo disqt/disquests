@@ -2,6 +2,8 @@ package com.disqt.disquests.client.data;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.disqt.disquests.client.gui.tree.SuggestionText;
+import com.disqt.disquests.client.gui.tree.Suggestions;
 import com.disqt.disquests.common.graph.Refusal;
 import com.disqt.disquests.common.model.Notice;
 import java.io.IOException;
@@ -16,10 +18,11 @@ import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 
 /**
- * Checks that every lang key {@link NoticeText} can emit exists in both language files. The files
- * use owo's nested syntax, so a key {@code gui.disquests.refusal.loop} is looked up as the block
- * {@code "gui.disquests.refusal.{}": { ... }} (text from its opening brace to the first closing
- * brace, the blocks hold only flat strings) containing {@code "loop":}.
+ * Checks that every lang key {@link NoticeText} and {@link SuggestionText} can emit, and the ones
+ * the tree rows draw, exist in both language files. The files use owo's nested syntax, so a key
+ * {@code gui.disquests.refusal.loop} is looked up as the block {@code "gui.disquests.refusal.{}": {
+ * ... }} (text from its opening brace to the first closing brace, the blocks hold only flat
+ * strings) containing {@code "loop":}.
  */
 class NoticeLangKeysTest {
 
@@ -36,7 +39,27 @@ class NoticeLangKeysTest {
     }
     for (Refusal r : Refusal.values()) keys.add(NoticeText.refusal(r, 3).key());
     keys.add(NoticeText.refusal(null, 3).key());
+    for (String note : new String[] {null, "", "READ", "WRITE", Suggestions.INSIDE_ANOTHER}) {
+      for (Refusal r : new Refusal[] {null, Refusal.NEED_OWNER}) {
+        SuggestionText.Line line =
+            SuggestionText.of(new Suggestions.Suggestion(UUID.randomUUID(), "t", r, note), 3);
+        collect(line.text(), keys);
+        if (line.note() != null) collect(line.note(), keys);
+      }
+    }
+    keys.addAll(TREE_ROW_KEYS);
     return keys.stream().distinct().toList();
+  }
+
+  /** Keys {@code TreeRowComponent} draws (a Minecraft class, so listed here by hand). */
+  private static final List<String> TREE_ROW_KEYS =
+      List.of("gui.disquests.tree.not_saved", "gui.disquests.tree.taken_out");
+
+  private static void collect(NoticeText.Message m, List<String> keys) {
+    keys.add(m.key());
+    for (Object arg : m.args()) {
+      if (arg instanceof NoticeText.Message nested) collect(nested, keys);
+    }
   }
 
   private static boolean declared(String file, String key) {

@@ -5,10 +5,13 @@ import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.DisquestsClient;
 import com.disqt.disquests.client.KeyBinds;
 import com.disqt.disquests.client.data.Quest;
+import com.disqt.disquests.client.gui.component.SuggestionDropdown;
+import com.disqt.disquests.client.gui.helper.Colors;
 import com.mojang.blaze3d.platform.InputConstants;
 import io.wispforest.owo.ui.base.BaseUIModelScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
+import io.wispforest.owo.ui.component.SmallCheckboxComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.container.OverlayContainer;
@@ -16,6 +19,7 @@ import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
 import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
 import java.util.UUID;
+import java.util.function.Consumer;
 import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
@@ -29,6 +33,8 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   public static final String CONFIRM_OVERLAY_ID = "confirm-overlay";
   public static final String CONFIRM_YES_ID = "btn-confirm-yes";
   public static final String CONFIRM_NO_ID = "btn-confirm-no";
+  public static final String CONFIRM_CHECKBOX_ID = "confirm-checkbox";
+  public static final String CONFIRM_EXTRA_ID = "confirm-extra";
 
   private static final java.util.Deque<NavEntry> backStack = new java.util.ArrayDeque<>();
   private static final java.util.Deque<NavEntry> forwardStack = new java.util.ArrayDeque<>();
@@ -106,6 +112,10 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
 
   @Override
   public boolean mouseClicked(MouseButtonEvent click, boolean simulated) {
+    // A click outside an open suggestion dropdown (and its field) closes it, then goes through.
+    if (this.uiAdapter != null) {
+      SuggestionDropdown.closeOnClickOutside(this.uiAdapter.rootComponent, click.x(), click.y());
+    }
     if (click.button() == InputConstants.MOUSE_BUTTON_4) {
       goBack();
       return true;
@@ -242,6 +252,33 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   }
 
   protected void showConfirmOverlay(Component message, Runnable onConfirm, Runnable onCancel) {
+    buildConfirmOverlay(message, null, null, ticked -> onConfirm.run(), onCancel);
+  }
+
+  /**
+   * A confirm dialog with an optional muted line under the question ({@code confirm-extra}) and an
+   * optional checkbox ({@code confirm-checkbox}), unticked; Yes passes whether it is ticked (false
+   * without one). Null or empty {@code extraLine} / {@code checkboxLabel} leave them out.
+   */
+  protected void showConfirmOverlay(
+      String text,
+      @Nullable String extraLine,
+      @Nullable String checkboxLabel,
+      Consumer<Boolean> onYes) {
+    buildConfirmOverlay(
+        Component.literal(text),
+        extraLine == null || extraLine.isEmpty() ? null : Component.literal(extraLine),
+        checkboxLabel == null || checkboxLabel.isEmpty() ? null : Component.literal(checkboxLabel),
+        onYes,
+        () -> {});
+  }
+
+  private void buildConfirmOverlay(
+      Component message,
+      @Nullable Component extraLine,
+      @Nullable Component checkboxLabel,
+      Consumer<Boolean> onConfirm,
+      Runnable onCancel) {
     if (this.uiAdapter == null) return;
 
     dismissOverlay();
@@ -251,12 +288,22 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     messageLabel.maxWidth(250);
     messageLabel.horizontalTextAlignment(HorizontalAlignment.CENTER);
 
+    SmallCheckboxComponent checkbox = null;
+    if (checkboxLabel != null) {
+      checkbox = UIComponents.smallCheckbox(checkboxLabel);
+      checkbox.id(CONFIRM_CHECKBOX_ID);
+      checkbox.checked(false);
+      checkbox.labelShadow(true);
+    }
+    SmallCheckboxComponent box = checkbox;
+
     ButtonComponent yesBtn =
         UIComponents.button(
             Component.translatable("gui.disquests.btn.yes"),
             b -> {
+              boolean ticked = box != null && box.checked();
               dismissOverlay();
-              onConfirm.run();
+              onConfirm.accept(ticked);
             });
     yesBtn.id(CONFIRM_YES_ID);
     yesBtn.sizing(Sizing.fixed(60), Sizing.fixed(20));
@@ -283,6 +330,18 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     panel.surface(Surface.DARK_PANEL);
     panel.horizontalAlignment(HorizontalAlignment.CENTER);
     panel.child(messageLabel);
+    if (extraLine != null) {
+      LabelComponent extraLabel = UIComponents.label(extraLine);
+      extraLabel.id(CONFIRM_EXTRA_ID);
+      extraLabel.color(Color.ofArgb(Colors.TEXT_MUTED));
+      extraLabel.shadow(true);
+      extraLabel.maxWidth(250);
+      extraLabel.horizontalTextAlignment(HorizontalAlignment.CENTER);
+      panel.child(extraLabel);
+    }
+    if (checkbox != null) {
+      panel.child(checkbox);
+    }
     panel.child(buttonRow);
 
     OverlayContainer<FlowLayout> overlay = UIContainers.overlay(panel);

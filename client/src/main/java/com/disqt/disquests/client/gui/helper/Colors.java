@@ -60,5 +60,15 @@ public final class Colors {
   public static int MAP_PLAYER = 0xFF55AAFF;
   public static int MAP_VERTEX = 0xFFFFFFFF;
 
+  // --- Suggestion dropdowns (same in every theme, like the map) ---
+  public static int DROPDOWN_BACKGROUND = 0xEE1A1A2E;
+  public static int DROPDOWN_OUTLINE = 0xFF3A3A5E;
+  public static int DROPDOWN_SELECTED = 0xEE3A3A5E;
+  public static int DROPDOWN_TEXT = 0xFFE0E0E0;
+
+  // --- Quest tree rows ---
+  public static int TREE_DROP_TARGET = 0x6655AADD;
+  public static int TREE_COMPLETED = 0xFF55CC55;
+
   private Colors() {}
 }

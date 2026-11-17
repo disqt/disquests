@@ -5,6 +5,7 @@ import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.NoticeText;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.data.QuestRouting;
+import com.disqt.disquests.client.gui.helper.Messages;
 import com.disqt.disquests.client.gui.map.SharedTileCache;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
@@ -73,20 +74,11 @@ public class ClientPacketHandler {
       ClientSession.newMarks().mark(notice.questId());
     }
     Minecraft client = Minecraft.getInstance();
-    Component text = toComponent(NoticeText.of(notice, ClientSession.getMaxQuestDepth()));
+    Component text = Messages.toComponent(NoticeText.of(notice, ClientSession.getMaxQuestDepth()));
     SystemToast.add(client.gui.toastManager(), NOTICE_TOAST, Component.literal("Disquests"), text);
     if (client.gui.screen() instanceof MainScreen mainScreen) {
       mainScreen.refreshListContents();
     }
-  }
-
-  private static Component toComponent(NoticeText.Message message) {
-    Object[] args = new Object[message.args().size()];
-    for (int i = 0; i < args.length; i++) {
-      Object arg = message.args().get(i);
-      args[i] = arg instanceof NoticeText.Message nested ? toComponent(nested) : arg;
-    }
-    return Component.translatable(message.key(), args);
   }
 
   private static void showOrDeferToast(String message) {

@@ -65,6 +65,23 @@
     "unknown": "not allowed",
   },
 
+  // Quest search dropdowns ("add a subquest...", "Prerequisites")
+  "gui.disquests.suggestion.{}": {
+    "title": "%s",
+    "refused": "%s (%s)",
+    "with_role": "%s, %s",
+    "role_read": "you have Read",
+    "role_write": "you have Write",
+    "role_none": "you have no role",
+    "inside_another": "inside another quest",
+  },
+
+  // Quest tree rows
+  "gui.disquests.tree.{}": {
+    "not_saved": "not saved",
+    "taken_out": "taken out, not saved",
+  },
+
   // Home tabs
   "gui.disquests.tab.{}": {
     "archived": "Archived",
@@ -171,6 +188,7 @@
     "option.pinnedVisible": "Show Pinned Quests",
     "option.pinnedWidth": "Pinned Width",
     "option.sidePanelWidth": "Quest list width",
+    "option.questPaneWidth": "Quest tree pane width",
     "option.theme": "Theme",
     "option.worldMap": "World map",
     // owo builds enum keys as text.config.<config>.enum.<enumName>.<value>,

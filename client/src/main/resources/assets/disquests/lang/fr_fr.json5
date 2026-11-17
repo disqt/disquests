@@ -65,6 +65,23 @@
     "unknown": "pas autorisé",
   },
 
+  // Listes de recherche de quêtes (« ajouter une sous-quête... », « Prérequis »)
+  "gui.disquests.suggestion.{}": {
+    "title": "%s",
+    "refused": "%s (%s)",
+    "with_role": "%s, %s",
+    "role_read": "tu as Read",
+    "role_write": "tu as Write",
+    "role_none": "tu n'as aucun rôle",
+    "inside_another": "dans une autre quête",
+  },
+
+  // Lignes de l'arbre des quêtes
+  "gui.disquests.tree.{}": {
+    "not_saved": "non enregistrée",
+    "taken_out": "sortie, non enregistrée",
+  },
+
   // Onglets de l'accueil
   "gui.disquests.tab.{}": {
     "archived": "Archivées",
@@ -171,6 +188,7 @@
     "option.pinnedVisible": "Afficher les quêtes épinglées",
     "option.pinnedWidth": "Largeur des quêtes épinglées",
     "option.sidePanelWidth": "Largeur de la liste des quêtes",
+    "option.questPaneWidth": "Largeur du panneau de l'arbre des quêtes",
     "option.theme": "Thème",
     "option.worldMap": "Map du monde",
     "enum.theme.vanilla": "Vanilla",
