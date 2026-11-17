@@ -714,8 +714,7 @@ public class MainScreen extends DisquestsBaseScreen {
 
   private void updateActionButtons() {
     Quest selected = getSelectedQuest();
-    // A locked view cannot be opened yet: it has no page until it unlocks
-    btnOpen.active(selected != null && !selected.isLocked());
+    btnOpen.active(selected != null);
     if (currentTab == ClientSession.Tab.SERVER_QUESTS) {
       updateInteractButton(selected);
     }
@@ -777,10 +776,8 @@ public class MainScreen extends DisquestsBaseScreen {
     }
   }
 
-  /** Opens the quest's page and clears its "NEW" mark; a locked view has no page yet. */
+  /** Opens the quest's page (a locked quest opens to its locked page); the page clears NEW. */
   private void openQuest(Quest quest) {
-    if (quest.isLocked()) return;
-    ClientSession.newMarks().opened(quest.getId());
     navigateToScreen(new QuestScreen(this, quest));
   }
 

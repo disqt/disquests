@@ -33,6 +33,9 @@
     "edit_on_map": "Edit on map",
     "complete": "Complete",
     "reopen": "Reopen",
+    "manage_people": "Manage people",
+    "restore_visibility": "Set back to %s",
+    "keep_private": "Keep Private",
   },
 
   // Toasts
@@ -79,6 +82,35 @@
   "gui.disquests.tree.{}": {
     "not_saved": "not saved",
     "taken_out": "taken out, not saved",
+  },
+
+  // A player's role on a quest, next to the visibility badge
+  "gui.disquests.role.{}": {
+    "owner": "Owner",
+    "write": "Write",
+    "read": "Read",
+    "none": "not joined",
+  },
+
+  // Banners on a quest's page, for its owners
+  "gui.disquests.banner.{}": {
+    "privatized_titled": "Set to Private on %s. The quest it was in, \"%s\", was deleted by %s. It was %s before.",
+    "privatized": "Set to Private on %s. The quest it was in was deleted. It was %s before.",
+    "deleted_prerequisite": "This quest waits on a deleted quest and stays locked. Open Edit to remove that link.",
+  },
+
+  // What a locked quest is waiting on
+  "gui.disquests.waiting.{}": {
+    "prerequisites": "PREREQUISITES",
+    "something_else": "… and something else you can't see yet",
+    "nothing_visible": "This quest isn't available yet. Something else has to be finished first.",
+  },
+
+  // The Prerequisites section of a quest's page (Write and Owner)
+  "gui.disquests.prerequisite.{}": {
+    "hidden": "… and something you don't have access to",
+    "deleted": "a deleted quest",
+    "auto_join": "When this unlocks, add the players from those quests",
   },
 
   // Home tabs
@@ -152,12 +184,22 @@
     "remove_contributor": "Remove %s from contributors?",
     "complete": "Mark this quest as completed? It moves to the Archived tab for everyone who worked on it.",
     "reopen": "Reopen this quest? It goes back to the active lists, and its completion time will be replaced if it is completed again.",
+    "also_complete_one": "Also complete my %d unfinished subquest",
+    "also_complete_many": "Also complete my %d unfinished subquests",
+    "others_stay_active_one": "%d other belongs to another player and stays active",
+    "others_stay_active_many": "%d others belong to other players and stay active",
+    "also_delete_one": "Also delete my %d subquest",
+    "also_delete_many": "Also delete my %d subquests",
+    "others_kept_one": "%d other belongs to another player and is kept",
+    "others_kept_many": "%d others belong to other players and are kept",
   },
 
   // Collapsible sections
   "gui.disquests.section.{}": {
     "tags": "Tags (%d)",
     "contributors": "Contributors (%d)",
+    "where_this_sits": "WHERE THIS SITS",
+    "prerequisites": "Prerequisites",
   },
 
   // World map

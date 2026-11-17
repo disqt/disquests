@@ -188,15 +188,26 @@ public class ClientPacketHandler {
     } else if (client.gui.screen() instanceof QuestScreen questScreen
         && !questScreen.isEditing()
         && questScreen.getQuest().getId().equals(quest.getId())
-        && (!java.util.Objects.equals(questScreen.getQuest().getContent(), quest.getContent())
-            || questScreen.getQuest().getCompletedAt() != quest.getCompletedAt())) {
-      // Re-open view mode when content changed (e.g. server resolved wiki-link UUIDs)
-      // or the quest was completed/reopened, so the buttons match its state
+        && pageChanged(questScreen.getQuest(), quest)) {
+      // Re-open view mode so the page matches the quest's state
       client.gui.setScreen(new QuestScreen(questScreen.getParentScreen(), quest));
     }
     if (justJoined) {
       showOrDeferToast("Joined \"" + quest.getTitle() + "\" \u2014 see My Quests");
     }
+  }
+
+  /**
+   * True when the open reading view must be rebuilt: the content changed (e.g. the server resolved
+   * wiki-link UUIDs), the quest was completed or reopened, locked or unlocked (the locked page and
+   * the normal view swap without closing), or an owner's banner was settled or appeared.
+   */
+  private static boolean pageChanged(Quest shown, Quest updated) {
+    return !java.util.Objects.equals(shown.getContent(), updated.getContent())
+        || shown.getCompletedAt() != updated.getCompletedAt()
+        || shown.isLocked() != updated.isLocked()
+        || shown.hasDeletedPrerequisite() != updated.hasDeletedPrerequisite()
+        || !java.util.Objects.equals(shown.getPrivatized(), updated.getPrivatized());
   }
 
   private static void handleDeleteQuestS2C(ByteBufReader r) {

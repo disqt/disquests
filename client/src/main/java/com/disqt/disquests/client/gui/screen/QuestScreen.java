@@ -2,11 +2,14 @@ package com.disqt.disquests.client.gui.screen;
 
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
+import com.disqt.disquests.client.data.NoticeText;
 import com.disqt.disquests.client.data.Quest;
+import com.disqt.disquests.client.data.QuestGraphs;
 import com.disqt.disquests.client.gui.component.SuggestionDropdown;
 import com.disqt.disquests.client.gui.component.TagChipComponent;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.helper.Messages;
 import com.disqt.disquests.client.gui.widget.MarkdownWidget;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
@@ -15,6 +18,8 @@ import com.disqt.disquests.client.network.PacketSender;
 import com.disqt.disquests.common.DimensionKeys;
 import com.disqt.disquests.common.QuestLocation;
 import com.disqt.disquests.common.TagConstraints;
+import com.disqt.disquests.common.graph.Plans;
+import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.PointData;
 import com.disqt.disquests.common.model.Visibility;
@@ -37,7 +42,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
@@ -67,8 +71,8 @@ public class QuestScreen extends DisquestsBaseScreen {
   // Permission cache
   private boolean canEdit;
   private boolean isOwner;
-  private boolean isContributor;
   private boolean hideContent;
+  private QuestPage.Actions actions;
 
   // Widget references for edit mode
   private TextFieldComponent titleFieldComponent;
@@ -123,7 +127,7 @@ public class QuestScreen extends DisquestsBaseScreen {
   }
 
   public boolean hasLeaveButton() {
-    return isContributor && !isOwner && !editing && !quest.isCompleted();
+    return !editing && actions != null && actions.leave();
   }
 
   @Override
@@ -147,8 +151,15 @@ public class QuestScreen extends DisquestsBaseScreen {
     UUID myUuid = ClientSession.getEffectivePlayerUuid();
     this.isOwner = quest.isOwner(myUuid);
     this.canEdit = quest.canEdit(myUuid);
-    this.isContributor = quest.isContributor(myUuid);
     this.hideContent = quest.isContentHidden(myUuid);
+    this.actions =
+        QuestPage.actions(
+            quest.toData(),
+            myUuid,
+            ClientSession.supportsCompletion(),
+            ClientSession.supportsTrees());
+    // Every way of opening a quest builds this screen: the quest is no longer new.
+    if (!isNewQuest) ClientSession.newMarks().opened(quest.getId());
 
     if (editing) {
       buildEditMode(root);
@@ -160,12 +171,29 @@ public class QuestScreen extends DisquestsBaseScreen {
   // ===================== VIEW MODE =====================
 
   private void buildViewMode(FlowLayout root) {
+    FlowLayout column = root.childById(FlowLayout.class, "quest-column");
+    QuestTreePane.attach(this, root, quest.getId(), this.width);
+
     // Title
     root.childById(LabelComponent.class, "title-label")
         .text(Component.literal(quest.getTitle() != null ? quest.getTitle() : "Untitled"));
+    buildHeaderInfo(root);
 
-    // Owner + visibility info (built programmatically so content sizing measures real text)
-    // A locked view has no owner name: show only the visibility.
+    if (quest.isLocked()) {
+      LockedQuestView.build(this, root, quest);
+    } else {
+      buildQuestBody(root, column);
+    }
+    QuestBanners.attach(root, quest, actions);
+    buildButtons(root, column);
+    wireBackButton(root);
+  }
+
+  /**
+   * "by owner", the visibility badge (the quest's own setting) and the player's role. A locked view
+   * has no owner name: only the badge and the role.
+   */
+  private void buildHeaderInfo(FlowLayout root) {
     boolean hasOwnerName = quest.getOwnerName() != null && !quest.getOwnerName().isBlank();
     MutableComponent ownerText =
         Component.literal(hasOwnerName ? "by " + quest.getOwnerName() : "")
@@ -183,20 +211,30 @@ public class QuestScreen extends DisquestsBaseScreen {
     LabelComponent ownerLabel = UIComponents.label(ownerText);
     ownerLabel.shadow(true);
     ownerLabel.sizing(Sizing.content(), Sizing.content());
-    root.childById(FlowLayout.class, "header-row").child(ownerLabel);
+    FlowLayout headerRow = root.childById(FlowLayout.class, "header-row");
+    headerRow.child(ownerLabel);
 
+    UUID me = ClientSession.getEffectivePlayerUuid();
+    LabelComponent roleLabel =
+        UIComponents.label(Messages.toComponent(QuestPage.role(quest.roleOf(me))));
+    roleLabel.id("role-label");
+    roleLabel.color(Color.ofArgb(Colors.TEXT_MUTED));
+    roleLabel.shadow(true);
+    roleLabel.margins(Insets.left(6));
+    headerRow.child(roleLabel);
+  }
+
+  /** Tags, content, location, prerequisites and people: everything a locked page leaves out. */
+  private void buildQuestBody(FlowLayout root, FlowLayout column) {
     // Tag display -- inline chips (no collapsible)
-    List<String> viewTags = quest.getTags();
-
     FlowLayout tagDisplay = UIContainers.ltrTextFlow(Sizing.fill(85), Sizing.content());
     tagDisplay.id("tag-display");
     tagDisplay.gap(4);
     tagDisplay.margins(Insets.bottom(4));
-    for (String tag : viewTags) {
+    for (String tag : quest.getTags()) {
       tagDisplay.child(new TagChipComponent(tag));
     }
-
-    replaceSlot(root, "tag-display-slot", tagDisplay);
+    replaceSlot(column, "tag-display-slot", tagDisplay);
 
     // Content area -- add MarkdownWidget
     String contentToRender =
@@ -239,120 +277,128 @@ public class QuestScreen extends DisquestsBaseScreen {
     // Location card (mini map, coords, map, BlueMap button)
     LocationCard.buildView(this, root, quest);
 
-    // Contributors row -- wrapped in collapsible
-    int contribCount = quest.getContributors().size();
-    boolean contribExpanded = contribCount <= 3;
+    // Prerequisites (Write and Owner), before the people
+    if (actions.prerequisites()) {
+      UIComponent slot = column.childById(UIComponent.class, "contributors-row-slot");
+      column.child(column.children().indexOf(slot), PrerequisiteLinks.section(this, quest));
+    }
+
+    // Everyone holding a role, owners first -- wrapped in collapsible
+    List<ContributorData> people = QuestPage.people(quest.toData());
+    int count = people.size();
     CollapsibleContainer contributorsCollapse =
         UIContainers.collapsible(
             Sizing.fill(85),
             Sizing.content(),
-            Component.translatable("gui.disquests.section.contributors", contribCount),
-            contribExpanded && contribCount > 0);
+            Component.translatable("gui.disquests.section.contributors", count),
+            count > 0 && count <= 3);
     contributorsCollapse.id("contributors-collapse");
     contributorsCollapse.margins(Insets.top(2));
 
-    if (contribCount > 0) {
-      String contribNames =
-          quest.getContributors().stream().map(c -> c.getName()).collect(Collectors.joining(", "));
-      LabelComponent contribLabel =
-          UIComponents.label(Component.literal(contribNames).withColor(Colors.TEXT_MUTED));
+    if (count > 0) {
+      MutableComponent names = Component.empty();
+      for (int i = 0; i < people.size(); i++) {
+        ContributorData person = people.get(i);
+        if (i > 0) names.append(Component.literal(", "));
+        names.append(Component.literal(person.name() != null ? person.name() : "?"));
+        names.append(Component.literal(" ("));
+        names.append(Messages.toComponent(QuestPage.role(person.role())));
+        names.append(Component.literal(")"));
+      }
+      LabelComponent contribLabel = UIComponents.label(names);
       contribLabel.id("contributors-label");
+      contribLabel.color(Color.ofArgb(Colors.TEXT_MUTED));
+      contribLabel.horizontalSizing(Sizing.fill(100));
       contribLabel.shadow(true);
-      FlowLayout contributorsRow = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+      FlowLayout contributorsRow = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
       contributorsRow.id("contributors-row");
       contributorsRow.padding(Insets.left(4));
       contributorsRow.child(contribLabel);
       contributorsCollapse.child(contributorsRow);
     }
 
-    replaceSlot(root, "contributors-row-slot", contributorsCollapse);
+    replaceSlot(column, "contributors-row-slot", contributorsCollapse);
+  }
 
-    // Buttons
+  /** The button row, from {@link QuestPage#actions}; ids are kept for the E2E journeys. */
+  private void buildButtons(FlowLayout root, FlowLayout column) {
     FlowLayout buttonRow = root.childById(FlowLayout.class, "button-row");
-    boolean completed = quest.isCompleted();
-    // A completed quest is read-only: no Join/Request, Edit or Leave.
-    boolean canJoinOrRequest = !isOwner && !isContributor && !completed;
 
-    if (completed) {
+    if (quest.isCompleted() && !quest.isLocked()) {
       LabelComponent completedLabel = UIComponents.label(completedText());
       completedLabel.id("completed-label");
       completedLabel.color(Color.ofArgb(Colors.TEXT_MUTED));
       completedLabel.shadow(true);
       completedLabel.margins(Insets.top(4));
-      root.child(root.children().indexOf(buttonRow), completedLabel);
+      column.child(column.children().indexOf(buttonRow), completedLabel);
     }
 
-    // Interact button: Join (OPEN), Request (CLOSED), or hidden (member/owner)
+    // Interact button: Join (OPEN), Request (CLOSED); absent otherwise
     ButtonComponent interactBtn = root.childById(ButtonComponent.class, "btn-interact");
-    if (canJoinOrRequest) {
-      if (quest.getVisibility() == Visibility.OPEN) {
-        interactBtn.setMessage(Component.translatable("gui.disquests.btn.join"));
-        interactBtn.onPress(ignored -> joinQuest());
-      } else if (quest.getVisibility() == Visibility.CLOSED) {
-        if (ClientSession.isRequested(quest.getId())) {
-          interactBtn.setMessage(Component.translatable("gui.disquests.btn.requested"));
-          interactBtn.active(false);
-          interactBtn.tooltip(Component.translatable("gui.disquests.tooltip.already_requested"));
-        } else {
-          interactBtn.setMessage(Component.translatable("gui.disquests.btn.request"));
-          interactBtn.onPress(ignored -> requestAccess());
-        }
+    if (actions.joinOrRequest() && quest.getVisibility() == Visibility.OPEN) {
+      interactBtn.setMessage(Component.translatable("gui.disquests.btn.join"));
+      interactBtn.onPress(ignored -> joinQuest());
+    } else if (actions.joinOrRequest() && quest.getVisibility() == Visibility.CLOSED) {
+      if (ClientSession.isRequested(quest.getId())) {
+        interactBtn.setMessage(Component.translatable("gui.disquests.btn.requested"));
+        interactBtn.active(false);
+        interactBtn.tooltip(Component.translatable("gui.disquests.tooltip.already_requested"));
       } else {
-        // PRIVATE quest viewed by non-member (shouldn't normally happen)
-        buttonRow.removeChild(interactBtn);
+        interactBtn.setMessage(Component.translatable("gui.disquests.btn.request"));
+        interactBtn.onPress(ignored -> requestAccess());
       }
     } else {
+      // A member, an archived or locked quest, or a Private quest seen without a role
       buttonRow.removeChild(interactBtn);
     }
 
-    // Edit button: hidden for non-members and completed quests, greyed with tooltip for view-only
-    // contributors
-    ButtonComponent editBtn = root.childById(ButtonComponent.class, "btn-edit");
-    if (canJoinOrRequest || completed) {
-      // Non-member or archived: hide Edit entirely
-      buttonRow.removeChild(editBtn);
-    } else {
-      editBtn.onPress(ignored -> enterEditMode());
-      if (canEdit) {
-        editBtn.active(true);
-      } else {
-        editBtn.active(false);
-        editBtn.tooltip(Component.translatable("gui.disquests.tooltip.view_only"));
-      }
-    }
-
-    ButtonComponent leaveBtn = root.childById(ButtonComponent.class, "btn-leave");
-    if (isContributor && !isOwner && !completed) {
-      leaveBtn.onPress(ignored -> leaveQuest());
-    } else {
-      buttonRow.removeChild(leaveBtn);
-    }
-
-    // Complete (active quest) or Reopen (completed quest), for players who may edit
-    ButtonComponent completeBtn = root.childById(ButtonComponent.class, "btn-complete");
-    if (canEdit && !completed && ClientSession.supportsCompletion()) {
+    wire(buttonRow, "btn-edit", actions.edit(), this::enterEditMode);
+    wire(buttonRow, "btn-leave", actions.leave(), this::leaveQuest);
+    // Complete and Reopen texts come from lang keys
+    ButtonComponent completeBtn =
+        wire(buttonRow, "btn-complete", actions.complete(), this::confirmComplete);
+    if (completeBtn != null) {
       completeBtn.setMessage(Component.translatable("gui.disquests.btn.complete"));
-      completeBtn.onPress(ignored -> confirmComplete());
-    } else {
-      buttonRow.removeChild(completeBtn);
     }
-    ButtonComponent reopenBtn = root.childById(ButtonComponent.class, "btn-reopen");
-    if (canEdit && completed && ClientSession.supportsCompletion()) {
+    ButtonComponent reopenBtn =
+        wire(buttonRow, "btn-reopen", actions.reopen(), this::confirmReopen);
+    if (reopenBtn != null) {
       reopenBtn.setMessage(Component.translatable("gui.disquests.btn.reopen"));
-      reopenBtn.onPress(ignored -> confirmReopen());
-    } else {
-      buttonRow.removeChild(reopenBtn);
     }
 
-    // Delete button: only visible for owner
-    ButtonComponent deleteBtn = root.childById(ButtonComponent.class, "btn-delete");
-    if (isOwner) {
-      deleteBtn.onPress(ignored -> confirmDelete());
-    } else {
-      buttonRow.removeChild(deleteBtn);
+    // The people screen, for owners, before Delete
+    if (actions.managePeople()) {
+      ButtonComponent manage =
+          UIComponents.button(
+              Component.translatable(QuestPage.MANAGE_PEOPLE), ignored -> openContributors());
+      manage.id("btn-manage-people");
+      manage.sizing(Sizing.content(), Sizing.fixed(20));
+      ButtonComponent deleteBtn = buttonRow.childById(ButtonComponent.class, "btn-delete");
+      buttonRow.child(buttonRow.children().indexOf(deleteBtn), manage);
     }
+    wire(buttonRow, "btn-delete", actions.delete(), this::confirmDelete);
+  }
 
-    wireBackButton(root);
+  /**
+   * Wires the button to {@code action} and returns it, or removes it and returns null when it does
+   * not apply.
+   */
+  @Nullable
+  private static ButtonComponent wire(
+      FlowLayout buttonRow, String id, boolean shown, Runnable action) {
+    ButtonComponent button = buttonRow.childById(ButtonComponent.class, id);
+    if (shown) {
+      button.onPress(ignored -> action.run());
+      return button;
+    }
+    buttonRow.removeChild(button);
+    return null;
+  }
+
+  /** Opens another quest from this page (tree pane, prerequisite links); back returns here. */
+  void openOther(UUID id) {
+    Quest other = ClientCache.getQuestById(id);
+    if (other != null) navigateToScreen(new QuestScreen(this.parent, other));
   }
 
   // ===================== EDIT MODE =====================
@@ -680,15 +726,19 @@ public class QuestScreen extends DisquestsBaseScreen {
 
   /** "Completed on <date> by <player>", without the name when the server does not know it. */
   private Component completedText() {
-    String date =
-        DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
-            .withLocale(gameLocale())
-            .withZone(ZoneId.systemDefault())
-            .format(Instant.ofEpochMilli(quest.getCompletedAt()));
+    String date = formatDate(quest.getCompletedAt());
     String name = quest.getCompletedByName();
     return name != null
         ? Component.translatable("gui.disquests.label.completed_by", date, name)
         : Component.translatable("gui.disquests.label.completed", date);
+  }
+
+  /** A date as the "Completed on" label shows it, in the game language. */
+  static String formatDate(long epochMillis) {
+    return DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+        .withLocale(gameLocale())
+        .withZone(ZoneId.systemDefault())
+        .format(Instant.ofEpochMilli(epochMillis));
   }
 
   /** The game language (e.g. fr_fr) as a Locale, so dates follow it rather than the JVM. */
@@ -697,13 +747,31 @@ public class QuestScreen extends DisquestsBaseScreen {
     return code != null ? Locale.forLanguageTag(code.replace('_', '-')) : Locale.getDefault();
   }
 
+  /**
+   * Completes after a confirm that offers to complete the player's unfinished subquests too, and
+   * says how many others stay active. Without subquests it is the plain question.
+   */
   private void confirmComplete() {
+    QuestPage.Dialog dialog =
+        QuestPage.completeDialog(
+            Plans.subquestCounts(
+                QuestGraphs.current(),
+                ClientSession.getEffectivePlayerUuid(),
+                quest.getId(),
+                true));
     showConfirmOverlay(
-        Component.translatable("gui.disquests.confirm.complete"),
-        () -> {
-          PacketSender.completeQuest(quest.getId());
+        Component.translatable("gui.disquests.confirm.complete").getString(),
+        text(dialog.extra()),
+        text(dialog.checkbox()),
+        alsoMine -> {
+          PacketSender.completeQuest(quest.getId(), alsoMine);
           navigateToScreen(this.parent);
         });
+  }
+
+  @Nullable
+  private static String text(@Nullable NoticeText.Message message) {
+    return message == null ? null : Messages.toComponent(message).getString();
   }
 
   private void confirmReopen() {
@@ -714,12 +782,22 @@ public class QuestScreen extends DisquestsBaseScreen {
         () -> PacketSender.reopenQuest(quest.getId()));
   }
 
+  /** Deletes after a confirm that offers to delete the player's subquests too. */
   private void confirmDelete() {
+    QuestPage.Dialog dialog =
+        QuestPage.deleteDialog(
+            Plans.subquestCounts(
+                QuestGraphs.current(),
+                ClientSession.getEffectivePlayerUuid(),
+                quest.getId(),
+                false));
     showConfirmOverlay(
-        Component.translatable("gui.disquests.confirm.delete", quest.getTitle()),
-        () -> {
+        Component.translatable("gui.disquests.confirm.delete", quest.getTitle()).getString(),
+        text(dialog.extra()),
+        text(dialog.checkbox()),
+        alsoMine -> {
           ClientCache.removeQuestById(quest.getId());
-          PacketSender.deleteQuest(quest.getId());
+          PacketSender.deleteQuest(quest.getId(), alsoMine);
           navigateToScreen(this.parent);
         });
   }

@@ -18,165 +18,187 @@
 
         <children>
 
-            <!-- Header row: back arrow + title + owner/visibility info -->
-            <flow-layout direction="horizontal" id="header-row">
+            <!-- Body: QuestTreePane inserts the "where this sits" pane and its divider before
+                 quest-column when the quest has a visible parent or subquests -->
+            <flow-layout direction="horizontal" id="quest-body">
                 <sizing>
-                    <horizontal method="fill">85</horizontal>
-                    <vertical method="content"/>
+                    <horizontal method="fill">100</horizontal>
+                    <vertical method="fill">100</vertical>
                 </sizing>
-                <vertical-alignment>center</vertical-alignment>
-                <margins>
-                    <bottom>4</bottom>
-                </margins>
                 <children>
-                    <button id="btn-back">
-                        <text>&lt;</text>
-                        <sizing>
-                            <horizontal method="fixed">20</horizontal>
-                            <vertical method="fixed">20</vertical>
-                        </sizing>
-                    </button>
-                    <label id="title-label">
-                        <text>Quest</text>
-                        <shadow>true</shadow>
+                    <!-- The quest itself -->
+                    <flow-layout direction="vertical" id="quest-column">
                         <sizing>
                             <horizontal method="expand">100</horizontal>
-                            <vertical method="content"/>
+                            <vertical method="fill">100</vertical>
                         </sizing>
-                        <margins>
-                            <left>4</left>
-                        </margins>
-                    </label>
-                </children>
-            </flow-layout>
-
-            <!-- Tags collapsible slot (replaced programmatically with CollapsibleContainer) -->
-            <flow-layout direction="horizontal" id="tag-display-slot">
-                <sizing>
-                    <horizontal method="fixed">0</horizontal>
-                    <vertical method="fixed">0</vertical>
-                </sizing>
-                <children/>
-            </flow-layout>
-
-            <!-- Content scroll area (MarkdownWidget added programmatically) -->
-            <template name="scrollable-list@disquests:templates">
-                <scroll-id>content-scroll</scroll-id>
-                <list-id>content-area</list-id>
-                <width>85</width>
-                <height>55</height>
-            </template>
-
-            <!-- Location card (mini map, coords, map, BlueMap button), zero-sized when unlocated -->
-            <flow-layout direction="horizontal" id="location-card">
-                <sizing>
-                    <horizontal method="fill">85</horizontal>
-                    <vertical method="content"/>
-                </sizing>
-                <surface>
-                    <panel dark="true"/>
-                </surface>
-                <padding>
-                    <all>4</all>
-                </padding>
-                <gap>6</gap>
-                <margins>
-                    <top>2</top>
-                </margins>
-                <children>
-                    <!-- LocationCard sets the map size -->
-                    <flow-layout direction="vertical" id="mini-map-slot">
-                        <sizing>
-                            <horizontal method="content"/>
-                            <vertical method="content"/>
-                        </sizing>
-                        <children/>
-                    </flow-layout>
-                    <flow-layout direction="vertical" id="location-labels">
-                        <sizing>
-                            <horizontal method="expand">100</horizontal>
-                            <vertical method="content"/>
-                        </sizing>
-                        <gap>4</gap>
+                        <horizontal-alignment>center</horizontal-alignment>
                         <children>
-                            <label id="coords-label">
-                                <text></text>
-                                <shadow>true</shadow>
-                            </label>
-                            <label id="map-label">
-                                <text></text>
-                                <shadow>true</shadow>
-                            </label>
+
+                            <!-- Header row: back arrow + title + owner/visibility info -->
+                            <flow-layout direction="horizontal" id="header-row">
+                                <sizing>
+                                    <horizontal method="fill">85</horizontal>
+                                    <vertical method="content"/>
+                                </sizing>
+                                <vertical-alignment>center</vertical-alignment>
+                                <margins>
+                                    <bottom>4</bottom>
+                                </margins>
+                                <children>
+                                    <button id="btn-back">
+                                        <text>&lt;</text>
+                                        <sizing>
+                                            <horizontal method="fixed">20</horizontal>
+                                            <vertical method="fixed">20</vertical>
+                                        </sizing>
+                                    </button>
+                                    <label id="title-label">
+                                        <text>Quest</text>
+                                        <shadow>true</shadow>
+                                        <sizing>
+                                            <horizontal method="expand">100</horizontal>
+                                            <vertical method="content"/>
+                                        </sizing>
+                                        <margins>
+                                            <left>4</left>
+                                        </margins>
+                                    </label>
+                                </children>
+                            </flow-layout>
+
+                            <!-- Tags collapsible slot (replaced programmatically with CollapsibleContainer) -->
+                            <flow-layout direction="horizontal" id="tag-display-slot">
+                                <sizing>
+                                    <horizontal method="fixed">0</horizontal>
+                                    <vertical method="fixed">0</vertical>
+                                </sizing>
+                                <children/>
+                            </flow-layout>
+
+                            <!-- Content scroll area (MarkdownWidget added programmatically) -->
+                            <template name="scrollable-list@disquests:templates">
+                                <scroll-id>content-scroll</scroll-id>
+                                <list-id>content-area</list-id>
+                                <width>85</width>
+                                <height>55</height>
+                            </template>
+
+                            <!-- Location card (mini map, coords, map, BlueMap button), zero-sized when unlocated -->
+                            <flow-layout direction="horizontal" id="location-card">
+                                <sizing>
+                                    <horizontal method="fill">85</horizontal>
+                                    <vertical method="content"/>
+                                </sizing>
+                                <surface>
+                                    <panel dark="true"/>
+                                </surface>
+                                <padding>
+                                    <all>4</all>
+                                </padding>
+                                <gap>6</gap>
+                                <margins>
+                                    <top>2</top>
+                                </margins>
+                                <children>
+                                    <!-- LocationCard sets the map size -->
+                                    <flow-layout direction="vertical" id="mini-map-slot">
+                                        <sizing>
+                                            <horizontal method="content"/>
+                                            <vertical method="content"/>
+                                        </sizing>
+                                        <children/>
+                                    </flow-layout>
+                                    <flow-layout direction="vertical" id="location-labels">
+                                        <sizing>
+                                            <horizontal method="expand">100</horizontal>
+                                            <vertical method="content"/>
+                                        </sizing>
+                                        <gap>4</gap>
+                                        <children>
+                                            <label id="coords-label">
+                                                <text></text>
+                                                <shadow>true</shadow>
+                                            </label>
+                                            <label id="map-label">
+                                                <text></text>
+                                                <shadow>true</shadow>
+                                            </label>
+                                        </children>
+                                    </flow-layout>
+                                </children>
+                            </flow-layout>
+
+                            <!-- Contributors collapsible slot (replaced programmatically with CollapsibleContainer) -->
+                            <flow-layout direction="horizontal" id="contributors-row-slot">
+                                <sizing>
+                                    <horizontal method="fixed">0</horizontal>
+                                    <vertical method="fixed">0</vertical>
+                                </sizing>
+                                <children/>
+                            </flow-layout>
+
+                            <!-- Button row -->
+                            <flow-layout direction="horizontal" id="button-row">
+                                <sizing>
+                                    <horizontal method="content"/>
+                                    <vertical method="content"/>
+                                </sizing>
+                                <gap>4</gap>
+                                <margins>
+                                    <top>4</top>
+                                    <bottom>4</bottom>
+                                </margins>
+                                <children>
+                                    <button id="btn-interact">
+                                        <text>Join</text>
+                                        <sizing>
+                                            <horizontal method="fixed">70</horizontal>
+                                            <vertical method="fixed">20</vertical>
+                                        </sizing>
+                                    </button>
+                                    <button id="btn-edit">
+                                        <text>Edit</text>
+                                        <sizing>
+                                            <horizontal method="fixed">60</horizontal>
+                                            <vertical method="fixed">20</vertical>
+                                        </sizing>
+                                    </button>
+                                    <button id="btn-leave">
+                                        <text>Leave</text>
+                                        <sizing>
+                                            <horizontal method="fixed">60</horizontal>
+                                            <vertical method="fixed">20</vertical>
+                                        </sizing>
+                                    </button>
+                                    <!-- Complete and Reopen texts are set from lang keys in QuestScreen;
+                                         each is removed when it does not apply -->
+                                    <button id="btn-complete">
+                                        <text>Complete</text>
+                                        <sizing>
+                                            <horizontal method="fixed">60</horizontal>
+                                            <vertical method="fixed">20</vertical>
+                                        </sizing>
+                                    </button>
+                                    <button id="btn-reopen">
+                                        <text>Reopen</text>
+                                        <sizing>
+                                            <horizontal method="fixed">60</horizontal>
+                                            <vertical method="fixed">20</vertical>
+                                        </sizing>
+                                    </button>
+                                    <button id="btn-delete">
+                                        <text>Delete</text>
+                                        <sizing>
+                                            <horizontal method="fixed">60</horizontal>
+                                            <vertical method="fixed">20</vertical>
+                                        </sizing>
+                                    </button>
+                                </children>
+                            </flow-layout>
+
                         </children>
                     </flow-layout>
-                </children>
-            </flow-layout>
-
-            <!-- Contributors collapsible slot (replaced programmatically with CollapsibleContainer) -->
-            <flow-layout direction="horizontal" id="contributors-row-slot">
-                <sizing>
-                    <horizontal method="fixed">0</horizontal>
-                    <vertical method="fixed">0</vertical>
-                </sizing>
-                <children/>
-            </flow-layout>
-
-            <!-- Button row -->
-            <flow-layout direction="horizontal" id="button-row">
-                <sizing>
-                    <horizontal method="content"/>
-                    <vertical method="content"/>
-                </sizing>
-                <gap>4</gap>
-                <margins>
-                    <top>4</top>
-                    <bottom>4</bottom>
-                </margins>
-                <children>
-                    <button id="btn-interact">
-                        <text>Join</text>
-                        <sizing>
-                            <horizontal method="fixed">70</horizontal>
-                            <vertical method="fixed">20</vertical>
-                        </sizing>
-                    </button>
-                    <button id="btn-edit">
-                        <text>Edit</text>
-                        <sizing>
-                            <horizontal method="fixed">60</horizontal>
-                            <vertical method="fixed">20</vertical>
-                        </sizing>
-                    </button>
-                    <button id="btn-leave">
-                        <text>Leave</text>
-                        <sizing>
-                            <horizontal method="fixed">60</horizontal>
-                            <vertical method="fixed">20</vertical>
-                        </sizing>
-                    </button>
-                    <!-- Complete and Reopen texts are set from lang keys in QuestScreen;
-                         each is removed when it does not apply -->
-                    <button id="btn-complete">
-                        <text>Complete</text>
-                        <sizing>
-                            <horizontal method="fixed">60</horizontal>
-                            <vertical method="fixed">20</vertical>
-                        </sizing>
-                    </button>
-                    <button id="btn-reopen">
-                        <text>Reopen</text>
-                        <sizing>
-                            <horizontal method="fixed">60</horizontal>
-                            <vertical method="fixed">20</vertical>
-                        </sizing>
-                    </button>
-                    <button id="btn-delete">
-                        <text>Delete</text>
-                        <sizing>
-                            <horizontal method="fixed">60</horizontal>
-                            <vertical method="fixed">20</vertical>
-                        </sizing>
-                    </button>
                 </children>
             </flow-layout>
 

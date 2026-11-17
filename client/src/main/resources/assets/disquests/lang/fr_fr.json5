@@ -33,6 +33,9 @@
     "edit_on_map": "Modifier sur la map",
     "complete": "Terminer",
     "reopen": "Rouvrir",
+    "manage_people": "Gérer les joueurs",
+    "restore_visibility": "Repasser en %s",
+    "keep_private": "Garder en Private",
   },
 
   // Notifications
@@ -79,6 +82,35 @@
   "gui.disquests.tree.{}": {
     "not_saved": "non enregistrée",
     "taken_out": "sortie, non enregistrée",
+  },
+
+  // Rôle du joueur sur une quête, à côté du badge de visibilité
+  "gui.disquests.role.{}": {
+    "owner": "Owner",
+    "write": "Write",
+    "read": "Read",
+    "none": "pas rejointe",
+  },
+
+  // Bandeaux sur la page d'une quête, pour ses owners
+  "gui.disquests.banner.{}": {
+    "privatized_titled": "Passée en Private le %s. La quête qui la contenait, \"%s\", a été supprimée par %s. Elle était %s avant.",
+    "privatized": "Passée en Private le %s. La quête qui la contenait a été supprimée. Elle était %s avant.",
+    "deleted_prerequisite": "Cette quête attend une quête supprimée et reste verrouillée. Clique sur Edit pour retirer ce lien.",
+  },
+
+  // Ce qu'attend une quête verrouillée
+  "gui.disquests.waiting.{}": {
+    "prerequisites": "PRÉREQUIS",
+    "something_else": "… et autre chose que tu ne peux pas encore voir",
+    "nothing_visible": "Cette quête n'est pas encore disponible. Autre chose doit d'abord être terminé.",
+  },
+
+  // Section Prérequis de la page d'une quête (Write et Owner)
+  "gui.disquests.prerequisite.{}": {
+    "hidden": "… et quelque chose auquel tu n'as pas accès",
+    "deleted": "une quête supprimée",
+    "auto_join": "Quand elle se débloque, ajouter les joueurs de ces quêtes",
   },
 
   // Onglets de l'accueil
@@ -152,12 +184,22 @@
     "remove_contributor": "Retirer %s des contributeurs ?",
     "complete": "Marquer cette quête comme terminée ? Elle passera dans l'onglet Archivées pour tous ceux qui y ont participé.",
     "reopen": "Rouvrir cette quête ? Elle revient dans les listes actives, et sa date d'achèvement sera remplacée si elle est terminée à nouveau.",
+    "also_complete_one": "Terminer aussi ma sous-quête non terminée (%d)",
+    "also_complete_many": "Terminer aussi mes %d sous-quêtes non terminées",
+    "others_stay_active_one": "%d autre appartient à un autre joueur et reste active",
+    "others_stay_active_many": "%d autres appartiennent à d'autres joueurs et restent actives",
+    "also_delete_one": "Supprimer aussi ma sous-quête (%d)",
+    "also_delete_many": "Supprimer aussi mes %d sous-quêtes",
+    "others_kept_one": "%d autre appartient à un autre joueur et est conservée",
+    "others_kept_many": "%d autres appartiennent à d'autres joueurs et sont conservées",
   },
 
   // Sections repliables
   "gui.disquests.section.{}": {
     "tags": "Tags (%d)",
     "contributors": "Contributeurs (%d)",
+    "where_this_sits": "OÙ ELLE SE TROUVE",
+    "prerequisites": "Prérequis",
   },
 
   // World map

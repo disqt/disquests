@@ -2,10 +2,15 @@ package com.disqt.disquests.client.data;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.disqt.disquests.client.gui.screen.QuestPage;
 import com.disqt.disquests.client.gui.tree.SuggestionText;
 import com.disqt.disquests.client.gui.tree.Suggestions;
+import com.disqt.disquests.common.graph.Plans;
 import com.disqt.disquests.common.graph.Refusal;
 import com.disqt.disquests.common.model.Notice;
+import com.disqt.disquests.common.model.Privatized;
+import com.disqt.disquests.common.model.Role;
+import com.disqt.disquests.common.model.Visibility;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -18,11 +23,11 @@ import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 
 /**
- * Checks that every lang key {@link NoticeText} and {@link SuggestionText} can emit, and the ones
- * the tree rows and quest list entries draw, exist in both language files. The files use owo's
- * nested syntax, so a key {@code gui.disquests.refusal.loop} is looked up as the block {@code
- * "gui.disquests.refusal.{}": { ... }} (text from its opening brace to the first closing brace, the
- * blocks hold only flat strings) containing {@code "loop":}.
+ * Checks that every lang key {@link NoticeText}, {@link SuggestionText} and {@link QuestPage} can
+ * emit, and the ones the tree rows and quest list entries draw, exist in both language files. The
+ * files use owo's nested syntax, so a key {@code gui.disquests.refusal.loop} is looked up as the
+ * block {@code "gui.disquests.refusal.{}": { ... }} (text from its opening brace to the first
+ * closing brace, the blocks hold only flat strings) containing {@code "loop":}.
  */
 class NoticeLangKeysTest {
 
@@ -47,6 +52,24 @@ class NoticeLangKeysTest {
         if (line.note() != null) collect(line.note(), keys);
       }
     }
+    for (int n = 1; n <= 2; n++) {
+      Plans.Counts counts = new Plans.Counts(n, n);
+      for (QuestPage.Dialog d :
+          List.of(QuestPage.completeDialog(counts), QuestPage.deleteDialog(counts))) {
+        collect(d.checkbox(), keys);
+        collect(d.extra(), keys);
+      }
+    }
+    for (Role role : new Role[] {null, Role.READ, Role.WRITE, Role.OWNER}) {
+      keys.add(QuestPage.role(role).key());
+    }
+    for (Visibility v : Visibility.values()) {
+      collect(QuestPage.privatizedBanner(new Privatized(v, "t", "n", 1L), "d"), keys);
+      collect(QuestPage.privatizedBanner(new Privatized(v, null, null, 1L), "d"), keys);
+      collect(QuestPage.restoreVisibility(v), keys);
+    }
+    keys.add(QuestPage.deletedPrerequisiteBanner().key());
+    keys.addAll(QuestPage.FIXED_KEYS);
     keys.addAll(TREE_ROW_KEYS);
     keys.addAll(QUEST_ENTRY_KEYS);
     return keys.stream().distinct().toList();

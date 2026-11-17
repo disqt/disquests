@@ -532,12 +532,12 @@ class TwoPlayerJourneys {
     click(context, "btn-open");
     waitForScreen(context, QuestScreen.class);
 
-    then("it is a read-only record PlayerB may reopen");
+    then("it is a read-only record; reopening is for owners, and PlayerB has Write");
     waitForComponent(context, "completed-label");
     LabelComponent label = findComponent(context, LabelComponent.class, "completed-label");
     String text = context.computeOnClient(c -> label.text().getString());
     assertTrue(text.startsWith("Completed on"), "completed-label text was '" + text + "'");
-    assertComponentExists(context, "btn-reopen");
+    assertComponentMissing(context, "btn-reopen");
     assertComponentMissing(context, "btn-edit");
     assertComponentMissing(context, "btn-leave");
 
