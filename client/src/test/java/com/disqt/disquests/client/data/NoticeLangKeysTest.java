@@ -3,6 +3,7 @@ package com.disqt.disquests.client.data;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.disqt.disquests.client.gui.screen.EditorText;
+import com.disqt.disquests.client.gui.screen.PeopleText;
 import com.disqt.disquests.client.gui.screen.QuestPage;
 import com.disqt.disquests.client.gui.tree.SuggestionText;
 import com.disqt.disquests.client.gui.tree.Suggestions;
@@ -24,11 +25,12 @@ import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 
 /**
- * Checks that every lang key {@link NoticeText}, {@link SuggestionText} and {@link QuestPage} can
- * emit, and the ones the tree rows and quest list entries draw, exist in both language files. The
- * files use owo's nested syntax, so a key {@code gui.disquests.refusal.loop} is looked up as the
- * block {@code "gui.disquests.refusal.{}": { ... }} (text from its opening brace to the first
- * closing brace, the blocks hold only flat strings) containing {@code "loop":}.
+ * Checks that every lang key {@link NoticeText}, {@link SuggestionText}, {@link QuestPage} and
+ * {@link PeopleText} can emit, and the ones the tree rows and quest list entries draw, exist in
+ * both language files. The files use owo's nested syntax, so a key {@code
+ * gui.disquests.refusal.loop} is looked up as the block {@code "gui.disquests.refusal.{}": { ... }}
+ * (text from its opening brace to the first closing brace, the blocks hold only flat strings)
+ * containing {@code "loop":}.
  */
 class NoticeLangKeysTest {
 
@@ -72,6 +74,7 @@ class NoticeLangKeysTest {
     keys.add(QuestPage.deletedPrerequisiteBanner().key());
     keys.addAll(QuestPage.FIXED_KEYS);
     keys.addAll(EditorText.keys());
+    keys.addAll(PeopleText.keys());
     keys.addAll(TREE_ROW_KEYS);
     keys.addAll(QUEST_ENTRY_KEYS);
     return keys.stream().distinct().toList();

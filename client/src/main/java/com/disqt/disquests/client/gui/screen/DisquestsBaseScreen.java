@@ -18,6 +18,7 @@ import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
 import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 import net.minecraft.client.gui.components.toasts.SystemToast;
@@ -373,10 +374,52 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     noBtn.id(CONFIRM_NO_ID);
     noBtn.sizing(Sizing.fixed(60), Sizing.fixed(20));
 
+    mountOverlay(messageLabel, checkbox, extraLine, List.of(yesBtn, noBtn));
+  }
+
+  /** One answer of a {@link #showChoiceOverlay} dialog: its button id, label and action. */
+  public record Choice(String id, Component label, Runnable action) {}
+
+  /**
+   * A dialog with the question, an optional muted line ({@code confirm-extra}) and one button per
+   * choice, in order; every button closes the dialog before running its action, and Escape closes
+   * it without running any.
+   */
+  protected void showChoiceOverlay(
+      Component message, @Nullable Component extraLine, List<Choice> choices) {
+    if (this.uiAdapter == null) return;
+    dismissOverlay();
+
+    LabelComponent messageLabel = UIComponents.label(message);
+    messageLabel.shadow(true);
+    messageLabel.maxWidth(250);
+    messageLabel.horizontalTextAlignment(HorizontalAlignment.CENTER);
+
+    List<ButtonComponent> buttons = new java.util.ArrayList<>();
+    for (Choice choice : choices) {
+      ButtonComponent button =
+          UIComponents.button(
+              choice.label(),
+              b -> {
+                dismissOverlay();
+                choice.action().run();
+              });
+      button.id(choice.id());
+      button.horizontalSizing(Sizing.content(4));
+      button.verticalSizing(Sizing.fixed(20));
+      buttons.add(button);
+    }
+    mountOverlay(messageLabel, null, extraLine, buttons);
+  }
+
+  private void mountOverlay(
+      LabelComponent messageLabel,
+      @Nullable SmallCheckboxComponent checkbox,
+      @Nullable Component extraLine,
+      List<ButtonComponent> buttons) {
     FlowLayout buttonRow = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
     buttonRow.gap(8);
-    buttonRow.child(yesBtn);
-    buttonRow.child(noBtn);
+    buttons.forEach(buttonRow::child);
     buttonRow.horizontalAlignment(HorizontalAlignment.CENTER);
 
     FlowLayout panel = UIContainers.verticalFlow(Sizing.content(), Sizing.content());

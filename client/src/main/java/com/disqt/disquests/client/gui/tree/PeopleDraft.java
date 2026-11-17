@@ -8,7 +8,10 @@ import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.common.model.Role;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -24,7 +27,7 @@ public final class PeopleDraft {
   private static final class Entry {
     final UUID uuid;
     final String name;
-    final Role baseRole; // null: added in the draft
+    Role baseRole; // null: added in the draft; else the role saved on the server
     Role role;
     boolean removed;
     boolean withMySubquests;
@@ -143,6 +146,48 @@ public final class PeopleDraft {
     ops.addAll(others);
     if (mine != null) ops.add(mine);
     return ops;
+  }
+
+  /** The person was added in this draft and holds no role on the saved quest. */
+  public boolean isNew(UUID uuid) {
+    Entry e = find(uuid);
+    return e != null && e.baseRole == null;
+  }
+
+  /**
+   * Takes in the quest as the server saved it meanwhile (a join request answered, a change made by
+   * another owner), keeping the player's changes and the row order. Someone new on the server comes
+   * last as a saved row. An unchanged row follows the server's role, or goes when the server
+   * dropped the person; a row the player removed goes too once the server has dropped the person. A
+   * role the player changed stays: against the new saved role, or as an addition when the server
+   * dropped the person. A person the player added who is now on the server keeps the draft's role.
+   */
+  public void merge(Quest saved) {
+    QuestData q = saved.toData();
+    Map<UUID, ContributorData> server = new LinkedHashMap<>();
+    server.put(q.ownerUuid(), new ContributorData(q.ownerUuid(), q.ownerName(), Role.OWNER));
+    for (ContributorData c : q.contributors()) server.putIfAbsent(c.uuid(), c);
+
+    Iterator<Entry> it = entries.iterator();
+    while (it.hasNext()) {
+      Entry e = it.next();
+      ContributorData now = server.remove(e.uuid);
+      if (now == null) {
+        if (e.baseRole == null) continue;
+        if (!e.removed && e.role != e.baseRole) {
+          e.baseRole = null;
+        } else {
+          it.remove();
+        }
+        continue;
+      }
+      boolean unchanged = !e.dirty();
+      e.baseRole = now.role();
+      if (unchanged) e.role = now.role();
+    }
+    for (ContributorData c : server.values()) {
+      entries.add(new Entry(c.uuid(), c.name(), c.role(), c.role()));
+    }
   }
 
   private Entry find(UUID uuid) {

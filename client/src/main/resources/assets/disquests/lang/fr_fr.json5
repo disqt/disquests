@@ -141,6 +141,33 @@
     "failed": "Échec du chargement de l’image",
   },
 
+  // L'écran des joueurs (owners) : les rôles restent en brouillon jusqu'à Enregistrer
+  "gui.disquests.people.{}": {
+    "title": "Joueurs",
+    "pending": "Demandes en attente",
+    "you": "%s (toi)",
+    "removed": "retiré, non enregistré",
+    "undo": "Annuler le retrait",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "add_hint": "Nom du joueur...",
+    "unknown_player": "Aucun joueur nommé \"%s\" n'est connu ici. Il doit être en ligne ou sur une de tes quêtes.",
+    "apply_down": "Appliquer aux sous-quêtes",
+    "save_first": "Enregistre d'abord",
+    "apply_down_question_one": "Donner %2$s à %1$s sur ta %3$d sous-quête de %4$s ?",
+    "apply_down_question_many": "Donner %2$s à %1$s sur tes %3$d sous-quêtes de %4$s ?",
+    "apply_down_extra": "Une seule fois. Personne n'est rétrogradé, et les quêtes ajoutées plus tard ne sont pas concernées.",
+    "apply_down_sent": "%s reçoit %s sur tes sous-quêtes.",
+    "need_owner": "Une quête garde toujours au moins un Owner.",
+    "give_up_owner": "Tu renonces au rôle Owner sur cette quête. Tu ne pourras pas revenir en arrière toi-même.",
+    "roles_hint": "Read : voir, épingler, quitter. Write : aussi modifier le texte, le lieu, les tags, et y placer ses propres quêtes. Owner : aussi terminer, supprimer, visibilité, joueurs, liens.",
+    "save_hint": "Rien ne change tant que tu n'appuies pas sur Enregistrer.",
+    "remove_question": "Retirer %s ?",
+    "remove_this_only": "De cette quête seulement",
+    "remove_with_mine_one": "De cette quête et de ma sous-quête (%d)",
+    "remove_with_mine_many": "De cette quête et de mes %d sous-quêtes",
+  },
+
   "gui.disquests.contributor.{}": {
     "can_edit": "Peut éditer",
     "view_only": "Lecture seule",

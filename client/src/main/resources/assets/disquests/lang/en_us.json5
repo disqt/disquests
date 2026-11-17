@@ -140,6 +140,33 @@
     "failed": "Image failed to load",
   },
 
+  // The people screen (owners): roles held in a draft until Save
+  "gui.disquests.people.{}": {
+    "title": "People",
+    "pending": "Pending Requests",
+    "you": "%s (you)",
+    "removed": "removed, not saved",
+    "undo": "Undo",
+    "save": "Save",
+    "cancel": "Cancel",
+    "add_hint": "Player name...",
+    "unknown_player": "No player called \"%s\" is known here. They need to be online or on one of your quests.",
+    "apply_down": "Apply to subquests",
+    "save_first": "Save first",
+    "apply_down_question_one": "Give %s %s on your %d subquest of %s?",
+    "apply_down_question_many": "Give %s %s on your %d subquests of %s?",
+    "apply_down_extra": "One time only. Nobody is lowered, and quests added later are not affected.",
+    "apply_down_sent": "%s gets %s on your subquests.",
+    "need_owner": "A quest always keeps at least one owner.",
+    "give_up_owner": "You are giving up Owner on this quest. You will not be able to change this back yourself.",
+    "roles_hint": "Read: see, pin, leave. Write: also edit text, location, tags, and put their own quests inside. Owner: also complete, delete, visibility, people, links.",
+    "save_hint": "Nothing changes until you press Save.",
+    "remove_question": "Remove %s?",
+    "remove_this_only": "From this quest only",
+    "remove_with_mine_one": "From this quest and my %d subquest",
+    "remove_with_mine_many": "From this quest and my %d subquests",
+  },
+
   // Contributor permissions
   "gui.disquests.contributor.{}": {
     "can_edit": "Can Edit",
