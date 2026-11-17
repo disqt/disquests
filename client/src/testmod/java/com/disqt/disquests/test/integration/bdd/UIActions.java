@@ -190,8 +190,8 @@ public final class UIActions {
   }
 
   /**
-   * Click a QuestEntryComponent by index in the quest list. Entries are children of the
-   * "quest-list" FlowLayout.
+   * Click a QuestEntryComponent by index in the quest list. Each child of the "quest-list"
+   * FlowLayout is a row holding one entry (or the unplaced header); the entry itself is clicked.
    */
   public static void clickEntry(ClientGameTestContext context, int index) {
     var questList =
@@ -203,9 +203,11 @@ public final class UIActions {
               if (index >= children.size())
                 throw new AssertionError(
                     "Entry index " + index + " out of bounds, size=" + children.size());
-              var entry = children.get(index);
+              var child = children.get(index);
+              var entry = com.disqt.disquests.client.gui.screen.QuestListPanel.entryOf(child);
+              var target = entry != null ? entry : child;
               return new double[] {
-                entry.x() + entry.width() / 2.0, entry.y() + entry.height() / 2.0
+                target.x() + target.width() / 2.0, target.y() + target.height() / 2.0
               };
             });
     clickAt(context, pos);
@@ -221,14 +223,12 @@ public final class UIActions {
     double[] pos =
         context.computeOnClient(
             c -> {
-              for (var child : questList.children()) {
-                if (child
-                    instanceof com.disqt.disquests.client.gui.component.QuestEntryComponent entry) {
-                  if (title.equals(entry.getQuest().getTitle())) {
-                    return new double[] {
-                      entry.x() + entry.width() / 2.0, entry.y() + entry.height() / 2.0
-                    };
-                  }
+              for (var entry :
+                  com.disqt.disquests.client.gui.screen.QuestListPanel.entries(questList)) {
+                if (title.equals(entry.getQuest().getTitle())) {
+                  return new double[] {
+                    entry.x() + entry.width() / 2.0, entry.y() + entry.height() / 2.0
+                  };
                 }
               }
               throw new AssertionError("No entry with title '" + title + "' found in quest list");
@@ -253,9 +253,11 @@ public final class UIActions {
     double[] pos =
         context.computeOnClient(
             c -> {
-              var entry = questList.children().get(index);
+              var child = questList.children().get(index);
+              var entry = com.disqt.disquests.client.gui.screen.QuestListPanel.entryOf(child);
+              var target = entry != null ? entry : child;
               return new double[] {
-                entry.x() + entry.width() - PIN_ICON_CLICK_X, entry.y() + PIN_ICON_CLICK_Y
+                target.x() + target.width() - PIN_ICON_CLICK_X, target.y() + PIN_ICON_CLICK_Y
               };
             });
     clickAt(context, pos);

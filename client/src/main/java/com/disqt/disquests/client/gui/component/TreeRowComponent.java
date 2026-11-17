@@ -264,7 +264,7 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
   }
 
   /** A small padlock: shackle over a body, 7 px wide. */
-  private static void drawLock(OwoUIGraphics context, int x, int y) {
+  static void drawLock(OwoUIGraphics context, int x, int y) {
     int color = Colors.TEXT_MUTED;
     context.fill(x + 2, y + 1, x + 5, y + 2, color);
     context.fill(x + 1, y + 2, x + 2, y + 5, color);

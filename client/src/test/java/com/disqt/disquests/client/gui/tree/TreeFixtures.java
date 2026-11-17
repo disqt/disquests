@@ -22,37 +22,37 @@ import java.util.UUID;
  * Builds client-side quest graphs for tests, the way the server sends them to one player: quests
  * named by their title, whose id is derived from that title, and players with fixed UUIDs.
  */
-final class TreeFixtures {
+public final class TreeFixtures {
 
-  static final UUID LEO = new UUID(0, 1);
-  static final UUID MAX = new UUID(0, 2);
-  static final UUID JUJU = new UUID(0, 3);
-  static final UUID ANNA = new UUID(0, 4);
+  public static final UUID LEO = new UUID(0, 1);
+  public static final UUID MAX = new UUID(0, 2);
+  public static final UUID JUJU = new UUID(0, 3);
+  public static final UUID ANNA = new UUID(0, 4);
 
   private TreeFixtures() {}
 
   /** The fixed id of the quest with this title. */
-  static UUID id(String title) {
+  public static UUID id(String title) {
     return UUID.nameUUIDFromBytes(("quest:" + title).getBytes(StandardCharsets.UTF_8));
   }
 
-  static List<UUID> ids(String... titles) {
+  public static List<UUID> ids(String... titles) {
     return Arrays.stream(titles).map(TreeFixtures::id).toList();
   }
 
-  static Q quest(String title) {
+  public static Q quest(String title) {
     return new Q(title);
   }
 
-  static QuestGraph graph(Q... quests) {
+  public static QuestGraph graph(Q... quests) {
     return QuestGraph.of(Arrays.stream(quests).map(Q::build).toList());
   }
 
   /** Stands for a parent the player cannot see. */
-  static final UUID HIDDEN = new UUID(0, 0);
+  public static final UUID HIDDEN = new UUID(0, 0);
 
   /** Every quest's parent, by id: {@link #HIDDEN} for one the player cannot see. */
-  static Map<UUID, UUID> parents(QuestGraph g) {
+  public static Map<UUID, UUID> parents(QuestGraph g) {
     Map<UUID, UUID> parents = new HashMap<>();
     for (QuestData q : g.all()) {
       parents.put(q.id(), q.parentId() == null && q.hiddenParent() ? HIDDEN : q.parentId());
@@ -64,7 +64,7 @@ final class TreeFixtures {
    * Applies the ops one by one as the server does: each checked with {@link LinkRules} against the
    * tree as it is then. Fails the test on the first refused op.
    */
-  static QuestGraph replay(QuestGraph g, UUID actor, int maxDepth, List<TreeOp> ops) {
+  public static QuestGraph replay(QuestGraph g, UUID actor, int maxDepth, List<TreeOp> ops) {
     for (TreeOp op : ops) {
       Optional<Refusal> refused =
           switch (op.kind()) {
@@ -122,7 +122,7 @@ final class TreeFixtures {
   }
 
   /** A quest under construction: Open, owned by {@link #LEO}, active, unless told otherwise. */
-  static final class Q {
+  public static final class Q {
     private final String title;
     private UUID owner = LEO;
     private Visibility visibility = Visibility.OPEN;
@@ -143,103 +143,103 @@ final class TreeFixtures {
       this.title = title;
     }
 
-    Q owner(UUID player) {
+    public Q owner(UUID player) {
       this.owner = player;
       return this;
     }
 
-    Q role(UUID player, Role role) {
+    public Q role(UUID player, Role role) {
       people.add(new ContributorData(player, "p" + player.getLeastSignificantBits(), role));
       return this;
     }
 
-    Q reader(UUID player) {
+    public Q reader(UUID player) {
       return role(player, Role.READ);
     }
 
-    Q writer(UUID player) {
+    public Q writer(UUID player) {
       return role(player, Role.WRITE);
     }
 
-    Q coOwner(UUID player) {
+    public Q coOwner(UUID player) {
       return role(player, Role.OWNER);
     }
 
-    Q visibility(Visibility visibility) {
+    public Q visibility(Visibility visibility) {
       this.visibility = visibility;
       return this;
     }
 
-    Q privateQuest() {
+    public Q privateQuest() {
       return visibility(Visibility.PRIVATE);
     }
 
-    Q closed() {
+    public Q closed() {
       return visibility(Visibility.CLOSED);
     }
 
-    Q in(String parentTitle) {
+    public Q in(String parentTitle) {
       this.parent = id(parentTitle);
       return this;
     }
 
-    Q after(String... titles) {
+    public Q after(String... titles) {
       for (String t : titles) prerequisites.add(id(t));
       return this;
     }
 
-    Q hiddenPrerequisites() {
+    public Q hiddenPrerequisites() {
       this.hiddenPrerequisites = true;
       return this;
     }
 
-    Q deletedPrerequisite() {
+    public Q deletedPrerequisite() {
       this.deletedPrerequisite = true;
       return this;
     }
 
-    Q hiddenParent() {
+    public Q hiddenParent() {
       this.hiddenParent = true;
       return this;
     }
 
-    Q completed(long at) {
+    public Q completed(long at) {
       this.completedAt = at;
       return this;
     }
 
-    Q completed() {
+    public Q completed() {
       return completed(1_000L);
     }
 
-    Q modified(long at) {
+    public Q modified(long at) {
       this.lastModified = at;
       return this;
     }
 
     /** A locked view: no content, no time of last change, the flag set. */
-    Q locked() {
+    public Q locked() {
       this.locked = true;
       this.lastModified = 0L;
       return this;
     }
 
-    Q placed() {
+    public Q placed() {
       this.placed = true;
       return this;
     }
 
-    Q content(String content) {
+    public Q content(String content) {
       this.content = content;
       return this;
     }
 
-    Q tags(String... tags) {
+    public Q tags(String... tags) {
       this.tags.addAll(List.of(tags));
       return this;
     }
 
-    QuestData build() {
+    public QuestData build() {
       return new QuestData(
           id(title),
           title,

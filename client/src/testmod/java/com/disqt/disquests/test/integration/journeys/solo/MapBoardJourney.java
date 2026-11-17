@@ -15,6 +15,7 @@ import com.disqt.disquests.client.gui.map.QuestPolygonLayer;
 import com.disqt.disquests.client.gui.map.SharedTileCache;
 import com.disqt.disquests.client.gui.map.TileCache;
 import com.disqt.disquests.client.gui.screen.MainScreen;
+import com.disqt.disquests.client.gui.screen.QuestListPanel;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.client.network.PacketSender;
 import com.disqt.disquests.common.DimensionKeys;
@@ -236,7 +237,7 @@ class MapBoardJourney {
             return children.size() >= 3
                 && children.get(0) instanceof LabelComponent header
                 && "unplaced-header".equals(header.id())
-                && children.get(1) instanceof QuestEntryComponent entry
+                && QuestListPanel.entryOf(children.get(1)) instanceof QuestEntryComponent entry
                 && NO_PLACE.equals(entry.getQuest().getTitle());
           },
           TIMEOUT);
@@ -246,7 +247,7 @@ class MapBoardJourney {
               c -> {
                 StringBuilder sb = new StringBuilder();
                 for (var child : questList.children()) {
-                  if (child instanceof QuestEntryComponent e) {
+                  if (QuestListPanel.entryOf(child) instanceof QuestEntryComponent e) {
                     sb.append("[entry ").append(e.getQuest().getTitle()).append("] ");
                   } else {
                     sb.append("[").append(child.id()).append("] ");

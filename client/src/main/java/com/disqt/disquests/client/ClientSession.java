@@ -35,6 +35,8 @@ public class ClientSession {
   private static int pendingRequestCount = 0;
   private static final List<UUID> pinnedQuestIds = new CopyOnWriteArrayList<>();
   private static final Set<UUID> requestedQuestIds = ConcurrentHashMap.newKeySet();
+  // Quests whose subquests the main screen's lists show; one set for every tab
+  private static final Set<UUID> expandedQuestIds = ConcurrentHashMap.newKeySet();
   private static UUID playerUuid = null;
   private static Map<String, String> bluemapMapNames = Map.of();
   private static String bluemapDefaultMap = "overworld";
@@ -90,6 +92,7 @@ public class ClientSession {
     pendingRequestCount = 0;
     pinnedQuestIds.clear();
     requestedQuestIds.clear();
+    expandedQuestIds.clear();
     pendingToast = null;
     SharedTileCache.reset();
     playerUuid = null;
@@ -279,6 +282,22 @@ public class ClientSession {
 
   public static void removePinnedQuest(UUID questId) {
     pinnedQuestIds.remove(questId);
+  }
+
+  /** The quests expanded in the main screen's lists this session (collapsed by default). */
+  public static Set<UUID> getExpandedQuests() {
+    return Collections.unmodifiableSet(expandedQuestIds);
+  }
+
+  /** Expands a collapsed quest in the lists, or collapses an expanded one. */
+  public static void toggleExpanded(UUID questId) {
+    if (questId != null && !expandedQuestIds.remove(questId)) {
+      expandedQuestIds.add(questId);
+    }
+  }
+
+  public static void expand(UUID questId) {
+    if (questId != null) expandedQuestIds.add(questId);
   }
 
   public static void markRequested(UUID questId) {

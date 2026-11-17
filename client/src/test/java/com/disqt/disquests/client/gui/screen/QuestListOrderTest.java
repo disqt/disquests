@@ -2,65 +2,9 @@ package com.disqt.disquests.client.gui.screen;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.disqt.disquests.client.data.Quest;
-import com.disqt.disquests.common.model.CoordinatesData;
-import com.disqt.disquests.common.model.PointData;
-import com.disqt.disquests.common.model.QuestData;
-import com.disqt.disquests.common.model.Visibility;
-import java.util.List;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class QuestListOrderTest {
-
-  private static Quest quest(String title) {
-    Quest q = new Quest();
-    q.setTitle(title);
-    return q;
-  }
-
-  private static Quest pin(String title) {
-    Quest q = quest(title);
-    q.setCoordinates(new CoordinatesData(1, 64, 2));
-    return q;
-  }
-
-  private static Quest polygon(String title) {
-    Quest q = quest(title);
-    q.setPolygon(List.of(new PointData(0, 0), new PointData(10, 0), new PointData(10, 10)));
-    return q;
-  }
-
-  @Test
-  void orderForList_unplacedFirst_stableWithinGroups() {
-    Quest placedA = pin("placed A");
-    Quest unplacedA = quest("unplaced A");
-    Quest placedB = polygon("placed B");
-    Quest unplacedB = quest("unplaced B");
-    Quest placedC = pin("placed C");
-
-    List<Quest> ordered =
-        QuestListOrder.orderForList(List.of(placedA, unplacedA, placedB, unplacedB, placedC));
-
-    assertEquals(List.of(unplacedA, unplacedB, placedA, placedB, placedC), ordered);
-    assertEquals(List.of(), QuestListOrder.orderForList(List.of()));
-  }
-
-  @Test
-  void lockedViewsAreNeverListed() {
-    Quest open = quest("open");
-    Quest locked =
-        Quest.fromNetwork(
-            quest("locked")
-                .toData()
-                .withLinksView(List.of(), false, false, true)
-                .withCompletion(5L, null, null));
-    Quest lockedActive =
-        Quest.fromNetwork(quest("locked").toData().withLinksView(List.of(), false, false, true));
-
-    assertEquals(List.of(open), QuestListOrder.active(List.of(open, lockedActive, locked)));
-    assertEquals(List.of(), QuestListOrder.archived(List.of(locked)));
-  }
 
   @Test
   void shouldCollapseList_below640() {
@@ -77,48 +21,5 @@ class QuestListOrderTest {
     assertEquals(600, QuestListOrder.clampPanelWidth(900, 1000));
     // Narrow screens never go below the minimum.
     assertEquals(216, QuestListOrder.clampPanelWidth(500, 200));
-  }
-
-  private static Quest completed(String title, long completedAt) {
-    return Quest.fromNetwork(
-        new QuestData(
-                UUID.randomUUID(),
-                title,
-                "",
-                UUID.randomUUID(),
-                "Owner",
-                Visibility.OPEN,
-                List.of(),
-                0L,
-                null,
-                false,
-                null,
-                null,
-                List.of(),
-                List.of())
-            .withCompletion(completedAt, UUID.randomUUID(), "Completer"));
-  }
-
-  @Test
-  void archived_onlyCompleted_newestFirst() {
-    Quest active = quest("active");
-    Quest older = completed("older", 100L);
-    Quest newest = completed("newest", 300L);
-    Quest middle = completed("middle", 200L);
-
-    assertEquals(
-        List.of(newest, middle, older),
-        QuestListOrder.archived(List.of(older, active, newest, middle)));
-    assertEquals(List.of(), QuestListOrder.archived(List.of(active)));
-  }
-
-  @Test
-  void active_dropsCompleted() {
-    Quest a = quest("a");
-    Quest done = completed("done", 100L);
-    Quest b = pin("b");
-
-    assertEquals(List.of(a, b), QuestListOrder.active(List.of(a, done, b)));
-    assertEquals(List.of(), QuestListOrder.active(List.of(done)));
   }
 }

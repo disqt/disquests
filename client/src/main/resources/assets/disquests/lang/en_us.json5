@@ -120,6 +120,7 @@
     "open": "Anyone can join and view this quest",
     "already_requested": "You have already requested access",
     "view_only": "You have view-only access",
+    "needs_attention": "Needs your attention",
   },
 
   // Filter tooltips
@@ -140,6 +141,7 @@
     "region_summary": "Region: %d corners, X:%d to %d Z:%d to %d",
     "completed_by": "Completed on %s by %s",
     "completed": "Completed on %s",
+    "new": "NEW",
   },
 
   // Confirm dialogs

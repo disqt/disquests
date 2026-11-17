@@ -9,10 +9,10 @@ import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Contributor;
 import com.disqt.disquests.client.data.Quest;
-import com.disqt.disquests.client.gui.component.QuestEntryComponent;
 import com.disqt.disquests.client.gui.screen.ContributorScreen;
 import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
+import com.disqt.disquests.client.gui.screen.QuestListPanel;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.test.integration.PhaseSync;
 import com.disqt.disquests.test.integration.harness.IntegrationTest;
@@ -522,11 +522,8 @@ class TwoPlayerJourneys {
           var root = screen.getRootComponent();
           FlowLayout list = root != null ? root.childById(FlowLayout.class, "quest-list") : null;
           return list != null
-              && list.children().stream()
-                  .anyMatch(
-                      child ->
-                          child instanceof QuestEntryComponent entry
-                              && "Archive Quest".equals(entry.getQuest().getTitle()));
+              && QuestListPanel.entries(list).stream()
+                  .anyMatch(entry -> "Archive Quest".equals(entry.getQuest().getTitle()));
         },
         TIMEOUT);
 

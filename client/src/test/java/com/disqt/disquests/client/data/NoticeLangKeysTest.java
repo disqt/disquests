@@ -19,10 +19,10 @@ import org.junit.jupiter.api.TestFactory;
 
 /**
  * Checks that every lang key {@link NoticeText} and {@link SuggestionText} can emit, and the ones
- * the tree rows draw, exist in both language files. The files use owo's nested syntax, so a key
- * {@code gui.disquests.refusal.loop} is looked up as the block {@code "gui.disquests.refusal.{}": {
- * ... }} (text from its opening brace to the first closing brace, the blocks hold only flat
- * strings) containing {@code "loop":}.
+ * the tree rows and quest list entries draw, exist in both language files. The files use owo's
+ * nested syntax, so a key {@code gui.disquests.refusal.loop} is looked up as the block {@code
+ * "gui.disquests.refusal.{}": { ... }} (text from its opening brace to the first closing brace, the
+ * blocks hold only flat strings) containing {@code "loop":}.
  */
 class NoticeLangKeysTest {
 
@@ -48,12 +48,17 @@ class NoticeLangKeysTest {
       }
     }
     keys.addAll(TREE_ROW_KEYS);
+    keys.addAll(QUEST_ENTRY_KEYS);
     return keys.stream().distinct().toList();
   }
 
   /** Keys {@code TreeRowComponent} draws (a Minecraft class, so listed here by hand). */
   private static final List<String> TREE_ROW_KEYS =
       List.of("gui.disquests.tree.not_saved", "gui.disquests.tree.taken_out");
+
+  /** Keys {@code QuestEntryComponent} draws for its marks (a Minecraft class, listed by hand). */
+  private static final List<String> QUEST_ENTRY_KEYS =
+      List.of("gui.disquests.label.new", "gui.disquests.tooltip.needs_attention");
 
   private static void collect(NoticeText.Message m, List<String> keys) {
     keys.add(m.key());
