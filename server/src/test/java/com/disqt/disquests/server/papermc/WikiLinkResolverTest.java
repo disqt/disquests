@@ -201,14 +201,117 @@ class WikiLinkResolverTest {
     assertTrue(result.contains("[[QuestLink16]]"), "17th link should remain raw");
   }
 
+  // A save keeps a link to a quest its sender cannot see fully in id form, [[uuid|text]]. The
+  // text is the sender's, so the forward pass never sends it on.
+
   @Test
-  void resolveForRecipient_alreadyResolvedLinksIgnored() {
-    // A [[uuid|title]] pattern (already resolved) should not be re-processed by the raw pattern
+  void resolveForRecipient_storedIdForm_readerSeesTarget_getsCurrentTitle() {
     UUID questId = UUID.randomUUID();
-    String alreadyResolved = "[[" + questId + "|Some Title]]";
-    String result = resolver.resolveForRecipient(dm.loadGraph(), alreadyResolved, PLAYER2);
-    // Should not double-process; the raw pattern won't match [[uuid|title]] because it has a pipe
-    assertEquals(alreadyResolved, result);
+    dm.saveQuest(makeQuest(questId, OWNER, "Real Title", Visibility.PRIVATE));
+    dm.setRole(questId, PLAYER2, Role.READ);
+
+    String result =
+        resolver.resolveForRecipient(
+            dm.loadGraph(), "Go to [[" + questId + "|whatever]] now.", PLAYER2);
+
+    assertEquals("Go to [[" + questId + "|Real Title]] now.", result);
+  }
+
+  @Test
+  void resolveForRecipient_storedIdForm_readerCannotSeeTarget_getsPlaceholder() {
+    UUID questId = UUID.randomUUID();
+    dm.saveQuest(makeQuest(questId, OWNER, "Secret Plan", Visibility.PRIVATE));
+
+    String result =
+        resolver.resolveForRecipient(dm.loadGraph(), "[[" + questId + "|whatever]]", PLAYER3);
+
+    assertEquals("[[" + questId + "|Private Quest]]", result);
+  }
+
+  @Test
+  void resolveForRecipient_storedIdForm_targetLockedForReader_getsPlaceholder() {
+    UUID first = UUID.randomUUID();
+    UUID next = UUID.randomUUID();
+    dm.saveQuest(makeQuest(first, OWNER, "First", Visibility.OPEN));
+    dm.saveQuest(makeQuest(next, OWNER, "Locked Plan", Visibility.OPEN));
+    dm.setPrerequisites(next, List.of(first));
+
+    String result =
+        resolver.resolveForRecipient(dm.loadGraph(), "[[" + next + "|whatever]]", PLAYER2);
+
+    assertEquals("[[" + next + "|Private Quest]]", result);
+  }
+
+  @Test
+  void resolveForRecipient_storedIdForm_noSuchQuest_getsPlaceholder() {
+    UUID missing = UUID.randomUUID();
+
+    String result =
+        resolver.resolveForRecipient(dm.loadGraph(), "[[" + missing + "|Some Title]]", PLAYER2);
+
+    assertEquals("[[" + missing + "|Private Quest]]", result);
+  }
+
+  @Test
+  void resolveForRecipient_storedIdForm_hiddenTitleWithPipeAndBracket_neverSent() {
+    UUID questId = UUID.randomUUID();
+    dm.saveQuest(makeQuest(questId, OWNER, "Se]cr|et", Visibility.PRIVATE));
+    String content = "a [[" + questId + "|whatever]] b";
+
+    String result = resolver.resolveForRecipient(dm.loadGraph(), content, PLAYER3);
+
+    assertEquals("a [[" + questId + "|Private Quest]] b", result);
+    assertFalse(result.contains("Se]cr"));
+  }
+
+  @Test
+  void resolveForRecipient_storedIdForm_nestedOpeningBrackets_stillResolved() {
+    UUID questId = UUID.randomUUID();
+    dm.saveQuest(makeQuest(questId, OWNER, "Secret Plan", Visibility.PRIVATE));
+
+    String result =
+        resolver.resolveForRecipient(dm.loadGraph(), "[[[[" + questId + "|mine]]", PLAYER3);
+
+    assertEquals("[[[[" + questId + "|Private Quest]]", result);
+  }
+
+  @Test
+  void resolveForRecipient_mixedRawAndIdForm_resolvesBoth() {
+    UUID open = UUID.randomUUID();
+    UUID hidden = UUID.randomUUID();
+    dm.saveQuest(makeQuest(open, OWNER, "Alpha", Visibility.OPEN));
+    dm.saveQuest(makeQuest(hidden, OWNER, "Hidden", Visibility.PRIVATE));
+    String content = "Do [[Alpha]] then [[" + hidden + "|kept]].";
+
+    assertEquals(
+        "Do [[" + open + "|Alpha]] then [[" + hidden + "|Private Quest]].",
+        resolver.resolveForRecipient(dm.loadGraph(), content, PLAYER2));
+    assertEquals(
+        "Do [[" + open + "|Alpha]] then [[" + hidden + "|Hidden]].",
+        resolver.resolveForRecipient(dm.loadGraph(), content, OWNER));
+  }
+
+  @Test
+  void resolveForRecipient_resolvingTwice_changesNothing() {
+    UUID open = UUID.randomUUID();
+    UUID hidden = UUID.randomUUID();
+    UUID missing = UUID.randomUUID();
+    dm.saveQuest(makeQuest(open, OWNER, "Alpha", Visibility.OPEN));
+    dm.saveQuest(makeQuest(hidden, OWNER, "Hidden", Visibility.PRIVATE));
+    String content =
+        "[[Alpha]] [[Ghost]] [[Hidden]] [["
+            + hidden
+            + "|x]] [["
+            + missing
+            + "|y]] [["
+            + open
+            + "|z]]";
+
+    for (UUID reader : List.of(OWNER, PLAYER2)) {
+      String once = resolver.resolveForRecipient(dm.loadGraph(), content, reader);
+      String twice = resolver.resolveForRecipient(dm.loadGraph(), once, reader);
+      assertEquals(once, twice, "reader " + reader);
+    }
   }
 
   // -------------------------------------------------------------------------

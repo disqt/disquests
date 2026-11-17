@@ -507,7 +507,7 @@ class ServerPacketHandlerTest {
     UUID id = seedQuest(Visibility.OPEN);
     dm.setRole(id, CONTRIBUTOR, Role.WRITE);
     dm.completeQuests(List.of(id), CONTRIBUTOR, 5000L);
-    dm.updateContributor(id, CONTRIBUTOR, false);
+    dm.setRole(id, CONTRIBUTOR, Role.READ);
 
     reopen(CONTRIBUTOR, id);
 

@@ -47,6 +47,20 @@ class DataManagerTest {
         1L);
   }
 
+  /** The stored role rows of the quest, read straight from the database. */
+  private int peopleRows(UUID questId) {
+    try (Connection c =
+            DriverManager.getConnection("jdbc:sqlite:" + tempDir.resolve("disquests.db"));
+        PreparedStatement st =
+            c.prepareStatement("SELECT COUNT(*) FROM quest_people WHERE quest_id = ?")) {
+      st.setString(1, questId.toString());
+      java.sql.ResultSet rs = st.executeQuery();
+      return rs.next() ? rs.getInt(1) : -1;
+    } catch (java.sql.SQLException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   private QuestData makeQuest(UUID id, UUID owner, String title, Visibility vis) {
     return new QuestData(
         id,
@@ -152,19 +166,6 @@ class DataManagerTest {
     assertNull(dm.getQuest(id));
   }
 
-  @Test
-  void updateVisibility() {
-    UUID id = UUID.randomUUID();
-    dm.upsertPlayerName(OWNER, "Alice");
-    dm.saveQuest(makeQuest(id, OWNER, "Quest", Visibility.PRIVATE));
-
-    dm.updateVisibility(id, Visibility.OPEN);
-
-    QuestData loaded = dm.getQuest(id);
-    assertNotNull(loaded);
-    assertEquals(Visibility.OPEN, loaded.visibility());
-  }
-
   // -------------------------------------------------------------------------
   // Contributors
   // -------------------------------------------------------------------------
@@ -177,29 +178,14 @@ class DataManagerTest {
     dm.saveQuest(makeQuest(questId, OWNER, "Quest", Visibility.OPEN));
 
     dm.setRole(questId, PLAYER2, Role.READ);
-    List<ContributorData> contributors = dm.getContributors(questId);
+    List<ContributorData> contributors = dm.getQuest(questId).contributors();
     assertEquals(1, contributors.size());
     assertEquals(PLAYER2, contributors.get(0).uuid());
     assertFalse(contributors.get(0).canEdit());
 
     dm.removePerson(questId, PLAYER2);
-    List<ContributorData> after = dm.getContributors(questId);
+    List<ContributorData> after = dm.getQuest(questId).contributors();
     assertTrue(after.isEmpty());
-  }
-
-  @Test
-  void updateContributor() {
-    UUID questId = UUID.randomUUID();
-    dm.upsertPlayerName(OWNER, "Alice");
-    dm.upsertPlayerName(PLAYER2, "Bob");
-    dm.saveQuest(makeQuest(questId, OWNER, "Quest", Visibility.OPEN));
-
-    dm.setRole(questId, PLAYER2, Role.READ);
-    dm.updateContributor(questId, PLAYER2, true);
-
-    List<ContributorData> contributors = dm.getContributors(questId);
-    assertEquals(1, contributors.size());
-    assertTrue(contributors.get(0).canEdit());
   }
 
   // -------------------------------------------------------------------------
@@ -518,7 +504,7 @@ class DataManagerTest {
 
     assertTrue(dm.getAllQuests().isEmpty());
     assertTrue(dm.getPinnedQuestIds(OWNER).isEmpty());
-    assertTrue(dm.getContributors(questId).isEmpty());
+    assertEquals(0, peopleRows(questId));
     assertTrue(dm.getPendingRequestsForOwner(OWNER).isEmpty());
     assertNull(dm.getPlayerName(OWNER));
   }
@@ -537,13 +523,13 @@ class DataManagerTest {
     dm.setRole(questId, PLAYER2, Role.READ);
     dm.setRole(questId, PLAYER3, Role.WRITE);
 
-    assertEquals(2, dm.getContributors(questId).size());
+    assertEquals(2, dm.getQuest(questId).contributors().size());
+    assertEquals(3, peopleRows(questId));
 
     delete(questId);
 
-    // getContributors on a deleted quest should return empty (FK cascade)
-    List<ContributorData> remaining = dm.getContributors(questId);
-    assertTrue(remaining.isEmpty());
+    // The quest's role rows go with it (FK cascade)
+    assertEquals(0, peopleRows(questId));
   }
 
   @Test
@@ -825,7 +811,7 @@ class DataManagerTest {
           List.of(new PointData(1, 2), new PointData(5, 2), new PointData(5, 8)), q.polygon());
       assertEquals(2, q.tags().size());
       assertTrue(q.tags().containsAll(List.of("base", "farm")));
-      List<ContributorData> contributors = second.getContributors(id);
+      List<ContributorData> contributors = second.getQuest(id).contributors();
       assertEquals(1, contributors.size());
       assertEquals(PLAYER2, contributors.get(0).uuid());
       assertTrue(contributors.get(0).canEdit());

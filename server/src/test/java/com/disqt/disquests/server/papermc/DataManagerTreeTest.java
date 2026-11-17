@@ -182,7 +182,6 @@ class DataManagerTreeTest {
 
       assertNull(dm.getQuest(child));
       assertTrue(dm.getAllQuests().stream().noneMatch(q -> q.roleOf(BOB) != null));
-      assertEquals(List.of(), dm.getContributors(child));
       assertEquals(0, rows("SELECT COUNT(*) FROM quest_links WHERE from_id = '" + child + "'"));
       assertEquals(0, rows("SELECT COUNT(*) FROM quest_people WHERE quest_id = '" + child + "'"));
     }
@@ -299,6 +298,24 @@ class DataManagerTreeTest {
     }
 
     @Test
+    void setRoleRefusesToLowerTheLastOwner() {
+      UUID id = quest(ALICE, "q");
+      dm.setRole(id, BOB, Role.WRITE);
+
+      assertThrows(IllegalStateException.class, () -> dm.setRole(id, ALICE, Role.WRITE));
+      assertThrows(IllegalStateException.class, () -> dm.setRole(id, ALICE, Role.READ));
+
+      QuestData stored = dm.getQuest(id);
+      assertEquals(ALICE, stored.ownerUuid());
+      assertEquals(Role.OWNER, stored.roleOf(ALICE));
+      assertEquals(Role.WRITE, stored.roleOf(BOB));
+      assertEquals(1, rows("SELECT COUNT(*) FROM quest_people WHERE role = 'OWNER'"));
+
+      dm.setRole(id, ALICE, Role.OWNER);
+      assertEquals(Role.OWNER, dm.getQuest(id).roleOf(ALICE));
+    }
+
+    @Test
     void displayOwnerStaysWhenAnotherOwnerIsRemoved() {
       UUID id = quest(ALICE, "q");
       dm.setRole(id, BOB, Role.OWNER);
@@ -348,31 +365,6 @@ class DataManagerTreeTest {
 
       assertEquals(
           List.of(new ContributorData(BOB, "Bob", Role.WRITE)), dm.getQuest(id).contributors());
-    }
-
-    @Test
-    void updateContributorWorksOnRoles() {
-      UUID id = quest(ALICE, "q");
-      dm.setRole(id, CAROL, Role.READ);
-
-      dm.updateContributor(id, CAROL, true);
-      assertEquals(Role.WRITE, dm.getQuest(id).roleOf(CAROL));
-
-      dm.updateContributor(id, CAROL, false);
-      assertEquals(Role.READ, dm.getQuest(id).roleOf(CAROL));
-    }
-
-    @Test
-    void updateContributorNeverDemotesAnOwner() {
-      UUID id = quest(ALICE, "q");
-      dm.setRole(id, BOB, Role.OWNER);
-
-      dm.updateContributor(id, BOB, false);
-      dm.updateContributor(id, ALICE, false);
-
-      assertEquals(Role.OWNER, dm.getQuest(id).roleOf(BOB));
-      assertEquals(Role.OWNER, dm.getQuest(id).roleOf(ALICE));
-      assertEquals(2, rows("SELECT COUNT(*) FROM quest_people WHERE role = 'OWNER'"));
     }
 
     @Test

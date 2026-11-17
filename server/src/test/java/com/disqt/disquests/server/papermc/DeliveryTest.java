@@ -325,7 +325,7 @@ class DeliveryTest {
     void settingTheHubPrivate_deletesItAndItsSubquestsForNonMembersOnly() {
       westenheim(Visibility.CLOSED);
 
-      QuestGraph after = change(() -> dm.updateVisibility(hub, Visibility.PRIVATE));
+      QuestGraph after = change(() -> dm.changeVisibility(hub, Visibility.PRIVATE));
 
       assertEquals(Set.of(hub, interieurs, wagons), Set.copyOf(outbox.deletesFor(OUTSIDER)));
       assertEquals(List.of(), outbox.updatesFor(OUTSIDER));
@@ -493,7 +493,7 @@ class DeliveryTest {
       Delivery onlyLeo =
           new Delivery(dm, config, fewer, new WikiLinkResolver(), fewer::protocolVersion);
       QuestGraph before = dm.loadGraph();
-      dm.updateVisibility(wagons, Visibility.OPEN);
+      dm.changeVisibility(wagons, Visibility.OPEN);
 
       onlyLeo.deliver(before, dm.loadGraph());
 
@@ -517,7 +517,7 @@ class DeliveryTest {
       dm.pinQuest(OUTSIDER, two);
       dm.pinQuest(OUTSIDER, one);
       dm.pinQuest(MEMBER, interieurs);
-      dm.updateVisibility(hub, Visibility.PRIVATE);
+      dm.changeVisibility(hub, Visibility.PRIVATE);
 
       delivery.handshake(OUTSIDER);
       delivery.handshake(MEMBER);

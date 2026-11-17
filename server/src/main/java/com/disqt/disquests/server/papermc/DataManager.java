@@ -359,17 +359,6 @@ public class DataManager {
     return QuestGraph.of(getAllQuests());
   }
 
-  public synchronized void updateVisibility(UUID questId, Visibility visibility) {
-    try (PreparedStatement stmt =
-        connection.prepareStatement("UPDATE quests SET visibility = ? WHERE id = ?")) {
-      stmt.setString(1, visibility.name());
-      stmt.setString(2, questId.toString());
-      stmt.executeUpdate();
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to update visibility", e);
-    }
-  }
-
   /**
    * Sets the visibility as an owner's choice: a visibility other than Private also forgets the
    * quest's privatization, since the owner has dealt with it.
@@ -395,36 +384,6 @@ public class DataManager {
           questId.toString());
     } catch (SQLException e) {
       throw new RuntimeException("Failed to change visibility", e);
-    }
-  }
-
-  // -------------------------------------------------------------------------
-  // Contributors
-  // -------------------------------------------------------------------------
-
-  public synchronized void updateContributor(UUID questId, UUID playerUuid, boolean canEdit) {
-    try {
-      update(
-          "UPDATE quest_people SET role = ? WHERE quest_id = ? AND player_uuid = ? AND role <> 'OWNER'",
-          (canEdit ? Role.WRITE : Role.READ).name(),
-          questId.toString(),
-          playerUuid.toString());
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to update contributor", e);
-    }
-  }
-
-  /** Everyone with a role on the quest except its display owner, oldest first. */
-  public synchronized List<ContributorData> getContributors(UUID questId) {
-    try (PreparedStatement stmt =
-        connection.prepareStatement("SELECT owner_uuid FROM quests WHERE id = ?")) {
-      stmt.setString(1, questId.toString());
-      ResultSet rs = stmt.executeQuery();
-      if (!rs.next()) return new ArrayList<>();
-      UUID displayOwner = UUID.fromString(rs.getString("owner_uuid"));
-      return getPeopleBatch(Map.of(questId, displayOwner)).get(questId);
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to get contributors", e);
     }
   }
 
@@ -923,10 +882,18 @@ public class DataManager {
         });
   }
 
+  /**
+   * Gives the player the role on the quest, adding them when they hold none. Throws {@link
+   * IllegalStateException}, changing nothing, when this would lower the quest's last OWNER row: a
+   * quest always keeps an owner.
+   */
   public synchronized void setRole(UUID quest, UUID player, Role role) {
     inTransaction(
         "set role",
         () -> {
+          if (role != Role.OWNER && isLastOwnerRow(quest, player)) {
+            throw new IllegalStateException(player + " is the last owner of " + quest);
+          }
           int changed =
               update(
                   "UPDATE quest_people SET role = ? WHERE quest_id = ? AND player_uuid = ?",
