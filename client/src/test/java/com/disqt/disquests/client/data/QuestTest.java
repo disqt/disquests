@@ -296,6 +296,20 @@ class QuestTest {
     }
 
     @Test
+    void toDataIsNotAffectedByLaterEditsToTheQuestLists() {
+      Quest q = Quest.fromNetwork(full());
+      QuestData before = q.toData();
+      q.getPrerequisites().add(UUID.randomUUID());
+      q.getContributors().clear();
+      q.setPolygon(new java.util.ArrayList<>(List.of(new PointData(9, 9))));
+      q.setTags(new java.util.ArrayList<>(List.of("zzz")));
+      assertEquals(full().prerequisites(), before.prerequisites());
+      assertEquals(3, before.contributors().size());
+      assertEquals(List.of(new PointData(1, 2)), before.polygon());
+      assertEquals(List.of("a"), before.tags());
+    }
+
+    @Test
     void toDataRoundTripsALockedView() {
       QuestData locked =
           new QuestData(

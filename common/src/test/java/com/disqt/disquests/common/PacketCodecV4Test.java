@@ -1,5 +1,6 @@
 package com.disqt.disquests.common;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -255,6 +256,16 @@ class PacketCodecV4Test {
               true,
               autoJoin);
       assertEquals(links, PacketCodec.readSaveQuest(body(saveWith(links))).links());
+    }
+
+    @Test
+    void noneWritesTheSameBytesAsTheOverloadWithoutLinks() {
+      byte[] withoutLinks =
+          PacketCodec.writeSaveQuest(
+              QUEST_ID, "t", "c", null, false, null, null, List.of(), List.of());
+      assertArrayEquals(withoutLinks, saveWith(LinkChanges.NONE));
+      assertArrayEquals(withoutLinks, saveWith(null));
+      assertEquals(LinkChanges.NONE, PacketCodec.readSaveQuest(body(withoutLinks)).links());
     }
 
     @Test

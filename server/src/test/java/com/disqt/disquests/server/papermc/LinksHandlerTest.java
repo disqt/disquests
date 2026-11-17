@@ -15,7 +15,6 @@ import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.common.model.Role;
 import com.disqt.disquests.common.model.Visibility;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Nested;
@@ -82,14 +81,11 @@ class LinksHandlerTest extends HandlerFixture {
       assertEquals(Visibility.CLOSED, q.visibility());
     }
 
-    /** A save as a V3 client writes it: no link block at the end. */
+    /** A save as a V3 client writes it: an empty link set is left out of the packet. */
     private byte[] withoutLinkBlock(UUID quest, String title) {
-      byte[] full =
+      byte[] legacy =
           PacketCodec.writeSaveQuest(
               quest, title, "", null, false, null, "overworld", List.of(), List.of());
-      // An empty link block is 7 bytes: visibility, op count, two list counts, two flags,
-      // auto-join.
-      byte[] legacy = Arrays.copyOf(full, full.length - 7);
       ByteBufReader check = new ByteBufReader(legacy);
       PacketCodec.readType(check);
       assertEquals(LinkChanges.NONE, PacketCodec.readSaveQuest(check).links());

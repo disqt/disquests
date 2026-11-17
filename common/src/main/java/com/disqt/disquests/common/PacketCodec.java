@@ -185,7 +185,10 @@ public final class PacketCodec {
       buf.writeString(tag);
     }
     writePolygon(buf, polygon);
-    writeLinkChanges(buf, links == null ? LinkChanges.NONE : links);
+    // An empty block is left out: a pre-V4 server reads the packet as it always did.
+    if (links != null && !links.equals(LinkChanges.NONE)) {
+      writeLinkChanges(buf, links);
+    }
     return buf.toByteArray();
   }
 
