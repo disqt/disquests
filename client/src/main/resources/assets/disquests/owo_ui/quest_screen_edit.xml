@@ -31,6 +31,23 @@
                 </margins>
             </label>
 
+            <!-- Body: QuestEditTreePane inserts the tree pane and its divider before quest-column
+                 when the server supports quest trees -->
+            <flow-layout direction="horizontal" id="quest-body">
+                <sizing>
+                    <horizontal method="fill">100</horizontal>
+                    <vertical method="expand">100</vertical>
+                </sizing>
+                <children>
+                    <!-- The form -->
+                    <flow-layout direction="vertical" id="quest-column">
+                        <sizing>
+                            <horizontal method="expand">100</horizontal>
+                            <vertical method="fill">100</vertical>
+                        </sizing>
+                        <horizontal-alignment>center</horizontal-alignment>
+                        <children>
+
             <!-- Title field row (title + help button) -->
             <flow-layout direction="horizontal" id="title-row">
                 <sizing>
@@ -67,7 +84,7 @@
             <flow-layout direction="horizontal" id="content-row">
                 <sizing>
                     <horizontal method="fill">85</horizontal>
-                    <vertical method="fill">35</vertical>
+                    <vertical method="expand">100</vertical>
                 </sizing>
                 <gap>4</gap>
                 <margins>
@@ -200,6 +217,20 @@
                 </children>
             </flow-layout>
 
+            <!-- Link controls (owners): hidden-parent line, visibility, prerequisites, auto-join;
+                 filled by QuestLinksForm, removed for other players -->
+            <flow-layout direction="vertical" id="links-form">
+                <sizing>
+                    <horizontal method="fill">85</horizontal>
+                    <vertical method="content"/>
+                </sizing>
+                <gap>2</gap>
+                <margins>
+                    <top>2</top>
+                </margins>
+                <children/>
+            </flow-layout>
+
             <!-- Settings row (owner only, hidden via zero-sizing for non-owners) -->
             <flow-layout direction="horizontal" id="settings-row">
                 <sizing>
@@ -211,13 +242,6 @@
                     <top>2</top>
                 </margins>
                 <children>
-                    <button id="btn-visibility">
-                        <text>Visibility</text>
-                        <sizing>
-                            <horizontal method="content"/>
-                            <vertical method="fixed">16</vertical>
-                        </sizing>
-                    </button>
                     <button id="btn-contributors">
                         <text>Contributors</text>
                         <sizing>
@@ -254,6 +278,11 @@
                             <vertical method="fixed">20</vertical>
                         </sizing>
                     </button>
+                </children>
+            </flow-layout>
+
+                        </children>
+                    </flow-layout>
                 </children>
             </flow-layout>
 

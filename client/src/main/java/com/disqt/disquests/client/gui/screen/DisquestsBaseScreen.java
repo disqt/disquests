@@ -63,6 +63,17 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   private static final SystemToast.SystemToastId ARCHIVED_TOAST =
       new SystemToast.SystemToastId(8000L);
 
+  private static final SystemToast.SystemToastId REFUSED_TOAST =
+      new SystemToast.SystemToastId(8002L);
+
+  /** A toast like the server's notices, for a change refused on this screen. */
+  protected void showRefusedToast(Component text) {
+    if (this.minecraft != null) {
+      SystemToast.add(
+          this.minecraft.gui.toastManager(), REFUSED_TOAST, Component.literal("Disquests"), text);
+    }
+  }
+
   /**
    * The cached quest when it was completed after this screen took its copy, else null. Screens that
    * edit a stale copy check this before writing: the server silently drops edits to archived quests
@@ -123,13 +134,21 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
       SuggestionDropdown.closeOnClickOutside(this.uiAdapter.rootComponent, click.x(), click.y());
     }
     if (click.button() == InputConstants.MOUSE_BUTTON_4) {
-      goBack();
+      confirmLeave(this::goBack);
       return true;
     } else if (click.button() == InputConstants.MOUSE_BUTTON_5) {
-      goForward();
+      confirmLeave(this::goForward);
       return true;
     }
     return super.mouseClicked(click, simulated);
+  }
+
+  /**
+   * Runs {@code leave}, which takes the player off this screen (back, forward, Escape). A screen
+   * holding unsaved changes overrides this to ask first.
+   */
+  protected void confirmLeave(Runnable leave) {
+    leave.run();
   }
 
   private void goBack() {

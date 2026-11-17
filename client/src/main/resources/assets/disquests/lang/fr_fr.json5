@@ -78,6 +78,21 @@
     "inside_another": "dans une autre quête",
   },
 
+  // L'éditeur de quête : arbre et liens
+  "gui.disquests.edit.{}": {
+    "add_subquest": "ajouter une sous-quête...",
+    "new_quest": "Nouvelle quête",
+    "drop_out": "Dépose ici pour sortir une quête de l'arbre",
+    "tree_hint": "Glisse une quête sur une autre pour la mettre dedans. Rien ne change avant que tu appuies sur Save.",
+    "hidden_parent": "Cette quête se trouve dans une quête que tu ne peux pas voir",
+    "detach": "Détacher",
+    "visibility": "Visibilité",
+    "visibility_in_parent": "Parmi ceux qui peuvent voir la quête qui la contient.",
+    "prerequisite_field": "tape pour ajouter une quête existante...",
+    "prerequisite_hidden": "quelque chose auquel tu n'as pas accès",
+    "open_only": "(quêtes Ouvertes seulement)",
+  },
+
   // Lignes de l'arbre des quêtes
   "gui.disquests.tree.{}": {
     "not_saved": "non enregistrée",
@@ -199,6 +214,7 @@
     "tags": "Tags (%d)",
     "contributors": "Contributeurs (%d)",
     "where_this_sits": "OÙ ELLE SE TROUVE",
+    "subquests": "SOUS-QUÊTES",
     "prerequisites": "Prérequis",
   },
 

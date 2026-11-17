@@ -11,6 +11,7 @@ import com.disqt.disquests.client.gui.component.TagChipComponent;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.helper.Messages;
+import com.disqt.disquests.client.gui.tree.QuestEditDraft;
 import com.disqt.disquests.client.gui.widget.MarkdownWidget;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
@@ -20,10 +21,12 @@ import com.disqt.disquests.common.DimensionKeys;
 import com.disqt.disquests.common.QuestLocation;
 import com.disqt.disquests.common.TagConstraints;
 import com.disqt.disquests.common.graph.Plans;
+import com.disqt.disquests.common.graph.Refusal;
 import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.CoordinatesData;
+import com.disqt.disquests.common.model.LinkChanges;
+import com.disqt.disquests.common.model.Notice;
 import com.disqt.disquests.common.model.PointData;
-import com.disqt.disquests.common.model.Visibility;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
@@ -71,6 +74,15 @@ public class QuestScreen extends DisquestsBaseScreen {
   private String originalContent;
   private LocationCard.LocationSnapshot originalLocation;
 
+  /**
+   * The editor's tree, visibility, prerequisites and auto-join changes; carried across the editor's
+   * own rebuilds (map editor, tag picker) like the originals above.
+   */
+  @Nullable private QuestEditDraft editDraft;
+
+  @Nullable private QuestEditTreePane editPane;
+  @Nullable private QuestLinksForm linksForm;
+
   // Permission cache
   private boolean canEdit;
   private boolean isOwner;
@@ -92,12 +104,12 @@ public class QuestScreen extends DisquestsBaseScreen {
 
   /** Open in view mode for an existing quest. */
   public QuestScreen(@Nullable Screen parent, Quest quest) {
-    this(parent, quest, false, false, null, null, null);
+    this(parent, quest, false, false, null, null, null, null);
   }
 
   /** Open in edit mode when startInEditMode is true (e.g. new quest). */
   public QuestScreen(@Nullable Screen parent, Quest quest, boolean startInEditMode) {
-    this(parent, quest, startInEditMode, startInEditMode, null, null, null);
+    this(parent, quest, startInEditMode, startInEditMode, null, null, null, null);
   }
 
   /** Internal constructor preserving edit state across mode switches. */
@@ -108,7 +120,8 @@ public class QuestScreen extends DisquestsBaseScreen {
       boolean isNewQuest,
       @Nullable String originalTitle,
       @Nullable String originalContent,
-      @Nullable LocationCard.LocationSnapshot originalLocation) {
+      @Nullable LocationCard.LocationSnapshot originalLocation,
+      @Nullable QuestEditDraft editDraft) {
     super(
         DataSource.asset(
             Identifier.fromNamespaceAndPath(
@@ -120,6 +133,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     this.originalTitle = originalTitle;
     this.originalContent = originalContent;
     this.originalLocation = originalLocation;
+    this.editDraft = editDraft;
   }
 
   // --- Accessors ---
@@ -466,6 +480,9 @@ public class QuestScreen extends DisquestsBaseScreen {
     if (originalLocation == null) {
       originalLocation = LocationCard.LocationSnapshot.of(quest);
     }
+    if (editDraft == null) {
+      editDraft = newEditDraft();
+    }
 
     // Title field
     FlowLayout titleRow = root.childById(FlowLayout.class, "title-row");
@@ -552,28 +569,24 @@ public class QuestScreen extends DisquestsBaseScreen {
     // Location card
     vertexRows = LocationCard.buildEdit(this, root, quest);
 
-    // Settings row (owner only)
+    // Tree pane (Write and Owner, servers with quest trees) and link controls (owners)
+    if (ClientSession.supportsTrees()) {
+      editPane =
+          QuestEditTreePane.attach(
+              this,
+              root,
+              editDraft,
+              isNewQuest,
+              () -> titleFieldComponent != null ? titleFieldComponent.getText() : quest.getTitle(),
+              () -> {
+                if (linksForm != null) linksForm.refresh();
+              });
+    }
+    linksForm = QuestLinksForm.attach(this, root, editDraft, isOwner, this::treeChanged);
+
+    // People (owner only)
     FlowLayout settingsRow = root.childById(FlowLayout.class, "settings-row");
     if (isOwner) {
-      ButtonComponent visBtn = root.childById(ButtonComponent.class, "btn-visibility");
-      visBtn.setMessage(
-          Component.literal("Visibility: ")
-              .append(
-                  Component.translatable(
-                      switch (quest.getVisibility()) {
-                        case PRIVATE -> "gui.disquests.visibility.private";
-                        case CLOSED -> "gui.disquests.visibility.closed";
-                        case OPEN -> "gui.disquests.visibility.open";
-                      })));
-      visBtn.tooltip(
-          Component.translatable(
-              switch (quest.getVisibility()) {
-                case PRIVATE -> "gui.disquests.tooltip.private";
-                case CLOSED -> "gui.disquests.tooltip.closed";
-                case OPEN -> "gui.disquests.tooltip.open";
-              }));
-      visBtn.onPress(ignored -> cycleVisibility());
-
       int contribCount = quest.getContributors().size();
       int pendingReqCount = ClientCache.getPendingCount(quest.getId());
       Component contribText;
@@ -683,7 +696,8 @@ public class QuestScreen extends DisquestsBaseScreen {
                         isNewQuest,
                         originalTitle,
                         originalContent,
-                        originalLocation);
+                        originalLocation,
+                        editDraft);
                 navigateToScreen(new TagPickerScreen(returnScreen, quest, returnScreen));
               });
       addTagBtn.sizing(Sizing.content(), Sizing.fixed(12));
@@ -710,25 +724,69 @@ public class QuestScreen extends DisquestsBaseScreen {
             isNewQuest,
             origTitle,
             origContent,
-            LocationCard.LocationSnapshot.of(quest)));
+            LocationCard.LocationSnapshot.of(quest),
+            newEditDraft()));
+  }
+
+  /** The tree, visibility, prerequisites and auto-join as the editor opened, nothing changed. */
+  private QuestEditDraft newEditDraft() {
+    return new QuestEditDraft(QuestGraphs.current(), quest.toData());
   }
 
   private void cancelEdit() {
-    if (isDirty()) {
-      showConfirmOverlay(
-          Component.translatable("gui.disquests.confirm.discard"),
-          () -> {
-            quest.setTitle(originalTitle);
-            quest.setContent(originalContent);
-            // The map editor and vertex rows write straight into the cached quest.
-            if (originalLocation != null) {
-              originalLocation.restore(quest);
-            }
-            exitToViewMode();
-          });
-    } else {
-      exitToViewMode();
+    confirmLeave(this::exitToViewMode);
+  }
+
+  /**
+   * Cancel, back, forward and Escape in the editor: with unsaved changes (text, location or any
+   * draft) the player confirms first, and the changes are dropped before leaving.
+   */
+  @Override
+  protected void confirmLeave(Runnable leave) {
+    if (!editing || !isDirty()) {
+      leave.run();
+      return;
     }
+    showConfirmOverlay(
+        Component.translatable("gui.disquests.confirm.discard"),
+        () -> {
+          restoreOriginals();
+          leave.run();
+        });
+  }
+
+  /** Escape: in the editor, asks before dropping unsaved changes. */
+  @Override
+  public void onClose() {
+    if (editing) {
+      confirmLeave(super::onClose);
+    } else {
+      super.onClose();
+    }
+  }
+
+  /** Puts back what the editor wrote into the cached quest; the drafts are simply dropped. */
+  private void restoreOriginals() {
+    quest.setTitle(originalTitle);
+    quest.setContent(originalContent);
+    // The map editor and vertex rows write straight into the cached quest.
+    if (originalLocation != null) {
+      originalLocation.restore(quest);
+    }
+  }
+
+  /** After a tree change made from the form (the hidden-parent Detach): pane and form follow. */
+  private void treeChanged() {
+    if (editPane != null) editPane.fill();
+    if (linksForm != null) linksForm.refresh();
+  }
+
+  /** A toast for a change the draft refused, worded like the server's refusal notices. */
+  void showRefused(UUID questId, Refusal refusal) {
+    var q = editDraft != null ? editDraft.tree().effective().get(questId) : null;
+    Notice notice =
+        new Notice(Notice.Kind.CHANGE_REFUSED, questId, q != null ? q.title() : null, refusal);
+    showRefusedToast(Messages.toComponent(NoticeText.of(notice, ClientSession.getMaxQuestDepth())));
   }
 
   private void exitToViewMode() {
@@ -751,6 +809,9 @@ public class QuestScreen extends DisquestsBaseScreen {
       return;
     }
     persistFieldValues();
+    LinkChanges links = editDraft != null ? editDraft.toLinkChanges() : LinkChanges.NONE;
+    // Shown at once, as before; the server's answer corrects it if it refuses.
+    if (links.visibility() != null) quest.setVisibility(links.visibility());
     ClientCache.addOrUpdateMyQuest(quest);
     PacketSender.saveQuest(
         quest.getId(),
@@ -761,11 +822,11 @@ public class QuestScreen extends DisquestsBaseScreen {
         quest.getCoordinates2(),
         quest.getMap(),
         quest.getTags(),
-        quest.getPolygon());
-
-    UUID myUuid = ClientSession.getEffectivePlayerUuid();
-    if (quest.getOwnerUuid().equals(myUuid)) {
-      PacketSender.updateVisibility(quest.getId(), quest.getVisibility());
+        quest.getPolygon(),
+        links);
+    // A server without quest trees takes no links block: visibility goes on its own, as before.
+    if (!ClientSession.supportsTrees() && links.visibility() != null) {
+      PacketSender.updateVisibility(quest.getId(), links.visibility());
     }
 
     navigateToScreen(new QuestScreen(this.parent, quest));
@@ -931,19 +992,6 @@ public class QuestScreen extends DisquestsBaseScreen {
     rebuildEditMode();
   }
 
-  private void cycleVisibility() {
-    Visibility current = quest.getVisibility();
-    Visibility next =
-        switch (current) {
-          case PRIVATE -> Visibility.CLOSED;
-          case CLOSED -> Visibility.OPEN;
-          case OPEN -> Visibility.PRIVATE;
-        };
-    quest.setVisibility(next);
-    persistFieldValues();
-    rebuildEditMode();
-  }
-
   private void openContributors() {
     persistFieldValues();
     navigateToScreen(new ContributorScreen(this, quest));
@@ -1019,7 +1067,8 @@ public class QuestScreen extends DisquestsBaseScreen {
             isNewQuest,
             originalTitle,
             originalContent,
-            originalLocation));
+            originalLocation,
+            editDraft));
   }
 
   // ===================== HELPERS =====================
@@ -1056,7 +1105,8 @@ public class QuestScreen extends DisquestsBaseScreen {
     return !currentTitle.equals(originalTitle)
         || !currentContent.equals(originalContent)
         || (originalLocation != null && !originalLocation.sameLocation(quest))
-        || LocationCard.vertexFieldsEdited(quest, vertexRows);
+        || LocationCard.vertexFieldsEdited(quest, vertexRows)
+        || (editDraft != null && editDraft.isDirty());
   }
 
   private String toggleCheckbox(String content, int index, boolean nowChecked) {
@@ -1090,10 +1140,12 @@ public class QuestScreen extends DisquestsBaseScreen {
     if (isNewQuest) return;
     Quest cached = ClientCache.getQuestById(quest.getId());
     if (cached == null) {
-      this.onClose();
+      // Gone (deleted, or no longer visible): close without asking about unsaved changes.
+      super.onClose();
       return;
     }
     if (treePane != null) treePane.tick();
+    if (editPane != null) editPane.tick();
     refreshIfPageChanged(cached);
   }
 

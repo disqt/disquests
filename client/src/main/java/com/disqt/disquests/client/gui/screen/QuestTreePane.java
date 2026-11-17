@@ -60,24 +60,44 @@ final class QuestTreePane {
   @Nullable
   static QuestTreePane attach(QuestScreen screen, FlowLayout root, UUID questId) {
     if (!ClientSession.supportsTrees() || rows(questId).isEmpty()) return null;
-    FlowLayout body = root.childById(FlowLayout.class, "quest-body");
+    Shell shell =
+        shell(
+            screen,
+            root.childById(FlowLayout.class, "quest-body"),
+            Component.translatable(QuestPage.WHERE_THIS_SITS),
+            PANE_ID,
+            LIST_ID);
+    QuestTreePane treePane = new QuestTreePane(screen, questId, shell.list(), shell.scroll());
+    treePane.fill();
+    return treePane;
+  }
 
+  /** The parts of a tree pane: the pane itself, its scrolling list and the scroll. */
+  record Shell(FlowLayout pane, FlowLayout list, ScrollContainer<FlowLayout> scroll) {}
+
+  /**
+   * Builds a tree pane, shared by the reading view and the editor: a header, a scrolling list that
+   * takes the height left, and the divider that resizes it (config {@code questPaneWidth}). Inserts
+   * both at the start of {@code body}.
+   */
+  static Shell shell(
+      QuestScreen screen, FlowLayout body, Component header, String paneId, String listId) {
     FlowLayout pane = UIContainers.verticalFlow(Sizing.fixed(MIN_WIDTH), Sizing.fill(100));
-    pane.id(PANE_ID);
+    pane.id(paneId);
     pane.padding(Insets.of(4));
     pane.gap(4);
     screen.applyThemePanel(pane);
 
-    LabelComponent header = UIComponents.label(Component.translatable(QuestPage.WHERE_THIS_SITS));
-    header.horizontalSizing(Sizing.fill(100));
-    header.color(Color.ofArgb(Colors.TEXT_MUTED));
-    header.shadow(true);
-    pane.child(header);
+    LabelComponent headerLabel = UIComponents.label(header);
+    headerLabel.horizontalSizing(Sizing.fill(100));
+    headerLabel.color(Color.ofArgb(Colors.TEXT_MUTED));
+    headerLabel.shadow(true);
+    pane.child(headerLabel);
 
     FlowLayout list = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
-    list.id(LIST_ID);
+    list.id(listId);
     // owo draws the bar inside the scroll's content box and forwards a press on it to the child:
-    // pad the rows clear of it so pressing the bar never opens a quest.
+    // pad the rows clear of it so pressing the bar never acts on a row.
     list.padding(Insets.right(SCROLLBAR_WIDTH + 2));
     ScrollContainer<FlowLayout> scroll =
         UIContainers.verticalScroll(Sizing.fill(100), Sizing.expand(100), list);
@@ -95,10 +115,7 @@ final class QuestTreePane {
             requested -> PaneWidth.clamp(requested, MIN_WIDTH, screen.width * 2 / 5));
     body.child(0, pane);
     body.child(1, split.divider());
-
-    QuestTreePane treePane = new QuestTreePane(screen, questId, list, scroll);
-    treePane.fill();
-    return treePane;
+    return new Shell(pane, list, scroll);
   }
 
   private static List<QuestTreeRows.Row> rows(UUID questId) {

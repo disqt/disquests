@@ -54,9 +54,8 @@ class TwoPlayerJourneys {
     and("PlayerA types a title");
     type(context, "title-field", "Collab Quest");
 
-    and("PlayerA cycles visibility to CLOSED (PRIVATE -> CLOSED)");
-    click(context, "btn-visibility");
-    assertButtonText(context, "btn-visibility", "Closed");
+    and("PlayerA sets visibility to CLOSED");
+    selectVisibility(context, "vis-closed");
 
     and("PlayerA saves the quest");
     click(context, "btn-save");
@@ -312,10 +311,8 @@ class TwoPlayerJourneys {
     and("PlayerA types a title");
     type(context, "title-field", "Open Quest");
 
-    and("PlayerA cycles visibility twice to reach OPEN");
-    click(context, "btn-visibility");
-    click(context, "btn-visibility");
-    assertButtonText(context, "btn-visibility", "Open");
+    and("PlayerA sets visibility to OPEN");
+    selectVisibility(context, "vis-open");
 
     and("PlayerA saves the quest");
     click(context, "btn-save");
@@ -415,9 +412,7 @@ class TwoPlayerJourneys {
     click(context, "btn-new-quest");
     waitForScreen(context, QuestScreen.class);
     type(context, "title-field", "Archive Quest");
-    click(context, "btn-visibility");
-    click(context, "btn-visibility");
-    assertButtonText(context, "btn-visibility", "Open");
+    selectVisibility(context, "vis-open");
     click(context, "btn-save");
     waitForScreen(context, QuestScreen.class);
 
@@ -570,5 +565,20 @@ class TwoPlayerJourneys {
             permBtn.x() + permBtn.width() / 2.0, permBtn.y() + permBtn.height() / 2.0
           };
         });
+  }
+
+  /**
+   * Picks a visibility in the editor ({@code vis-private}, {@code vis-closed}, {@code vis-open})
+   * and waits until it shows as the current one (pressed); it is sent with Save.
+   */
+  private static void selectVisibility(ClientGameTestContext context, String id) {
+    click(context, id);
+    context.waitFor(
+        client ->
+            client.gui.screen() instanceof DisquestsBaseScreen screen
+                && screen.getRootComponent() != null
+                && screen.getRootComponent().childById(ButtonComponent.class, id) != null
+                && !screen.getRootComponent().childById(ButtonComponent.class, id).isActive(),
+        TIMEOUT);
   }
 }

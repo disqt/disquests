@@ -2,6 +2,7 @@ package com.disqt.disquests.client.data;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.disqt.disquests.client.gui.screen.EditorText;
 import com.disqt.disquests.client.gui.screen.QuestPage;
 import com.disqt.disquests.client.gui.tree.SuggestionText;
 import com.disqt.disquests.client.gui.tree.Suggestions;
@@ -70,6 +71,7 @@ class NoticeLangKeysTest {
     }
     keys.add(QuestPage.deletedPrerequisiteBanner().key());
     keys.addAll(QuestPage.FIXED_KEYS);
+    keys.addAll(EditorText.keys());
     keys.addAll(TREE_ROW_KEYS);
     keys.addAll(QUEST_ENTRY_KEYS);
     return keys.stream().distinct().toList();

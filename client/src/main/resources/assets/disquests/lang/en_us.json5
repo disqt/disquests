@@ -78,6 +78,21 @@
     "inside_another": "inside another quest",
   },
 
+  // The quest editor: tree pane and link controls
+  "gui.disquests.edit.{}": {
+    "add_subquest": "add a subquest...",
+    "new_quest": "New quest",
+    "drop_out": "Drop here to take a quest out of the tree",
+    "tree_hint": "Drag a quest onto another to put it inside. Nothing changes until you press Save.",
+    "hidden_parent": "This quest sits inside a quest you can't see",
+    "detach": "Detach",
+    "visibility": "Visibility",
+    "visibility_in_parent": "Among those who can see the quest it sits in.",
+    "prerequisite_field": "type to add an existing quest...",
+    "prerequisite_hidden": "something you don't have access to",
+    "open_only": "(Open quests only)",
+  },
+
   // Quest tree rows
   "gui.disquests.tree.{}": {
     "not_saved": "not saved",
@@ -199,6 +214,7 @@
     "tags": "Tags (%d)",
     "contributors": "Contributors (%d)",
     "where_this_sits": "WHERE THIS SITS",
+    "subquests": "SUBQUESTS",
     "prerequisites": "Prerequisites",
   },
 

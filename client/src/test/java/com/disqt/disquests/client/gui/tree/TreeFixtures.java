@@ -132,6 +132,7 @@ public final class TreeFixtures {
     private boolean hiddenPrerequisites;
     private boolean deletedPrerequisite;
     private boolean hiddenParent;
+    private boolean autoJoin;
     private long completedAt;
     private long lastModified = 1L;
     private boolean locked;
@@ -203,6 +204,11 @@ public final class TreeFixtures {
       return this;
     }
 
+    public Q autoJoin() {
+      this.autoJoin = true;
+      return this;
+    }
+
     public Q completed(long at) {
       this.completedAt = at;
       return this;
@@ -263,7 +269,7 @@ public final class TreeFixtures {
           hiddenPrerequisites,
           deletedPrerequisite,
           hiddenParent,
-          false,
+          autoJoin,
           locked,
           null);
     }
