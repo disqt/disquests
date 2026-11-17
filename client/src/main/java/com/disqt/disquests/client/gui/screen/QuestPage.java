@@ -160,7 +160,8 @@ public final class QuestPage {
   /**
    * The lines of the Prerequisites section: the visible prerequisites in the view's order, then "…
    * and something you don't have access to" when the server hid some or the client does not have
-   * one of them, "a deleted quest", and the auto-join line.
+   * one of them, "a deleted quest", and the auto-join line. With a deleted prerequisite, an id the
+   * client does not have is that deleted quest: it shows as "a deleted quest" only.
    */
   public record Prerequisites(
       List<Link> links, boolean somethingHidden, boolean deleted, boolean autoJoin) {}
@@ -178,7 +179,7 @@ public final class QuestPage {
     }
     return new Prerequisites(
         List.copyOf(links),
-        q.hiddenPrerequisites() || missing,
+        q.hiddenPrerequisites() || (missing && !q.deletedPrerequisite()),
         q.deletedPrerequisite(),
         q.autoJoin());
   }
@@ -205,7 +206,40 @@ public final class QuestPage {
         if (q != null) pane.add(new PaneLine(row, q.title(), q.isCompleted()));
       }
     }
-    return new PageSignature(quest, List.copyOf(pane), prerequisites(quest, graph));
+    return new PageSignature(drawn(quest), List.copyOf(pane), prerequisites(quest, graph));
+  }
+
+  /**
+   * The quest as the page draws it: the time of the last save is never shown, and the server stamps
+   * a new one on every save, including the echo of the player's own checkbox tick.
+   */
+  private static QuestData drawn(QuestData q) {
+    return new QuestData(
+        q.id(),
+        q.title(),
+        q.content(),
+        q.ownerUuid(),
+        q.ownerName(),
+        q.visibility(),
+        q.contributors(),
+        0L,
+        q.coordinates(),
+        q.isRegion(),
+        q.coordinates2(),
+        q.map(),
+        q.tags(),
+        q.polygon(),
+        q.completedAt(),
+        q.completedBy(),
+        q.completedByName(),
+        q.parentId(),
+        q.prerequisites(),
+        q.hiddenPrerequisites(),
+        q.deletedPrerequisite(),
+        q.hiddenParent(),
+        q.autoJoin(),
+        q.locked(),
+        q.privatized());
   }
 
   /** "Owner", "Write", "Read", or "not joined" without a role. */

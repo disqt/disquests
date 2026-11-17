@@ -3,6 +3,7 @@ package com.disqt.disquests.client.gui.screen;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.DisquestsClient;
 import com.disqt.disquests.client.data.QuestGraphs;
+import com.disqt.disquests.client.gui.component.MinHeightScroll;
 import com.disqt.disquests.client.gui.component.TreeRowComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.tree.QuestTreeRows;
@@ -42,11 +43,11 @@ final class QuestTreePane {
   private final QuestScreen screen;
   private final UUID questId;
   private final FlowLayout list;
-  private final ScrollContainer<FlowLayout> scroll;
+  private final MinHeightScroll<FlowLayout> scroll;
   private boolean revealPending = true;
 
   private QuestTreePane(
-      QuestScreen screen, UUID questId, FlowLayout list, ScrollContainer<FlowLayout> scroll) {
+      QuestScreen screen, UUID questId, FlowLayout list, MinHeightScroll<FlowLayout> scroll) {
     this.screen = screen;
     this.questId = questId;
     this.list = list;
@@ -67,7 +68,9 @@ final class QuestTreePane {
             Component.translatable(QuestPage.WHERE_THIS_SITS),
             PANE_ID,
             LIST_ID);
-    QuestTreePane treePane = new QuestTreePane(screen, questId, shell.list(), shell.scroll());
+    QuestTreePane treePane =
+        new QuestTreePane(
+            screen, questId, shell.list(), (MinHeightScroll<FlowLayout>) shell.scroll());
     treePane.fill();
     return treePane;
   }
@@ -99,8 +102,9 @@ final class QuestTreePane {
     // owo draws the bar inside the scroll's content box and forwards a press on it to the child:
     // pad the rows clear of it so pressing the bar never acts on a row.
     list.padding(Insets.right(SCROLLBAR_WIDTH + 2));
+    // No minimum height; the subclass lets the reading view carry its position across a rebuild
     ScrollContainer<FlowLayout> scroll =
-        UIContainers.verticalScroll(Sizing.fill(100), Sizing.expand(100), list);
+        new MinHeightScroll<>(Sizing.fill(100), Sizing.expand(100), list, 0);
     scroll.scrollbarThiccness(SCROLLBAR_WIDTH);
     pane.child(scroll);
 
@@ -163,6 +167,22 @@ final class QuestTreePane {
     if (current.y() + current.height() > scroll.y() + scroll.height()) {
       scroll.scrollTo(current);
     }
+  }
+
+  /** How far the rows are scrolled, to carry over to a rebuilt page. */
+  double offset() {
+    return scroll.offset();
+  }
+
+  /**
+   * Restores a carried scroll position once the pane is laid out, instead of the automatic reveal
+   * of the current row. False while not mounted yet.
+   */
+  boolean restore(double offset) {
+    if (!scroll.hasParent()) return false;
+    revealPending = false;
+    scroll.jumpTo(offset);
+    return true;
   }
 
   /** The current quest's row does nothing; any other opens that quest, back returning here. */

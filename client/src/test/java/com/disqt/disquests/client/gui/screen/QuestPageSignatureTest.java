@@ -88,6 +88,32 @@ class QuestPageSignatureTest {
     }
 
     @Test
+    void withADeletedPrerequisiteAMissingIdIsTheDeletedQuest() {
+      QuestGraph g =
+          QuestGraph.of(
+              List.of(quest("Gare").owner(LEO).after("Dig").deletedPrerequisite().build()));
+      assertEquals(
+          new Prerequisites(List.of(), false, true, false),
+          QuestPage.prerequisites(g.get(id("Gare")), g));
+    }
+
+    @Test
+    void hiddenStillShowsBesideADeletedOne() {
+      QuestGraph g =
+          QuestGraph.of(
+              List.of(
+                  quest("Gare")
+                      .owner(LEO)
+                      .after("Dig")
+                      .deletedPrerequisite()
+                      .hiddenPrerequisites()
+                      .build()));
+      assertEquals(
+          new Prerequisites(List.of(), true, true, false),
+          QuestPage.prerequisites(g.get(id("Gare")), g));
+    }
+
+    @Test
     void flagsCarryOver() {
       QuestData gare =
           withAutoJoin(
@@ -139,6 +165,31 @@ class QuestPageSignatureTest {
     @Test
     void theSameGraphGivesTheSameSignature() {
       assertEquals(BASE, signature(built(base())));
+    }
+
+    @Test
+    void aNewSaveTimeAloneLeavesItEqual() {
+      assertEquals(
+          BASE,
+          signature(
+              with(
+                  "Gare",
+                  quest("Gare").owner(MAX).writer(JUJU).in("Hub").after("Dig").modified(99))));
+    }
+
+    @Test
+    void aContentChangeOnTheQuestChangesIt() {
+      assertNotEquals(
+          BASE,
+          signature(
+              with(
+                  "Gare",
+                  quest("Gare")
+                      .owner(MAX)
+                      .writer(JUJU)
+                      .in("Hub")
+                      .after("Dig")
+                      .content("- [x] a"))));
     }
 
     @Test

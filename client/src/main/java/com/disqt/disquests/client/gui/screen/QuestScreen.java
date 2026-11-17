@@ -96,6 +96,15 @@ public class QuestScreen extends DisquestsBaseScreen {
   @Nullable private QuestPage.PageSignature shownPage;
   private long seenCacheVersion;
   @Nullable private QuestTreePane treePane;
+  @Nullable private MinHeightScroll<FlowLayout> contentScroll;
+
+  /**
+   * Scroll positions carried from the page this one replaced after a change to what it shows (null
+   * for an ordinary opening); {@code pane} is null when that page had no tree pane.
+   */
+  private record ReaderPlace(double content, @Nullable Double pane) {}
+
+  @Nullable private ReaderPlace carriedPlace;
 
   // Widget references for edit mode
   private TextFieldComponent titleFieldComponent;
@@ -231,6 +240,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     scroll.surface(Surface.DARK_PANEL);
     scroll.padding(Insets.of(4));
     replaceSlot(root.childById(FlowLayout.class, "quest-column"), "content-scroll-slot", scroll);
+    this.contentScroll = scroll;
   }
 
   /** Records what the page now draws; later cache changes are compared against it. */
@@ -1144,6 +1154,8 @@ public class QuestScreen extends DisquestsBaseScreen {
       super.onClose();
       return;
     }
+    // The carried place wins over the pane's automatic reveal of the current row
+    if (carriedPlace != null && applyCarriedPlace(carriedPlace)) carriedPlace = null;
     if (treePane != null) treePane.tick();
     if (editPane != null) editPane.tick();
     refreshIfPageChanged(cached);
@@ -1163,8 +1175,30 @@ public class QuestScreen extends DisquestsBaseScreen {
     if (root != null && root.childById(OverlayContainer.class, CONFIRM_OVERLAY_ID) != null) return;
     seenCacheVersion = version;
     if (!pageSignature(cached).equals(shownPage)) {
-      minecraft.gui.setScreen(new QuestScreen(this.parent, cached));
+      QuestScreen rebuilt = new QuestScreen(this.parent, cached);
+      // Same page, new state: keep the reader where they were
+      rebuilt.carriedPlace =
+          new ReaderPlace(
+              contentScroll != null ? contentScroll.offset() : 0,
+              treePane != null ? treePane.offset() : null);
+      minecraft.gui.setScreen(rebuilt);
     }
+  }
+
+  /**
+   * Applies a carried place once the page is laid out; false while it is not mounted yet. A locked
+   * page has no content scroll and a page without a pane ignores the pane offset.
+   */
+  private boolean applyCarriedPlace(ReaderPlace place) {
+    if (contentScroll != null && contentScroll.hasParent()) {
+      contentScroll.jumpTo(place.content());
+    } else if (contentScroll != null && !quest.isLocked()) {
+      return false;
+    }
+    if (treePane != null && place.pane() != null) {
+      return treePane.restore(place.pane());
+    }
+    return true;
   }
 
   /**
