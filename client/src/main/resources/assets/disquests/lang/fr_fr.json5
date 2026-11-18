@@ -151,7 +151,7 @@
     "save": "Enregistrer",
     "cancel": "Annuler",
     "add_hint": "Nom du joueur...",
-    "unknown_player": "Aucun joueur nommé « %s » n'est connu ici. Il doit être en ligne ou sur une quête que tu peux voir.",
+    "unknown_player": "Aucun joueur nommé « %s » n'est connu ici. Il doit être en ligne ou sur une quête que tu peux voir.",
     "apply_down": "Appliquer aux sous-quêtes",
     "save_first": "Enregistre d'abord",
     "apply_down_question_one": "Donner %2$s à %1$s sur ta sous-quête de %4$s ?",

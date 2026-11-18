@@ -198,7 +198,10 @@ public final class PeopleText {
   /** {@code uuid} and {@code name} are the person matched; the typed text when none is. */
   public record AddMatch(AddKind kind, @Nullable UUID uuid, String name) {}
 
-  /** The typed name, matched in any case: first against the list, then against known players. */
+  /**
+   * The typed name, matched in any case: first against the names on the list, then against known
+   * players, who are matched to the list by id, whatever name the list shows for them.
+   */
   public static AddMatch addMatch(
       String typed, Collection<Candidate> known, List<PeopleDraft.Person> rows) {
     String t = typed.trim();
@@ -210,7 +213,15 @@ public final class PeopleText {
       }
     }
     for (Candidate c : known) {
-      if (c.name().equalsIgnoreCase(t)) return new AddMatch(AddKind.ADD, c.uuid(), c.name());
+      if (!c.name().equalsIgnoreCase(t)) continue;
+      // The same player can be listed under another name (or none): match the list by id
+      for (PeopleDraft.Person p : rows) {
+        if (p.uuid().equals(c.uuid())) {
+          return new AddMatch(
+              p.removed() ? AddKind.RESTORE : AddKind.ALREADY_LISTED, c.uuid(), c.name());
+        }
+      }
+      return new AddMatch(AddKind.ADD, c.uuid(), c.name());
     }
     return new AddMatch(AddKind.UNKNOWN, null, t);
   }

@@ -69,6 +69,10 @@ public class QuestScreen extends DisquestsBaseScreen {
 
   private final Quest quest;
   private final boolean editing;
+
+  /** The cache version the people button's label was last set from. */
+  private long contributorsLabelVersion = -1;
+
   private final boolean isNewQuest;
 
   // Edit mode state preserved across rebuilds
@@ -1035,12 +1039,15 @@ public class QuestScreen extends DisquestsBaseScreen {
 
   /**
    * The people button's label: the saved quest's contributor count and the pending requests. Set
-   * when the editor is built and again whenever it becomes the current screen, since the editor
-   * instance is reused when the people screen returns to it.
+   * when the editor is built, whenever it becomes the current screen again (the instance is reused
+   * when the people screen returns to it), and from {@link #tick} after any cache change, because
+   * the server's answer to a people save arrives after that return. Only the button's message is
+   * set: nothing is rebuilt and the editor's draft is untouched.
    */
   private void refreshContributorsButton(FlowLayout root) {
     ButtonComponent contribBtn = root.childById(ButtonComponent.class, "btn-contributors");
     if (contribBtn == null) return;
+    contributorsLabelVersion = ClientCache.getVersion();
     Quest saved = ClientCache.getQuestById(quest.getId());
     int contribCount = (saved != null ? saved : quest).getContributors().size();
     int pendingReqCount = ClientCache.getPendingCount(quest.getId());
@@ -1221,6 +1228,14 @@ public class QuestScreen extends DisquestsBaseScreen {
     if (carriedPlace != null && applyCarriedPlace(carriedPlace)) carriedPlace = null;
     if (treePane != null) treePane.tick();
     refreshIfPageChanged(cached);
+    // The editor is never rebuilt, but its people button follows the cache (a people save's echo)
+    FlowLayout root = getRootComponent();
+    if (editing
+        && isOwner
+        && root != null
+        && ClientCache.getVersion() != contributorsLabelVersion) {
+      refreshContributorsButton(root);
+    }
   }
 
   /**

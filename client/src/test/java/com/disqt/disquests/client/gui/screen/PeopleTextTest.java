@@ -240,6 +240,33 @@ class PeopleTextTest {
           Arguments.of("Zed", new AddMatch(AddKind.UNKNOWN, null, "Zed")));
     }
 
+    static Stream<Arguments> matchesById() {
+      UUID bob = new UUID(0, 6);
+      return Stream.of(
+          Arguments.of(
+              "a listed row with no name",
+              new Person(bob, null, Role.READ, false, false),
+              "bob",
+              new AddMatch(AddKind.ALREADY_LISTED, bob, "Bob")),
+          Arguments.of(
+              "a listed row under another name",
+              new Person(bob, "Robert", Role.WRITE, false, false),
+              "Bob",
+              new AddMatch(AddKind.ALREADY_LISTED, bob, "Bob")),
+          Arguments.of(
+              "a removed row under another name",
+              new Person(NEWCOMER, "Juni", Role.READ, true, true),
+              "juniper",
+              new AddMatch(AddKind.RESTORE, NEWCOMER, "Juniper")));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("matchesById")
+    void knownPlayersAreMatchedToTheListById(
+        String name, Person row, String typed, AddMatch expected) {
+      assertEquals(expected, PeopleText.addMatch(typed, KNOWN, List.of(row)));
+    }
+
     @ParameterizedTest(name = "\"{0}\"")
     @MethodSource("matches")
     void addMatch(String typed, AddMatch expected) {
