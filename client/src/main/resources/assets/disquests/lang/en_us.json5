@@ -150,7 +150,7 @@
     "save": "Save",
     "cancel": "Cancel",
     "add_hint": "Player name...",
-    "unknown_player": "No player called \"%s\" is known here. They need to be online or on one of your quests.",
+    "unknown_player": "No player called \"%s\" is known here. They need to be online or on a quest you can see.",
     "apply_down": "Apply to subquests",
     "save_first": "Save first",
     "apply_down_question_one": "Give %s %s on your %d subquest of %s?",
@@ -165,6 +165,9 @@
     "remove_this_only": "From this quest only",
     "remove_with_mine_one": "From this quest and my %d subquest",
     "remove_with_mine_many": "From this quest and my %d subquests",
+    "dropped_meanwhile": "no longer on this quest, will be added back",
+    "no_longer_owner": "You are no longer an owner of this quest.",
+    "already_listed": "%s is already on this quest.",
   },
 
   // Contributor permissions

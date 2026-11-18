@@ -179,9 +179,39 @@ class PeopleDraftTest {
       PeopleDraft d = draft();
       d.setRole(JUJU, Role.WRITE);
       d.merge(saved(quest("hub").coOwner(MAX).writer(ANNA)));
-      assertEquals(person(JUJU, Role.WRITE, false, true), d.rows().get(3));
+      assertEquals(new Person(JUJU, "p3", Role.WRITE, false, true, true), d.rows().get(3));
       assertTrue(d.isNew(JUJU));
       assertEquals(List.of(setRole(JUJU, Role.WRITE)), d.ops());
+    }
+
+    @Test
+    void aDroppedRowTheServerTakesBackIsNoLongerMarked() {
+      PeopleDraft d = draft();
+      d.setRole(JUJU, Role.WRITE);
+      d.merge(saved(quest("hub").coOwner(MAX).writer(ANNA)));
+      d.merge(saved(quest("hub").coOwner(MAX).writer(ANNA).reader(JUJU)));
+      assertEquals(person(JUJU, Role.WRITE, false, true), d.rows().get(3));
+    }
+
+    @Test
+    void aRemovalFollowsTheServerRoleSoUndoBringsBackTheCurrentOne() {
+      PeopleDraft d = draft();
+      d.remove(JUJU, false);
+      d.merge(saved(quest("hub").writer(JUJU).coOwner(MAX).writer(ANNA)));
+      assertEquals(person(JUJU, Role.WRITE, true, true), d.rows().get(3));
+      d.undoRemove(JUJU);
+      assertEquals(person(JUJU, Role.WRITE, false, false), d.rows().get(3));
+      assertEquals(List.of(), d.ops());
+    }
+
+    @Test
+    void aRemovalWithAChangedRoleKeepsTheDraftRole() {
+      PeopleDraft d = draft();
+      d.setRole(JUJU, Role.OWNER);
+      d.remove(JUJU, false);
+      d.merge(saved(quest("hub").writer(JUJU).coOwner(MAX).writer(ANNA)));
+      d.undoRemove(JUJU);
+      assertEquals(List.of(setRole(JUJU, Role.OWNER)), d.ops());
     }
 
     @Test
@@ -236,6 +266,32 @@ class PeopleDraftTest {
       d.merge(saved(quest("hub").reader(JUJU).coOwner(MAX).writer(ANNA).reader(NEWCOMER)));
       assertEquals(person(NEWCOMER, Role.READ, false, false), d.rows().get(4));
       assertEquals(5, d.rows().size());
+    }
+  }
+
+  @Nested
+  class FromTheSavedQuest {
+
+    /** The screen builds its draft from the cache's quest: a person removed there has no row. */
+    @Test
+    void aDraftFromTheSavedQuestHasNoPhantomRows() {
+      Quest saved = Quest.fromNetwork(quest("hub").coOwner(MAX).writer(ANNA).build());
+      PeopleDraft d = new PeopleDraft(saved);
+      assertEquals(
+          List.of(
+              person(LEO, Role.OWNER, false, false),
+              person(MAX, Role.OWNER, false, false),
+              person(ANNA, Role.WRITE, false, false)),
+          d.rows());
+      assertEquals(List.of(), d.ops());
+    }
+
+    @Test
+    void aStaleDraftMergedWithTheSavedQuestMatchesOneBuiltFromIt() {
+      Quest saved = Quest.fromNetwork(quest("hub").writer(JUJU).coOwner(MAX).build());
+      PeopleDraft stale = draft();
+      stale.merge(saved);
+      assertEquals(new PeopleDraft(saved).rows(), stale.rows());
     }
   }
 

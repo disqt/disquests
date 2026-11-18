@@ -231,9 +231,19 @@ class TwoPlayerJourneys {
         q ->
             q.getContributors().stream().anyMatch(c -> c.getUuid().equals(playerB) && c.canEdit()));
 
-    when("PlayerA reopens the people screen and clicks Remove on the contributor");
+    when("PlayerA reopens the people screen from the same editor");
     click(context, "btn-contributors");
     waitForScreen(context, ContributorScreen.class);
+
+    then("Write shows as the contributor's current role, saved");
+    // The draft starts from the saved quest, not the editor's older copy
+    waitForComponent(context, "role-write-" + playerB);
+    ButtonComponent write = findComponent(context, ButtonComponent.class, "role-write-" + playerB);
+    boolean writeActive = context.computeOnClient(c -> write.isActive());
+    assertFalse(writeActive, "Write should show pressed");
+    assertComponentMissing(context, "person-status-" + playerB);
+
+    when("PlayerA clicks Remove on the contributor");
     click(context, "btn-remove-" + playerB);
 
     then("the row shows as removed, not saved, with Undo");

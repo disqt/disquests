@@ -2,10 +2,8 @@ package com.disqt.disquests.client.gui.screen;
 
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
-import com.disqt.disquests.client.data.Contributor;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.data.QuestGraphs;
-import com.disqt.disquests.client.gui.component.SuggestionDropdown;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.helper.Messages;
 import com.disqt.disquests.client.gui.screen.PeopleText.ApplyDown;
@@ -13,35 +11,26 @@ import com.disqt.disquests.client.gui.screen.PeopleText.RemoveChoice;
 import com.disqt.disquests.client.gui.tree.PeopleDraft;
 import com.disqt.disquests.client.gui.tree.PeopleDraft.Person;
 import com.disqt.disquests.client.network.PacketSender;
-import com.disqt.disquests.common.PacketCodec;
 import com.disqt.disquests.common.graph.Plans;
 import com.disqt.disquests.common.model.CollaborationRequestData;
-import com.disqt.disquests.common.model.ContributorData;
-import com.disqt.disquests.common.model.ContributorOp;
 import com.disqt.disquests.common.model.Role;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
-import io.wispforest.owo.ui.component.TextBoxComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.container.OverlayContainer;
-import io.wispforest.owo.ui.container.ScrollContainer;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.Color;
 import io.wispforest.owo.ui.core.ParentUIComponent;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.UIComponent;
 import io.wispforest.owo.ui.core.VerticalAlignment;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.Identifier;
@@ -59,8 +48,6 @@ public class ContributorScreen extends DisquestsBaseScreen {
   private static final SystemToast.SystemToastId PEOPLE_TOAST =
       new SystemToast.SystemToastId(8003L);
 
-  private static final int ADD_SUGGESTIONS = 8;
-
   private final Quest quest;
   private final UUID questId;
   private final UUID me;
@@ -72,24 +59,21 @@ public class ContributorScreen extends DisquestsBaseScreen {
   private FlowLayout root;
   private FlowLayout list;
   private ButtonComponent saveBtn;
-  @Nullable private TextBoxComponent addField;
-  @Nullable private SuggestionDropdown<Candidate> addDropdown;
-  private Role addRole = Role.READ;
-
-  /** A player who can be added: online, or on one of the quests the player knows. */
-  private record Candidate(UUID uuid, String name) {}
+  @Nullable private PlayerChooser chooser;
 
   public ContributorScreen(@Nullable Screen parent, Quest quest) {
     super(
         DataSource.asset(Identifier.fromNamespaceAndPath("disquests", "contributor_screen")),
         parent);
-    this.quest = quest;
-    this.questId = quest.getId();
+    // The saved quest as the cache has it now: the caller's copy (the editor's) can be older
+    Quest saved = ClientCache.getQuestById(quest.getId());
+    this.quest = saved != null ? saved : quest;
+    this.questId = this.quest.getId();
     this.me = ClientSession.getEffectivePlayerUuid();
     this.trees = ClientSession.supportsTrees();
-    this.manages = quest.isOwner(me);
+    this.manages = this.quest.isOwner(me);
     // Built once, when the screen opens; later server changes are merged in (see tick)
-    this.draft = trees ? new PeopleDraft(quest) : null;
+    this.draft = trees ? new PeopleDraft(this.quest) : null;
     this.seenCacheVersion = ClientCache.getVersion();
   }
 
@@ -115,7 +99,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
     if (trees) {
       buildPeople();
     } else {
-      buildLegacy();
+      new LegacyContributorList(this, root, list, quest, manages).build();
     }
 
     wireBackButton(root);
@@ -211,16 +195,22 @@ public class ContributorScreen extends DisquestsBaseScreen {
     cancelBtn.setMessage(Component.translatable(PeopleText.CANCEL));
     cancelBtn.onPress(ignored -> onClose());
 
-    buildAddRow();
+    chooser =
+        new PlayerChooser(root, draft, this::refreshLater, this::showToast, this::dropStaleFocus);
     refreshRows();
   }
 
   /** Redraws the rows in the draft's fixed order, in the same list, and Save's state. */
   private void refreshRows() {
     if (list == null || draft == null) return;
-    list.clearChildren();
     int mySubquests = manages ? Plans.mySubquests(QuestGraphs.current(), me, questId).size() : 0;
-    for (Person p : draft.rows()) list.child(row(p, mySubquests));
+    List<Person> rows = draft.rows();
+    // One layout pass for the whole refill; the scroll container and its offset stay
+    list.<FlowLayout>configure(
+        l -> {
+          l.clearChildren();
+          for (Person p : rows) l.child(row(p, mySubquests));
+        });
     if (saveBtn != null) {
       saveBtn.active(PeopleText.saveStep(draft, me) != PeopleText.SaveStep.NOTHING);
     }
@@ -274,7 +264,10 @@ public class ContributorScreen extends DisquestsBaseScreen {
         row.child(roleBtn);
       }
       if (p.dirty()) {
-        LabelComponent notSaved = muted(Component.translatable(PeopleText.NOT_SAVED));
+        LabelComponent notSaved =
+            muted(
+                Component.translatable(
+                    p.droppedMeanwhile() ? PeopleText.DROPPED_MEANWHILE : PeopleText.NOT_SAVED));
         notSaved.id("person-status-" + id);
         row.child(notSaved);
       }
@@ -302,7 +295,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
     return p.name() != null ? p.name() : "?";
   }
 
-  private static ButtonComponent button(String id, Component text, Runnable action) {
+  static ButtonComponent button(String id, Component text, Runnable action) {
     ButtonComponent button = UIComponents.button(text, ignored -> action.run());
     button.id(id);
     button.sizing(Sizing.content(), Sizing.fixed(14));
@@ -322,10 +315,10 @@ public class ContributorScreen extends DisquestsBaseScreen {
    */
   private void remove(Person p) {
     int onMine =
-        draft.isNew(p.uuid())
+        draft.isNew(p.uuid()) || p.uuid().equals(me)
             ? 0
             : PeopleText.subquestsWithRole(QuestGraphs.current(), me, questId, p.uuid());
-    RemoveChoice choice = PeopleText.removeChoice(draft, p.uuid(), nameOf(p), onMine);
+    RemoveChoice choice = PeopleText.removeChoice(draft, me, p.uuid(), nameOf(p), onMine);
     if (choice == null) {
       draft.remove(p.uuid(), false);
       refreshLater();
@@ -381,131 +374,6 @@ public class ContributorScreen extends DisquestsBaseScreen {
         });
   }
 
-  // --- Add row ---
-
-  private void buildAddRow() {
-    FlowLayout addRow = root.childById(FlowLayout.class, "add-person-row");
-    addField = UIComponents.textBox(Sizing.fixed(110));
-    addField.id("add-name-field");
-    addField.setHint(Component.translatable(PeopleText.ADD_HINT));
-    addField.onChanged().subscribe(this::suggestNames);
-    addRow.child(addField);
-    addDropdown =
-        new SuggestionDropdown<Candidate>(
-                root,
-                "add-name-suggestions",
-                c -> new SuggestionDropdown.Entry(c.name(), null, true, null),
-                c -> addField.text(c.name()))
-            .pickOnTab(true)
-            .preferAbove(true);
-
-    FlowLayout roles = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
-    roles.id("add-role-buttons");
-    roles.gap(2);
-    addRow.child(roles);
-    fillAddRoles(roles);
-
-    addRow.child(button("btn-add-person", Component.translatable(PeopleText.ADD), this::addPerson));
-  }
-
-  private void fillAddRoles(FlowLayout roles) {
-    roles.clearChildren();
-    for (Role role : Role.values()) {
-      ButtonComponent b =
-          button(
-              "add-role-" + role.name().toLowerCase(Locale.ROOT),
-              Messages.toComponent(QuestPage.role(role)),
-              () -> {
-                addRole = role;
-                root.queue(
-                    () -> {
-                      fillAddRoles(roles);
-                      dropStaleFocus();
-                    });
-              });
-      b.active(addRole != role);
-      roles.child(b);
-    }
-  }
-
-  private void suggestNames(String text) {
-    if (addDropdown == null || addField == null) return;
-    String typed = text.trim().toLowerCase(Locale.ROOT);
-    if (typed.isEmpty()) {
-      addDropdown.hide();
-      return;
-    }
-    List<Candidate> matches = new ArrayList<>();
-    for (Candidate c : candidates().values()) {
-      String name = c.name().toLowerCase(Locale.ROOT);
-      if (name.contains(typed) && !name.equals(typed)) matches.add(c);
-      if (matches.size() >= ADD_SUGGESTIONS) break;
-    }
-    addDropdown.show(matches, addField);
-  }
-
-  /** Adds the typed player last, with the chosen role; unknown names get a toast. */
-  private void addPerson() {
-    if (addField == null) return;
-    String typed = addField.getValue().trim();
-    if (typed.isEmpty()) return;
-    Candidate found = null;
-    for (Candidate c : candidates().values()) {
-      if (c.name().equalsIgnoreCase(typed)) {
-        found = c;
-        break;
-      }
-    }
-    if (found == null) {
-      for (Person p : draft.rows()) {
-        if (p.name() != null && p.name().equalsIgnoreCase(typed)) {
-          found = new Candidate(p.uuid(), p.name());
-          break;
-        }
-      }
-    }
-    if (found == null) {
-      showRefusedToast(Component.translatable(PeopleText.UNKNOWN_PLAYER, typed));
-      return;
-    }
-    draft.add(found.uuid(), found.name(), addRole);
-    addField.text("");
-    if (addDropdown != null) addDropdown.hide();
-    refreshLater();
-  }
-
-  /**
-   * Players who can be added, by UUID: those online, then the people of every quest the player
-   * knows; anyone listed on this screen is left out.
-   */
-  private Map<UUID, Candidate> candidates() {
-    Map<UUID, Candidate> found = new LinkedHashMap<>();
-    if (this.minecraft != null && this.minecraft.getConnection() != null) {
-      for (PlayerInfo info : this.minecraft.getConnection().getOnlinePlayers()) {
-        var profile = info.getProfile();
-        if (profile.id() != null && profile.name() != null) {
-          found.putIfAbsent(profile.id(), new Candidate(profile.id(), profile.name()));
-        }
-      }
-    }
-    List<Quest> known = new ArrayList<>(ClientCache.getMyQuests());
-    known.addAll(ClientCache.getServerQuests());
-    for (Quest q : known) {
-      if (q.getOwnerUuid() != null && q.getOwnerName() != null) {
-        found.putIfAbsent(q.getOwnerUuid(), new Candidate(q.getOwnerUuid(), q.getOwnerName()));
-      }
-      for (Contributor c : q.getContributors()) {
-        if (c.getUuid() != null && c.getName() != null) {
-          found.putIfAbsent(c.getUuid(), new Candidate(c.getUuid(), c.getName()));
-        }
-      }
-    }
-    if (draft != null) {
-      for (Person p : draft.rows()) found.remove(p.uuid());
-    }
-    return found;
-  }
-
   // --- Save, Cancel, leaving ---
 
   private void save() {
@@ -549,30 +417,49 @@ public class ContributorScreen extends DisquestsBaseScreen {
   @Override
   public boolean keyPressed(KeyEvent keyInput) {
     // Arrows, Enter, Tab and Escape go to the name suggestions while they are open
-    if (addDropdown != null && addDropdown.onKey(keyInput)) return true;
+    if (chooser != null && chooser.onKey(keyInput)) return true;
     return super.keyPressed(keyInput);
   }
 
   /**
-   * Takes in changes the server made meanwhile (a join request accepted, another owner's change),
-   * merged into the draft so nothing the player changed is lost. Waits while a dialog is open. A
-   * quest completed meanwhile is left alone: Save shows it archived instead.
+   * Follows the cache while the screen is open. When the quest is gone, or the player managed it
+   * and is no longer an owner, the screen closes without asking (its changes could not be saved),
+   * the latter with a toast. Otherwise changes the server made meanwhile (a join request accepted,
+   * another owner's change) are merged into the draft so nothing the player changed is lost; that
+   * waits while a dialog is open. A quest completed meanwhile is left alone: Save shows it
+   * archived.
    */
   @Override
   public void tick() {
     super.tick();
-    if (draft == null || root == null) return;
+    if (root == null) return;
     long version = ClientCache.getVersion();
     if (version == seenCacheVersion) return;
+    Quest cached = ClientCache.getQuestById(questId);
+    switch (PeopleText.openState(cached, me, manages)) {
+      case CLOSE_GONE -> {
+        super.onClose();
+        return;
+      }
+      case CLOSE_NO_LONGER_OWNER -> {
+        showToast(Component.translatable(PeopleText.NO_LONGER_OWNER));
+        super.onClose();
+        return;
+      }
+      case STAY -> {}
+    }
+    if (draft == null) {
+      seenCacheVersion = version;
+      return;
+    }
     if (root.childById(OverlayContainer.class, CONFIRM_OVERLAY_ID) != null) return;
     seenCacheVersion = version;
-    Quest cached = ClientCache.getQuestById(questId);
-    if (cached == null || cached.isCompleted()) return;
+    if (cached.isCompleted()) return;
     draft.merge(cached);
     refreshRows();
   }
 
-  private void showToast(Component text) {
+  void showToast(Component text) {
     if (this.minecraft != null) {
       SystemToast.add(
           this.minecraft.gui.toastManager(), PEOPLE_TOAST, Component.literal("Disquests"), text);
@@ -583,7 +470,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
    * Clears the focus when it sits on a component a refresh just removed (a pressed role or remove
    * button), so Enter or Space cannot press it again.
    */
-  private void dropStaleFocus() {
+  void dropStaleFocus() {
     if (root == null || root.focusHandler() == null) return;
     UIComponent focused = root.focusHandler().focused();
     if (focused == null) return;
@@ -593,7 +480,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
   }
 
   /** True (and bounces to the archived quest) when the quest was completed meanwhile. */
-  private boolean archivedSinceOpened() {
+  boolean archivedSinceOpened() {
     Quest archived = archivedMeanwhile(quest.getId());
     if (archived == null) return false;
     // Skip the stale quest screen this one was opened from.
@@ -603,106 +490,5 @@ public class ContributorScreen extends DisquestsBaseScreen {
             : this.parent;
     showArchivedInstead(viewParent, archived);
     return true;
-  }
-
-  // ===================== CONTRIBUTORS (servers before quest trees) =====================
-
-  /** The old list: contributors only, "can edit / view only" and Remove applied at once. */
-  private void buildLegacy() {
-    root.removeChild(root.childById(FlowLayout.class, "add-person-row"));
-    root.removeChild(root.childById(LabelComponent.class, "people-roles-hint"));
-    root.removeChild(root.childById(LabelComponent.class, "people-save-hint"));
-    root.removeChild(root.childById(FlowLayout.class, "people-buttons"));
-
-    List<Contributor> contributors = quest.getContributors();
-    LabelComponent emptyLabel = root.childById(LabelComponent.class, "empty-label");
-    if (contributors.isEmpty() && ClientCache.getPendingRequestsForQuest(questId).isEmpty()) {
-      // Show empty label, hide contributor scroll
-      root.removeChild(root.childById(ScrollContainer.class, "contributor-scroll"));
-      return;
-    }
-    root.removeChild(emptyLabel);
-
-    for (int i = 0; i < contributors.size(); i++) {
-      Contributor contrib = contributors.get(i);
-      final int idx = i;
-
-      FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
-      row.verticalAlignment(VerticalAlignment.CENTER);
-      row.gap(4);
-
-      LabelComponent nameLabel = UIComponents.label(Component.literal(contrib.getName()));
-      nameLabel.shadow(true);
-      nameLabel.sizing(Sizing.fill(40), Sizing.content());
-      row.child(nameLabel);
-
-      // Spacer
-      FlowLayout spacer = UIContainers.horizontalFlow(Sizing.fill(20), Sizing.fixed(1));
-      row.child(spacer);
-
-      // Permission toggle, only for the owner (the old server lets only the owner manage)
-      if (manages) {
-        Component permText =
-            contrib.canEdit()
-                ? Component.translatable("gui.disquests.contributor.can_edit")
-                : Component.translatable("gui.disquests.contributor.view_only");
-        ButtonComponent permBtn = UIComponents.button(permText, b -> togglePermission(idx));
-        permBtn.sizing(Sizing.fixed(60), Sizing.fixed(14));
-        row.child(permBtn);
-
-        ButtonComponent removeBtn =
-            UIComponents.button(
-                Component.translatable("gui.disquests.btn.remove"), b -> removeContributor(idx));
-        removeBtn.sizing(Sizing.fixed(60), Sizing.fixed(14));
-        row.child(removeBtn);
-      } else {
-        row.child(muted(Messages.toComponent(QuestPage.role(contrib.getRole()))));
-      }
-
-      list.child(row);
-    }
-  }
-
-  private void togglePermission(int index) {
-    if (index < 0 || index >= quest.getContributors().size()) return;
-    if (archivedSinceOpened()) return;
-    Contributor contrib = quest.getContributors().get(index);
-    boolean newCanEdit = !contrib.canEdit();
-
-    PacketSender.updateContributors(
-        quest.getId(),
-        List.of(
-            new PacketCodec.ContributorOpEntry(
-                ContributorOp.UPDATE, contrib.getUuid(), contrib.getName(), newCanEdit)));
-
-    quest
-        .getContributors()
-        .set(
-            index,
-            new Contributor(new ContributorData(contrib.getUuid(), contrib.getName(), newCanEdit)));
-    rebuildLegacyUi();
-  }
-
-  private void removeContributor(int index) {
-    if (index < 0 || index >= quest.getContributors().size()) return;
-    Contributor contrib = quest.getContributors().get(index);
-
-    showConfirmOverlay(
-        Component.translatable("gui.disquests.confirm.remove_contributor", contrib.getName()),
-        () -> {
-          if (archivedSinceOpened()) return;
-          PacketSender.updateContributors(
-              quest.getId(),
-              List.of(
-                  new PacketCodec.ContributorOpEntry(
-                      ContributorOp.REMOVE, contrib.getUuid(), contrib.getName(), false)));
-          quest.getContributors().remove(index);
-          rebuildLegacyUi();
-        });
-  }
-
-  private void rebuildLegacyUi() {
-    // Re-open this screen to rebuild the component tree (no draft on these servers)
-    navigateToScreen(new ContributorScreen(this.parent, this.quest));
   }
 }

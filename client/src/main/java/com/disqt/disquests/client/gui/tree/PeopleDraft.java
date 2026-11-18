@@ -21,8 +21,18 @@ import java.util.UUID;
  */
 public final class PeopleDraft {
 
-  /** One row of the people screen. {@code dirty}: added, removed or role changed in the draft. */
-  public record Person(UUID uuid, String name, Role role, boolean removed, boolean dirty) {}
+  /**
+   * One row of the people screen. {@code dirty}: added, removed or role changed in the draft.
+   * {@code droppedMeanwhile}: another owner took the person off the quest after the player changed
+   * their role, so Save adds them back.
+   */
+  public record Person(
+      UUID uuid, String name, Role role, boolean removed, boolean dirty, boolean droppedMeanwhile) {
+
+    public Person(UUID uuid, String name, Role role, boolean removed, boolean dirty) {
+      this(uuid, name, role, removed, dirty, false);
+    }
+  }
 
   private static final class Entry {
     final UUID uuid;
@@ -31,6 +41,7 @@ public final class PeopleDraft {
     Role role;
     boolean removed;
     boolean withMySubquests;
+    boolean droppedMeanwhile;
 
     Entry(UUID uuid, String name, Role baseRole, Role role) {
       this.uuid = uuid;
@@ -62,7 +73,8 @@ public final class PeopleDraft {
   /** The rows in their fixed order. */
   public List<Person> rows() {
     List<Person> rows = new ArrayList<>();
-    for (Entry e : entries) rows.add(new Person(e.uuid, e.name, e.role, e.removed, e.dirty()));
+    for (Entry e : entries)
+      rows.add(new Person(e.uuid, e.name, e.role, e.removed, e.dirty(), e.droppedMeanwhile));
     return rows;
   }
 
@@ -160,7 +172,9 @@ public final class PeopleDraft {
    * last as a saved row. An unchanged row follows the server's role, or goes when the server
    * dropped the person; a row the player removed goes too once the server has dropped the person. A
    * role the player changed stays: against the new saved role, or as an addition when the server
-   * dropped the person. A person the player added who is now on the server keeps the draft's role.
+   * dropped the person (marked {@code droppedMeanwhile}). A row whose only change is its removal
+   * follows the server's role, so Undo brings back the current one. A person the player added who
+   * is now on the server keeps the draft's role.
    */
   public void merge(Quest saved) {
     QuestData q = saved.toData();
@@ -176,14 +190,17 @@ public final class PeopleDraft {
         if (e.baseRole == null) continue;
         if (!e.removed && e.role != e.baseRole) {
           e.baseRole = null;
+          e.droppedMeanwhile = true;
         } else {
           it.remove();
         }
         continue;
       }
       boolean unchanged = !e.dirty();
+      boolean onlyRemoved = e.removed && e.baseRole != null && e.role == e.baseRole;
+      e.droppedMeanwhile = false;
       e.baseRole = now.role();
-      if (unchanged) e.role = now.role();
+      if (unchanged || onlyRemoved) e.role = now.role();
     }
     for (ContributorData c : server.values()) {
       entries.add(new Entry(c.uuid(), c.name(), c.role(), c.role()));

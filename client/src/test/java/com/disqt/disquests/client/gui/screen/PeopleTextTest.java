@@ -12,7 +12,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.disqt.disquests.client.data.NoticeText.Message;
 import com.disqt.disquests.client.data.Quest;
+import com.disqt.disquests.client.gui.screen.PeopleText.AddKind;
+import com.disqt.disquests.client.gui.screen.PeopleText.AddMatch;
 import com.disqt.disquests.client.gui.screen.PeopleText.ApplyDown;
+import com.disqt.disquests.client.gui.screen.PeopleText.Candidate;
+import com.disqt.disquests.client.gui.screen.PeopleText.OpenState;
 import com.disqt.disquests.client.gui.screen.PeopleText.RemoveChoice;
 import com.disqt.disquests.client.gui.screen.PeopleText.SaveStep;
 import com.disqt.disquests.client.gui.tree.PeopleDraft;
@@ -107,7 +111,7 @@ class PeopleTextTest {
               new Message("gui.disquests.people.remove_question", List.of("Juju")),
               new Message("gui.disquests.people.remove_this_only", List.of()),
               new Message("gui.disquests.people.remove_with_mine_one", List.of(1))),
-          PeopleText.removeChoice(draft(), JUJU, "Juju", 1));
+          PeopleText.removeChoice(draft(), LEO, JUJU, "Juju", 1));
     }
 
     @Test
@@ -117,19 +121,24 @@ class PeopleTextTest {
               new Message("gui.disquests.people.remove_question", List.of("Juju")),
               new Message("gui.disquests.people.remove_this_only", List.of()),
               new Message("gui.disquests.people.remove_with_mine_many", List.of(3))),
-          PeopleText.removeChoice(draft(), JUJU, "Juju", 3));
+          PeopleText.removeChoice(draft(), LEO, JUJU, "Juju", 3));
     }
 
     @Test
     void doesNotAskWithoutSubquestsHoldingTheirRole() {
-      assertNull(PeopleText.removeChoice(draft(), JUJU, "Juju", 0));
+      assertNull(PeopleText.removeChoice(draft(), LEO, JUJU, "Juju", 0));
     }
 
     @Test
     void doesNotAskForSomeoneAddedInTheDraft() {
       PeopleDraft d = draft();
       d.add(NEWCOMER, "p5", Role.READ);
-      assertNull(PeopleText.removeChoice(d, NEWCOMER, "p5", 2));
+      assertNull(PeopleText.removeChoice(d, LEO, NEWCOMER, "p5", 2));
+    }
+
+    @Test
+    void doesNotAskOnMyOwnRow() {
+      assertNull(PeopleText.removeChoice(draft(), LEO, LEO, "Leo", 3));
     }
 
     /**
@@ -156,6 +165,85 @@ class PeopleTextTest {
             default -> LEO;
           };
       assertEquals(expected, PeopleText.subquestsWithRole(TREE, LEO, id("hub"), person));
+    }
+  }
+
+  @Nested
+  class Open {
+
+    static Stream<Arguments> states() {
+      Quest mine = Quest.fromNetwork(quest("hub").reader(JUJU).build());
+      Quest demoted = Quest.fromNetwork(quest("hub").owner(MAX).writer(LEO).build());
+      Quest removed = Quest.fromNetwork(quest("hub").owner(MAX).build());
+      return Stream.of(
+          Arguments.of("still an owner", mine, true, OpenState.STAY),
+          Arguments.of("demoted", demoted, true, OpenState.CLOSE_NO_LONGER_OWNER),
+          Arguments.of("removed", removed, true, OpenState.CLOSE_NO_LONGER_OWNER),
+          Arguments.of("gone", null, true, OpenState.CLOSE_GONE),
+          Arguments.of("read-only viewer, quest changed", demoted, false, OpenState.STAY),
+          Arguments.of("read-only viewer, quest gone", null, false, OpenState.CLOSE_GONE));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("states")
+    void state(String name, Quest cached, boolean managed, OpenState expected) {
+      assertEquals(expected, PeopleText.openState(cached, LEO, managed));
+    }
+  }
+
+  @Nested
+  class Chooser {
+
+    private static final List<Candidate> KNOWN =
+        List.of(
+            new Candidate(NEWCOMER, "Juniper"),
+            new Candidate(JUJU, "Juju"),
+            new Candidate(new UUID(0, 6), "Bob"));
+
+    /** Leo (me), Juju (removed in the draft), Anna. */
+    private static List<Person> rows() {
+      return List.of(
+          new Person(LEO, "Leo", Role.OWNER, false, false),
+          new Person(JUJU, "Juju", Role.READ, true, true),
+          new Person(ANNA, "Anna", Role.WRITE, false, false));
+    }
+
+    @ParameterizedTest(name = "\"{0}\" offers {1}")
+    @CsvSource({
+      "ju, 'Juniper,Juju'",
+      "JU, 'Juniper,Juju'",
+      "b, Bob",
+      "le, ''",
+      "an, ''",
+      "' ', ''",
+      "juju, ''"
+    })
+    void suggestions(String typed, String expected) {
+      List<String> names =
+          PeopleText.suggestions(typed, KNOWN, rows(), 8).stream().map(Candidate::name).toList();
+      assertEquals(expected.isEmpty() ? List.of() : List.of(expected.split(",")), names);
+    }
+
+    @Test
+    void suggestionsStopAtTheLimit() {
+      assertEquals(1, PeopleText.suggestions("u", KNOWN, rows(), 1).size());
+    }
+
+    static Stream<Arguments> matches() {
+      return Stream.of(
+          Arguments.of("", new AddMatch(AddKind.NOTHING, null, "")),
+          Arguments.of("bob", new AddMatch(AddKind.ADD, new UUID(0, 6), "Bob")),
+          Arguments.of(" Juniper ", new AddMatch(AddKind.ADD, NEWCOMER, "Juniper")),
+          Arguments.of("juju", new AddMatch(AddKind.RESTORE, JUJU, "Juju")),
+          Arguments.of("ANNA", new AddMatch(AddKind.ALREADY_LISTED, ANNA, "Anna")),
+          Arguments.of("leo", new AddMatch(AddKind.ALREADY_LISTED, LEO, "Leo")),
+          Arguments.of("Zed", new AddMatch(AddKind.UNKNOWN, null, "Zed")));
+    }
+
+    @ParameterizedTest(name = "\"{0}\"")
+    @MethodSource("matches")
+    void addMatch(String typed, AddMatch expected) {
+      assertEquals(expected, PeopleText.addMatch(typed, KNOWN, rows()));
     }
   }
 

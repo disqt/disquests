@@ -603,20 +603,9 @@ public class QuestScreen extends DisquestsBaseScreen {
     // People (owner only)
     FlowLayout settingsRow = root.childById(FlowLayout.class, "settings-row");
     if (isOwner) {
-      int contribCount = quest.getContributors().size();
-      int pendingReqCount = ClientCache.getPendingCount(quest.getId());
-      Component contribText;
-      if (pendingReqCount > 0) {
-        contribText =
-            Component.translatable("gui.disquests.section.contributors", contribCount)
-                .append(Component.literal(" "))
-                .append(Component.literal("+ " + pendingReqCount).withColor(Colors.AMBER));
-      } else {
-        contribText = Component.translatable("gui.disquests.section.contributors", contribCount);
-      }
       ButtonComponent contribBtn = root.childById(ButtonComponent.class, "btn-contributors");
-      contribBtn.setMessage(contribText);
       contribBtn.onPress(ignored -> openContributors());
+      refreshContributorsButton(root);
     } else {
       settingsRow.sizing(Sizing.fixed(0), Sizing.fixed(0));
     }
@@ -1042,6 +1031,37 @@ public class QuestScreen extends DisquestsBaseScreen {
           default -> DimensionKeys.OVERWORLD;
         });
     rebuildEditMode();
+  }
+
+  /**
+   * The people button's label: the saved quest's contributor count and the pending requests. Set
+   * when the editor is built and again whenever it becomes the current screen, since the editor
+   * instance is reused when the people screen returns to it.
+   */
+  private void refreshContributorsButton(FlowLayout root) {
+    ButtonComponent contribBtn = root.childById(ButtonComponent.class, "btn-contributors");
+    if (contribBtn == null) return;
+    Quest saved = ClientCache.getQuestById(quest.getId());
+    int contribCount = (saved != null ? saved : quest).getContributors().size();
+    int pendingReqCount = ClientCache.getPendingCount(quest.getId());
+    Component contribText;
+    if (pendingReqCount > 0) {
+      contribText =
+          Component.translatable("gui.disquests.section.contributors", contribCount)
+              .append(Component.literal(" "))
+              .append(Component.literal("+ " + pendingReqCount).withColor(Colors.AMBER));
+    } else {
+      contribText = Component.translatable("gui.disquests.section.contributors", contribCount);
+    }
+    contribBtn.setMessage(contribText);
+  }
+
+  /** Back from the people screen to this editor: its people button follows the saved quest. */
+  @Override
+  protected void init() {
+    super.init();
+    FlowLayout root = getRootComponent();
+    if (editing && isOwner && root != null) refreshContributorsButton(root);
   }
 
   private void openContributors() {
