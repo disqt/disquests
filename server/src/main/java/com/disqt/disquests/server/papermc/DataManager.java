@@ -649,7 +649,11 @@ public class DataManager {
     }
   }
 
-  public synchronized void resetDatabase() {
+  /**
+   * Wipes every table (debug {@code /disquests reset}), then records {@code namesToKeep} again: the
+   * players still connected, who would otherwise be unknown and could not be added to a quest.
+   */
+  public synchronized void resetDatabase(Map<UUID, String> namesToKeep) {
     try (var stmt = connection.createStatement()) {
       stmt.executeUpdate("DELETE FROM pinned_quests");
       stmt.executeUpdate("DELETE FROM collaboration_requests");
@@ -663,6 +667,7 @@ public class DataManager {
     } catch (SQLException e) {
       throw new RuntimeException("Failed to reset database", e);
     }
+    namesToKeep.forEach(this::upsertPlayerName);
   }
 
   // -------------------------------------------------------------------------

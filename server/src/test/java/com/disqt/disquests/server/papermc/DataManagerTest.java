@@ -481,10 +481,23 @@ class DataManagerTest {
             List.of("tag1", "tag2"));
     dm.saveQuest(quest);
 
-    dm.resetDatabase();
+    dm.resetDatabase(java.util.Map.of());
 
     assertNull(dm.getQuest(id));
     assertTrue(dm.getAllQuests().isEmpty());
+  }
+
+  @Test
+  void resetDatabase_keepsOnlyTheNamesGiven() {
+    UUID online = UUID.randomUUID();
+    dm.upsertPlayerName(OWNER, "Alice");
+    dm.upsertPlayerName(online, "Bob");
+
+    // The players still connected stay known, so they can be added to quests after a reset
+    dm.resetDatabase(java.util.Map.of(online, "Bob"));
+
+    assertEquals("Bob", dm.getPlayerName(online));
+    assertNull(dm.getPlayerName(OWNER));
   }
 
   // -------------------------------------------------------------------------
@@ -500,7 +513,7 @@ class DataManagerTest {
     dm.setRole(questId, PLAYER2, Role.READ);
     dm.createCollaborationRequest(questId, PLAYER2);
 
-    dm.resetDatabase();
+    dm.resetDatabase(java.util.Map.of());
 
     assertTrue(dm.getAllQuests().isEmpty());
     assertTrue(dm.getPinnedQuestIds(OWNER).isEmpty());
@@ -966,7 +979,7 @@ class DataManagerTest {
             .withPolygon(List.of(new PointData(0, 0), new PointData(10, 0), new PointData(10, 8))));
     assertEquals(3, dm.countPolygonRows());
 
-    dm.resetDatabase();
+    dm.resetDatabase(java.util.Map.of());
 
     assertEquals(0, dm.countPolygonRows());
   }

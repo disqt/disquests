@@ -1,5 +1,8 @@
 package com.disqt.disquests.server.papermc;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -40,7 +43,11 @@ public class Commands implements CommandExecutor {
         sender.sendMessage("Reset can only be run from console/RCON.");
         return true;
       }
-      dataManager.resetDatabase();
+      Map<UUID, String> online = new HashMap<>();
+      for (Player p : plugin.getServer().getOnlinePlayers()) {
+        online.put(p.getUniqueId(), p.getName());
+      }
+      dataManager.resetDatabase(online);
       packetHandler.resendHandshakes();
       sender.sendMessage("Disquests database reset. Handshakes resent.");
       return true;
