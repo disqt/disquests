@@ -1,7 +1,7 @@
 # Quest Trees, Quest Lines and Roles Design
 
 **Date:** 2026-11-09, rewritten 2026-11-15, canvas dropped 2026-11-16
-**Status:** Draft, awaiting approval. Replaces the subquests design approved on 2026-11-09
+**Status:** Implemented in 0.9.0. Replaces the subquests design approved on 2026-11-09
 (inherited access, visibility caps and the "Subquests section" layout are gone).
 **Builds on:** 0.8.0 (world map, completion and Archived tab)
 
@@ -203,6 +203,9 @@ single owner.
   see it in the Prerequisites field as "a deleted quest" with a remove button, and the quest
   carries a warning mark in their lists until they deal with it. Links from the deleted quest
   to its own prerequisites are simply removed.
+- Deleting a prerequisite that was already completed removes the link: the quests that had
+  unlocked through it do not lock again. Only an unfinished deleted prerequisite stays, as
+  "a deleted quest".
 - In a game-mastered line: players have Read, a helper who writes chapter text has Write, and
   only owners of a chapter can complete it and so unlock the next.
 
@@ -411,8 +414,7 @@ Westenheim hub                 | Description    [ ...                       ]
 
 - Protocol: `ProtocolVersion.CURRENT` becomes `V4`; new fields are trailing-optional. Per
   recipient a quest carries: the role of each person, `parentId` only when the recipient can
-  see the parent, its depth counted from the highest ancestor the recipient can see, whether
-  it is locked for the recipient, `autoJoin`, the prerequisite ids the recipient can see and a
+  see the parent, whether it is locked for the recipient, `autoJoin`, the prerequisite ids the recipient can see and a
   flag saying whether there are others (never a count). A quest sent as locked carries no
   description, tags, location or people.
 - Clients below V4: get subquests as plain quests; never receive a quest that is locked for
@@ -424,7 +426,9 @@ Westenheim hub                 | Description    [ ...                       ]
 - Depth: `max-quest-depth` (default 3, 0 = no limit, negative values treated as the default)
   is sent in the HANDSHAKE as a trailing varint (3 assumed when absent); `/disquests reload`
   resends it. Lowering it never changes existing trees; only new links and moves are checked.
-  The limit counts the real depth, hidden ancestors and descendants included. A refusal says
+  The limit counts the real depth, hidden ancestors and descendants included. No depth number
+  is sent per recipient: the client derives the depth it shows from `parentId`, and the server
+  alone judges the limit. A refusal says
   only that the quest cannot go there; that a player can learn by trying that some hidden
   structure exists is accepted, since no title or content is revealed. Lists stop indenting
   after a fixed number of levels. Every walk up or down the tree is guarded against loops.

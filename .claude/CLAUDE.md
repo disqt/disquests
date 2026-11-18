@@ -139,7 +139,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 |------|---------|
 | `common/src/main/java/com/disqt/disquests/common/PacketCodec.java` | All packet encode/decode methods |
 | `common/src/main/java/com/disqt/disquests/common/PacketType.java` | Packet type enum with byte IDs |
-| `common/src/main/java/com/disqt/disquests/common/ProtocolVersion.java` | Protocol version enum (V0-V3) |
+| `common/src/main/java/com/disqt/disquests/common/ProtocolVersion.java` | Protocol version enum (V0-V4) |
 | `common/src/main/java/com/disqt/disquests/common/QuestLocation.java` | Pin/polygon geometry, bounding box and V1 `normalize` downgrade |
 | `common/src/main/java/com/disqt/disquests/common/DimensionKeys.java` | `normalize` maps `nether`/`end` to `the_nether`/`the_end` (config keys, saves, migration) |
 | `common/src/main/java/com/disqt/disquests/common/BlueMapUrlBuilder.java` | BlueMap URL construction with coords |
@@ -149,7 +149,12 @@ Channel: `disquests:main`. First byte = PacketType ID.
 | `client/src/main/java/com/disqt/disquests/client/ClientSession.java` | Tracks connection state, dispatches S2C packets |
 | `client/src/main/java/com/disqt/disquests/client/ClientCache.java` | Client-side quest cache |
 | `client/.../gui/screen/` | All screens (MainScreen, QuestScreen, ContributorScreen, TagPickerScreen). Base: `DisquestsBaseScreen`. Confirm dialogs use overlay. |
-| `client/.../gui/component/` | Custom owo-ui components: QuestEntryComponent, TagChipComponent, TextFieldComponent |
+| `client/.../gui/component/` | Custom owo-ui components: QuestEntryComponent, TagChipComponent, TextFieldComponent; trees: `TreeRowComponent` (+ Minecraft-free `TreeRowGeometry`), `DropTracker`, `TreeToggleComponent`, `QuestSearchField` + `SuggestionDropdown`, `SplitterComponent` |
+| `client/.../gui/tree/` | Minecraft-free tree logic: `QuestTreeRows` (list, "where this sits" and edit-pane rows), `TreeDraft` (tree moves until Save), `QuestEditDraft` (tree, visibility, prerequisites, auto-join), `PeopleDraft`, `Suggestions`/`SuggestionText`, `WaitingText`, `NewMarkRows`, `ListedQuests` |
+| `client/.../gui/screen/QuestListPanel.java` | Main screen's nested quest list: `quest-row-<id>` rows with `toggle-<id>` and the entry, expansion in `ClientSession` |
+| `client/.../gui/screen/QuestPage.java` | Reading-view rules (buttons, dialogs, banners, page signature), Minecraft-free; helpers `QuestTreePane` (`where-this-sits`), `LockedQuestView`, `PrerequisiteLinks`, `QuestBanners`, `PaneSplit` |
+| `client/.../gui/screen/QuestEditTreePane.java` | Editor's tree pane (`edit-tree-pane`, `add-subquest-field`, `tree-drop-out`); `QuestLinksForm` holds `vis-*`, `prerequisite-field`, `prereq-chip-*`, `auto-join`, `btn-detach-hidden-parent`; texts in `EditorText` |
+| `client/.../gui/screen/ContributorScreen.java` | People screen: `PeopleDraft` until Save, `PlayerChooser` (Add row), `PeopleText` (Minecraft-free texts and decisions), `LegacyContributorList` (pre-V4 servers) |
 | `client/.../gui/map/` | World map: MapMath, TileCache/SharedTileCache, MapView, layers (quest polygons, player marker, polygon edit), QuestStyle |
 | `client/.../gui/screen/LocationCard.java` | Location card (mini map, vertex fields, map button) shared by edit and view mode of QuestScreen |
 | `client/.../gui/screen/MapEditScreen.java` | Full-screen polygon editor for a quest location |
@@ -164,7 +169,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 | `server/src/main/java/com/disqt/disquests/server/papermc/Commands.java` | `/disquests reload` and `/disquests reset` (debug mode) |
 | `client/src/testmod/.../integration/harness/` | JUnit 5 harness: HarnessCommon, TestContext, IntegrationTestExtension, RconClient |
 | `client/src/testmod/.../integration/harness/TileFixtureServer.java` | Local HTTP server serving one BlueMap tile for map E2E |
-| `client/src/testmod/.../integration/journeys/` | Solo and duo journey test classes |
+| `client/src/testmod/.../integration/journeys/` | Solo and duo journey test classes (trees: solo `QuestTreeJourney`; duo `RolesAndTreesJourney`, `SubquestOwnersJourney`, `QuestLineJourney`) |
 
 ## Dependencies
 
@@ -247,6 +252,17 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **Stale-editor guard** — `DisquestsBaseScreen.archivedMeanwhile(id)` returns the cached quest when it was completed after a screen took its copy. `QuestScreen` save and `ContributorScreen` edits check it and call `showArchivedInstead` (toast + view of the archived quest) instead of sending an edit the server would silently drop.
 - **Archived tab** — `tab-archived` (`ClientSession.Tab.ARCHIVED`) lists `QuestListOrder.archived(ClientCache.getMyQuests())`, newest completion first; completed quests stay in `myQuests`, so filter with `Quest.isCompleted()`. View ids: `btn-complete` (active), `btn-reopen` + `completed-label` (completed; no `btn-edit`/`btn-leave`). Complete navigates back to the parent; Reopen rebuilds the open `QuestScreen` via `ClientPacketHandler`, so wait for `btn-complete`, not `waitForScreen`.
 - **`ClientSession.activeTab` persists across journey classes** — reset it (and the search term) at the start of a journey that relies on My Quests.
+
+### Quest trees and roles
+- **Locked views** — a quest locked for the player arrives with title, links and `locked` only (no content, tags, location, people; `lastModified` 0). `QuestScreen` then builds `LockedQuestView`: `title-lock` and `waiting-text` (each visible prerequisite a `prerequisite-<id>` link, then "… and something else you can't see yet", or the "isn't available yet" sentence when none is visible); only Leave remains.
+- **Reading view rebuilds itself** — `QuestScreen.tick` compares `QuestPage.signature` (quest without `lastModified`, pane quests, prerequisites, expanded set) on each cache version and reopens the page in place, carrying both scroll offsets; it waits while a confirm overlay is open and never touches the editor. In journeys, wait on a component of the new page, not on the screen class.
+- **Drafts apply only on Save** — `QuestEditDraft` (tree, visibility, prerequisites, auto-join) and `PeopleDraft` are sent as changes (`LinkChanges` tree ops, `PersonOp`s), never as a whole tree or list; a move and back leaves `TreeDraft.ops()` empty, so Cancel closes without asking. The edit pane keeps the tree the quest was in when the editor opened.
+- **`SuggestionDropdown` is mounted on the screen root** (absolute position, not an `OverlayContainer`); rows are `suggestion-<n>` in `<fieldId>-suggestions` (`add-name-suggestions` for the people chooser). An open list under `add-subquest-field` covers the rows below it: click elsewhere (`tree-hint`) before dragging.
+- **Drag and drop** — `TreeRowComponent` is one leaf per row (owo sends drags only to the focused component); past a 4 px threshold it reports to the pane (`DragTarget`), which hit-tests rows and the `tree-drop-out` strip with `DropTracker`. Drop on a row = attach, on a descendant = swap; `TreeRowComponent.pointFor(Part)` gives the body, toggle and remove (x) points for tests.
+- **Two sets of enums** — `QuestTreeRows.Tab`/`BoardFilter` mirror `ClientSession.Tab`/`QuestFilter` so `gui/tree` stays Minecraft-free; map them at the call site (`QuestListPanel.treeTab`, `SERVER_QUESTS` -> `QUEST_BOARD`).
+- **Journey helpers** — `UIActions`: `createQuest(title, vis-id)`, `openQuest(tab, title)`, `enterEditor`/`saveEditor`, `pickSuggestion`/`typeAndFindSuggestion`, `dragTreeRowOnto`/`dragTreeRowOut` (real mouse: hold, move in steps, release), `clickTreeRowRemove`, `clickChipRemove`, `choose` (pressed-state buttons), `tickCheckbox`/`tickConfirmCheckbox`, `openPeople`/`addPerson`/`savePeople`, `waitForTreeRow`, `waitForListed`, `waitForCachedQuest`/`waitForNotCached`, `resetServerForDuo(journey)`; `UIAssertions`: `textOf`/`textUnder`, `waitForText`/`waitForTextUnder`, `assertListed`.
+- **Duo journey classes need a barrier** — both clients run every duo class; start with `resetServerForDuo("<journey>")` (B arrives, A resets, B resyncs), prefix every phase name with the journey, and end with a step where one player waits for the other. Use `PhaseSync.waitFor(phase, context, seconds(120))` when the other side does several screens of work (the default is 15 s).
+- **`-PtestFilter` reaches the clients through `run.signal`** — the run task writes it before the clients connect, and `HarnessCommon` reads it in both modes. Harness mode (`-Pharness`) re-runs as long as `run.signal` exists; prefer plain filtered runs.
 
 ### Testing & E2E
 - **QuestScreen auto-close** — `tick()` closes the screen if the quest is not in `ClientCache`. E2E tests must add quests to cache before opening screens.
