@@ -82,6 +82,77 @@ public final class UIAssertions {
     assertEquals(expected, actual, "Quest list entry count mismatch");
   }
 
+  /** Asserts the current screen's quest list does (or does not) show an entry, right now. */
+  public static void assertListed(ClientGameTestContext context, String title, boolean listed) {
+    boolean found = context.computeOnClient(c -> UIActions.listedEntry(c, title) != null);
+    assertEquals(listed, found, "'" + title + "' listed");
+  }
+
+  /**
+   * The text a component shows: a label's text, a button's message or a checkbox's label; null when
+   * the component is missing or shows no text.
+   */
+  public static String textOf(net.minecraft.client.Minecraft client, String componentId) {
+    UIComponent c = UIActions.onScreen(client, UIComponent.class, componentId);
+    if (c instanceof LabelComponent label) return label.text().getString();
+    if (c instanceof ButtonComponent button) return button.getMessage().getString();
+    if (c instanceof io.wispforest.owo.ui.component.SmallCheckboxComponent box) {
+      return box.label().getString();
+    }
+    return null;
+  }
+
+  /**
+   * Every label's text inside a container (the container included when it is a label), one per
+   * line, in order; null when the container is missing.
+   */
+  public static String textUnder(net.minecraft.client.Minecraft client, String componentId) {
+    UIComponent root = UIActions.onScreen(client, UIComponent.class, componentId);
+    if (root == null) return null;
+    StringBuilder text = new StringBuilder();
+    collectText(root, text);
+    return text.toString();
+  }
+
+  private static void collectText(UIComponent c, StringBuilder text) {
+    if (c instanceof LabelComponent label) text.append(label.text().getString()).append('\n');
+    if (c instanceof io.wispforest.owo.ui.core.ParentUIComponent parent) {
+      for (UIComponent child : parent.children()) collectText(child, text);
+    }
+  }
+
+  /** Waits until the component's text (see {@link #textOf}) satisfies the condition. */
+  public static void waitForText(
+      ClientGameTestContext context, String componentId, Predicate<String> condition) {
+    String[] last = {null};
+    try {
+      context.waitFor(
+          client -> {
+            last[0] = textOf(client, componentId);
+            return last[0] != null && condition.test(last[0]);
+          },
+          UIActions.TIMEOUT);
+    } catch (Throwable t) {
+      throw new AssertionError("Text of '" + componentId + "' was '" + last[0] + "'", t);
+    }
+  }
+
+  /** Waits until the labels inside a container (see {@link #textUnder}) satisfy the condition. */
+  public static void waitForTextUnder(
+      ClientGameTestContext context, String componentId, Predicate<String> condition) {
+    String[] last = {null};
+    try {
+      context.waitFor(
+          client -> {
+            last[0] = textUnder(client, componentId);
+            return last[0] != null && condition.test(last[0]);
+          },
+          UIActions.TIMEOUT);
+    } catch (Throwable t) {
+      throw new AssertionError("Text under '" + componentId + "' was '" + last[0] + "'", t);
+    }
+  }
+
   /** Wait for a condition with timeout, then assert it's true. */
   public static void waitAndAssert(
       ClientGameTestContext context,

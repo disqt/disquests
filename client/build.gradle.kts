@@ -760,7 +760,7 @@ tasks.register("runDuoTests") {
             // --- Step 5: Wait for results (both players) ---
             val resultA = File(syncDir, "results-a.txt")
             val resultB = File(syncDir, "results-b.txt")
-            val resultsDeadline = System.currentTimeMillis() + 300000 // 5 minutes
+            val resultsDeadline = System.currentTimeMillis() + 900000 // 15 minutes: four two-player journeys
             while (System.currentTimeMillis() < resultsDeadline) {
                 if (resultA.exists() && resultB.exists()) break
                 if (!harness && startedClients && processes.all { !it.isAlive }) break
