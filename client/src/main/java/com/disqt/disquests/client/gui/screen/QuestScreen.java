@@ -40,6 +40,7 @@ import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.Color;
 import io.wispforest.owo.ui.core.Insets;
+import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.ParentUIComponent;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.Surface;
@@ -54,6 +55,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -1262,6 +1264,22 @@ public class QuestScreen extends DisquestsBaseScreen {
       i = found + 3;
     }
     return content;
+  }
+
+  // ===================== OVERLAYS =====================
+
+  /**
+   * Draws what must sit above the whole UI after owo has drawn it: the dragged tree row's ghost.
+   * Here, at the screen level, it is outside every scroll container's scissor and drawn after (so
+   * above) the pane and the form; owo's tooltips still come later, in the after-extract pass.
+   */
+  @Override
+  public void extractRenderState(
+      GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+    super.extractRenderState(context, mouseX, mouseY, delta);
+    if (editPane != null) {
+      editPane.drawGhost(OwoUIGraphics.of(context), mouseX, mouseY, this.width, this.height);
+    }
   }
 
   // ===================== AUTO-CLOSE =====================

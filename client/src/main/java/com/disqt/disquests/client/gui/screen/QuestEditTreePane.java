@@ -1,8 +1,10 @@
 package com.disqt.disquests.client.gui.screen;
 
 import com.disqt.disquests.client.ClientSession;
+import com.disqt.disquests.client.gui.component.DragGhost;
 import com.disqt.disquests.client.gui.component.DropTracker;
 import com.disqt.disquests.client.gui.component.QuestSearchField;
+import com.disqt.disquests.client.gui.component.TextFit;
 import com.disqt.disquests.client.gui.component.TreeRowComponent;
 import com.disqt.disquests.client.gui.component.TreeRowGeometry;
 import com.disqt.disquests.client.gui.helper.Colors;
@@ -28,6 +30,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.network.chat.Component;
 
 /**
@@ -41,6 +45,10 @@ import net.minecraft.network.chat.Component;
  * line). The drop strip and the hint sit below the scroll, so a short pane still shows them. The
  * header reads "QUEST TREE": the pane shows the whole tree, not only subquests. A refused change
  * shows a toast and changes nothing.
+ *
+ * <p>While a row is dragged it stays in place dimmed, the row or strip under the cursor is
+ * highlighted as the drop target, and {@link #drawGhost} (called by the screen after the whole UI
+ * is drawn) paints the row's title beside the pointer.
  *
  * <p>After an accepted change only the pane's contents are rebuilt, in one layout pass so the
  * scroll position stays, and {@code onChanged} lets the form follow. The field and its holder are
@@ -74,6 +82,7 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
   private List<TreeRowComponent> rows = List.of();
   private DropTracker tracker;
   private boolean dropOutHighlighted;
+  private TreeRowComponent dragSource;
   private boolean revealPending = true;
   private String shownTitle;
 
@@ -331,11 +340,13 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
 
   @Override
   public void dragMoved(TreeRowComponent source, int absX, int absY) {
+    dragSource = source;
     tracker.moved(source, absX, absY);
   }
 
   @Override
   public void dropped(TreeRowComponent source, int absX, int absY) {
+    dragSource = null;
     DropTracker.Zone zone = tracker.dropped(source, absX, absY);
     if (zone == null) return;
     UUID me = ClientSession.getEffectivePlayerUuid();
@@ -350,17 +361,44 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
 
   @Override
   public void dragCancelled(TreeRowComponent source) {
+    dragSource = null;
     tracker.clear();
   }
 
-  /** A dashed outline, filled while a dragged row is over it. */
+  /** A row is being dragged: still dragging and still in the pane (a rebuild drops it). */
+  @Override
+  public boolean dragging() {
+    return dragSource != null && dragSource.isDragging() && dragSource.hasParent();
+  }
+
+  /**
+   * The dragged row's ghost at the pointer: its title on a translucent panel the row's height,
+   * placed by {@link DragGhost#rect}. The screen calls this after the UI has drawn, outside any
+   * scissor, so it is above the pane and the form and never clipped; it is only paint, so it never
+   * takes a click. Nothing is drawn when no drag is in progress.
+   */
+  void drawGhost(OwoUIGraphics context, int mouseX, int mouseY, int screenWidth, int screenHeight) {
+    if (!dragging()) return;
+    Font font = Minecraft.getInstance().font;
+    String title = dragSource.title();
+    int width = DragGhost.width(font.width(title), dragSource.width());
+    DropTracker.Bounds b =
+        DragGhost.rect(
+            mouseX, mouseY, width, TreeRowComponent.ROW_HEIGHT, screenWidth, screenHeight);
+    context.fill(b.x(), b.y(), b.x() + b.width(), b.y() + b.height(), Colors.TREE_GHOST_BACKGROUND);
+    context.drawRectOutline(b.x(), b.y(), b.width(), b.height(), Colors.DROPDOWN_OUTLINE);
+    String shown = TextFit.title(title, "", b.width() - DragGhost.PADDING * 2, font::width);
+    context.text(font, shown, b.x() + DragGhost.PADDING, b.y() + 2, Colors.TEXT_PRIMARY, false);
+  }
+
+  /** A dashed outline; tinted, with a bright outline, while a dragged row is over it. */
   private void drawDropOut(OwoUIGraphics context, ParentUIComponent component) {
     int x = component.x();
     int y = component.y();
     int w = component.width();
     int h = component.height();
     if (dropOutHighlighted) context.fill(x, y, x + w, y + h, Colors.TREE_DROP_TARGET);
-    int color = dropOutHighlighted ? Colors.TEXT_PRIMARY : Colors.TEXT_MUTED;
+    int color = dropOutHighlighted ? Colors.TREE_DROP_OUTLINE : Colors.TEXT_MUTED;
     for (int i = 0; i < w; i += DASH * 2) {
       int end = Math.min(x + i + DASH, x + w);
       context.fill(x + i, y, end, y + 1, color);

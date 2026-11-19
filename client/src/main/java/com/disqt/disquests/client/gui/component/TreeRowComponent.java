@@ -304,7 +304,8 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
     }
     if (!count.isEmpty() && font.width(count) <= right - textEnd) {
       context.text(font, count, textEnd, y + TEXT_Y, Colors.TEXT_MUTED, false);
-    }
+    } // The dragged row stays in place, dimmed; its ghost follows the cursor
+    if (dragging) context.fill(x, y, x + w, y + ROW_HEIGHT, Colors.TREE_SOURCE_DIM);
   }
 
   /** The drag handle: a grip of two columns of three dots. */
