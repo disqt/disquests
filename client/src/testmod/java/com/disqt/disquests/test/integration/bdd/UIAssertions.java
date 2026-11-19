@@ -153,6 +153,58 @@ public final class UIAssertions {
     }
   }
 
+  /**
+   * The text of the shown (or queued) system toast with this id, its lines joined by spaces, or
+   * null when there is none. The message is private to {@code SystemToast}: read by reflection.
+   */
+  public static String toastText(
+      net.minecraft.client.Minecraft client,
+      net.minecraft.client.gui.components.toasts.SystemToast.SystemToastId id) {
+    var toast =
+        client
+            .gui
+            .toastManager()
+            .getToast(net.minecraft.client.gui.components.toasts.SystemToast.class, id);
+    if (toast == null) return null;
+    try {
+      var field =
+          net.minecraft.client.gui.components.toasts.SystemToast.class.getDeclaredField(
+              "messageLines");
+      field.setAccessible(true);
+      StringBuilder text = new StringBuilder();
+      for (Object line : (java.util.List<?>) field.get(toast)) {
+        if (!text.isEmpty()) text.append(' ');
+        ((net.minecraft.util.FormattedCharSequence) line)
+            .accept(
+                (index, style, codePoint) -> {
+                  text.appendCodePoint(codePoint);
+                  return true;
+                });
+      }
+      return text.toString();
+    } catch (ReflectiveOperationException e) {
+      throw new AssertionError("Cannot read the toast's text", e);
+    }
+  }
+
+  /** Waits until a system toast with this id shows and its text satisfies the condition. */
+  public static void waitForToast(
+      ClientGameTestContext context,
+      net.minecraft.client.gui.components.toasts.SystemToast.SystemToastId id,
+      Predicate<String> condition) {
+    String[] last = {null};
+    try {
+      context.waitFor(
+          client -> {
+            last[0] = toastText(client, id);
+            return last[0] != null && condition.test(last[0]);
+          },
+          UIActions.TIMEOUT);
+    } catch (Throwable t) {
+      throw new AssertionError("Toast text was '" + last[0] + "'", t);
+    }
+  }
+
   /** Wait for a condition with timeout, then assert it's true. */
   public static void waitAndAssert(
       ClientGameTestContext context,

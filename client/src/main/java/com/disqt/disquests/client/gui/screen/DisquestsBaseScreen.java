@@ -64,7 +64,8 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   private static final SystemToast.SystemToastId ARCHIVED_TOAST =
       new SystemToast.SystemToastId(8000L);
 
-  private static final SystemToast.SystemToastId REFUSED_TOAST =
+  /** The toast of {@link #showRefusedToast}; public so the E2E journeys can find it. */
+  public static final SystemToast.SystemToastId REFUSED_TOAST =
       new SystemToast.SystemToastId(8002L);
 
   /** A toast like the server's notices, for a change refused on this screen. */
