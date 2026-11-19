@@ -4,6 +4,7 @@ import com.disqt.disquests.client.data.NewMarks;
 import com.disqt.disquests.client.gui.map.MapCameraMemory;
 import com.disqt.disquests.client.gui.map.MapMath;
 import com.disqt.disquests.client.gui.map.SharedTileCache;
+import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.common.ProtocolVersion;
 import java.util.Collections;
 import java.util.List;
@@ -109,6 +110,8 @@ public class ClientSession {
     activeTab = Tab.MY_QUESTS;
     searchTerm = "";
     serverQuestsFilter = QuestFilter.ALL;
+    // The back and forward history names quests of the server just left
+    DisquestsBaseScreen.clearHistory();
   }
 
   public static int getServerProtocolVersion() {

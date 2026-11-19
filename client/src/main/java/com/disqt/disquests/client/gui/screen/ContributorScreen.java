@@ -56,6 +56,13 @@ public class ContributorScreen extends DisquestsBaseScreen {
   @Nullable private final PeopleDraft draft;
   private long seenCacheVersion;
 
+  /**
+   * The editor this screen was opened from, or null (opened from the reading view). Every way back
+   * returns to that same instance, so its unsaved drafts survive; history would rebuild a fresh
+   * editor.
+   */
+  @Nullable private final QuestScreen returnEditor;
+
   private FlowLayout root;
   private FlowLayout list;
   private ButtonComponent saveBtn;
@@ -75,6 +82,8 @@ public class ContributorScreen extends DisquestsBaseScreen {
     // Built once, when the screen opens; later server changes are merged in (see tick)
     this.draft = trees ? new PeopleDraft(this.quest) : null;
     this.seenCacheVersion = ClientCache.getVersion();
+    this.returnEditor =
+        parent instanceof QuestScreen questScreen && questScreen.isEditing() ? questScreen : null;
   }
 
   @Override
@@ -396,7 +405,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
   private void send() {
     if (draft == null || archivedSinceOpened()) return;
     PacketSender.updatePeople(questId, draft.ops(me));
-    super.onClose();
+    leave();
   }
 
   /** Back, forward, Escape and Cancel: a draft with changes asks before it is dropped. */
@@ -411,7 +420,29 @@ public class ContributorScreen extends DisquestsBaseScreen {
 
   @Override
   public void onClose() {
-    confirmLeave(super::onClose);
+    confirmLeave(this::leave);
+  }
+
+  /** Mouse back: to the editor this screen was opened from, when there is one. */
+  @Override
+  protected void goBack() {
+    if (returnEditor != null) {
+      goBackTo(returnEditor);
+    } else {
+      super.goBack();
+    }
+  }
+
+  /**
+   * Back where the screen was opened from, without asking: the same editor instance (using up the
+   * history entry it pushed, as mouse back does), else the parent.
+   */
+  private void leave() {
+    if (returnEditor != null) {
+      goBackTo(returnEditor);
+    } else {
+      super.onClose();
+    }
   }
 
   @Override
@@ -438,12 +469,12 @@ public class ContributorScreen extends DisquestsBaseScreen {
     Quest cached = ClientCache.getQuestById(questId);
     switch (PeopleText.openState(cached, me, manages)) {
       case CLOSE_GONE -> {
-        super.onClose();
+        leave();
         return;
       }
       case CLOSE_NO_LONGER_OWNER -> {
         showToast(Component.translatable(PeopleText.NO_LONGER_OWNER));
-        super.onClose();
+        leave();
         return;
       }
       case STAY -> {}

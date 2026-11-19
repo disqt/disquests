@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.disqt.disquests.client.gui.screen.EditorText;
 import com.disqt.disquests.client.gui.screen.PeopleText;
 import com.disqt.disquests.client.gui.screen.QuestPage;
+import com.disqt.disquests.client.gui.screen.SaveGuard;
 import com.disqt.disquests.client.gui.tree.SuggestionText;
 import com.disqt.disquests.client.gui.tree.Suggestions;
 import com.disqt.disquests.common.graph.Plans;
@@ -77,6 +78,9 @@ class NoticeLangKeysTest {
     keys.addAll(PeopleText.keys());
     keys.addAll(TREE_ROW_KEYS);
     keys.addAll(QUEST_ENTRY_KEYS);
+    keys.add(SaveGuard.NO_LONGER_EDITABLE);
+    keys.addAll(TOAST_KEYS);
+    for (Visibility v : Visibility.values()) keys.add(EditorText.visibility(v));
     return keys.stream().distinct().toList();
   }
 
@@ -87,6 +91,11 @@ class NoticeLangKeysTest {
   /** Keys {@code QuestEntryComponent} draws for its marks (a Minecraft class, listed by hand). */
   private static final List<String> QUEST_ENTRY_KEYS =
       List.of("gui.disquests.label.new", "gui.disquests.tooltip.needs_attention");
+
+  /**
+   * The toast {@code ClientPacketHandler} shows when a quest reaches My Quests (listed by hand).
+   */
+  private static final List<String> TOAST_KEYS = List.of("gui.disquests.toast.now_on");
 
   private static void collect(NoticeText.Message m, List<String> keys) {
     keys.add(m.key());

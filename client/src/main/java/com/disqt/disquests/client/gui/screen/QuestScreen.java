@@ -125,9 +125,14 @@ public class QuestScreen extends DisquestsBaseScreen {
     this(parent, quest, false, false, null, null, null, null);
   }
 
-  /** Open in edit mode when startInEditMode is true (e.g. new quest). */
-  public QuestScreen(@Nullable Screen parent, Quest quest, boolean startInEditMode) {
-    this(parent, quest, startInEditMode, startInEditMode, null, null, null, null);
+  /** The editor of a quest the server has not stored yet (Create). */
+  public static QuestScreen forNewQuest(@Nullable Screen parent, Quest quest) {
+    return new QuestScreen(parent, quest, true, true, null, null, null, null);
+  }
+
+  /** The editor of an existing quest, for instance rebuilt from the history. */
+  public static QuestScreen editorFor(@Nullable Screen parent, Quest quest) {
+    return new QuestScreen(parent, quest, true, false, null, null, null, null);
   }
 
   /** Internal constructor preserving edit state across mode switches. */
@@ -793,7 +798,11 @@ public class QuestScreen extends DisquestsBaseScreen {
     }
   }
 
-  /** Puts back what the editor wrote into the cached quest; the drafts are simply dropped. */
+  /**
+   * Puts back what the editor wrote into the cached quest; the drafts are simply dropped. The cache
+   * version moves on, so anything built from the quest meanwhile (a {@code QuestGraphs} graph, a
+   * list) is rebuilt without the cancelled text.
+   */
   private void restoreOriginals() {
     quest.setTitle(originalTitle);
     quest.setContent(originalContent);
@@ -838,6 +847,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     Quest archived = archivedMeanwhile(quest.getId());
     if (archived != null) {
       // Completed by a teammate while editing: show it as it is now, not the stale copy.
+    ClientCache.markChanged();
       navigateToScreen(new QuestScreen(this.parent, archived));
     } else if (isNewQuest) {
       navigateToScreen(this.parent);
@@ -847,11 +857,26 @@ public class QuestScreen extends DisquestsBaseScreen {
   }
 
   private void saveAndView() {
-    Quest archived = archivedMeanwhile(quest.getId());
-    if (archived != null) {
-      // A teammate completed the quest while we edited; the server would drop this save.
-      showArchivedInstead(this.parent, archived);
-      return;
+    // The server drops a save it refuses without an answer: check the quest as it is now.
+    Quest cached = ClientCache.getQuestById(quest.getId());
+    switch (SaveGuard.check(cached, ClientSession.getEffectivePlayerUuid(), isNewQuest)) {
+      case ARCHIVED -> {
+        // A teammate completed the quest while we edited.
+        showArchivedInstead(this.parent, cached);
+        return;
+      }
+      case NO_LONGER_EDITABLE -> {
+        // Demoted to Read, removed, or the quest locked for us meanwhile: nothing is sent or
+        // written to the cache, and the reading view shows the quest as it is now.
+        showRefusedToast(Component.translatable(SaveGuard.NO_LONGER_EDITABLE));
+        navigateToScreen(new QuestScreen(this.parent, cached));
+        return;
+      }
+      case GONE -> {
+        super.onClose();
+        return;
+      }
+      case SEND -> {}
     }
     persistFieldValues();
     LinkChanges links = editDraft != null ? editDraft.toLinkChanges() : LinkChanges.NONE;

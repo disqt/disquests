@@ -109,7 +109,8 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
           qn.editing()
               && !quest.isLocked()
               && quest.canEdit(ClientSession.getEffectivePlayerUuid());
-      return new QuestScreen(this.parent, quest, edit);
+      // A quest rebuilt from history exists on the server: never a new quest
+      return edit ? QuestScreen.editorFor(this.parent, quest) : new QuestScreen(this.parent, quest);
     } else if (entry instanceof NavEntry.MainNav mn) {
       ClientSession.setActiveTab(mn.tab());
       ClientSession.setSearchTerm(mn.searchTerm());
@@ -165,7 +166,8 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     this.minecraft.gui.setScreen(screen);
   }
 
-  private void goBack() {
+  /** Mouse back: the previous history entry, rebuilt. A screen may return elsewhere instead. */
+  protected void goBack() {
     if (this.minecraft == null) return;
     while (!backStack.isEmpty()) {
       NavEntry entry = backStack.pop();

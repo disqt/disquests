@@ -41,6 +41,8 @@
   // Notifications
   "gui.disquests.toast.{}": {
     "quest_archived": "Cette quête a été terminée par un coéquipier ; tes modifications n'ont pas été enregistrées.",
+    "no_longer_editable": "Tu ne peux plus modifier cette quête ; tes modifications n'ont pas été enregistrées.",
+    "now_on": "Tu fais maintenant partie de « %s » : retrouve-la dans My Quests",
   },
 
   // Notifications du serveur

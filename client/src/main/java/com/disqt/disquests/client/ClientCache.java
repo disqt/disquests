@@ -25,6 +25,14 @@ public class ClientCache {
     return version.get();
   }
 
+  /**
+   * Moves the version on after a cached quest was changed in place (the editor restoring what it
+   * wrote into it), so whatever was built from the cache is rebuilt.
+   */
+  public static void markChanged() {
+    version.incrementAndGet();
+  }
+
   public static List<Quest> getMyQuests() {
     return myQuests;
   }
