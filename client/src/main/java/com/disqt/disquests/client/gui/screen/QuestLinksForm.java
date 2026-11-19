@@ -35,8 +35,9 @@ import net.minecraft.network.chat.MutableComponent;
  * there are prerequisites and usable only while the draft's visibility is Open.
  *
  * <p>Owners only; prerequisites, auto-join and the hidden-parent line also need a server with quest
- * trees. Fills the {@code links-form} container of the edit XML, which is removed when there is
- * nothing to show.
+ * trees. Fills the {@code links-form} container of the edit XML (a dark panel like the location
+ * card, so the muted lines stay readable against the world), which is removed when there is nothing
+ * to show.
  */
 final class QuestLinksForm {
 
@@ -216,10 +217,13 @@ final class QuestLinksForm {
       button.active(draft.visibility() != v);
       visibilityRow.child(button);
     }
-    MutableComponent hint = Component.translatable(EditorText.visibilityHint(draft.visibility()));
-    if (trees && draft.hasParent()) {
-      hint.append(Component.literal(" "))
-          .append(Component.translatable(EditorText.VISIBILITY_IN_PARENT));
+    // Full sentences; inside a hidden quest the visibility depends on that quest all the same
+    boolean inside =
+        trees && (draft.hasParent() || draft.hiddenParent() == QuestEditDraft.HiddenParent.INSIDE);
+    MutableComponent hint = Component.empty();
+    for (String key : EditorText.visibilityHintKeys(draft.visibility(), inside)) {
+      if (!hint.getSiblings().isEmpty()) hint.append(Component.literal(" "));
+      hint.append(Component.translatable(key));
     }
     visibilityHint.text(hint);
   }
@@ -268,6 +272,8 @@ final class QuestLinksForm {
     if (!usable) {
       text.append(Component.literal(" ")).append(Component.translatable(EditorText.OPEN_ONLY));
       text.withColor(Colors.TEXT_MUTED);
+    } else {
+      text.withColor(Colors.TEXT_PRIMARY);
     }
     AutoJoinCheckbox box = new AutoJoinCheckbox(text, usable);
     box.id(AUTO_JOIN_ID);
@@ -287,9 +293,10 @@ final class QuestLinksForm {
   }
 
   private static LabelComponent label(Component text, boolean muted) {
+    // The form sits on a dark panel: primary for labels, the theme's muted for explanations
     LabelComponent label = UIComponents.label(text);
     label.shadow(true);
-    if (muted) label.color(Color.ofArgb(Colors.TEXT_MUTED));
+    label.color(Color.ofArgb(muted ? Colors.TEXT_MUTED : Colors.TEXT_PRIMARY));
     return label;
   }
 

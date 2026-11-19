@@ -75,6 +75,8 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
 
   private final UndoManager undoManager = new UndoManager(this);
   protected String placeholderText;
+  // Placeholder in the theme's muted colour (readable on a dark panel) instead of the disabled one
+  private boolean mutedPlaceholder;
   // caret blink
   protected boolean caretVisible = true;
   protected long lastBlinkTime = System.currentTimeMillis();
@@ -172,6 +174,11 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
   public void setCaretEnabled(boolean enabled) {
     this.caretEnabled = enabled;
     this.caretVisible = enabled;
+  }
+
+  /** Draws the placeholder in {@code Colors.TEXT_MUTED} rather than {@code TEXT_DISABLED}. */
+  public void setMutedPlaceholder(boolean muted) {
+    this.mutedPlaceholder = muted;
   }
 
   public void setChangedListener(Consumer<String> listener) {
@@ -614,8 +621,8 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
           this.placeholderText,
           drawX,
           contentY,
-          Colors.TEXT_DISABLED,
-          false); // Gray color
+          mutedPlaceholder ? Colors.TEXT_MUTED : Colors.TEXT_DISABLED,
+          false);
     }
 
     int firstVisibleLine = (int) (scrollY / textRenderer.lineHeight);

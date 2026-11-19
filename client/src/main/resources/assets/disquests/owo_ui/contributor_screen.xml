@@ -98,31 +98,42 @@
                 <children/>
             </flow-layout>
 
-            <!-- What the roles allow, and that nothing changes until Save (texts set programmatically) -->
-            <label id="people-roles-hint">
-                <text>-</text>
-                <shadow>true</shadow>
-                <color>#CCCCCC</color>
+            <!-- What the roles allow, and that nothing changes until Save (texts set programmatically),
+                 on a dark panel so the muted lines read against the world -->
+            <flow-layout direction="vertical" id="people-hints">
                 <sizing>
                     <horizontal method="fill">85</horizontal>
                     <vertical method="content"/>
                 </sizing>
+                <surface>
+                    <panel dark="true"/>
+                </surface>
+                <padding>
+                    <all>4</all>
+                </padding>
+                <gap>2</gap>
                 <margins>
                     <top>4</top>
                 </margins>
-            </label>
-            <label id="people-save-hint">
-                <text>-</text>
-                <shadow>true</shadow>
-                <color>#CCCCCC</color>
-                <sizing>
-                    <horizontal method="fill">85</horizontal>
-                    <vertical method="content"/>
-                </sizing>
-                <margins>
-                    <top>2</top>
-                </margins>
-            </label>
+                <children>
+                    <label id="people-roles-hint">
+                        <text>-</text>
+                        <shadow>true</shadow>
+                        <sizing>
+                            <horizontal method="fill">100</horizontal>
+                            <vertical method="content"/>
+                        </sizing>
+                    </label>
+                    <label id="people-save-hint">
+                        <text>-</text>
+                        <shadow>true</shadow>
+                        <sizing>
+                            <horizontal method="fill">100</horizontal>
+                            <vertical method="content"/>
+                        </sizing>
+                    </label>
+                </children>
+            </flow-layout>
 
             <!-- Save and Cancel (texts set programmatically) -->
             <flow-layout direction="horizontal" id="people-buttons">

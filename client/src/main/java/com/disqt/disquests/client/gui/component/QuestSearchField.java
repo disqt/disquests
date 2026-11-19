@@ -58,6 +58,7 @@ public class QuestSearchField extends TextFieldComponent {
     this.root = root;
     this.source = source;
     this.id(id);
+    getDelegate().setMutedPlaceholder(true);
     this.dropdown =
         new SuggestionDropdown<>(root, id + "-suggestions", QuestSearchField::entry, this::picked);
     setAutocomplete(dropdown, this::refreshIfChanged);

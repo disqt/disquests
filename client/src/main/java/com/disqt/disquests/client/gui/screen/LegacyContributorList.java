@@ -45,8 +45,7 @@ final class LegacyContributorList {
   /** Removes the people screen's parts and lists the contributors (the owner is not listed). */
   void build() {
     root.removeChild(root.childById(FlowLayout.class, "add-person-row"));
-    root.removeChild(root.childById(LabelComponent.class, "people-roles-hint"));
-    root.removeChild(root.childById(LabelComponent.class, "people-save-hint"));
+    root.removeChild(root.childById(FlowLayout.class, ContributorScreen.HINTS_ID));
     root.removeChild(root.childById(FlowLayout.class, "people-buttons"));
 
     List<Contributor> contributors = quest.getContributors();

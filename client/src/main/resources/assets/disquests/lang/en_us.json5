@@ -90,7 +90,7 @@
     "hidden_parent": "This quest sits inside a quest you can't see",
     "detach": "Detach",
     "visibility": "Visibility",
-    "visibility_in_parent": "Among those who can see the quest it sits in.",
+    "visibility_in_parent": "This applies among those who can see the quest it sits in.",
     "prerequisite_field": "type to add an existing quest...",
     "prerequisite_hidden": "something you don't have access to",
     "open_only": "(Open quests only)",
@@ -196,9 +196,9 @@
 
   // Visibility tooltips
   "gui.disquests.tooltip.{}": {
-    "private": "Only you can see this quest",
-    "closed": "Visible on Quest Board, others must request access",
-    "open": "Anyone can join and view this quest",
+    "private": "Only the people on this quest can see it.",
+    "closed": "Visible; others must request access.",
+    "open": "Visible; anyone can join.",
     "already_requested": "You have already requested access",
     "view_only": "You have view-only access",
     "needs_attention": "Needs your attention",

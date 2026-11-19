@@ -45,6 +45,9 @@ import org.jetbrains.annotations.Nullable;
  */
 public class ContributorScreen extends DisquestsBaseScreen {
 
+  /** The dark panel holding the two explanation lines. */
+  static final String HINTS_ID = "people-hints";
+
   private static final SystemToast.SystemToastId PEOPLE_TOAST =
       new SystemToast.SystemToastId(8003L);
 
@@ -183,15 +186,19 @@ public class ContributorScreen extends DisquestsBaseScreen {
 
   private void buildPeople() {
     root.removeChild(root.childById(LabelComponent.class, "empty-label"));
+    FlowLayout hints = root.childById(FlowLayout.class, HINTS_ID);
+    applyThemePanel(hints);
     LabelComponent rolesHint = root.childById(LabelComponent.class, "people-roles-hint");
     rolesHint.text(Component.translatable(PeopleText.ROLES_HINT));
+    rolesHint.color(Color.ofArgb(Colors.TEXT_MUTED));
     LabelComponent saveHint = root.childById(LabelComponent.class, "people-save-hint");
     saveHint.text(Component.translatable(PeopleText.SAVE_HINT));
+    saveHint.color(Color.ofArgb(Colors.TEXT_MUTED));
 
     if (!manages) {
       // Read-only: the people and their roles, no controls
       root.removeChild(root.childById(FlowLayout.class, "add-person-row"));
-      root.removeChild(saveHint);
+      hints.removeChild(saveHint);
       root.removeChild(root.childById(FlowLayout.class, "people-buttons"));
       refreshRows();
       return;

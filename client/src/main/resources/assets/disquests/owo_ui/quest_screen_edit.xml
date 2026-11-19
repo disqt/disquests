@@ -218,12 +218,19 @@
             </flow-layout>
 
             <!-- Link controls (owners): hidden-parent line, visibility, prerequisites, auto-join;
-                 filled by QuestLinksForm, removed for other players -->
+                 filled by QuestLinksForm, removed for other players. A dark panel like the
+                 location card, so its muted lines read against the world -->
             <flow-layout direction="vertical" id="links-form">
                 <sizing>
                     <horizontal method="fill">85</horizontal>
                     <vertical method="content"/>
                 </sizing>
+                <surface>
+                    <panel dark="true"/>
+                </surface>
+                <padding>
+                    <all>4</all>
+                </padding>
                 <gap>2</gap>
                 <margins>
                     <top>2</top>

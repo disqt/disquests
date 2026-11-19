@@ -35,9 +35,20 @@ public final class EditorText {
     return "gui.disquests.visibility." + v.name().toLowerCase(java.util.Locale.ROOT);
   }
 
-  /** The visibility's tooltip, shown as a muted line beside the three buttons. */
+  /** The visibility's explanation sentence, also the tooltip of 0.8.0's visibility button. */
   public static String visibilityHint(Visibility v) {
     return "gui.disquests.tooltip." + v.name().toLowerCase(java.util.Locale.ROOT);
+  }
+
+  /**
+   * The sentences of the explanation line under the visibility buttons, in order: the setting's own
+   * sentence, then, for Closed and Open on a quest that sits inside another, the sentence saying it
+   * applies among those who can see that quest. Private stands alone: it does not depend on the
+   * parent.
+   */
+  public static List<String> visibilityHintKeys(Visibility v, boolean insideAnother) {
+    if (v == Visibility.PRIVATE || !insideAnother) return List.of(visibilityHint(v));
+    return List.of(visibilityHint(v), VISIBILITY_IN_PARENT);
   }
 
   /** Every key above, for the lang-file test. */

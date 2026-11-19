@@ -195,6 +195,8 @@ public class QuestScreen extends DisquestsBaseScreen {
     if (editorPanel != null) applyThemePanel(editorPanel);
     ParentUIComponent formattingPanel = root.childById(ParentUIComponent.class, "formatting-panel");
     if (formattingPanel != null) applyThemePanel(formattingPanel);
+    ParentUIComponent linksPanel = root.childById(ParentUIComponent.class, QuestLinksForm.ID);
+    if (linksPanel != null) applyThemePanel(linksPanel);
 
     UUID myUuid = ClientSession.getEffectivePlayerUuid();
     this.isOwner = quest.isOwner(myUuid);
