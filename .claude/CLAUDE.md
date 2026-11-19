@@ -234,6 +234,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 
 ### Wiki-links
 - **Dirty tracking has two entry points** — `enterEditMode()` passes `origContent` to the constructor, `buildEditMode()` has a fallback snapshot guarded by `if (originalTitle == null)`. Both must reverse-resolve wiki-link UUIDs. The constructor path is the one used in practice (view→edit mode switch).
+- **A locked view is not a link target** — `WikiLinks.target` (Minecraft-free) resolves a link only to a cached quest that is not `isLocked()`; rendering, hover and click all ask it, so a locked quest keeps the server's "Private Quest" placeholder. `WikiLinks.toEditingForm` turns only such links into `[[Title]]` and keeps `[[uuid|text]]` for the rest, so editing never destroys a link the editor cannot see.
 - **Server resolution is per-recipient** — `WikiLinkResolver.resolveForRecipient()` converts `[[Quest Name]]` → `[[uuid|title]]` when sending to clients. `reverseResolve()` converts back on save. DB stores raw `[[Quest Name]]` form, clients receive UUID form.
 
 ### World map
@@ -249,8 +250,9 @@ Channel: `disquests:main`. First byte = PacketType ID.
 ### Quest completion
 - **Archive lock is server-side** — every edit handler (save, contributors, visibility, join, request, pin, leave) returns early when `quest.isCompleted()`; COMPLETE/REOPEN need the OWNER role (since V4 rules; a can-edit contributor can no longer complete). Completing drops the quest's pins and pending requests. Only REOPEN unlocks it.
 - **Clients < V3 never receive completed quests** — syncs filter them out, and a completion sends those clients DELETE_QUEST_S2C; reopen sends the quest back. V3 clients get a completed quest only when they hold a role on it; V4+ clients get every completed quest they can see and keep it off the board themselves.
+- **Lost-write guard** — `QuestScreen` Save asks `SaveGuard.check` with the cached quest: completed shows it archived, no longer Write (or locked) toasts `no_longer_editable` and shows the reading view without sending, gone closes.
 - **Stale-editor guard** — `DisquestsBaseScreen.archivedMeanwhile(id)` returns the cached quest when it was completed after a screen took its copy. `QuestScreen` save and `ContributorScreen` edits check it and call `showArchivedInstead` (toast + view of the archived quest) instead of sending an edit the server would silently drop.
-- **Archived tab** — `tab-archived` (`ClientSession.Tab.ARCHIVED`) lists `QuestListOrder.archived(ClientCache.getMyQuests())`, newest completion first; completed quests stay in `myQuests`, so filter with `Quest.isCompleted()`. View ids: `btn-complete` (active), `btn-reopen` + `completed-label` (completed; no `btn-edit`/`btn-leave`). Complete navigates back to the parent; Reopen rebuilds the open `QuestScreen` via `ClientPacketHandler`, so wait for `btn-complete`, not `waitForScreen`.
+- **Archived tab** — `tab-archived` (`ClientSession.Tab.ARCHIVED`) lists the rows of `QuestTreeRows` for `Tab.ARCHIVED`: every completed quest the player holds a role on (not locked), flat, newest completion first; completed quests stay in `myQuests`, so filter with `Quest.isCompleted()`. View ids: `btn-complete` (active), `btn-reopen` + `completed-label` (completed; no `btn-edit`/`btn-leave`). Complete navigates back to the parent; Reopen's answer changes the page signature and `QuestScreen.refreshIfPageChanged` rebuilds the open page in place, so wait for `btn-complete`, not `waitForScreen`.
 - **`ClientSession.activeTab` persists across journey classes** — reset it (and the search term) at the start of a journey that relies on My Quests.
 
 ### Quest trees and roles
