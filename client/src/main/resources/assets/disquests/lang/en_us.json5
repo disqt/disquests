@@ -42,6 +42,7 @@
   "gui.disquests.toast.{}": {
     "quest_archived": "This quest was completed by a teammate; your changes were not saved.",
     "no_longer_editable": "You can no longer edit this quest; your changes were not saved.",
+    "owner_parts_not_saved": "You are no longer an owner of this quest; visibility and prerequisites were not saved.",
     "now_on": "You are now on \"%s\": see My Quests",
   },
 

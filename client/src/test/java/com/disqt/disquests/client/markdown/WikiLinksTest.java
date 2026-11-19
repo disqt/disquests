@@ -57,6 +57,23 @@ class WikiLinksTest {
   }
 
   @Nested
+  class Suggestions {
+
+    @Test
+    void offersOnlyQuestsSeenFullyMatchingTheStart() {
+      java.util.List<Quest> quests =
+          java.util.List.of(
+              CACHE.get(id("Mine")),
+              CACHE.get(id("Gate")),
+              Quest.fromNetwork(quest("Minefield").owner(LEO).build()),
+              Quest.fromNetwork(quest("Gatehouse").owner(LEO).build()));
+      assertEquals(java.util.List.of("Mine", "Minefield"), WikiLinks.suggestions(quests, "mi", 5));
+      assertEquals(java.util.List.of("Gatehouse"), WikiLinks.suggestions(quests, "gate", 5));
+      assertEquals(java.util.List.of("Mine"), WikiLinks.suggestions(quests, "", 1));
+    }
+  }
+
+  @Nested
   class EditingForm {
 
     static Stream<Arguments> conversions() {

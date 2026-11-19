@@ -18,6 +18,7 @@ import com.disqt.disquests.client.gui.widget.MarkdownWidget;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.client.markdown.RenderedLine;
+import com.disqt.disquests.client.markdown.WikiLinks;
 import com.disqt.disquests.client.network.PacketSender;
 import com.disqt.disquests.common.DimensionKeys;
 import com.disqt.disquests.common.QuestLocation;
@@ -77,8 +78,7 @@ public class QuestScreen extends DisquestsBaseScreen {
   private final boolean isNewQuest;
 
   // Edit mode state preserved across rebuilds
-  private String originalTitle;
-  private String originalContent;
+  @Nullable private EditorOriginals originals;
   private LocationCard.LocationSnapshot originalLocation;
 
   /**
@@ -123,17 +123,17 @@ public class QuestScreen extends DisquestsBaseScreen {
 
   /** Open in view mode for an existing quest. */
   public QuestScreen(@Nullable Screen parent, Quest quest) {
-    this(parent, quest, false, false, null, null, null, null);
+    this(parent, quest, false, false, null, null, null);
   }
 
   /** The editor of a quest the server has not stored yet (Create). */
   public static QuestScreen forNewQuest(@Nullable Screen parent, Quest quest) {
-    return new QuestScreen(parent, quest, true, true, null, null, null, null);
+    return new QuestScreen(parent, quest, true, true, null, null, null);
   }
 
   /** The editor of an existing quest, for instance rebuilt from the history. */
   public static QuestScreen editorFor(@Nullable Screen parent, Quest quest) {
-    return new QuestScreen(parent, quest, true, false, null, null, null, null);
+    return new QuestScreen(parent, quest, true, false, null, null, null);
   }
 
   /** Internal constructor preserving edit state across mode switches. */
@@ -142,8 +142,7 @@ public class QuestScreen extends DisquestsBaseScreen {
       Quest quest,
       boolean editing,
       boolean isNewQuest,
-      @Nullable String originalTitle,
-      @Nullable String originalContent,
+      @Nullable EditorOriginals originals,
       @Nullable LocationCard.LocationSnapshot originalLocation,
       @Nullable QuestEditDraft editDraft) {
     super(
@@ -154,8 +153,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     this.quest = quest;
     this.editing = editing;
     this.isNewQuest = isNewQuest;
-    this.originalTitle = originalTitle;
-    this.originalContent = originalContent;
+    this.originals = originals;
     this.originalLocation = originalLocation;
     this.editDraft = editDraft;
   }
@@ -503,9 +501,8 @@ public class QuestScreen extends DisquestsBaseScreen {
             : "";
 
     // Snapshot originals for dirty tracking
-    if (originalTitle == null) {
-      originalTitle = quest.getTitle() != null ? quest.getTitle() : "";
-      originalContent = editableContent;
+    if (originals == null) {
+      originals = EditorOriginals.of(quest, ClientCache::getQuestById);
     }
     if (originalLocation == null) {
       originalLocation = LocationCard.LocationSnapshot.of(quest);
@@ -764,8 +761,7 @@ public class QuestScreen extends DisquestsBaseScreen {
                         quest,
                         true,
                         isNewQuest,
-                        originalTitle,
-                        originalContent,
+                        originals,
                         originalLocation,
                         editDraft);
                 navigateToScreen(new TagPickerScreen(returnScreen, quest, returnScreen));
@@ -781,19 +777,13 @@ public class QuestScreen extends DisquestsBaseScreen {
   private void enterEditMode() {
     if (!canEdit) return;
     persistFieldValues();
-    String origTitle = quest.getTitle() != null ? quest.getTitle() : "";
-    String origContent =
-        quest.getContent() != null
-            ? MarkdownRenderer.reverseResolveWikiLinks(quest.getContent())
-            : "";
     navigateToScreen(
         new QuestScreen(
             this.parent,
             quest,
             true,
             isNewQuest,
-            origTitle,
-            origContent,
+            EditorOriginals.of(quest, ClientCache::getQuestById),
             LocationCard.LocationSnapshot.of(quest),
             newEditDraft()));
   }
@@ -841,8 +831,8 @@ public class QuestScreen extends DisquestsBaseScreen {
    * list) is rebuilt without the cancelled text.
    */
   private void restoreOriginals() {
-    quest.setTitle(originalTitle);
-    quest.setContent(originalContent);
+    // Exactly what the server sent, not the editing form ([[Title]] would show literally)
+    if (originals != null) originals.restore(quest);
     // The map editor and vertex rows write straight into the cached quest.
     if (originalLocation != null) {
       originalLocation.restore(quest);
@@ -916,7 +906,14 @@ public class QuestScreen extends DisquestsBaseScreen {
       case SEND -> {}
     }
     persistFieldValues();
-    LinkChanges links = editDraft != null ? editDraft.toLinkChanges() : LinkChanges.NONE;
+    LinkChanges draftLinks = editDraft != null ? editDraft.toLinkChanges() : LinkChanges.NONE;
+    // No longer an owner (lowered to Write meanwhile): only the text and the tree moves go out
+    SaveGuard.Links sendable =
+        SaveGuard.linksToSend(cached, ClientSession.getEffectivePlayerUuid(), draftLinks);
+    LinkChanges links = sendable.links();
+    if (sendable.ownerPartsDropped()) {
+      showRefusedToast(Component.translatable(SaveGuard.NO_LONGER_OWNER));
+    }
     // Shown at once, as before; the server's answer corrects it if it refuses.
     if (links.visibility() != null) quest.setVisibility(links.visibility());
     ClientCache.addOrUpdateMyQuest(quest);
@@ -1202,14 +1199,7 @@ public class QuestScreen extends DisquestsBaseScreen {
   private void rebuildEditMode() {
     navigateToScreen(
         new QuestScreen(
-            this.parent,
-            quest,
-            true,
-            isNewQuest,
-            originalTitle,
-            originalContent,
-            originalLocation,
-            editDraft));
+            this.parent, quest, true, isNewQuest, originals, originalLocation, editDraft));
   }
 
   // ===================== HELPERS =====================
@@ -1243,8 +1233,7 @@ public class QuestScreen extends DisquestsBaseScreen {
         contentFieldComponent != null ? contentFieldComponent.getText() : quest.getContent();
     if (currentTitle == null) currentTitle = "";
     if (currentContent == null) currentContent = "";
-    return !currentTitle.equals(originalTitle)
-        || !currentContent.equals(originalContent)
+    return (originals != null && originals.textChanged(currentTitle, currentContent))
         || (originalLocation != null && !originalLocation.sameLocation(quest))
         || LocationCard.vertexFieldsEdited(quest, vertexRows)
         || (editDraft != null && editDraft.isDirty());
@@ -1344,12 +1333,11 @@ public class QuestScreen extends DisquestsBaseScreen {
    * Wiki-link suggestions, as before: my quests then the board's, titles starting with the query.
    */
   private static List<String> wikiLinkTitles(String query) {
-    String lower = query.toLowerCase(Locale.ROOT);
-    return Stream.concat(ClientCache.getMyQuests().stream(), ClientCache.getServerQuests().stream())
-        .map(Quest::getTitle)
-        .filter(Objects::nonNull)
-        .filter(title -> lower.isEmpty() || title.toLowerCase(Locale.ROOT).startsWith(lower))
-        .limit(WIKI_LINK_SUGGESTIONS)
-        .toList();
+    // Locked quests are not offered: the link would show "Private Quest" to its own author
+    return WikiLinks.suggestions(
+        Stream.concat(ClientCache.getMyQuests().stream(), ClientCache.getServerQuests().stream())
+            .toList(),
+        query,
+        WIKI_LINK_SUGGESTIONS);
   }
 }

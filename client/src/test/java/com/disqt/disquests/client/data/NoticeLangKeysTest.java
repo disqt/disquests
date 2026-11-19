@@ -79,6 +79,7 @@ class NoticeLangKeysTest {
     keys.addAll(TREE_ROW_KEYS);
     keys.addAll(QUEST_ENTRY_KEYS);
     keys.add(SaveGuard.NO_LONGER_EDITABLE);
+    keys.add(SaveGuard.NO_LONGER_OWNER);
     keys.addAll(TOAST_KEYS);
     for (Visibility v : Visibility.values()) keys.add(EditorText.visibility(v));
     return keys.stream().distinct().toList();

@@ -56,6 +56,23 @@ public final class WikiLinks {
             });
   }
 
+  /**
+   * The {@code [[} autocomplete: titles of the given quests (mine first, then the board's) that
+   * start with the query, ignoring case, at most {@code limit}. Only quests the player sees fully
+   * are offered: a link to a locked view would render as the placeholder for its own author.
+   */
+  public static java.util.List<String> suggestions(
+      java.util.List<Quest> quests, String query, int limit) {
+    String lower = query.toLowerCase(java.util.Locale.ROOT);
+    return quests.stream()
+        .filter(q -> !q.isLocked())
+        .map(Quest::getTitle)
+        .filter(java.util.Objects::nonNull)
+        .filter(t -> lower.isEmpty() || t.toLowerCase(java.util.Locale.ROOT).startsWith(lower))
+        .limit(limit)
+        .toList();
+  }
+
   @Nullable
   private static UUID parse(@Nullable String id) {
     if (id == null || id.isEmpty()) return null;
