@@ -107,6 +107,14 @@ class QuestPageTest {
     }
 
     @Test
+    void anOlderServerOffersNoPeopleScreenOnTheReadingView() {
+      // 0.8.0 reached the contributors from the editor only
+      assertEquals(
+          false,
+          QuestPage.actions(quest("Gare").owner(LEO).build(), LEO, true, false).managePeople());
+    }
+
+    @Test
     void noCompletionBeforeV3() {
       Actions a = QuestPage.actions(quest("Gare").owner(LEO).build(), LEO, false, false);
       assertEquals(false, a.complete());

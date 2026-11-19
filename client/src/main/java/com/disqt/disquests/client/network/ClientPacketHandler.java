@@ -90,6 +90,18 @@ public class ClientPacketHandler {
     }
   }
 
+  /** Lang key of the toast for a quest that just reached My Quests. */
+  public static final String NOW_ON_KEY = "gui.disquests.toast.now_on";
+
+  /**
+   * "You are now on "X": see My Quests", for every way a quest reaches My Quests: a join, an
+   * accepted request, an owner adding the player, a role applied to subquests, an auto-join.
+   */
+  private static String nowOnText(Quest quest) {
+    return Component.translatable(NOW_ON_KEY, quest.getTitle() != null ? quest.getTitle() : "")
+        .getString();
+  }
+
   private static void handleHandshake(ByteBufReader r) {
     PacketCodec.HandshakePayload payload = PacketCodec.readHandshake(r);
     ClientSession.joinServer(
@@ -187,7 +199,7 @@ public class ClientPacketHandler {
       mainScreen.refreshListContents();
     }
     if (justJoined) {
-      showOrDeferToast("Joined \"" + quest.getTitle() + "\" \u2014 see My Quests");
+      showOrDeferToast(nowOnText(quest));
     }
   }
 
@@ -231,7 +243,7 @@ public class ClientPacketHandler {
       ClientCache.addOrUpdateMyQuest(quest);
       ClientCache.removeFromServerQuests(payload.questId());
 
-      showOrDeferToast("Joined \"" + quest.getTitle() + "\" \u2014 see My Quests");
+      showOrDeferToast(nowOnText(quest));
     }
   }
 }

@@ -29,6 +29,7 @@ import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.LinkChanges;
 import com.disqt.disquests.common.model.Notice;
 import com.disqt.disquests.common.model.PointData;
+import com.disqt.disquests.common.model.Visibility;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
@@ -273,8 +274,8 @@ public class QuestScreen extends DisquestsBaseScreen {
   }
 
   /**
-   * "by owner", the visibility badge (the quest's own setting) and the player's role. A locked view
-   * has no owner name: only the badge and the role.
+   * "by owner", the visibility badge (the quest's own setting) and, on a server with quest trees,
+   * the player's role. A locked view has no owner name: only the badge and the role.
    */
   private void buildHeaderInfo(FlowLayout root) {
     boolean hasOwnerName = quest.getOwnerName() != null && !quest.getOwnerName().isBlank();
@@ -289,7 +290,10 @@ public class QuestScreen extends DisquestsBaseScreen {
             case OPEN -> 0x55FF55; // green
           };
       ownerText.append(
-          Component.literal("  [" + quest.getVisibility().name() + "]").withColor(visColor));
+          Component.literal("  [")
+              .append(Component.translatable(EditorText.visibility(quest.getVisibility())))
+              .append("]")
+              .withColor(visColor));
     }
     LabelComponent ownerLabel = UIComponents.label(ownerText);
     ownerLabel.shadow(true);
@@ -297,6 +301,8 @@ public class QuestScreen extends DisquestsBaseScreen {
     FlowLayout headerRow = root.childById(FlowLayout.class, "header-row");
     headerRow.child(ownerLabel);
 
+    // Roles come with quest trees: an older server's page shows none, as in 0.8.0
+    if (!ClientSession.supportsTrees()) return;
     UUID me = ClientSession.getEffectivePlayerUuid();
     LabelComponent roleLabel =
         UIComponents.label(Messages.toComponent(QuestPage.role(quest.roleOf(me))));
@@ -607,10 +613,13 @@ public class QuestScreen extends DisquestsBaseScreen {
                 if (linksForm != null) linksForm.refresh();
               });
     }
-    linksForm = QuestLinksForm.attach(this, root, editDraft, isOwner, this::treeChanged);
+    // An older server keeps 0.8.0's visibility button in the settings row instead of the form
+    boolean trees = ClientSession.supportsTrees();
+    linksForm = QuestLinksForm.attach(this, root, editDraft, isOwner && trees, this::treeChanged);
 
     // People (owner only)
     FlowLayout settingsRow = root.childById(FlowLayout.class, "settings-row");
+    if (isOwner && !trees) addLegacyVisibilityButton(settingsRow);
     if (isOwner) {
       ButtonComponent contribBtn = root.childById(ButtonComponent.class, "btn-contributors");
       contribBtn.onPress(ignored -> openContributors());
@@ -672,6 +681,34 @@ public class QuestScreen extends DisquestsBaseScreen {
               .append(
                   Component.literal("quest link")
                       .withStyle(s -> s.withUnderlined(true).withColor(0xe8a86d))));
+  }
+
+  /**
+   * 0.8.0's visibility control, for a server without quest trees: {@code btn-visibility} reads
+   * "Visibility: Private" and each press moves to the next setting (Private, Closed, Open). It
+   * changes the draft only; Save sends the change, as 0.8.0 did.
+   */
+  private void addLegacyVisibilityButton(FlowLayout settingsRow) {
+    Visibility shown = editDraft.visibility();
+    ButtonComponent visBtn =
+        UIComponents.button(
+            Component.translatable(EditorText.VISIBILITY)
+                .append(": ")
+                .append(Component.translatable(EditorText.visibility(shown))),
+            ignored -> {
+              editDraft.visibility(
+                  switch (editDraft.visibility()) {
+                    case PRIVATE -> Visibility.CLOSED;
+                    case CLOSED -> Visibility.OPEN;
+                    case OPEN -> Visibility.PRIVATE;
+                  });
+              persistFieldValues();
+              rebuildEditMode();
+            });
+    visBtn.id("btn-visibility");
+    visBtn.tooltip(Component.translatable(EditorText.visibilityHint(shown)));
+    visBtn.sizing(Sizing.content(), Sizing.fixed(16));
+    settingsRow.child(0, visBtn);
   }
 
   /**
@@ -810,6 +847,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     if (originalLocation != null) {
       originalLocation.restore(quest);
     }
+    ClientCache.markChanged();
   }
 
   /** After a tree change made from the form (the hidden-parent Detach): pane and form follow. */
@@ -847,7 +885,6 @@ public class QuestScreen extends DisquestsBaseScreen {
     Quest archived = archivedMeanwhile(quest.getId());
     if (archived != null) {
       // Completed by a teammate while editing: show it as it is now, not the stale copy.
-    ClientCache.markChanged();
       navigateToScreen(new QuestScreen(this.parent, archived));
     } else if (isNewQuest) {
       navigateToScreen(this.parent);
@@ -955,8 +992,8 @@ public class QuestScreen extends DisquestsBaseScreen {
   }
 
   private void confirmReopen() {
-    // The server answers with UPDATE_QUEST; ClientPacketHandler then reopens this screen with the
-    // active quest, so the buttons switch back.
+    // The server answers with UPDATE_QUEST; the page signature changes and refreshIfPageChanged
+    // rebuilds this page with the active quest, so the buttons switch back.
     showConfirmOverlay(
         Component.translatable("gui.disquests.confirm.reopen"),
         () -> PacketSender.reopenQuest(quest.getId()));

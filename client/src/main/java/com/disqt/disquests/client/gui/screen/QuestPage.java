@@ -78,7 +78,8 @@ public final class QuestPage {
    * role. Otherwise: Join or Request without a role, Edit for Write and Owner, Leave for any role
    * except the last owner, Complete, Delete and the people screen for owners; a completed quest
    * keeps only Reopen and Delete, for owners. Servers before quest trees ({@code supportsTrees}
-   * false) still let Write complete and reopen, as they did.
+   * false) still let Write complete and reopen, as they did, and reach the people from the editor
+   * only.
    */
   public static Actions actions(
       QuestData q, UUID me, boolean supportsCompletion, boolean supportsTrees) {
@@ -102,7 +103,8 @@ public final class QuestPage {
         completes,
         false,
         owner,
-        owner,
+        // An older server's people are reached from the editor only, as in 0.8.0
+        owner && supportsTrees,
         write && hasLinks,
         owner && q.privatized() != null,
         owner && q.deletedPrerequisite());
