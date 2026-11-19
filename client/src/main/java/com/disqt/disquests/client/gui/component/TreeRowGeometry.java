@@ -5,7 +5,9 @@ package com.disqt.disquests.client.gui.component;
  * a click hits. Minecraft-free, so it can be unit-tested.
  *
  * <p>A completed quest's links are frozen: it never shows the remove zone and never drags, whatever
- * the caller asked for. The toggle only exists in read mode, for a quest with listed subquests.
+ * the caller asked for. The toggle only exists in read mode, for a quest with listed subquests; in
+ * edit mode its slot holds the drag handle of a row that drags (part of the body, so pressing it
+ * starts a drag like pressing the title).
  */
 public record TreeRowGeometry(
     int depth,
@@ -22,6 +24,11 @@ public record TreeRowGeometry(
   public static final int TOGGLE_WIDTH = 9;
   public static final int ICON_WIDTH = 10;
   public static final int REMOVE_WIDTH = 12;
+
+  /** The drag handle's grip: two columns of three dots, in the toggle slot. */
+  public static final int HANDLE_WIDTH = 5;
+
+  public static final int HANDLE_HEIGHT = 7;
 
   /** The clickable parts of a row. */
   public enum Part {
@@ -40,6 +47,26 @@ public record TreeRowGeometry(
 
   public boolean canDrag() {
     return editMode && draggable && !completed;
+  }
+
+  /** A grip at the left of a row that can be dragged (edit mode, never for a completed quest). */
+  public boolean hasHandle() {
+    return canDrag();
+  }
+
+  /** Left edge of the handle's grip, centred in the toggle slot. */
+  public int handleX() {
+    return toggleX() + (TOGGLE_WIDTH - HANDLE_WIDTH) / 2;
+  }
+
+  /**
+   * What follows the title, drawn muted and always kept whole: the subquest count ("(2)") and, on
+   * the edited quest's own row in the editor, the "(editing)" label; "" when there is neither.
+   */
+  public static String trailing(int childCount, String editingLabel) {
+    String count = childCount > 0 ? "(" + childCount + ")" : "";
+    if (editingLabel == null || editingLabel.isEmpty()) return count;
+    return count.isEmpty() ? editingLabel : count + " " + editingLabel;
   }
 
   public int toggleX() {

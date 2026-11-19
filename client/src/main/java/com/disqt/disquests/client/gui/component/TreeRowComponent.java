@@ -18,10 +18,12 @@ import net.minecraft.network.chat.Component;
  * One line of a quest tree, drawn by itself: a single leaf, because owo delivers drags only to the
  * focused component and a row made of labels would never receive them.
  *
- * <p>From the left: the expand toggle (when the quest has listed subquests), a lock or a tick, the
- * title and the subquest count; at the right, the "not saved" marker and, when removable, the
- * remove hit zone. Locks and ticks are drawn only, never clickable. Layout and hit zones come from
- * {@link TreeRowGeometry}.
+ * <p>From the left: the expand toggle (read mode, when the quest has listed subquests) or the drag
+ * handle (edit mode, when the row drags), a lock or a tick, the title and the subquest count, then
+ * "(editing)" on the edited quest's own row; at the right, the "not saved" marker and, when
+ * removable, the remove hit zone with its "Take out of X" tooltip. The current quest's row is
+ * filled and marked with an accent bar, more than a hovered row. Locks and ticks are drawn only,
+ * never clickable. Layout and hit zones come from {@link TreeRowGeometry}.
  *
  * <p>Read mode: a click opens the quest, the toggle expands or collapses it. Edit mode: nothing
  * navigates; the remove zone removes, and a left press on a draggable row that moves more than
@@ -64,12 +66,21 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
     void dropped(TreeRowComponent source, int absX, int absY);
 
     void dragCancelled(TreeRowComponent source);
+
+    /** True while any row of this target is being dragged: rows then drop hover effects. */
+    default boolean dragging() {
+      return false;
+    }
   }
+
+  private static final int ACCENT_WIDTH = 2;
+  private static final String EDITING_KEY = "gui.disquests.tree.editing";
 
   private final Line line;
   private final String title;
   private final Component marker;
-  private final String count;
+  private String count;
+  private Component removeTooltip;
 
   private boolean editMode;
   private Consumer<UUID> onOpen = id -> {};
@@ -94,7 +105,7 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
         line.takenOut()
             ? Component.translatable("gui.disquests.tree.taken_out")
             : line.changed() ? Component.translatable("gui.disquests.tree.not_saved") : null;
-    this.count = line.childCount() > 0 ? "(" + line.childCount() + ")" : "";
+    this.count = TreeRowGeometry.trailing(line.childCount(), "");
     this.id("tree-row-" + line.questId());
     this.sizing(Sizing.fill(100), Sizing.fixed(ROW_HEIGHT));
   }
@@ -114,7 +125,22 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
     this.editMode = true;
     this.onRemove = onRemove;
     this.dragTarget = target;
+    // The edited quest's own row says so
+    String editing = line.current() ? Component.translatable(EDITING_KEY).getString() : "";
+    this.count = TreeRowGeometry.trailing(line.childCount(), editing);
+    this.fittedFor = -1;
     return this;
+  }
+
+  /** The tooltip of the remove zone ("Take out of X"); null for none. */
+  public TreeRowComponent removeTooltip(Component tooltip) {
+    this.removeTooltip = tooltip;
+    return this;
+  }
+
+  /** The title as given, for the drag ghost. */
+  public String title() {
+    return title;
   }
 
   public UUID questId() {
@@ -202,14 +228,20 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
     int x = x();
     int y = y();
     int w = width();
-    boolean hovered = isInBoundingBox(mouseX, mouseY);
+    // While a row is dragged only the drop target lights up, not what the cursor passes over
+    boolean otherDrag = dragTarget != null && dragTarget.dragging();
+    boolean hovered = isInBoundingBox(mouseX, mouseY) && !otherDrag;
     Part hoveredPart = hovered ? g.partAt(mouseX - x) : null;
 
     if (highlighted) {
       context.fill(x, y, x + w, y + ROW_HEIGHT, Colors.TREE_DROP_TARGET);
-      context.drawRectOutline(x, y, w, ROW_HEIGHT, Colors.TEXT_PRIMARY);
-    } else if (line.current() || dragging) {
+      context.drawRectOutline(x, y, w, ROW_HEIGHT, Colors.TREE_DROP_OUTLINE);
+    } else if (line.current()) {
       context.fill(x, y, x + w, y + ROW_HEIGHT, Colors.ENTRY_SELECTED);
+      if (hovered && (!editMode || g.canDrag())) {
+        context.fill(x, y, x + w, y + ROW_HEIGHT, Colors.ENTRY_HOVER);
+      }
+      context.fill(x, y, x + ACCENT_WIDTH, y + ROW_HEIGHT, Colors.AMBER);
     } else if (hovered && (!editMode || g.canDrag())) {
       context.fill(x, y, x + w, y + ROW_HEIGHT, Colors.ENTRY_HOVER);
     }
@@ -223,6 +255,13 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
           hoveredPart == Part.TOGGLE ? Colors.TEXT_PRIMARY : Colors.TEXT_MUTED,
           false);
     }
+    if (g.hasHandle()) {
+      drawHandle(
+          context,
+          x + g.handleX(),
+          y + (ROW_HEIGHT - TreeRowGeometry.HANDLE_HEIGHT) / 2,
+          hovered && hoveredPart == Part.BODY ? Colors.TEXT_PRIMARY : Colors.TEXT_MUTED);
+    }
     if (line.completed()) {
       context.text(font, "✔", x + g.iconX(), y + TEXT_Y, Colors.TREE_COMPLETED, false);
     } else if (line.locked()) {
@@ -230,12 +269,17 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
     }
 
     if (g.hasRemove()) {
+      boolean onRemove = hoveredPart == Part.REMOVE;
+      if (onRemove) {
+        context.fill(x + g.removeX(), y, x + w, y + ROW_HEIGHT, Colors.ENTRY_HOVER);
+        if (removeTooltip != null) context.setTooltipForNextFrame(removeTooltip, mouseX, mouseY);
+      }
       context.text(
           font,
           "×",
           x + g.removeX() + 3,
           y + TEXT_Y,
-          hoveredPart == Part.REMOVE ? Colors.BADGE_RED : Colors.TEXT_MUTED,
+          onRemove ? Colors.TREE_REMOVE_HOVER : Colors.TEXT_MUTED,
           false);
     }
     int right = x + g.removeX() - TreeRowGeometry.LEFT;
@@ -260,6 +304,15 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
     }
     if (!count.isEmpty() && font.width(count) <= right - textEnd) {
       context.text(font, count, textEnd, y + TEXT_Y, Colors.TEXT_MUTED, false);
+    }
+  }
+
+  /** The drag handle: a grip of two columns of three dots. */
+  private static void drawHandle(OwoUIGraphics context, int x, int y, int color) {
+    for (int row = 0; row < 3; row++) {
+      int dy = y + row * 3;
+      context.fill(x, dy, x + 2, dy + 1, color);
+      context.fill(x + 3, dy, x + 5, dy + 1, color);
     }
   }
 

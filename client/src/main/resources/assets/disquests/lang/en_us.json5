@@ -101,6 +101,8 @@
   "gui.disquests.tree.{}": {
     "not_saved": "not saved",
     "taken_out": "taken out, not saved",
+    "editing": "(editing)",
+    "take_out_of": "Take out of %s",
   },
 
   // A player's role on a quest, next to the visibility badge
@@ -248,7 +250,7 @@
     "tags": "Tags (%d)",
     "contributors": "Contributors (%d)",
     "where_this_sits": "WHERE THIS SITS",
-    "subquests": "SUBQUESTS",
+    "quest_tree": "QUEST TREE",
     "prerequisites": "Prerequisites",
   },
 

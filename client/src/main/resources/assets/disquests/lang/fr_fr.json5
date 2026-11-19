@@ -101,6 +101,8 @@
   "gui.disquests.tree.{}": {
     "not_saved": "non enregistrée",
     "taken_out": "sortie, non enregistrée",
+    "editing": "(en cours d'édition)",
+    "take_out_of": "Sortir de « %s »",
   },
 
   // Rôle du joueur sur une quête, à côté du badge de visibilité
@@ -248,7 +250,7 @@
     "tags": "Tags (%d)",
     "contributors": "Contributeurs (%d)",
     "where_this_sits": "OÙ ELLE SE TROUVE",
-    "subquests": "SOUS-QUÊTES",
+    "quest_tree": "ARBRE DE QUÊTES",
     "prerequisites": "Prérequis",
   },
 

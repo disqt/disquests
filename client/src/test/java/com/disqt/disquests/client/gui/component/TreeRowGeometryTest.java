@@ -1,10 +1,13 @@
 package com.disqt.disquests.client.gui.component;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.disqt.disquests.client.gui.component.TreeRowGeometry.Part;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -109,6 +112,49 @@ class TreeRowGeometryTest {
     @MethodSource("cases")
     void partAt(String name, TreeRowGeometry g, double relX, Part expected) {
       assertEquals(expected, g.partAt(relX));
+    }
+  }
+
+  @Nested
+  class Handle {
+    @Test
+    void aDraggableRowHasAGripInTheToggleSlot() {
+      TreeRowGeometry g = row(1, true, 0, false, false, true, true);
+      assertTrue(g.hasHandle());
+      // Toggle slot starts at 12 and is 9 wide; the 5 px grip is centred in it
+      assertEquals(14, g.handleX());
+      assertEquals(Part.BODY, g.partAt(g.handleX() + 1.0));
+    }
+
+    static Stream<Arguments> noHandle() {
+      return Stream.of(
+          Arguments.of("read mode", row(0, false, 0, false, false, true, true)),
+          Arguments.of("not draggable", row(0, true, 0, false, false, true, false)),
+          Arguments.of("completed", row(0, true, 0, false, true, true, true)));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("noHandle")
+    void otherRowsHaveNone(String name, TreeRowGeometry g) {
+      assertFalse(g.hasHandle());
+    }
+  }
+
+  @Nested
+  class Trailing {
+    static Stream<Arguments> cases() {
+      return Stream.of(
+          Arguments.of("nothing", 0, "", ""),
+          Arguments.of("count only", 2, "", "(2)"),
+          Arguments.of("editing only", 0, "(editing)", "(editing)"),
+          Arguments.of("count then editing", 3, "(editing)", "(3) (editing)"),
+          Arguments.of("null label", 1, null, "(1)"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("cases")
+    void follows(String name, int children, String editing, String expected) {
+      assertEquals(expected, TreeRowGeometry.trailing(children, editing));
     }
   }
 }

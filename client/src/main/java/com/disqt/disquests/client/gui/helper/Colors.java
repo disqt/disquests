@@ -66,9 +66,18 @@ public final class Colors {
   public static int DROPDOWN_SELECTED = 0xEE3A3A5E;
   public static int DROPDOWN_TEXT = 0xFFE0E0E0;
 
+  // --- Quest search fields: an inset with a frame (same in every theme) ---
+  public static int FIELD_BACKGROUND = 0x80000000;
+  public static int FIELD_OUTLINE = 0xFF5A5A5A;
+  public static int FIELD_OUTLINE_FOCUSED = 0xFFA0A0A0;
+
   // --- Quest tree rows ---
   public static int TREE_DROP_TARGET = 0x6655AADD;
+  public static int TREE_DROP_OUTLINE = 0xFF77CCFF;
   public static int TREE_COMPLETED = 0xFF55CC55;
+  public static int TREE_REMOVE_HOVER = 0xFFFF6666;
+  public static int TREE_GHOST_BACKGROUND = 0xCC1A1A2E;
+  public static int TREE_SOURCE_DIM = 0x99000000;
 
   private Colors() {}
 }

@@ -87,7 +87,10 @@ class NoticeLangKeysTest {
 
   /** Keys {@code TreeRowComponent} draws (a Minecraft class, so listed here by hand). */
   private static final List<String> TREE_ROW_KEYS =
-      List.of("gui.disquests.tree.not_saved", "gui.disquests.tree.taken_out");
+      List.of(
+          "gui.disquests.tree.not_saved",
+          "gui.disquests.tree.taken_out",
+          "gui.disquests.tree.editing");
 
   /** Keys {@code QuestEntryComponent} draws for its marks (a Minecraft class, listed by hand). */
   private static final List<String> QUEST_ENTRY_KEYS =

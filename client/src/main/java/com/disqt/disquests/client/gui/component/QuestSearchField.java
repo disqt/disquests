@@ -1,11 +1,13 @@
 package com.disqt.disquests.client.gui.component;
 
 import com.disqt.disquests.client.ClientSession;
+import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.helper.Messages;
 import com.disqt.disquests.client.gui.tree.SuggestionText;
 import com.disqt.disquests.client.gui.tree.Suggestions.Suggestion;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.UIComponent;
 import java.util.List;
 import java.util.Objects;
@@ -20,6 +22,9 @@ import net.minecraft.network.chat.Component;
  * the dropdown with what the empty text suggests; typing refreshes it. Refused quests are listed
  * greyed with the reason in brackets. Picking one passes its id on, clears the text and keeps the
  * focus in the field. Rows are {@code suggestion-<index>} in the {@code <id>-suggestions} list.
+ *
+ * <p>Drawn as an input: a dark inset with a frame (brighter while focused), the placeholder in the
+ * theme's muted colour, and optionally a leading glyph such as "+".
  */
 public class QuestSearchField extends TextFieldComponent {
 
@@ -30,6 +35,7 @@ public class QuestSearchField extends TextFieldComponent {
   private final SuggestionDropdown<Suggestion> dropdown;
   private Consumer<UUID> onPick = id -> {};
   private String shownFor;
+  private String glyph;
 
   /**
    * @param root the screen root, where the dropdown is mounted
@@ -62,6 +68,37 @@ public class QuestSearchField extends TextFieldComponent {
     this.dropdown =
         new SuggestionDropdown<>(root, id + "-suggestions", QuestSearchField::entry, this::picked);
     setAutocomplete(dropdown, this::refreshIfChanged);
+  }
+
+  /** A glyph drawn at the left inside the frame ("+" for "add"); the text starts after it. */
+  public QuestSearchField leadingGlyph(String glyph) {
+    this.glyph = glyph;
+    lead(Minecraft.getInstance().font.width(glyph) + GLYPH_GAP);
+    return this;
+  }
+
+  private static final int GLYPH_GAP = 1;
+  private static final int TEXT_INSET = 5;
+
+  @Override
+  public void draw(OwoUIGraphics context, int mouseX, int mouseY, float partialTicks, float delta) {
+    int x = x();
+    int y = y();
+    int w = width();
+    int h = height();
+    context.fill(x, y, x + w, y + h, Colors.FIELD_BACKGROUND);
+    context.drawRectOutline(
+        x,
+        y,
+        w,
+        h,
+        getDelegate().isFocused() ? Colors.FIELD_OUTLINE_FOCUSED : Colors.FIELD_OUTLINE);
+    if (glyph != null) {
+      var font = Minecraft.getInstance().font;
+      // On the delegate's first line (it draws its text 5 px in from the top and the left)
+      context.text(font, glyph, x + 4, y + TEXT_INSET, Colors.TEXT_MUTED, false);
+    }
+    super.draw(context, mouseX, mouseY, partialTicks, delta);
   }
 
   /** Called with the picked quest's id. */

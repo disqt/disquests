@@ -9,7 +9,7 @@ import java.util.List;
  */
 public final class EditorText {
 
-  public static final String SUBQUESTS = "gui.disquests.section.subquests";
+  public static final String QUEST_TREE = "gui.disquests.section.quest_tree";
   public static final String ADD_SUBQUEST = "gui.disquests.edit.add_subquest";
   public static final String NEW_QUEST = "gui.disquests.edit.new_quest";
   public static final String DROP_OUT = "gui.disquests.edit.drop_out";
@@ -27,6 +27,8 @@ public final class EditorText {
   public static final String NOW_INSIDE = "gui.disquests.edit.now_inside";
   public static final String NOT_SAVED = "gui.disquests.tree.not_saved";
   public static final String TAKEN_OUT = "gui.disquests.tree.taken_out";
+  public static final String EDITING = "gui.disquests.tree.editing";
+  public static final String TAKE_OUT_OF = "gui.disquests.tree.take_out_of";
 
   private EditorText() {}
 
@@ -56,7 +58,7 @@ public final class EditorText {
     List<String> keys = new java.util.ArrayList<>();
     keys.addAll(
         List.of(
-            SUBQUESTS,
+            QUEST_TREE,
             ADD_SUBQUEST,
             NEW_QUEST,
             DROP_OUT,
@@ -73,7 +75,9 @@ public final class EditorText {
             OPEN_ONLY,
             NOW_INSIDE,
             NOT_SAVED,
-            TAKEN_OUT));
+            TAKEN_OUT,
+            EDITING,
+            TAKE_OUT_OF));
     for (Visibility v : Visibility.values()) {
       keys.add(visibility(v));
       keys.add(visibilityHint(v));

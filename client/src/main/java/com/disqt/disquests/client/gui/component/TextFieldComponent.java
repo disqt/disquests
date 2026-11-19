@@ -27,6 +27,9 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
   private int offsetX;
   private int offsetY;
 
+  // Room kept free at the left of the component (a leading glyph); the text starts after it
+  private int lead;
+
   // Optional suggestion dropdown: gets the keys first while open; onEdit runs after each key
   private SuggestionDropdown<?> dropdown;
   private Runnable onEdit;
@@ -65,14 +68,19 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
     return preferredHeight;
   }
 
+  /** Keeps {@code px} free at the left for something the subclass draws there. */
+  protected void lead(int px) {
+    this.lead = px;
+  }
+
   private void computeOffset() {
-    offsetX = this.x() - delegate.x;
+    offsetX = this.x() + lead - delegate.x;
     offsetY = this.y() - delegate.y;
   }
 
   @Override
   public void draw(OwoUIGraphics context, int mouseX, int mouseY, float partialTicks, float delta) {
-    delegate.resize(this.width(), this.height());
+    delegate.resize(Math.max(0, this.width() - lead), this.height());
 
     computeOffset();
     // Translate graphics so delegate renders at owo-ui position
@@ -168,7 +176,7 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
 
   /** Screen x of the cursor. */
   public int cursorScreenX() {
-    return this.x() + delegate.getCursorScreenX();
+    return this.x() + lead + delegate.getCursorScreenX();
   }
 
   /** Screen y of the top of the cursor's line. */

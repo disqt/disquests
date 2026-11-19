@@ -35,10 +35,12 @@ import net.minecraft.network.chat.Component;
  * QuestEditDraft#rows}, with nothing applied until Save. Rows drag onto other rows ({@code
  * TreeDraft.move}: attach, or swap with a subquest) or onto the dashed {@code tree-drop-out} area
  * ({@code TreeDraft.detach}); a row's remove button detaches it too. Directly under the edited
- * quest's line, the {@code add-subquest-field} brings in a quest from outside the tree. Below the
- * tree, the quests taken out of it ("taken out, not saved"; the edited quest among them while it is
- * outside the tree, with the field under its line) and a hint. A refused change shows a toast and
- * changes nothing.
+ * quest's line, the {@code add-subquest-field} ("+", framed as an input) brings in a quest from
+ * outside the tree. After the tree, inside the same scroll, the quests taken out of it ("taken out,
+ * not saved"; the edited quest among them while it is outside the tree, with the field under its
+ * line). The drop strip and the hint sit below the scroll, so a short pane still shows them. The
+ * header reads "QUEST TREE": the pane shows the whole tree, not only subquests. A refused change
+ * shows a toast and changes nothing.
  *
  * <p>After an accepted change only the pane's contents are rebuilt, in one layout pass so the
  * scroll position stays, and {@code onChanged} lets the form follow. The field and its holder are
@@ -95,6 +97,10 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
     this.fieldHolder = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
     fieldHolder.child(field);
 
+    // After the rows, in the scrolled list, so the strip and the hint below stay in view
+    this.takenOutList = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
+    takenOutList.id(TAKEN_OUT_ID);
+
     FlowLayout dropOut = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
     dropOut.id(DROP_OUT_ID);
     dropOut.padding(Insets.of(4));
@@ -104,18 +110,16 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
     dropText.horizontalSizing(Sizing.fill(100));
     dropText.horizontalTextAlignment(HorizontalAlignment.CENTER);
     dropText.color(Color.ofArgb(Colors.TEXT_MUTED));
+    dropText.shadow(true);
     dropOut.child(dropText);
     shell.pane().child(dropOut);
     this.dropOutZone = TreeRowComponent.dropZone(dropOut, h -> dropOutHighlighted = h);
-
-    this.takenOutList = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
-    takenOutList.id(TAKEN_OUT_ID);
-    shell.pane().child(takenOutList);
 
     LabelComponent hint = UIComponents.label(Component.translatable(EditorText.TREE_HINT));
     hint.id(HINT_ID);
     hint.horizontalSizing(Sizing.fill(100));
     hint.color(Color.ofArgb(Colors.TEXT_MUTED));
+    hint.shadow(true);
     shell.pane().child(hint);
   }
 
@@ -136,7 +140,7 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
         QuestTreePane.shell(
             screen,
             root.childById(FlowLayout.class, "quest-body"),
-            Component.translatable(EditorText.SUBQUESTS),
+            Component.translatable(EditorText.QUEST_TREE),
             PANE_ID,
             LIST_ID);
     QuestEditTreePane pane =
@@ -187,12 +191,16 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
               draft.canDrag(row.id()),
               row.childCount(),
               row.expanded());
-      TreeRowComponent component = new TreeRowComponent(line).editMode(this::remove, this);
+      TreeRowComponent component =
+          new TreeRowComponent(line)
+              .editMode(this::remove, this)
+              .removeTooltip(takeOutOf(g, q.parentId()));
       built.add(component);
       list.child(component);
       if (current) list.child(placeField(row.depth() + 1));
     }
     rows = built;
+    list.child(takenOutList);
 
     for (QuestEditDraft.TakenOut out : draft.takenOut(me)) {
       QuestData q = g.get(out.id());
@@ -228,6 +236,14 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
         : shownTitle;
   }
 
+  /** "Take out of X", the remove zone's tooltip; null for a quest at the top of the tree. */
+  private static Component takeOutOf(QuestGraph g, UUID parentId) {
+    QuestData parent = parentId != null ? g.get(parentId) : null;
+    if (parent == null) return null;
+    return Component.translatable(
+        EditorText.TAKE_OUT_OF, parent.title() != null ? parent.title() : "?");
+  }
+
   /** "now inside X", under a taken-out line that sits in another quest. */
   private LabelComponent nowInside(QuestData container) {
     LabelComponent label =
@@ -237,6 +253,7 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
     label.id(NOW_INSIDE_ID);
     label.horizontalSizing(Sizing.fill(100));
     label.color(Color.ofArgb(Colors.TEXT_MUTED));
+    label.shadow(true);
     label.margins(Insets.left(TreeRowGeometry.LEFT + TreeRowGeometry.INDENT));
     return label;
   }
@@ -265,6 +282,7 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
                     draft.questId(),
                     typed,
                     ClientSession.getMaxQuestDepth()));
+    searchField.leadingGlyph("+");
     searchField.sizing(Sizing.fill(100), Sizing.fixed(QuestSearchField.HEIGHT));
     searchField.onPick(
         picked ->
