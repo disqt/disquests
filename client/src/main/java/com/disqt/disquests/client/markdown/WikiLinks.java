@@ -28,7 +28,15 @@ public final class WikiLinks {
    */
   @Nullable
   public static Quest target(@Nullable String id, Function<UUID, Quest> lookup) {
-    UUID questId = parse(id);
+    return target(parse(id), lookup);
+  }
+
+  /**
+   * The same rule for a quest id already parsed: the quest when the player sees it fully, else
+   * null. Every hover preview of a quest (wiki-links, prerequisites, tree rows) asks this.
+   */
+  @Nullable
+  public static Quest target(@Nullable UUID questId, Function<UUID, Quest> lookup) {
     if (questId == null) return null;
     Quest quest = lookup.apply(questId);
     return quest != null && !quest.isLocked() ? quest : null;

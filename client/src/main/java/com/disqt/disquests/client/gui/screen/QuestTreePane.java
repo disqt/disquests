@@ -155,7 +155,10 @@ final class QuestTreePane {
               false,
               row.childCount(),
               row.expanded());
-      list.child(new TreeRowComponent(line).readMode(this::open, this::toggle));
+      TreeRowComponent component = new TreeRowComponent(line).readMode(this::open, this::toggle);
+      // Hovering another quest's row previews it (a locked one shows nothing)
+      if (!row.id().equals(questId)) screen.previewOnHover(component, row.id());
+      list.child(component);
     }
   }
 

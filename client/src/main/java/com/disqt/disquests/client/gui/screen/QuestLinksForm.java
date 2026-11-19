@@ -234,7 +234,9 @@ final class QuestLinksForm {
     for (UUID id : draft.prerequisites()) {
       QuestData q = draft.tree().effective().get(id);
       String title = q != null && q.title() != null ? q.title() : "?";
-      chips.child(chip(CHIP_PREFIX + id, title, () -> draft.removePrerequisite(id)));
+      TagChipComponent chip = chip(CHIP_PREFIX + id, title, () -> draft.removePrerequisite(id));
+      screen.previewOnHover(chip, id);
+      chips.child(chip);
     }
     if (draft.showsHiddenPrerequisites()) {
       chips.child(

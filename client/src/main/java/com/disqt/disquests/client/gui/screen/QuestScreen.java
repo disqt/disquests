@@ -12,6 +12,7 @@ import com.disqt.disquests.client.gui.component.SuggestionDropdown;
 import com.disqt.disquests.client.gui.component.TagChipComponent;
 import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.helper.HoverPreviewRenderer;
 import com.disqt.disquests.client.gui.helper.Messages;
 import com.disqt.disquests.client.gui.tree.QuestEditDraft;
 import com.disqt.disquests.client.gui.widget.MarkdownWidget;
@@ -51,8 +52,10 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.WeakHashMap;
 import java.util.stream.Stream;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -90,6 +93,10 @@ public class QuestScreen extends DisquestsBaseScreen {
   @Nullable private QuestEditDraft editDraft;
 
   @Nullable private QuestEditTreePane editPane;
+
+  // Components that preview a quest on hover (prerequisite links and chips, the pane's rows); weak,
+  // so the rows and chips a rebuild drops go with it
+  private final Map<UIComponent, UUID> previews = new WeakHashMap<>();
   @Nullable private QuestLinksForm linksForm;
 
   // Permission cache
@@ -1269,16 +1276,46 @@ public class QuestScreen extends DisquestsBaseScreen {
   // ===================== OVERLAYS =====================
 
   /**
-   * Draws what must sit above the whole UI after owo has drawn it: the dragged tree row's ghost.
-   * Here, at the screen level, it is outside every scroll container's scissor and drawn after (so
-   * above) the pane and the form; owo's tooltips still come later, in the after-extract pass.
+   * Hovering {@code component} previews the quest {@code questId} like a wiki-link does, when the
+   * player sees that quest fully ({@link WikiLinks#target}); a locked quest shows nothing.
+   */
+  void previewOnHover(UIComponent component, UUID questId) {
+    previews.put(component, questId);
+  }
+
+  /**
+   * Draws what must sit above the whole UI after owo has drawn it: the hover preview of a quest
+   * link and the dragged tree row's ghost. Here, at the screen level, they are outside every scroll
+   * container's scissor and drawn after (so above) the pane and the form; owo's tooltips still come
+   * later, in the after-extract pass.
    */
   @Override
   public void extractRenderState(
       GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
     super.extractRenderState(context, mouseX, mouseY, delta);
+    boolean dragging = editPane != null && editPane.dragging();
+    if (!dragging) drawHoverPreview(context, mouseX, mouseY);
     if (editPane != null) {
       editPane.drawGhost(OwoUIGraphics.of(context), mouseX, mouseY, this.width, this.height);
+    }
+  }
+
+  /**
+   * The preview of the registered component under the pointer, found as owo finds the hovered
+   * component: the topmost one there, so a dropdown, a confirm overlay or a scrolled-away row hides
+   * it.
+   */
+  private void drawHoverPreview(GuiGraphicsExtractor context, int mouseX, int mouseY) {
+    FlowLayout root = getRootComponent();
+    if (root == null || previews.isEmpty()) return;
+    for (UIComponent c = root.childAt(mouseX, mouseY); c != null; c = c.parent()) {
+      UUID id = previews.get(c);
+      if (id == null) continue;
+      Quest target = WikiLinks.target(id, ClientCache::getQuestById);
+      if (target != null) {
+        HoverPreviewRenderer.draw(context, target, mouseX, mouseY, this.width, this.height);
+      }
+      return;
     }
   }
 

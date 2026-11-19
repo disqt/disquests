@@ -22,7 +22,7 @@ import net.minecraft.network.chat.MutableComponent;
  * The prerequisite lists of the reading view: what a locked quest is waiting on ({@code
  * waiting-text}) and the Prerequisites section shown to Write and Owner ({@code
  * prerequisites-section}). Each visible prerequisite is a line {@code prerequisite-<id>} that opens
- * it; a completed one carries a tick, drawn only.
+ * it and previews it on hover like a wiki-link; a completed one carries a tick, drawn only.
  */
 final class PrerequisiteLinks {
 
@@ -106,6 +106,8 @@ final class PrerequisiteLinks {
     label.id(LINE_PREFIX + link.id());
     label.horizontalSizing(Sizing.fill(100));
     label.shadow(true);
+    // The same preview as a wiki-link; none for a quest locked for the player
+    screen.previewOnHover(label, link.id());
     label
         .mouseDown()
         .subscribe(

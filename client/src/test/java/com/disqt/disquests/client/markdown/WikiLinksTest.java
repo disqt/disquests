@@ -54,6 +54,14 @@ class WikiLinksTest {
     void doesNotResolve(String name, String linkId) {
       assertNull(WikiLinks.target(linkId, LOOKUP));
     }
+
+    @Test
+    void anIdResolvesTheSameWay() {
+      assertSame(CACHE.get(id("Mine")), WikiLinks.target(id("Mine"), LOOKUP));
+      assertNull(WikiLinks.target(id("Gate"), LOOKUP));
+      assertNull(WikiLinks.target(id("Away"), LOOKUP));
+      assertNull(WikiLinks.target((UUID) null, LOOKUP));
+    }
   }
 
   @Nested
