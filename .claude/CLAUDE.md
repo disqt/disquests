@@ -102,6 +102,7 @@ Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with physical input via
 - **ModMenu incompatible with `runClient`** — ModMenu's TitleScreen mixin crashes in dev. Use F6 keybind to open config screen instead.
 - **`server/run/server.properties` `max-players`** — must be >= 4 (two test clients + reconnect headroom)
 - **CI Xvfb** — `854x480x24` with `guiScale:1` via `ensureClientOptions()`. Do NOT increase Xvfb resolution -- 1920x1080 causes 4x software-rendering overhead, making tests 2x slower.
+- **Test clients are muted by default** — `ensureClientOptions()` sets `soundCategory_master:0.0` in `run/` and `run-b/` `options.txt` on every launch; `-PtestAudio` keeps sound.
 - **`catch(Throwable)` not `catch(Exception)` for `waitFor`** — Fabric's `waitFor` throws `AssertionError` (extends `Error`). `catch(Exception)` won't catch it.
 - **Server handshake retry** — `ServerPacketHandler.onPlayerJoin` retries every 20 ticks (up to 10 attempts) because client channel registration can be delayed on slow CI.
 - **`CoordinatesJourney` is now `LocationJourney`** — filter with `-PtestFilter=LocationJourney`; map journeys are `MapBoardJourney` and `MapEditJourney`.

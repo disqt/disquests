@@ -480,12 +480,22 @@ fun rconReset(logger: org.gradle.api.logging.Logger) {
     throw RuntimeException("RCON reset failed after 30s: ${lastError?.message}")
 }
 
-fun ensureClientOptions(runDir: File) {
+/**
+ * Prepares a test client's options before every launch: a new file gets guiScale:1, and unless
+ * muteAudio is false the master volume is set to 0 (Minecraft rewrites options.txt on exit, so
+ * this runs on each launch). -PtestAudio passes muteAudio = false and leaves the volume alone.
+ */
+fun ensureClientOptions(runDir: File, muteAudio: Boolean) {
     val optionsFile = File(runDir, "options.txt")
+    val mute = "soundCategory_master:0.0"
     if (!optionsFile.exists()) {
         runDir.mkdirs()
-        optionsFile.writeText("guiScale:1\n")
+        optionsFile.writeText(if (muteAudio) "guiScale:1\n$mute\n" else "guiScale:1\n")
+        return
     }
+    if (!muteAudio) return
+    val lines = optionsFile.readLines().filter { !it.startsWith("soundCategory_master:") }
+    optionsFile.writeText((lines + mute).joinToString("\n", postfix = "\n"))
 }
 
 fun launchClient(
@@ -587,7 +597,7 @@ tasks.register("runSoloTests") {
 
             // --- Step 3: Launch PlayerA only ---
             if (!noStart) {
-                ensureClientOptions(file("run"))
+                ensureClientOptions(file("run"), !project.hasProperty("testAudio"))
                 val clientAReady = File(syncDir, "client-a-ready.done").exists()
 
                 if (!clientAReady) {
@@ -703,8 +713,8 @@ tasks.register("runDuoTests") {
                 val clientBReady = File(syncDir, "client-b-ready.done").exists()
 
                 if (!clientAReady || !clientBReady) {
-                    ensureClientOptions(file("run"))
-                    ensureClientOptions(file("run-b"))
+                    ensureClientOptions(file("run"), !project.hasProperty("testAudio"))
+                    ensureClientOptions(file("run-b"), !project.hasProperty("testAudio"))
 
                     val procA = launchClient(
                         gradlew, isWin, rootProject.projectDir,
