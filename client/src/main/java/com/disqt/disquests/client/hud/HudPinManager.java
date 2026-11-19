@@ -4,7 +4,6 @@ import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.network.PacketSender;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,13 +23,6 @@ public class HudPinManager {
   }
 
   public static List<Quest> getPinnedQuests() {
-    List<Quest> result = new ArrayList<>();
-    for (UUID id : ClientSession.getPinnedQuestIds()) {
-      Quest quest = ClientCache.getQuestById(id);
-      if (quest != null && !quest.isCompleted()) {
-        result.add(quest);
-      }
-    }
-    return result;
+    return HudPins.shown(ClientSession.getPinnedQuestIds(), ClientCache::getQuestById);
   }
 }
