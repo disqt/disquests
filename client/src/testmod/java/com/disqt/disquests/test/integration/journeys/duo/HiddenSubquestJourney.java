@@ -6,7 +6,6 @@ import static com.disqt.disquests.test.integration.bdd.UIAssertions.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.disqt.disquests.client.ClientSession;
-import com.disqt.disquests.client.gui.component.TreeRowComponent;
 import com.disqt.disquests.client.gui.component.TreeRowGeometry;
 import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.common.model.Role;
@@ -17,7 +16,6 @@ import com.disqt.disquests.test.integration.harness.PlayerA;
 import com.disqt.disquests.test.integration.harness.PlayerB;
 import java.util.UUID;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
-import net.minecraft.client.Minecraft;
 import org.junit.jupiter.api.*;
 
 /**
@@ -36,6 +34,9 @@ class HiddenSubquestJourney {
   private static final String B_NAME = "IntTestPlayerB";
 
   private static UUID playerB;
+
+  /** The hub's last change as A saw it before B's save: B's save moves it on. */
+  private static long hubModified;
 
   @BeforeAll
   static void resetServer() throws Exception {
@@ -58,6 +59,7 @@ class HiddenSubquestJourney {
         context.computeOnClient(
             c -> cachedQuest(HUB).getContributors().stream().findFirst().get().getUuid());
     waitForQuestCondition(context, HUB, true, q -> q.roleOf(playerB) == Role.WRITE);
+    hubModified = context.computeOnClient(c -> cachedQuest(HUB).getLastModified());
     signal("hub-ready");
   }
 
@@ -90,7 +92,8 @@ class HiddenSubquestJourney {
   void a_does_not_see_secret(ClientGameTestContext context) {
     await("b-attached", context);
 
-    then("A's cache does not hold it");
+    then("A receives B's save of the hub, and A's cache does not hold the subquest");
+    waitForQuestCondition(context, HUB, true, q -> q.getLastModified() > hubModified);
     assertNull(context.computeOnClient(c -> cachedQuest(SECRET)), "B's Private quest leaked");
 
     and("My Quests lists the hub with no toggle and nothing under it");
@@ -104,8 +107,9 @@ class HiddenSubquestJourney {
     when("A opens the hub");
     openQuest(context, "tab-my-quests", HUB);
 
-    then("'where this sits' shows no subquest");
-    assertEquals(0, (int) context.computeOnClient(c -> subquestRowCount(c, hub)));
+    then("the page has no 'where this sits' pane: the hub has no subquest A can see");
+    waitForComponent(context, "btn-complete");
+    assertComponentMissing(context, "where-this-sits");
 
     when("A presses Complete");
     click(context, "btn-complete");
@@ -208,16 +212,5 @@ class HiddenSubquestJourney {
 
   private static void await(String phase, ClientGameTestContext context) {
     PhaseSync.waitFor(J + phase, context, seconds(120));
-  }
-
-  /** Rows of the reading view's "where this sits" pane other than the quest itself. */
-  private static int subquestRowCount(Minecraft client, UUID self) {
-    var list =
-        onScreen(client, io.wispforest.owo.ui.container.FlowLayout.class, "where-this-sits-list");
-    if (list == null) return 0;
-    return (int)
-        list.children().stream()
-            .filter(c -> c instanceof TreeRowComponent row && !row.id().equals("tree-row-" + self))
-            .count();
   }
 }

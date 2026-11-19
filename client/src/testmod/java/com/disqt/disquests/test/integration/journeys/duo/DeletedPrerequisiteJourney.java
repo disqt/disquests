@@ -58,6 +58,8 @@ class DeletedPrerequisiteJourney {
   void b_sees_locked(ClientGameTestContext context) {
     await("ready", context);
     waitForCachedQuest(context, FOLLOW, Quest::isLocked);
+    // The Open step is on B's board: its removal later shows the deletion has reached B
+    waitForCachedQuest(context, STEP, q -> !q.isCompleted());
     signal("b-saw-locked");
   }
 
@@ -96,10 +98,12 @@ class DeletedPrerequisiteJourney {
   @DisplayName("The follow-up stays locked for B")
   void b_still_locked(ClientGameTestContext context) {
     await("step-deleted", context);
+    // The deletion has reached B once the step is gone from B's cache: then the follow-up must
+    // still be locked
     waitForNotCached(context, STEP);
-    // Give any change the deletion could bring time to arrive, then check it is still locked
-    context.waitTicks(seconds(2));
-    waitForCachedQuest(context, FOLLOW, Quest::isLocked);
+    assertTrue(
+        (Boolean) context.computeOnClient(c -> cachedQuest(FOLLOW).isLocked()),
+        "the follow-up should stay locked");
     signal("b-still-locked");
   }
 

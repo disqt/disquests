@@ -110,10 +110,11 @@ class QuestTreeLimitsJourney {
     }
 
     when("player saves");
+    long savedBefore = context.computeOnClient(c -> cachedQuest(TOP).getLastModified());
     saveEditor(context);
 
-    then("nothing moved");
-    context.waitTicks(seconds(1));
+    then("the server's answer to the save arrives, and nothing moved");
+    waitForQuestCondition(context, TOP, true, q -> q.getLastModified() > savedBefore);
     assertEquals(top, parentOf(context, MIDDLE));
     assertEquals(middle, parentOf(context, BOTTOM));
     assertEquals(top, parentOf(context, SIDE));
@@ -141,8 +142,11 @@ class QuestTreeLimitsJourney {
 
     then("only the top quest is completed");
     waitForQuestCondition(context, TOP, true, Quest::isCompleted);
+    // The completion has arrived: the subquests are checked now, not waited for
     for (String title : new String[] {MIDDLE, BOTTOM, SIDE}) {
-      waitForQuestCondition(context, title, true, q -> !q.isCompleted());
+      assertFalse(
+          (Boolean) context.computeOnClient(c -> cachedQuest(title).isCompleted()),
+          title + " should stay active");
     }
 
     and("its subquests list at the top level of My Quests, the top quest under Archived");

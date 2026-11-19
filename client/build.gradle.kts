@@ -826,6 +826,8 @@ tasks.register("runIntegrationTest") {
             if (project.hasProperty("coverage")) cmd.add("-Pcoverage")
             if (project.hasProperty("noStart")) cmd.add("-PnoStart")
             if (project.hasProperty("harness")) cmd.add("-Pharness")
+            // The sub-tasks write the clients' options.txt: they need the flag to keep sound
+            if (project.hasProperty("testAudio")) cmd.add("-PtestAudio")
             if (project.hasProperty("testFilter")) cmd.add("-PtestFilter=${project.findProperty("testFilter")}")
 
             logger.lifecycle("=== Running $taskName ===")
