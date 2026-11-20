@@ -195,6 +195,23 @@ tasks.named<net.fabricmc.loom.task.RunGameTask>("runClientGameTest") {
     }
 }
 
+// Player B's client writes its own exec file: two JVMs must not share one, and without an agent
+// everything only Player B does in a duo journey (a locked quest's page, for one) counts as
+// uncovered.
+val jacocoExecFileB = layout.buildDirectory.file("jacoco/gameTestB.exec")
+
+tasks.named<net.fabricmc.loom.task.RunGameTask>("runClientGameTestB") {
+    if (project.hasProperty("coverage")) {
+        doFirst {
+            val agentJar = jacocoRuntime.singleFile
+            val destFile = jacocoExecFileB.get().asFile
+            destFile.parentFile.mkdirs()
+            jvmArgs("-javaagent:$agentJar=destfile=$destFile,includes=com.disqt.disquests.*")
+            logger.lifecycle("JaCoCo agent attached, writing to: $destFile")
+        }
+    }
+}
+
 tasks.register<JacocoReport>("jacocoGameTestReport") {
     group = "verification"
     description = "Generate code coverage report from E2E game tests"
@@ -221,10 +238,11 @@ tasks.register<JacocoReport>("jacocoIntegrationTestReport") {
     description = "Generate combined coverage report from client + server E2E tests"
     dependsOn("compileJava", ":server:compileJava", ":common:compileJava")
 
-    // Merge all exec files: E2E client + E2E server + unit tests of client, common and server.
+    // Merge all exec files: E2E clients (Player A, Player B) + E2E server + unit tests of client, common and server.
     // Client logic kept free of Minecraft is covered by unit tests, not by the journeys.
     val execFiles = files(
         layout.buildDirectory.file("jacoco/gameTest.exec").get().asFile,
+        layout.buildDirectory.file("jacoco/gameTestB.exec").get().asFile,
         layout.buildDirectory.file("jacoco/test.exec").get().asFile,
         file("../server/run/jacoco-server.exec"),
         file("../common/build/jacoco/test.exec"),
