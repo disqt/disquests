@@ -108,9 +108,47 @@ class QuestLineJourney {
     then("the locked page shows the lock and lists chapter 1, nothing else");
     waitForComponent(context, "title-lock");
     waitForComponent(context, "prerequisite-" + c1);
-    waitForTextUnder(context, "waiting-text", t -> !t.contains(SOMETHING_ELSE));
+    waitForTextUnder(context, "waiting-text", t -> t.equals("PREREQUISITES\n" + CH1 + "\n"));
+    assertLabelText(context, "title-label", CH2);
     assertComponentMissing(context, "content-markdown");
     assertComponentMissing(context, "btn-interact");
+
+    and("none of an open quest's page: no text, tags, location, people or prerequisites section");
+    for (String id :
+        new String[] {
+          "content-scroll",
+          "tag-display",
+          "tag-display-slot",
+          "location-card",
+          "contributors-collapse",
+          "contributors-row-slot",
+          "prerequisites-section"
+        }) {
+      assertComponentMissing(context, id);
+    }
+
+    and("no button acts on it: B holds no role, so not even Leave");
+    for (String id :
+        new String[] {"btn-edit", "btn-leave", "btn-complete", "btn-delete", "btn-manage-people"}) {
+      assertComponentMissing(context, id);
+    }
+
+    when("B clicks chapter 1 in the list of what it waits on");
+    var line =
+        findComponent(context, io.wispforest.owo.ui.core.UIComponent.class, "prerequisite-" + c1);
+    clickAt(
+        context,
+        context.computeOnClient(c -> new double[] {line.x() + 20, line.y() + line.height() / 2.0}));
+
+    then("chapter 1's page opens, an ordinary one; mouse back returns to the locked page");
+    waitForText(context, "title-label", CH1::equals);
+    assertComponentMissing(context, "title-lock");
+    assertComponentMissing(context, "waiting-text");
+    assertComponentExists(context, "content-scroll");
+    assertComponentExists(context, "contributors-collapse");
+    context.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_4);
+    waitForText(context, "title-label", CH2::equals);
+    waitForComponent(context, "title-lock");
     signal("b-saw-list");
   }
 
@@ -263,6 +301,20 @@ class QuestLineJourney {
     QuestEntryComponent entry = context.computeOnClient(c -> listedEntry(c, CH2));
     assertTrue(
         (Boolean) context.computeOnClient(c -> entry.getMarks().locked()), "lock on the entry");
+
+    when("B opens it from My Quests");
+    UUID c1 = context.computeOnClient(c -> cachedQuest(CH1).getId());
+    openQuest(context, "tab-my-quests", CH2);
+
+    then("the locked page lists chapter 1 again and offers Leave alone, for B's Read");
+    waitForComponent(context, "title-lock");
+    waitForTextUnder(context, "waiting-text", t -> t.equals("PREREQUISITES\n" + CH1 + "\n"));
+    assertComponentExists(context, "prerequisite-" + c1);
+    assertComponentExists(context, "btn-leave");
+    for (String id : new String[] {"btn-edit", "btn-complete", "btn-delete", "btn-interact"}) {
+      assertComponentMissing(context, id);
+    }
+    assertComponentMissing(context, "contributors-collapse");
     signal("b-saw-relock");
   }
 
