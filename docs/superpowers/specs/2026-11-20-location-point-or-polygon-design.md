@@ -1,7 +1,7 @@
 # Location: a Point or a Polygon, Edited on the Map
 
 **Date:** 2026-11-20
-**Status:** Approved by the owner on 2026-11-20
+**Status:** Implemented
 **Size:** small change
 **Builds on:** the quest editor's location card and the full-screen map editor (0.7.x), as they
 stand on the branch `feat/quest-trees-client` (PR #99)

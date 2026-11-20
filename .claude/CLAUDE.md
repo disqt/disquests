@@ -157,7 +157,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 | `client/.../gui/screen/QuestEditTreePane.java` | Editor's tree pane (`edit-tree-pane`, `add-subquest-field`, `tree-drop-out`); `QuestLinksForm` holds `vis-*`, `prerequisite-field`, `prereq-chip-*`, `auto-join`, `btn-detach-hidden-parent`; texts in `EditorText` |
 | `client/.../gui/screen/ContributorScreen.java` | People screen: `PeopleDraft` until Save, `PlayerChooser` (Add row), `PeopleText` (Minecraft-free texts and decisions), `LegacyContributorList` (pre-V4 servers) |
 | `client/.../gui/map/` | World map: MapMath, TileCache/SharedTileCache, MapView, layers (quest polygons, player marker, polygon edit), QuestStyle |
-| `client/.../gui/screen/LocationCard.java` | Location card (mini map, vertex fields, map button) shared by edit and view mode of QuestScreen |
+| `client/.../gui/screen/LocationCard.java` | Location card (mini map, vertex fields when the map is off, map button) shared by edit and view mode of QuestScreen |
 | `client/.../gui/screen/MapEditScreen.java` | Full-screen polygon editor for a quest location |
 | `client/.../gui/helper/` | Colors, Theme, TagColors, HoverPreviewRenderer, DisquestsConfigModel (owo-config) |
 | `client/src/main/resources/assets/disquests/owo_ui/*.xml` | XML UI models for all screens (hot-reloadable) |
@@ -244,7 +244,10 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **`MapView` takes mouse-click focus while interactive** — owo delivers drag and key events only to the focused component.
 - **`SharedTileCache.reset()` on `leaveServer`** — the production tile cache is a singleton; disk cache lives under `<gameDir>/disquests/tiles/`.
 - **VPS `config.yml` dimension keys** — `nether` still works (`DimensionKeys.normalize`) but should become `the_nether` when next edited.
-- **`MainScreen` layouts** — `main_screen.xml` (map + side panel) when `ClientSession.mapAvailable()`, else `main_screen_legacy.xml`; its `server-notice` label shows only for an outdated server (`server_outdated`) or an unreachable BlueMap (`map_unavailable`), not when the map is switched off. `LocationCard` drops the mini map and `btn-edit-on-map` under the same rule.
+- **`MainScreen` layouts** — `main_screen.xml` (map + side panel) when `ClientSession.mapAvailable()`, else `main_screen_legacy.xml`; its `server-notice` label shows only for an outdated server (`server_outdated`) or an unreachable BlueMap (`map_unavailable`), not when the map is switched off. `LocationCard` drops the mini map under the same rule.
+- **Edit card preview opens the map editor** — in edit mode the `mini-map` is a click target (left press and release in place; a drag over 3 px is ignored) that opens `MapEditScreen`; there is no `btn-edit-on-map`.
+- **Coordinate rows only without the map** — `vertex-x-*`/`vertex-y-*`/`vertex-z-*` exist only when `ClientSession.mapAvailable()` is false (the E2E fallback switches the client `worldMap` setting off).
+- **Two corners are a point** — `QuestLocation.pointOrPolygon` turns two corners into a pin on the first; `MapEditScreen` Done, `QuestScreen.applyMapLocation` and the server's `normalize` all apply it.
 - **Server config `world-map`** (default `true`) — `Config.isWorldMapEnabled()` = `world-map` && non-empty `bluemap-url`, sent in the HANDSHAKE; `/disquests reload` resends handshakes. The client also has an owo-config `worldMap` setting. `mapAvailable()` = `supportsMap()` && server flag && client setting && `hasBluemap()` && the default map's `settings.json` probe (started in `handleHandshake`, `TileCache.settingsFailed`) has not failed.
 - **Server config `player-marker`** (default `true`) — `Config.isPlayerMarkerEnabled()`, sent in the HANDSHAKE, read as `ClientSession.isPlayerMarkerEnabled()`. When false: no `PlayerMarkerLayer` on `MainScreen`/`MapEditScreen`, `btn-centre-me` is removed, and maps open on the camera remembered this session (`ClientSession.rememberCamera`/`rememberedCamera`, a per-dimension `MapCameraMemory`, saved in `removed()` of both map screens, cleared on `leaveServer`) else `MapCameraMemory.WORLD_VIEW` ((0,0) zoom 0) in the default map's dimension. When true the board still opens on the player. `btn-set-pos` is unaffected.
 
@@ -274,7 +277,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **Logger names use `.` not `/`** — `LoggerFactory.getLogger("Disquests.MainScreen")` not `"Disquests/MainScreen"`. Log4j2 uses `.` for hierarchy.
 - **`javax.annotation` not on testmod classpath** — Don't use `@Nullable` etc. in testmod code. JUnit is also unresolvable in IDE (cosmetic, compiles fine via Gradle).
 - **`childById(Class, id)` is type-strict** — changing a component's container type (e.g., `OverlayContainer` to `FlowLayout`) breaks any test using `childById(OverlayContainer.class, id)`. Search testmod for the component ID before changing container types.
-- **Same-class screen rebuilds** — `waitForScreen(QuestScreen.class)` returns immediately when one `QuestScreen` replaces another; wait on a component only the new screen has (`btn-edit` = view mode, `btn-edit-on-map` = edit mode, `vertex-x-2`).
+- **Same-class screen rebuilds** — `waitForScreen(QuestScreen.class)` returns immediately when one `QuestScreen` replaces another; wait on a component only the new screen has (`btn-edit` = view mode, `btn-set-pos` = edit mode), or poll the open editor's `QuestScreen.getQuest()` for the expected location.
 
 ## Release
 
