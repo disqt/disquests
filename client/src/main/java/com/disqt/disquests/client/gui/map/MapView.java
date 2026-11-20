@@ -26,6 +26,10 @@ import net.minecraft.network.chat.Component;
  *
  * <p>The view takes owo focus on mouse click only, because owo routes drags and releases to the
  * focused component. It never takes keyboard-cycle focus.
+ *
+ * <p>A non-interactive view is a still picture: no pan, zoom or layer input. Given a {@linkplain
+ * #onPreviewClick preview action} it is also a click target: hovering outlines it and shows a
+ * tooltip, and a left click (see {@link PreviewClick}) runs the action.
  */
 public class MapView extends BaseUIComponent {
   /** Pixels the cursor must travel with the left button held before the gesture becomes a pan. */
@@ -33,6 +37,8 @@ public class MapView extends BaseUIComponent {
 
   private static final Component TILES_UNAVAILABLE =
       Component.translatable("gui.disquests.map.tiles_unavailable");
+  private static final Component CLICK_TO_EDIT =
+      Component.translatable("gui.disquests.map.click_to_edit");
 
   private final TileCache cache;
   private final List<MapLayer> layers = new ArrayList<>();
@@ -41,6 +47,8 @@ public class MapView extends BaseUIComponent {
   private boolean interactive = true;
   private Component hoverTooltip;
   private Component shownTooltip;
+  private Runnable previewAction;
+  private final PreviewClick previewClick = new PreviewClick();
 
   // Left-button gesture: held back until it is known to be a click or a pan.
   private boolean pendingLeft;
@@ -106,6 +114,19 @@ public class MapView extends BaseUIComponent {
     return this;
   }
 
+  /**
+   * Makes a {@linkplain #interactive(boolean) non-interactive} view a click target that runs {@code
+   * action} on a left click. Has no effect on an interactive view.
+   */
+  public MapView onPreviewClick(Runnable action) {
+    this.previewAction = action;
+    return this;
+  }
+
+  private boolean isPreview() {
+    return !interactive && previewAction != null;
+  }
+
   /** Component-relative screen position to block {x, z}. */
   public double[] screenToBlock(double relX, double relY) {
     return MapMath.screenToBlock(camera, width(), height(), relX, relY);
@@ -164,6 +185,10 @@ public class MapView extends BaseUIComponent {
     if (tilesUnavailable()) {
       Font font = Minecraft.getInstance().font;
       g.text(font, TILES_UNAVAILABLE, x + 4, y + h - 4 - font.lineHeight, Colors.TEXT_MUTED, false);
+    }
+    if (isPreview() && isInBoundingBox(mouseX, mouseY)) {
+      g.drawRectOutline(x, y, w, h, Colors.TEXT_PRIMARY);
+      hoverTooltip = CLICK_TO_EDIT;
     }
     updateTooltip();
   }
@@ -262,13 +287,24 @@ public class MapView extends BaseUIComponent {
 
   @Override
   public boolean canFocus(FocusSource source) {
-    return interactive && source == FocusSource.MOUSE_CLICK;
+    return (interactive || isPreview()) && source == FocusSource.MOUSE_CLICK;
+  }
+
+  @Override
+  public void onFocusLost() {
+    super.onFocusLost();
+    previewClick.cancel();
   }
 
   @Override
   public boolean onMouseDown(MouseButtonEvent click, boolean doubled) {
     if (!interactive) {
-      return false;
+      if (!isPreview()) {
+        return false;
+      }
+      boolean left = click.button() == InputConstants.MOUSE_BUTTON_LEFT;
+      previewClick.press(click.x(), click.y(), left);
+      return left;
     }
     int button = click.button();
     if (button == InputConstants.MOUSE_BUTTON_LEFT) {
@@ -333,7 +369,16 @@ public class MapView extends BaseUIComponent {
   @Override
   public boolean onMouseUp(MouseButtonEvent click) {
     if (!interactive) {
-      return false;
+      if (!isPreview()) {
+        return false;
+      }
+      boolean left = click.button() == InputConstants.MOUSE_BUTTON_LEFT;
+      boolean inside =
+          click.x() >= 0 && click.y() >= 0 && click.x() < width() && click.y() < height();
+      if (previewClick.release(click.x(), click.y(), left, inside)) {
+        previewAction.run();
+      }
+      return left;
     }
     int button = click.button();
     if (button == InputConstants.MOUSE_BUTTON_LEFT) {

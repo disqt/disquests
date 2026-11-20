@@ -30,7 +30,6 @@
     "done": "Done",
     "cancel_map": "Cancel",
     "clear_location": "Clear location",
-    "edit_on_map": "Edit on map",
     "complete": "Complete",
     "reopen": "Reopen",
     "manage_people": "Manage people",
@@ -268,7 +267,7 @@
     "list_off": "List: Off",
     "edit_hint": "Click to add corners. Enter or click the first corner to finish. Right-click removes the last one. Drag to move the map.",
     "self_intersecting": "The outline crosses itself",
-    "need_three_corners": "A region needs at least 3 corners",
+    "click_to_edit": "Click to edit on the map",
     "too_many_vertices": "At most %d corners",
   },
   "gui.disquests.map.dim.{}": {

@@ -1200,24 +1200,17 @@ public class QuestScreen extends DisquestsBaseScreen {
   }
 
   /**
-   * Applies a location drawn on the map: no corners clears it, one is a pin, two or more an
-   * outline. A location sets the quest's map to {@link #dimensionForEdit()}; clearing sets it to
-   * null. Rebuilds the editor.
+   * Applies a location drawn on the map: no corners clears it, one or two is a pin (on the first),
+   * three or more an outline. A location sets the quest's map to {@link #dimensionForEdit()};
+   * clearing sets it to null. Rebuilds the editor.
    */
   public void applyMapLocation(List<PointData> vertices) {
-    setLocation(vertices, false);
+    setLocation(vertices);
     rebuildEditMode();
   }
 
-  /**
-   * Applies corners dragged in the location card's preview with the rules of {@link
-   * #applyMapLocation}, but keeps the screen (the drag must not tear it down) and a pin's height.
-   */
-  void moveMapLocation(List<PointData> vertices) {
-    setLocation(vertices, true);
-  }
-
-  private void setLocation(List<PointData> vertices, boolean keepPinY) {
+  private void setLocation(List<PointData> corners) {
+    List<PointData> vertices = QuestLocation.pointOrPolygon(corners);
     String dimension = dimensionForEdit();
     if (vertices.isEmpty()) {
       quest.setCoordinates(null);
@@ -1228,9 +1221,7 @@ public class QuestScreen extends DisquestsBaseScreen {
     } else if (vertices.size() == 1) {
       PointData p = vertices.get(0);
       double y = LocationCard.DEFAULT_Y;
-      if (keepPinY && quest.getCoordinates() != null && !quest.isPolygon()) {
-        y = quest.getCoordinates().y();
-      } else if (minecraft != null
+      if (minecraft != null
           && minecraft.player != null
           && minecraft.player.level().dimension().identifier().getPath().equals(dimension)) {
         y = minecraft.player.getY();

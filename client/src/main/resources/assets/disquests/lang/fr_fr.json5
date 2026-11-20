@@ -30,7 +30,6 @@
     "done": "Terminer",
     "cancel_map": "Annuler",
     "clear_location": "Effacer",
-    "edit_on_map": "Modifier sur la map",
     "complete": "Terminer",
     "reopen": "Rouvrir",
     "manage_people": "Gérer les joueurs",
@@ -268,7 +267,7 @@
     "list_off": "Liste : non",
     "edit_hint": "Clique pour ajouter des coins. Entrée ou clic sur le premier coin pour terminer. Clic droit retire le dernier. Glisse pour déplacer la map.",
     "self_intersecting": "Le contour se croise lui-même",
-    "need_three_corners": "Une région a besoin d'au moins 3 coins",
+    "click_to_edit": "Clique pour modifier sur la carte",
     "too_many_vertices": "%d coins au maximum",
   },
   "gui.disquests.map.dim.{}": {
