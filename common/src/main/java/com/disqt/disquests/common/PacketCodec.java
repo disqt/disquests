@@ -1,16 +1,25 @@
 package com.disqt.disquests.common;
 
+import com.disqt.disquests.common.graph.LinkRules;
+import com.disqt.disquests.common.graph.Refusal;
 import com.disqt.disquests.common.model.CollaborationRequestData;
 import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.ContributorOp;
 import com.disqt.disquests.common.model.CoordinatesData;
+import com.disqt.disquests.common.model.LinkChanges;
+import com.disqt.disquests.common.model.Notice;
+import com.disqt.disquests.common.model.PersonOp;
 import com.disqt.disquests.common.model.PointData;
+import com.disqt.disquests.common.model.Privatized;
 import com.disqt.disquests.common.model.QuestData;
+import com.disqt.disquests.common.model.Role;
+import com.disqt.disquests.common.model.TreeOp;
 import com.disqt.disquests.common.model.Visibility;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public final class PacketCodec {
@@ -20,6 +29,8 @@ public final class PacketCodec {
   private static final int MAX_CONTRIBUTORS = 256;
   private static final int MAX_OPS = 256;
   private static final int MAX_QUEST_LIST = 10000;
+  public static final int MAX_TREE_OPS = 64;
+  public static final int DEFAULT_MAX_QUEST_DEPTH = 3;
 
   private static final java.util.concurrent.ConcurrentHashMap<Class<?>, Object[]> ENUM_CACHE =
       new java.util.concurrent.ConcurrentHashMap<>();
@@ -55,7 +66,31 @@ public final class PacketCodec {
       CoordinatesData coords2,
       String map,
       List<String> tags,
-      List<PointData> polygon) {}
+      List<PointData> polygon,
+      LinkChanges links) {
+
+    public SaveQuestPayload(
+        UUID questId,
+        String title,
+        String content,
+        CoordinatesData coords,
+        boolean isRegion,
+        CoordinatesData coords2,
+        String map,
+        List<String> tags,
+        List<PointData> polygon) {
+      this(
+          questId, title, content, coords, isRegion, coords2, map, tags, polygon, LinkChanges.NONE);
+    }
+  }
+
+  public record QuestActionPayload(UUID questId, boolean alsoMySubquests) {}
+
+  public record UpdatePeoplePayload(UUID questId, List<PersonOp> ops) {}
+
+  public record ApplyRoleDownPayload(UUID questId, UUID player) {}
+
+  public record ResolvePrivatizedPayload(UUID questId, boolean restore) {}
 
   public record RespondCollaborationPayload(UUID requestId, boolean approved) {}
 
@@ -76,7 +111,8 @@ public final class PacketCodec {
       String bluemapDefaultMap,
       int serverProtocolVersion,
       boolean worldMapEnabled,
-      boolean playerMarkerEnabled) {}
+      boolean playerMarkerEnabled,
+      int maxQuestDepth) {}
 
   public record CollaborationRequestPayload(
       UUID requestId, UUID questId, String questTitle, String requesterName) {}
@@ -120,6 +156,21 @@ public final class PacketCodec {
       String map,
       List<String> tags,
       List<PointData> polygon) {
+    return writeSaveQuest(
+        questId, title, content, coords, isRegion, coords2, map, tags, polygon, LinkChanges.NONE);
+  }
+
+  public static byte[] writeSaveQuest(
+      UUID questId,
+      String title,
+      String content,
+      CoordinatesData coords,
+      boolean isRegion,
+      CoordinatesData coords2,
+      String map,
+      List<String> tags,
+      List<PointData> polygon,
+      LinkChanges links) {
     ByteBufWriter buf = new ByteBufWriter();
     buf.writeByte(PacketType.SAVE_QUEST.getId());
     buf.writeUUID(questId);
@@ -134,6 +185,10 @@ public final class PacketCodec {
       buf.writeString(tag);
     }
     writePolygon(buf, polygon);
+    // An empty block is left out: a pre-V4 server reads the packet as it always did.
+    if (links != null && !links.equals(LinkChanges.NONE)) {
+      writeLinkChanges(buf, links);
+    }
     return buf.toByteArray();
   }
 
@@ -141,6 +196,14 @@ public final class PacketCodec {
     ByteBufWriter buf = new ByteBufWriter();
     buf.writeByte(PacketType.DELETE_QUEST.getId());
     buf.writeUUID(questId);
+    return buf.toByteArray();
+  }
+
+  public static byte[] writeDeleteQuest(UUID questId, boolean alsoMySubquests) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.DELETE_QUEST.getId());
+    buf.writeUUID(questId);
+    buf.writeBoolean(alsoMySubquests);
     return buf.toByteArray();
   }
 
@@ -199,6 +262,43 @@ public final class PacketCodec {
     ByteBufWriter buf = new ByteBufWriter();
     buf.writeByte(PacketType.COMPLETE_QUEST.getId());
     buf.writeUUID(questId);
+    return buf.toByteArray();
+  }
+
+  public static byte[] writeCompleteQuest(UUID questId, boolean alsoMySubquests) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.COMPLETE_QUEST.getId());
+    buf.writeUUID(questId);
+    buf.writeBoolean(alsoMySubquests);
+    return buf.toByteArray();
+  }
+
+  public static byte[] writeUpdatePeople(UUID questId, List<PersonOp> ops) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.UPDATE_PEOPLE.getId());
+    buf.writeUUID(questId);
+    buf.writeVarInt(ops.size());
+    for (PersonOp op : ops) {
+      buf.writeVarInt(op.kind().ordinal());
+      buf.writeUUID(op.player());
+      writeNullableRole(buf, op.role());
+    }
+    return buf.toByteArray();
+  }
+
+  public static byte[] writeApplyRoleDown(UUID questId, UUID player) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.APPLY_ROLE_DOWN.getId());
+    buf.writeUUID(questId);
+    buf.writeUUID(player);
+    return buf.toByteArray();
+  }
+
+  public static byte[] writeResolvePrivatized(UUID questId, boolean restore) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.RESOLVE_PRIVATIZED.getId());
+    buf.writeUUID(questId);
+    buf.writeBoolean(restore);
     return buf.toByteArray();
   }
 
@@ -333,6 +433,33 @@ public final class PacketCodec {
       int protocolVersion,
       boolean worldMapEnabled,
       boolean playerMarkerEnabled) {
+    return writeHandshake(
+        bluemapUrl,
+        pendingRequestCount,
+        pinnedQuestIds,
+        playerUuid,
+        mapNames,
+        predefinedTags,
+        defaultMap,
+        protocolVersion,
+        worldMapEnabled,
+        playerMarkerEnabled,
+        DEFAULT_MAX_QUEST_DEPTH);
+  }
+
+  /** The full handshake, ending in the server's maximum quest depth (0 = no limit). */
+  public static byte[] writeHandshake(
+      String bluemapUrl,
+      int pendingRequestCount,
+      List<UUID> pinnedQuestIds,
+      UUID playerUuid,
+      Map<String, String> mapNames,
+      List<String> predefinedTags,
+      String defaultMap,
+      int protocolVersion,
+      boolean worldMapEnabled,
+      boolean playerMarkerEnabled,
+      int maxQuestDepth) {
     ByteBufWriter buf = new ByteBufWriter();
     buf.writeByte(PacketType.HANDSHAKE.getId());
     writeNullableString(buf, bluemapUrl);
@@ -355,6 +482,7 @@ public final class PacketCodec {
     buf.writeVarInt(ProtocolVersion.CURRENT);
     buf.writeBoolean(worldMapEnabled);
     buf.writeBoolean(playerMarkerEnabled);
+    buf.writeVarInt(maxQuestDepth);
     return buf.toByteArray();
   }
 
@@ -460,6 +588,16 @@ public final class PacketCodec {
     return buf.toByteArray();
   }
 
+  public static byte[] writeNotice(Notice notice) {
+    ByteBufWriter buf = new ByteBufWriter();
+    buf.writeByte(PacketType.NOTICE.getId());
+    buf.writeVarInt(notice.kind().ordinal());
+    writeNullableUUID(buf, notice.questId());
+    writeNullableString(buf, notice.title());
+    buf.writeByte(notice.reason() == null ? 0 : notice.reason().ordinal() + 1);
+    return buf.toByteArray();
+  }
+
   // ---- Shared quest serialization ----
 
   public static void writeQuest(ByteBufWriter buf, QuestData quest) {
@@ -484,7 +622,7 @@ public final class PacketCodec {
     buf.writeVarInt(quest.contributors().size());
     for (ContributorData contributor : quest.contributors()) {
       buf.writeUUID(contributor.uuid());
-      buf.writeString(contributor.name());
+      buf.writeString(contributor.name() != null ? contributor.name() : "");
       buf.writeBoolean(contributor.canEdit());
     }
     buf.writeLong(quest.lastModified());
@@ -505,6 +643,29 @@ public final class PacketCodec {
       buf.writeLong(quest.completedAt());
       writeNullableUUID(buf, quest.completedBy());
       writeNullableString(buf, quest.completedByName());
+    }
+    if (protocolVersion >= ProtocolVersion.V4) {
+      for (ContributorData contributor : quest.contributors()) {
+        buf.writeByte(contributor.role().ordinal());
+      }
+      writeNullableUUID(buf, quest.parentId());
+      buf.writeVarInt(quest.prerequisites().size());
+      for (UUID id : quest.prerequisites()) {
+        buf.writeUUID(id);
+      }
+      buf.writeBoolean(quest.hiddenPrerequisites());
+      buf.writeBoolean(quest.deletedPrerequisite());
+      buf.writeBoolean(quest.hiddenParent());
+      buf.writeBoolean(quest.autoJoin());
+      buf.writeBoolean(quest.locked());
+      Privatized privatized = quest.privatized();
+      buf.writeBoolean(privatized != null);
+      if (privatized != null) {
+        buf.writeByte(privatized.previous().ordinal());
+        writeNullableString(buf, privatized.deletedTitle());
+        writeNullableString(buf, privatized.deletedByName());
+        buf.writeLong(privatized.at());
+      }
     }
   }
 
@@ -537,7 +698,7 @@ public final class PacketCodec {
     CoordinatesData coordinates2 = readNullableCoords(buf);
     String map = readNullableString(buf);
     List<String> tags;
-    if (buf.remaining() > 0) {
+    if (protocolVersion >= ProtocolVersion.V1 && buf.remaining() > 0) {
       int tagCount = readCount(buf, TagConstraints.MAX_TAGS, "Tag");
       tags = new ArrayList<>(tagCount);
       for (int i = 0; i < tagCount; i++) {
@@ -554,6 +715,35 @@ public final class PacketCodec {
       completedAt = buf.readLong();
       completedBy = readNullableUUID(buf);
       completedByName = readNullableString(buf);
+    }
+    UUID parentId = null;
+    List<UUID> prerequisites = List.of();
+    boolean hiddenPrerequisites = false;
+    boolean deletedPrerequisite = false;
+    boolean hiddenParent = false;
+    boolean autoJoin = false;
+    boolean locked = false;
+    Privatized privatized = null;
+    if (protocolVersion >= ProtocolVersion.V4) {
+      List<ContributorData> withRoles = new ArrayList<>(contributors.size());
+      for (ContributorData contributor : contributors) {
+        withRoles.add(new ContributorData(contributor.uuid(), contributor.name(), readRole(buf)));
+      }
+      contributors = withRoles;
+      parentId = readNullableUUID(buf);
+      prerequisites = readUuidList(buf, LinkRules.MAX_PREREQUISITES, "Prerequisite");
+      hiddenPrerequisites = buf.readBoolean();
+      deletedPrerequisite = buf.readBoolean();
+      hiddenParent = buf.readBoolean();
+      autoJoin = buf.readBoolean();
+      locked = buf.readBoolean();
+      if (buf.readBoolean()) {
+        Visibility previous = readByteEnum(buf, Visibility.class);
+        String deletedTitle = readNullableString(buf);
+        String deletedByName = readNullableString(buf);
+        long at = buf.readLong();
+        privatized = new Privatized(previous, deletedTitle, deletedByName, at, Set.of());
+      }
     }
     return new QuestData(
         id,
@@ -572,7 +762,15 @@ public final class PacketCodec {
         polygon,
         completedAt,
         completedBy,
-        completedByName);
+        completedByName,
+        parentId,
+        prerequisites,
+        hiddenPrerequisites,
+        deletedPrerequisite,
+        hiddenParent,
+        autoJoin,
+        locked,
+        privatized);
   }
 
   // ---- SYNC_TAGS ----
@@ -623,12 +821,64 @@ public final class PacketCodec {
       tags.add(buf.readString());
     }
     List<PointData> polygon = buf.remaining() > 0 ? readPolygon(buf) : List.of();
+    LinkChanges links = buf.remaining() > 0 ? readLinkChanges(buf) : LinkChanges.NONE;
     return new SaveQuestPayload(
-        questId, title, content, coords, isRegion, coords2, map, tags, polygon);
+        questId, title, content, coords, isRegion, coords2, map, tags, polygon, links);
   }
 
   public static UUID readDeleteQuest(ByteBufReader buf) {
     return buf.readUUID();
+  }
+
+  public static QuestActionPayload readDeleteQuestAction(ByteBufReader buf) {
+    return readQuestAction(buf);
+  }
+
+  public static QuestActionPayload readCompleteQuestAction(ByteBufReader buf) {
+    return readQuestAction(buf);
+  }
+
+  private static QuestActionPayload readQuestAction(ByteBufReader buf) {
+    UUID questId = buf.readUUID();
+    boolean alsoMySubquests = buf.remaining() > 0 && buf.readBoolean();
+    return new QuestActionPayload(questId, alsoMySubquests);
+  }
+
+  public static UpdatePeoplePayload readUpdatePeople(ByteBufReader buf) {
+    UUID questId = buf.readUUID();
+    int count = readCount(buf, MAX_OPS, "PersonOp");
+    List<PersonOp> ops = new ArrayList<>(count);
+    for (int i = 0; i < count; i++) {
+      PersonOp.Kind kind = readEnum(buf, PersonOp.Kind.class);
+      UUID player = buf.readUUID();
+      Role role = readNullableRole(buf);
+      ops.add(new PersonOp(kind, player, role));
+    }
+    return new UpdatePeoplePayload(questId, ops);
+  }
+
+  public static ApplyRoleDownPayload readApplyRoleDown(ByteBufReader buf) {
+    UUID questId = buf.readUUID();
+    UUID player = buf.readUUID();
+    return new ApplyRoleDownPayload(questId, player);
+  }
+
+  public static ResolvePrivatizedPayload readResolvePrivatized(ByteBufReader buf) {
+    UUID questId = buf.readUUID();
+    boolean restore = buf.readBoolean();
+    return new ResolvePrivatizedPayload(questId, restore);
+  }
+
+  public static Notice readNotice(ByteBufReader buf) {
+    Notice.Kind kind = readEnum(buf, Notice.Kind.class);
+    UUID questId = readNullableUUID(buf);
+    String title = readNullableString(buf);
+    int reason = buf.readByte() & 0xFF;
+    Refusal[] refusals = Refusal.values();
+    if (reason > refusals.length) {
+      throw new IllegalArgumentException("Invalid Refusal code: " + reason);
+    }
+    return new Notice(kind, questId, title, reason == 0 ? null : refusals[reason - 1]);
   }
 
   public static UUID readJoinQuest(ByteBufReader buf) {
@@ -718,6 +968,7 @@ public final class PacketCodec {
     int serverProtocolVersion = buf.remaining() > 0 ? buf.readVarInt() : ProtocolVersion.V1;
     boolean worldMapEnabled = buf.remaining() > 0 ? buf.readBoolean() : true;
     boolean playerMarkerEnabled = buf.remaining() > 0 ? buf.readBoolean() : true;
+    int maxQuestDepth = buf.remaining() > 0 ? buf.readVarInt() : DEFAULT_MAX_QUEST_DEPTH;
     return new HandshakePayload(
         bluemapUrl,
         pendingRequestCount,
@@ -728,7 +979,8 @@ public final class PacketCodec {
         defaultMap,
         serverProtocolVersion,
         worldMapEnabled,
-        playerMarkerEnabled);
+        playerMarkerEnabled,
+        maxQuestDepth);
   }
 
   private static List<QuestData> readQuestList(ByteBufReader buf, int protocolVersion) {
@@ -814,6 +1066,92 @@ public final class PacketCodec {
   }
 
   // ---- Private nullable helpers ----
+
+  private static void writeLinkChanges(ByteBufWriter buf, LinkChanges links) {
+    buf.writeByte(links.visibility() == null ? 0 : links.visibility().ordinal() + 1);
+    buf.writeVarInt(links.treeOps().size());
+    for (TreeOp op : links.treeOps()) {
+      buf.writeVarInt(op.kind().ordinal());
+      buf.writeUUID(op.quest());
+      writeNullableUUID(buf, op.target());
+    }
+    writeUuidList(buf, links.addPrerequisites());
+    writeUuidList(buf, links.removePrerequisites());
+    buf.writeBoolean(links.dropHidden());
+    buf.writeBoolean(links.dropDeleted());
+    buf.writeByte(links.autoJoin() == null ? 0 : (links.autoJoin() ? 2 : 1));
+  }
+
+  private static LinkChanges readLinkChanges(ByteBufReader buf) {
+    int visibilityCode = buf.readByte() & 0xFF;
+    Visibility[] visibilities = Visibility.values();
+    if (visibilityCode > visibilities.length) {
+      throw new IllegalArgumentException("Invalid Visibility code: " + visibilityCode);
+    }
+    Visibility visibility = visibilityCode == 0 ? null : visibilities[visibilityCode - 1];
+    int opCount = readCount(buf, MAX_TREE_OPS, "TreeOp");
+    List<TreeOp> treeOps = new ArrayList<>(opCount);
+    for (int i = 0; i < opCount; i++) {
+      TreeOp.Kind kind = readEnum(buf, TreeOp.Kind.class);
+      UUID quest = buf.readUUID();
+      UUID target = readNullableUUID(buf);
+      treeOps.add(new TreeOp(kind, quest, target));
+    }
+    List<UUID> add = readUuidList(buf, LinkRules.MAX_PREREQUISITES, "Added prerequisite");
+    List<UUID> remove = readUuidList(buf, LinkRules.MAX_PREREQUISITES, "Removed prerequisite");
+    boolean dropHidden = buf.readBoolean();
+    boolean dropDeleted = buf.readBoolean();
+    int autoJoinCode = buf.readByte() & 0xFF;
+    if (autoJoinCode > 2) {
+      throw new IllegalArgumentException("Invalid auto-join code: " + autoJoinCode);
+    }
+    Boolean autoJoin = autoJoinCode == 0 ? null : autoJoinCode == 2;
+    return new LinkChanges(visibility, treeOps, add, remove, dropHidden, dropDeleted, autoJoin);
+  }
+
+  private static void writeUuidList(ByteBufWriter buf, List<UUID> ids) {
+    buf.writeVarInt(ids.size());
+    for (UUID id : ids) {
+      buf.writeUUID(id);
+    }
+  }
+
+  private static List<UUID> readUuidList(ByteBufReader buf, int max, String label) {
+    int count = readCount(buf, max, label);
+    List<UUID> ids = new ArrayList<>(count);
+    for (int i = 0; i < count; i++) {
+      ids.add(buf.readUUID());
+    }
+    return ids;
+  }
+
+  private static Role readRole(ByteBufReader buf) {
+    return readByteEnum(buf, Role.class);
+  }
+
+  private static void writeNullableRole(ByteBufWriter buf, Role role) {
+    buf.writeByte(role == null ? 0 : role.ordinal() + 1);
+  }
+
+  private static Role readNullableRole(ByteBufReader buf) {
+    int code = buf.readByte() & 0xFF;
+    Role[] roles = Role.values();
+    if (code > roles.length) {
+      throw new IllegalArgumentException("Invalid Role code: " + code);
+    }
+    return code == 0 ? null : roles[code - 1];
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T extends Enum<T>> T readByteEnum(ByteBufReader buf, Class<T> enumClass) {
+    int ordinal = buf.readByte() & 0xFF;
+    T[] values = (T[]) ENUM_CACHE.computeIfAbsent(enumClass, Class::getEnumConstants);
+    if (ordinal >= values.length) {
+      throw new IllegalArgumentException(
+          "Invalid " + enumClass.getSimpleName() + " ordinal: " + ordinal);
+    }
+    return values[ordinal];
+  }
 
   private static void writePolygon(ByteBufWriter buf, List<PointData> polygon) {
     buf.writeVarInt(polygon.size());

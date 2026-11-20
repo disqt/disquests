@@ -40,6 +40,27 @@ class DataManagerTest {
   // Helpers
   // -------------------------------------------------------------------------
 
+  private void delete(UUID id) {
+    dm.applyDeletePlan(
+        new com.disqt.disquests.common.graph.Plans.DeletePlan(
+            java.util.Set.of(id), Map.of(), Map.of(), Map.of()),
+        1L);
+  }
+
+  /** The stored role rows of the quest, read straight from the database. */
+  private int peopleRows(UUID questId) {
+    try (Connection c =
+            DriverManager.getConnection("jdbc:sqlite:" + tempDir.resolve("disquests.db"));
+        PreparedStatement st =
+            c.prepareStatement("SELECT COUNT(*) FROM quest_people WHERE quest_id = ?")) {
+      st.setString(1, questId.toString());
+      java.sql.ResultSet rs = st.executeQuery();
+      return rs.next() ? rs.getInt(1) : -1;
+    } catch (java.sql.SQLException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   private QuestData makeQuest(UUID id, UUID owner, String title, Visibility vis) {
     return new QuestData(
         id,
@@ -141,79 +162,8 @@ class DataManagerTest {
     dm.saveQuest(makeQuest(id, OWNER, "To Delete", Visibility.OPEN));
 
     assertNotNull(dm.getQuest(id));
-    boolean deleted = dm.deleteQuest(id);
-    assertTrue(deleted);
+    delete(id);
     assertNull(dm.getQuest(id));
-  }
-
-  @Test
-  void getQuestsForPlayer_asOwner() {
-    UUID id = UUID.randomUUID();
-    dm.upsertPlayerName(OWNER, "Alice");
-    dm.saveQuest(makeQuest(id, OWNER, "My Quest", Visibility.OPEN));
-
-    List<QuestData> quests = dm.getQuestsForPlayer(OWNER);
-    assertEquals(1, quests.size());
-    assertEquals(id, quests.get(0).id());
-  }
-
-  @Test
-  void getQuestsForPlayer_asContributor() {
-    UUID id = UUID.randomUUID();
-    dm.upsertPlayerName(OWNER, "Alice");
-    dm.upsertPlayerName(PLAYER2, "Bob");
-    dm.saveQuest(makeQuest(id, OWNER, "Shared Quest", Visibility.OPEN));
-    dm.addContributor(id, PLAYER2, false);
-
-    List<QuestData> quests = dm.getQuestsForPlayer(PLAYER2);
-    assertEquals(1, quests.size());
-    assertEquals(id, quests.get(0).id());
-  }
-
-  @Test
-  void getServerQuests_excludesOwnedAndContributed() {
-    UUID ownedId = UUID.randomUUID();
-    UUID contribId = UUID.randomUUID();
-    UUID unrelatedId = UUID.randomUUID();
-
-    dm.upsertPlayerName(OWNER, "Alice");
-    dm.upsertPlayerName(PLAYER2, "Bob");
-    dm.upsertPlayerName(PLAYER3, "Carol");
-
-    // OWNER's own quest
-    dm.saveQuest(makeQuest(ownedId, OWNER, "Owned", Visibility.OPEN));
-    // quest by PLAYER2 where OWNER is contributor
-    dm.saveQuest(makeQuest(contribId, PLAYER2, "Contributed", Visibility.OPEN));
-    dm.addContributor(contribId, OWNER, false);
-    // unrelated open quest by PLAYER3
-    dm.saveQuest(makeQuest(unrelatedId, PLAYER3, "Unrelated", Visibility.OPEN));
-
-    List<QuestData> server = dm.getServerQuests(OWNER);
-    assertEquals(1, server.size());
-    assertEquals(unrelatedId, server.get(0).id());
-  }
-
-  @Test
-  void getServerQuests_excludesPrivate() {
-    UUID privateId = UUID.randomUUID();
-    dm.upsertPlayerName(PLAYER2, "Bob");
-    dm.saveQuest(makeQuest(privateId, PLAYER2, "Secret", Visibility.PRIVATE));
-
-    List<QuestData> server = dm.getServerQuests(OWNER);
-    assertTrue(server.isEmpty());
-  }
-
-  @Test
-  void updateVisibility() {
-    UUID id = UUID.randomUUID();
-    dm.upsertPlayerName(OWNER, "Alice");
-    dm.saveQuest(makeQuest(id, OWNER, "Quest", Visibility.PRIVATE));
-
-    dm.updateVisibility(id, Visibility.OPEN);
-
-    QuestData loaded = dm.getQuest(id);
-    assertNotNull(loaded);
-    assertEquals(Visibility.OPEN, loaded.visibility());
   }
 
   // -------------------------------------------------------------------------
@@ -221,48 +171,21 @@ class DataManagerTest {
   // -------------------------------------------------------------------------
 
   @Test
-  void addAndRemoveContributor() {
+  void addAndRemovePerson() {
     UUID questId = UUID.randomUUID();
     dm.upsertPlayerName(OWNER, "Alice");
     dm.upsertPlayerName(PLAYER2, "Bob");
     dm.saveQuest(makeQuest(questId, OWNER, "Quest", Visibility.OPEN));
 
-    dm.addContributor(questId, PLAYER2, false);
-    List<ContributorData> contributors = dm.getContributors(questId);
+    dm.setRole(questId, PLAYER2, Role.READ);
+    List<ContributorData> contributors = dm.getQuest(questId).contributors();
     assertEquals(1, contributors.size());
     assertEquals(PLAYER2, contributors.get(0).uuid());
     assertFalse(contributors.get(0).canEdit());
 
-    dm.removeContributor(questId, PLAYER2);
-    List<ContributorData> after = dm.getContributors(questId);
+    dm.removePerson(questId, PLAYER2);
+    List<ContributorData> after = dm.getQuest(questId).contributors();
     assertTrue(after.isEmpty());
-  }
-
-  @Test
-  void updateContributor() {
-    UUID questId = UUID.randomUUID();
-    dm.upsertPlayerName(OWNER, "Alice");
-    dm.upsertPlayerName(PLAYER2, "Bob");
-    dm.saveQuest(makeQuest(questId, OWNER, "Quest", Visibility.OPEN));
-
-    dm.addContributor(questId, PLAYER2, false);
-    dm.updateContributor(questId, PLAYER2, true);
-
-    List<ContributorData> contributors = dm.getContributors(questId);
-    assertEquals(1, contributors.size());
-    assertTrue(contributors.get(0).canEdit());
-  }
-
-  @Test
-  void isContributor() {
-    UUID questId = UUID.randomUUID();
-    dm.upsertPlayerName(OWNER, "Alice");
-    dm.upsertPlayerName(PLAYER2, "Bob");
-    dm.saveQuest(makeQuest(questId, OWNER, "Quest", Visibility.OPEN));
-
-    assertFalse(dm.isContributor(questId, PLAYER2));
-    dm.addContributor(questId, PLAYER2, false);
-    assertTrue(dm.isContributor(questId, PLAYER2));
   }
 
   // -------------------------------------------------------------------------
@@ -387,45 +310,6 @@ class DataManagerTest {
     dm.upsertPlayerName(OWNER, "Alice");
     assertEquals(OWNER, dm.getPlayerUuidByName("Alice"));
     assertNull(dm.getPlayerUuidByName("UnknownPlayer"));
-  }
-
-  // -------------------------------------------------------------------------
-  // Leave Quest
-  // -------------------------------------------------------------------------
-
-  @Test
-  void leaveQuest_removesContributorAndPin() {
-    UUID questId = UUID.randomUUID();
-    dm.upsertPlayerName(OWNER, "Owner");
-    dm.upsertPlayerName(PLAYER2, "Player2");
-
-    QuestData quest =
-        new QuestData(
-            questId,
-            "Quest",
-            "content",
-            OWNER,
-            null,
-            Visibility.OPEN,
-            List.of(),
-            System.currentTimeMillis(),
-            null,
-            false,
-            null,
-            null,
-            List.of());
-    dm.saveQuest(quest);
-    dm.addContributor(questId, PLAYER2, false);
-    dm.pinQuest(PLAYER2, questId);
-
-    assertTrue(dm.isContributor(questId, PLAYER2));
-    assertTrue(dm.isQuestPinned(PLAYER2, questId));
-
-    dm.leaveQuest(questId, PLAYER2);
-
-    assertFalse(dm.isContributor(questId, PLAYER2));
-    assertFalse(dm.isQuestPinned(PLAYER2, questId));
-    assertNotNull(dm.getQuest(questId)); // quest still exists
   }
 
   @Test
@@ -597,10 +481,23 @@ class DataManagerTest {
             List.of("tag1", "tag2"));
     dm.saveQuest(quest);
 
-    dm.resetDatabase();
+    dm.resetDatabase(java.util.Map.of());
 
     assertNull(dm.getQuest(id));
-    assertTrue(dm.getQuestsForPlayer(OWNER).isEmpty());
+    assertTrue(dm.getAllQuests().isEmpty());
+  }
+
+  @Test
+  void resetDatabase_keepsOnlyTheNamesGiven() {
+    UUID online = UUID.randomUUID();
+    dm.upsertPlayerName(OWNER, "Alice");
+    dm.upsertPlayerName(online, "Bob");
+
+    // The players still connected stay known, so they can be added to quests after a reset
+    dm.resetDatabase(java.util.Map.of(online, "Bob"));
+
+    assertEquals("Bob", dm.getPlayerName(online));
+    assertNull(dm.getPlayerName(OWNER));
   }
 
   // -------------------------------------------------------------------------
@@ -613,14 +510,14 @@ class DataManagerTest {
     dm.upsertPlayerName(OWNER, "Alice");
     dm.saveQuest(makeQuest(questId, OWNER, "Test Quest", Visibility.OPEN));
     dm.pinQuest(OWNER, questId);
-    dm.addContributor(questId, PLAYER2, false);
+    dm.setRole(questId, PLAYER2, Role.READ);
     dm.createCollaborationRequest(questId, PLAYER2);
 
-    dm.resetDatabase();
+    dm.resetDatabase(java.util.Map.of());
 
-    assertTrue(dm.getQuestsForPlayer(OWNER).isEmpty());
+    assertTrue(dm.getAllQuests().isEmpty());
     assertTrue(dm.getPinnedQuestIds(OWNER).isEmpty());
-    assertFalse(dm.isContributor(questId, PLAYER2));
+    assertEquals(0, peopleRows(questId));
     assertTrue(dm.getPendingRequestsForOwner(OWNER).isEmpty());
     assertNull(dm.getPlayerName(OWNER));
   }
@@ -636,16 +533,16 @@ class DataManagerTest {
     dm.upsertPlayerName(PLAYER2, "Bob");
     dm.upsertPlayerName(PLAYER3, "Carol");
     dm.saveQuest(makeQuest(questId, OWNER, "Quest", Visibility.OPEN));
-    dm.addContributor(questId, PLAYER2, false);
-    dm.addContributor(questId, PLAYER3, true);
+    dm.setRole(questId, PLAYER2, Role.READ);
+    dm.setRole(questId, PLAYER3, Role.WRITE);
 
-    assertEquals(2, dm.getContributors(questId).size());
+    assertEquals(2, dm.getQuest(questId).contributors().size());
+    assertEquals(3, peopleRows(questId));
 
-    dm.deleteQuest(questId);
+    delete(questId);
 
-    // getContributors on a deleted quest should return empty (FK cascade)
-    List<ContributorData> remaining = dm.getContributors(questId);
-    assertTrue(remaining.isEmpty());
+    // The quest's role rows go with it (FK cascade)
+    assertEquals(0, peopleRows(questId));
   }
 
   @Test
@@ -658,7 +555,7 @@ class DataManagerTest {
     UUID requestId = dm.createCollaborationRequest(questId, PLAYER2);
     assertNotNull(dm.getCollaborationRequest(requestId));
 
-    dm.deleteQuest(questId);
+    delete(questId);
 
     assertNull(dm.getCollaborationRequest(requestId));
   }
@@ -694,12 +591,6 @@ class DataManagerTest {
     dm.createCollaborationRequest(questId2, PLAYER2);
 
     assertEquals(3, dm.getPendingRequestCount(OWNER));
-  }
-
-  @Test
-  void deleteQuest_returnsFalseForNonexistent() {
-    boolean deleted = dm.deleteQuest(UUID.randomUUID());
-    assertFalse(deleted);
   }
 
   @Test
@@ -746,7 +637,7 @@ class DataManagerTest {
   }
 
   @Test
-  void getQuestsForPlayer_batchContributors() {
+  void getAllQuests_batchContributors() {
     UUID questId1 = UUID.randomUUID();
     UUID questId2 = UUID.randomUUID();
     dm.upsertPlayerName(OWNER, "Alice");
@@ -755,11 +646,11 @@ class DataManagerTest {
     dm.saveQuest(makeQuest(questId1, OWNER, "Q1", Visibility.OPEN));
     dm.saveQuest(makeQuest(questId2, OWNER, "Q2", Visibility.OPEN));
 
-    dm.addContributor(questId1, PLAYER2, false);
-    dm.addContributor(questId2, PLAYER2, true);
-    dm.addContributor(questId2, PLAYER3, false);
+    dm.setRole(questId1, PLAYER2, Role.READ);
+    dm.setRole(questId2, PLAYER2, Role.WRITE);
+    dm.setRole(questId2, PLAYER3, Role.READ);
 
-    List<QuestData> quests = dm.getQuestsForPlayer(OWNER);
+    List<QuestData> quests = dm.getAllQuests();
     assertEquals(2, quests.size());
 
     QuestData q1 = quests.stream().filter(q -> q.id().equals(questId1)).findFirst().orElse(null);
@@ -784,7 +675,7 @@ class DataManagerTest {
     dm.pinQuest(OWNER, questId);
     assertTrue(dm.isQuestPinned(OWNER, questId));
 
-    dm.deleteQuest(questId);
+    delete(questId);
 
     assertFalse(dm.isQuestPinned(OWNER, questId));
     assertTrue(dm.getPinnedQuestIds(OWNER).isEmpty());
@@ -933,7 +824,7 @@ class DataManagerTest {
           List.of(new PointData(1, 2), new PointData(5, 2), new PointData(5, 8)), q.polygon());
       assertEquals(2, q.tags().size());
       assertTrue(q.tags().containsAll(List.of("base", "farm")));
-      List<ContributorData> contributors = second.getContributors(id);
+      List<ContributorData> contributors = second.getQuest(id).contributors();
       assertEquals(1, contributors.size());
       assertEquals(PLAYER2, contributors.get(0).uuid());
       assertTrue(contributors.get(0).canEdit());
@@ -1049,6 +940,23 @@ class DataManagerTest {
   }
 
   @Test
+  void savePolygon_twoCornersAreStoredAsAPinOnTheFirst() {
+    UUID id = UUID.randomUUID();
+    dm.upsertPlayerName(OWNER, "Alice");
+    List<PointData> two = List.of(new PointData(10, 20), new PointData(30, 40));
+    dm.saveQuest(
+        makeQuest(id, OWNER, "Two", Visibility.PRIVATE)
+            .withLocation(
+                new CoordinatesData(10, 64, 20), true, new CoordinatesData(30, 64, 40), two));
+
+    QuestData q = dm.getQuest(id);
+    assertEquals(new CoordinatesData(10, 64, 20), q.coordinates());
+    assertFalse(q.isRegion());
+    assertNull(q.coordinates2());
+    assertTrue(q.polygon().isEmpty());
+  }
+
+  @Test
   void savePolygon_replacesPreviousVertices() {
     UUID id = UUID.randomUUID();
     dm.upsertPlayerName(OWNER, "Alice");
@@ -1068,17 +976,15 @@ class DataManagerTest {
   }
 
   @Test
-  void getQuestsForPlayer_includesPolygons() {
+  void getAllQuests_includesPolygons() {
     UUID id = UUID.randomUUID();
     dm.upsertPlayerName(OWNER, "Alice");
     List<PointData> poly = List.of(new PointData(0, 0), new PointData(10, 0), new PointData(10, 8));
     dm.saveQuest(makeQuest(id, OWNER, "Poly", Visibility.OPEN).withPolygon(poly));
 
-    List<QuestData> mine = dm.getQuestsForPlayer(OWNER);
-    assertEquals(1, mine.size());
-    assertEquals(poly, mine.get(0).polygon());
-    List<QuestData> server = dm.getServerQuests(PLAYER2);
-    assertEquals(poly, server.get(0).polygon());
+    List<QuestData> all = dm.getAllQuests();
+    assertEquals(1, all.size());
+    assertEquals(poly, all.get(0).polygon());
   }
 
   @Test
@@ -1090,7 +996,7 @@ class DataManagerTest {
             .withPolygon(List.of(new PointData(0, 0), new PointData(10, 0), new PointData(10, 8))));
     assertEquals(3, dm.countPolygonRows());
 
-    dm.resetDatabase();
+    dm.resetDatabase(java.util.Map.of());
 
     assertEquals(0, dm.countPolygonRows());
   }
@@ -1104,7 +1010,7 @@ class DataManagerTest {
             .withPolygon(List.of(new PointData(0, 0), new PointData(10, 0), new PointData(10, 8))));
     assertEquals(3, dm.countPolygonRows());
 
-    dm.deleteQuest(id);
+    delete(id);
 
     assertEquals(0, dm.countPolygonRows());
   }
@@ -1196,7 +1102,7 @@ class DataManagerTest {
     UUID id = UUID.randomUUID();
     dm.upsertPlayerName(OWNER, "Alice");
     dm.saveQuest(makeQuest(id, OWNER, "Q", Visibility.OPEN));
-    dm.completeQuest(id, OWNER, 5000L);
+    dm.completeQuests(List.of(id), OWNER, 5000L);
     QuestData q = dm.getQuest(id);
     assertEquals(5000L, q.completedAt());
     assertEquals(OWNER, q.completedBy());
@@ -1210,7 +1116,7 @@ class DataManagerTest {
     dm.saveQuest(makeQuest(id, OWNER, "Q", Visibility.OPEN));
     dm.pinQuest(OWNER, id);
     dm.pinQuest(PLAYER2, id);
-    dm.completeQuest(id, OWNER, 5000L);
+    dm.completeQuests(List.of(id), OWNER, 5000L);
     assertFalse(dm.isQuestPinned(OWNER, id));
     assertFalse(dm.isQuestPinned(PLAYER2, id));
   }
@@ -1221,7 +1127,7 @@ class DataManagerTest {
     dm.saveQuest(makeQuest(id, OWNER, "Q", Visibility.OPEN));
     dm.createCollaborationRequest(id, PLAYER2);
     assertEquals(1, dm.getPendingRequestCount(OWNER));
-    dm.completeQuest(id, OWNER, 5000L);
+    dm.completeQuests(List.of(id), OWNER, 5000L);
     assertEquals(0, dm.getPendingRequestCount(OWNER));
   }
 
@@ -1229,7 +1135,7 @@ class DataManagerTest {
   void reopenQuest_clearsCompletion() {
     UUID id = UUID.randomUUID();
     dm.saveQuest(makeQuest(id, OWNER, "Q", Visibility.OPEN));
-    dm.completeQuest(id, OWNER, 5000L);
+    dm.completeQuests(List.of(id), OWNER, 5000L);
     dm.reopenQuest(id);
     QuestData q = dm.getQuest(id);
     assertEquals(0L, q.completedAt());
@@ -1238,23 +1144,12 @@ class DataManagerTest {
   }
 
   @Test
-  void getServerQuests_excludesCompleted() {
-    UUID open = UUID.randomUUID();
-    UUID done = UUID.randomUUID();
-    dm.saveQuest(makeQuest(open, OWNER, "Open", Visibility.OPEN));
-    dm.saveQuest(makeQuest(done, OWNER, "Done", Visibility.OPEN));
-    dm.completeQuest(done, OWNER, 5000L);
-    List<UUID> ids = dm.getServerQuests(PLAYER3).stream().map(QuestData::id).toList();
-    assertEquals(List.of(open), ids);
-  }
-
-  @Test
-  void getQuestsForPlayer_includesCompleted() {
+  void getAllQuests_includesCompleted() {
     UUID done = UUID.randomUUID();
     dm.upsertPlayerName(OWNER, "Alice");
     dm.saveQuest(makeQuest(done, OWNER, "Done", Visibility.PRIVATE));
-    dm.completeQuest(done, OWNER, 5000L);
-    List<QuestData> quests = dm.getQuestsForPlayer(OWNER);
+    dm.completeQuests(List.of(done), OWNER, 5000L);
+    List<QuestData> quests = dm.getAllQuests();
     assertEquals(1, quests.size());
     assertEquals(5000L, quests.get(0).completedAt());
     assertEquals("Alice", quests.get(0).completedByName());
@@ -1264,7 +1159,7 @@ class DataManagerTest {
   void saveQuest_preservesCompletion() {
     UUID id = UUID.randomUUID();
     dm.saveQuest(makeQuest(id, OWNER, "Q", Visibility.OPEN));
-    dm.completeQuest(id, OWNER, 5000L);
+    dm.completeQuests(List.of(id), OWNER, 5000L);
     dm.saveQuest(makeQuest(id, OWNER, "Q edited", Visibility.OPEN));
     QuestData q = dm.getQuest(id);
     assertEquals("Q edited", q.title());

@@ -9,10 +9,10 @@ import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Contributor;
 import com.disqt.disquests.client.data.Quest;
-import com.disqt.disquests.client.gui.component.QuestEntryComponent;
 import com.disqt.disquests.client.gui.screen.ContributorScreen;
 import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
+import com.disqt.disquests.client.gui.screen.QuestListPanel;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.test.integration.PhaseSync;
 import com.disqt.disquests.test.integration.harness.IntegrationTest;
@@ -21,6 +21,7 @@ import com.disqt.disquests.test.integration.harness.PlayerB;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.container.FlowLayout;
+import java.util.UUID;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.client.gui.screens.Screen;
 import org.junit.jupiter.api.*;
@@ -54,9 +55,8 @@ class TwoPlayerJourneys {
     and("PlayerA types a title");
     type(context, "title-field", "Collab Quest");
 
-    and("PlayerA cycles visibility to CLOSED (PRIVATE -> CLOSED)");
-    click(context, "btn-visibility");
-    assertButtonText(context, "btn-visibility", "Closed");
+    and("PlayerA sets visibility to CLOSED");
+    selectVisibility(context, "vis-closed");
 
     and("PlayerA saves the quest");
     click(context, "btn-save");
@@ -181,7 +181,7 @@ class TwoPlayerJourneys {
     waitForQuestCondition(context, "Collab Quest", true, q -> !q.getContributors().isEmpty());
 
     and("PlayerA reopens ContributorScreen with updated data");
-    // ContributorScreen doesn't auto-refresh, so reopen it via quest edit mode
+    // Reopened via quest edit mode, so the people screen's parent is the editor
     openMainScreen(context);
     clickEntryByTitle(context, "Collab Quest");
     click(context, "btn-open");
@@ -214,78 +214,45 @@ class TwoPlayerJourneys {
   @Test
   @Order(3)
   @PlayerA
-  @DisplayName("Collab: A toggles permission and removes contributor")
+  @DisplayName("Collab: A gives the contributor Write and removes them")
   void collab_a_manages_contributor(ClientGameTestContext context) {
     given("PlayerA is still on ContributorScreen");
     waitForScreen(context, ContributorScreen.class);
+    UUID playerB = firstContributor(context, "Collab Quest");
 
-    when("PlayerA toggles contributor's permission");
-    double[] permPos =
-        context.computeOnClient(
-            c -> {
-              Screen screen = c.gui.screen();
-              if (screen
-                  instanceof com.disqt.disquests.client.gui.screen.DisquestsBaseScreen dScreen) {
-                var root = dScreen.getRootComponent();
-                if (root == null) throw new AssertionError("Root not found");
-                FlowLayout contribList = root.childById(FlowLayout.class, "contributor-list");
-                if (contribList == null || contribList.children().isEmpty())
-                  throw new AssertionError("contributor-list is empty");
-                var firstRow = contribList.children().get(0);
-                if (!(firstRow instanceof FlowLayout rowLayout))
-                  throw new AssertionError("First contributor row is not a FlowLayout");
-                ButtonComponent permBtn =
-                    rowLayout.children().stream()
-                        .filter(child -> child instanceof ButtonComponent)
-                        .map(child -> (ButtonComponent) child)
-                        .findFirst()
-                        .orElseThrow(() -> new AssertionError("Permission button not found"));
-                return new double[] {
-                  permBtn.x() + permBtn.width() / 2.0, permBtn.y() + permBtn.height() / 2.0
-                };
-              }
-              throw new AssertionError("Not a Disquests screen");
-            });
-    clickAt(context, permPos, 4);
+    when("PlayerA gives the contributor Write and saves");
+    grantWriteAndSave(context, playerB);
+
+    then("the contributor has Write");
+    waitForQuestCondition(
+        context,
+        "Collab Quest",
+        true,
+        q ->
+            q.getContributors().stream().anyMatch(c -> c.getUuid().equals(playerB) && c.canEdit()));
+
+    when("PlayerA reopens the people screen from the same editor");
+    click(context, "btn-contributors");
     waitForScreen(context, ContributorScreen.class);
+
+    then("Write shows as the contributor's current role, saved");
+    // The draft starts from the saved quest, not the editor's older copy
+    waitForComponent(context, "role-write-" + playerB);
+    ButtonComponent write = findComponent(context, ButtonComponent.class, "role-write-" + playerB);
+    boolean writeActive = context.computeOnClient(c -> write.isActive());
+    assertFalse(writeActive, "Write should show pressed");
+    assertComponentMissing(context, "person-status-" + playerB);
 
     when("PlayerA clicks Remove on the contributor");
-    double[] removePos =
-        context.computeOnClient(
-            c -> {
-              Screen screen = c.gui.screen();
-              if (screen
-                  instanceof com.disqt.disquests.client.gui.screen.DisquestsBaseScreen dScreen) {
-                var root = dScreen.getRootComponent();
-                if (root == null) throw new AssertionError("Root not found");
-                FlowLayout contribList = root.childById(FlowLayout.class, "contributor-list");
-                if (contribList == null || contribList.children().isEmpty())
-                  throw new AssertionError("contributor-list is empty");
-                var firstRow = contribList.children().get(0);
-                if (!(firstRow instanceof FlowLayout rowLayout))
-                  throw new AssertionError("First contributor row is not a FlowLayout");
-                var buttons =
-                    rowLayout.children().stream()
-                        .filter(child -> child instanceof ButtonComponent)
-                        .map(child -> (ButtonComponent) child)
-                        .toList();
-                if (buttons.size() < 2)
-                  throw new AssertionError("Expected 2 buttons in contributor row");
-                ButtonComponent removeBtn = buttons.get(1);
-                return new double[] {
-                  removeBtn.x() + removeBtn.width() / 2.0, removeBtn.y() + removeBtn.height() / 2.0
-                };
-              }
-              throw new AssertionError("Not a Disquests screen");
-            });
-    clickAt(context, removePos);
+    click(context, "btn-remove-" + playerB);
 
-    then("confirm overlay appears");
-    waitForComponent(context, DisquestsBaseScreen.CONFIRM_OVERLAY_ID);
+    then("the row shows as removed, not saved, with Undo");
+    // No subquests, so nothing to ask: the removal waits in the draft
+    waitForComponent(context, "btn-undo-" + playerB);
 
-    when("PlayerA confirms removal");
-    click(context, DisquestsBaseScreen.CONFIRM_YES_ID);
-    waitForScreen(context, ContributorScreen.class);
+    when("PlayerA saves the removal");
+    clickWhenActive(context, "btn-save-people");
+    waitForScreen(context, QuestScreen.class);
 
     then("contributor list is empty");
     // Wait for server to process removal
@@ -312,10 +279,8 @@ class TwoPlayerJourneys {
     and("PlayerA types a title");
     type(context, "title-field", "Open Quest");
 
-    and("PlayerA cycles visibility twice to reach OPEN");
-    click(context, "btn-visibility");
-    click(context, "btn-visibility");
-    assertButtonText(context, "btn-visibility", "Open");
+    and("PlayerA sets visibility to OPEN");
+    selectVisibility(context, "vis-open");
 
     and("PlayerA saves the quest");
     click(context, "btn-save");
@@ -415,9 +380,7 @@ class TwoPlayerJourneys {
     click(context, "btn-new-quest");
     waitForScreen(context, QuestScreen.class);
     type(context, "title-field", "Archive Quest");
-    click(context, "btn-visibility");
-    click(context, "btn-visibility");
-    assertButtonText(context, "btn-visibility", "Open");
+    selectVisibility(context, "vis-open");
     click(context, "btn-save");
     waitForScreen(context, QuestScreen.class);
 
@@ -475,7 +438,7 @@ class TwoPlayerJourneys {
     waitForScreen(context, QuestScreen.class);
     click(context, "btn-contributors");
     waitForScreen(context, ContributorScreen.class);
-    clickAt(context, firstContributorPermissionButton(context), 4);
+    grantWriteAndSave(context, firstContributor(context, "Archive Quest"));
     waitForQuestCondition(
         context,
         "Archive Quest",
@@ -522,11 +485,8 @@ class TwoPlayerJourneys {
           var root = screen.getRootComponent();
           FlowLayout list = root != null ? root.childById(FlowLayout.class, "quest-list") : null;
           return list != null
-              && list.children().stream()
-                  .anyMatch(
-                      child ->
-                          child instanceof QuestEntryComponent entry
-                              && "Archive Quest".equals(entry.getQuest().getTitle()));
+              && QuestListPanel.entries(list).stream()
+                  .anyMatch(entry -> "Archive Quest".equals(entry.getQuest().getTitle()));
         },
         TIMEOUT);
 
@@ -535,12 +495,12 @@ class TwoPlayerJourneys {
     click(context, "btn-open");
     waitForScreen(context, QuestScreen.class);
 
-    then("it is a read-only record PlayerB may reopen");
+    then("it is a read-only record; reopening is for owners, and PlayerB has Write");
     waitForComponent(context, "completed-label");
     LabelComponent label = findComponent(context, LabelComponent.class, "completed-label");
     String text = context.computeOnClient(c -> label.text().getString());
     assertTrue(text.startsWith("Completed on"), "completed-label text was '" + text + "'");
-    assertComponentExists(context, "btn-reopen");
+    assertComponentMissing(context, "btn-reopen");
     assertComponentMissing(context, "btn-edit");
     assertComponentMissing(context, "btn-leave");
 
@@ -550,28 +510,65 @@ class TwoPlayerJourneys {
     click(context, "tab-my-quests");
   }
 
-  /** Centre of the permission toggle in the first ContributorScreen contributor row. */
-  private static double[] firstContributorPermissionButton(ClientGameTestContext context) {
+  /** The first contributor (not the owner) of the cached quest with this title. */
+  private static UUID firstContributor(ClientGameTestContext context, String title) {
     return context.computeOnClient(
-        c -> {
-          if (!(c.gui.screen() instanceof DisquestsBaseScreen dScreen))
-            throw new AssertionError("Not a Disquests screen");
-          var root = dScreen.getRootComponent();
-          if (root == null) throw new AssertionError("Root not found");
-          FlowLayout contribList = root.childById(FlowLayout.class, "contributor-list");
-          if (contribList == null || contribList.children().isEmpty())
-            throw new AssertionError("contributor-list is empty");
-          if (!(contribList.children().get(0) instanceof FlowLayout rowLayout))
-            throw new AssertionError("First contributor row is not a FlowLayout");
-          ButtonComponent permBtn =
-              rowLayout.children().stream()
-                  .filter(child -> child instanceof ButtonComponent)
-                  .map(child -> (ButtonComponent) child)
-                  .findFirst()
-                  .orElseThrow(() -> new AssertionError("Permission button not found"));
-          return new double[] {
-            permBtn.x() + permBtn.width() / 2.0, permBtn.y() + permBtn.height() / 2.0
-          };
-        });
+        c ->
+            ClientCache.getMyQuests().stream()
+                .filter(q -> title.equals(q.getTitle()))
+                .flatMap(q -> q.getContributors().stream())
+                .map(Contributor::getUuid)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("No contributor on " + title)));
+  }
+
+  /**
+   * On the people screen: presses the person's Write button, then Save once the draft shows the
+   * change (Save is disabled while nothing changed). Save returns to the screen it was opened from.
+   */
+  private static void grantWriteAndSave(ClientGameTestContext context, UUID person) {
+    click(context, "role-write-" + person);
+    context.waitFor(
+        client ->
+            client.gui.screen() instanceof DisquestsBaseScreen screen
+                && screen.getRootComponent() != null
+                && screen
+                        .getRootComponent()
+                        .childById(ButtonComponent.class, "role-write-" + person)
+                    != null
+                && !screen
+                    .getRootComponent()
+                    .childById(ButtonComponent.class, "role-write-" + person)
+                    .isActive(),
+        TIMEOUT);
+    clickWhenActive(context, "btn-save-people");
+    waitForScreen(context, QuestScreen.class);
+  }
+
+  /** Waits until the button is enabled, then clicks it. */
+  private static void clickWhenActive(ClientGameTestContext context, String id) {
+    context.waitFor(
+        client ->
+            client.gui.screen() instanceof DisquestsBaseScreen screen
+                && screen.getRootComponent() != null
+                && screen.getRootComponent().childById(ButtonComponent.class, id) != null
+                && screen.getRootComponent().childById(ButtonComponent.class, id).isActive(),
+        TIMEOUT);
+    click(context, id);
+  }
+
+  /**
+   * Picks a visibility in the editor ({@code vis-private}, {@code vis-closed}, {@code vis-open})
+   * and waits until it shows as the current one (pressed); it is sent with Save.
+   */
+  private static void selectVisibility(ClientGameTestContext context, String id) {
+    click(context, id);
+    context.waitFor(
+        client ->
+            client.gui.screen() instanceof DisquestsBaseScreen screen
+                && screen.getRootComponent() != null
+                && screen.getRootComponent().childById(ButtonComponent.class, id) != null
+                && !screen.getRootComponent().childById(ButtonComponent.class, id).isActive(),
+        TIMEOUT);
   }
 }

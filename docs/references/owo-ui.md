@@ -1,4 +1,4 @@
-# owo-ui Reference (v0.13.0 for MC 1.21.11)
+# owo-ui Reference (v0.13.1 for MC 26.3)
 
 Fabric GUI framework by Wisp Forest. Declarative component tree (React/Flutter-like). Two paradigms: code-driven (Java) or data-driven (XML with hot-reload).
 
@@ -12,13 +12,13 @@ Fabric GUI framework by Wisp Forest. Declarative component tree (React/Flutter-l
 // build.gradle.kts
 repositories { maven("https://maven.wispforest.io/releases/") }
 dependencies {
-    modImplementation("io.wispforest:owo-lib:${properties["owo_version"]}")
+    implementation("io.wispforest:owo-lib:${properties["owo_version"]}")
     include("io.wispforest:owo-sentinel:${properties["owo_version"]}")
 }
 ```
 ```properties
 # gradle.properties
-owo_version=0.13.0+1.21.11
+owo_version=0.13.1+26.3
 ```
 
 Runtime dependency -- players must install owo-lib separately. owo-sentinel (jar-in-jar) shows a friendly download dialog if missing.
@@ -30,7 +30,7 @@ Runtime dependency -- players must install owo-lib separately. owo-sentinel (jar
 public class MyScreen extends BaseOwoScreen<FlowLayout> {
     @Override
     protected @NotNull OwoUIAdapter<FlowLayout> createAdapter() {
-        return OwoUIAdapter.create(this, Containers::verticalFlow);
+        return OwoUIAdapter.create(this, UIContainers::verticalFlow);
     }
 
     @Override
@@ -40,8 +40,8 @@ public class MyScreen extends BaseOwoScreen<FlowLayout> {
             .verticalAlignment(VerticalAlignment.CENTER);
 
         root.child(
-            Containers.verticalFlow(Sizing.content(), Sizing.content())
-                .child(Components.button(Text.literal("Click"), btn -> {}))
+            UIContainers.verticalFlow(Sizing.content(), Sizing.content())
+                .child(UIComponents.button(Component.literal("Click"), btn -> {}))
                 .padding(Insets.of(10))
                 .surface(Surface.DARK_PANEL)
         );
@@ -51,7 +51,7 @@ public class MyScreen extends BaseOwoScreen<FlowLayout> {
 
 **XML-driven**: Extend `BaseUIModelScreen<FlowLayout>`, XML at `assets/modid/owo_ui/name.xml`. Hot-reload with `Ctrl+F5` in-game.
 
-**Embed in existing screen**: `OwoUIAdapter.create(this, Containers::verticalFlow)` -> `addDrawableChild(adapter)`.
+**Embed in existing screen**: `OwoUIAdapter.create(this, UIContainers::verticalFlow)` -> `addRenderableWidget(adapter)`.
 
 ## Sizing
 
@@ -69,13 +69,13 @@ public class MyScreen extends BaseOwoScreen<FlowLayout> {
 
 | Component | Java | XML |
 |-----------|------|-----|
-| Vertical flow | `Containers.verticalFlow(hSize, vSize)` | `<flow-layout direction="vertical">` |
-| Horizontal flow | `Containers.horizontalFlow(hSize, vSize)` | `<flow-layout direction="horizontal">` |
-| Grid | `Containers.grid(hSize, vSize, rows, cols)` | `<grid-layout rows="2" columns="2">` |
-| Scroll | `Containers.verticalScroll(hSize, vSize, child)` | `<scroll direction="vertical">` |
-| Collapsible | `Containers.collapsible(hSize, vSize, Text, expanded)` | `<collapsible expanded="true">` |
-| Draggable | `Containers.draggable(hSize, vSize, child)` | `<drag>` |
-| Overlay | `Containers.overlay(child)` | Java only |
+| Vertical flow | `UIContainers.verticalFlow(hSize, vSize)` | `<flow-layout direction="vertical">` |
+| Horizontal flow | `UIContainers.horizontalFlow(hSize, vSize)` | `<flow-layout direction="horizontal">` |
+| Grid | `UIContainers.grid(hSize, vSize, rows, cols)` | `<grid-layout rows="2" columns="2">` |
+| Scroll | `UIContainers.verticalScroll(hSize, vSize, child)` | `<scroll direction="vertical">` |
+| Collapsible | `UIContainers.collapsible(hSize, vSize, Component, expanded)` | `<collapsible expanded="true">` |
+| Draggable | `UIContainers.draggable(hSize, vSize, child)` | `<drag>` |
+| Overlay | `UIContainers.overlay(child)` | Java only |
 
 Flow layouts support `.gap(int)` for spacing between children.
 Scroll container accepts a single child -- wrap multiple items in a flow layout.
@@ -84,12 +84,12 @@ Scroll container accepts a single child -- wrap multiple items in a flow layout.
 
 | Component | Java | Key Methods |
 |-----------|------|-------------|
-| Button | `Components.button(Text, Consumer<ButtonComponent>)` | `.active(bool)` |
-| Checkbox | `Components.checkbox(Text)` | `.checked(bool)` |
-| Label | `Components.label(Text)` | `.color(Color)`, `.shadow(bool)`, `.maxWidth(int)` |
-| Slider | `Components.slider(Sizing)` | `.value(double)`, `.message(Function)` |
-| Dropdown | `Components.dropdown(Sizing)` | `.button()`, `.checkbox()`, `.nested()` |
-| Text box | `Components.textBox(Sizing)` | standard text input |
+| Button | `UIComponents.button(Component, Consumer<ButtonComponent>)` | `.active(bool)` |
+| Checkbox | `UIComponents.checkbox(Component)` | `.checked(bool)` |
+| Label | `UIComponents.label(Component)` | `.color(Color)`, `.shadow(bool)`, `.maxWidth(int)` |
+| Slider | `UIComponents.slider(Sizing)` | `.value(double)`, `.message(Function)` |
+| Dropdown | `UIComponents.dropdown(Sizing)` | `.button()`, `.checkbox()`, `.nested()` |
+| Text box | `UIComponents.textBox(Sizing)` | standard text input |
 
 ## Surfaces (Panel Backgrounds)
 
@@ -112,7 +112,7 @@ Chain: `Surface.PANEL.and(Surface.VANILLA_TRANSLUCENT)`
 .horizontalAlignment(HorizontalAlignment.CENTER)
 .verticalAlignment(VerticalAlignment.CENTER)
 .id("my-id")                       // for childById() lookup
-.tooltip(Text.literal("hover"))    // hover tooltip
+.tooltip(Component.literal("hover"))    // hover tooltip
 .gap(10)                           // child spacing (flow layouts)
 ```
 
@@ -133,10 +133,10 @@ XML placeholders: `{{key}}`.
 ```java
 import io.wispforest.owo.ui.base.BaseOwoScreen;
 import io.wispforest.owo.ui.base.BaseUIModelScreen;
-import io.wispforest.owo.ui.container.Containers;
+import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.container.ScrollContainer;
-import io.wispforest.owo.ui.component.Components;
+import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.core.*;
@@ -144,7 +144,7 @@ import io.wispforest.owo.ui.core.*;
 
 ## Gotchas
 
-1. **Type decay**: `.horizontalAlignment()` returns `ParentComponent`, not `FlowLayout`. Call `.child()` before styling methods.
+1. **Type decay**: `.horizontalAlignment()` returns `ParentUIComponent`, not `FlowLayout`. Call `.child()` before styling methods.
 2. **Templates in init(), not build()**: `this.uiAdapter` is null during `build()`.
 3. **Scroll container**: single child only -- wrap in flow layout.
 4. **Content sizing**: not all components have intrinsic size (throws exception).

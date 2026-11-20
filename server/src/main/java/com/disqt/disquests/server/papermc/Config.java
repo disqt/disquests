@@ -16,6 +16,7 @@ public class Config {
   private boolean debug;
   private boolean worldMap;
   private boolean playerMarker;
+  private int maxQuestDepth;
 
   public Config(JavaPlugin plugin) {
     plugin.saveDefaultConfig();
@@ -47,6 +48,7 @@ public class Config {
     }
     this.worldMap = cfg.getBoolean("world-map", true);
     this.playerMarker = readPlayerMarker(cfg);
+    this.maxQuestDepth = readMaxQuestDepth(cfg);
     this.debug = cfg.getBoolean("debug", false);
     if (Boolean.getBoolean("disquests.debug")) {
       this.debug = true;
@@ -77,6 +79,17 @@ public class Config {
   /** Whether clients show each player's own marker and "Centre on me" on the in-game map. */
   public boolean isPlayerMarkerEnabled() {
     return playerMarker;
+  }
+
+  /** The {@code max-quest-depth} setting: default 3 when absent or negative, 0 for no limit. */
+  static int readMaxQuestDepth(ConfigurationSection cfg) {
+    int depth = cfg.getInt("max-quest-depth", 3);
+    return depth < 0 ? 3 : depth;
+  }
+
+  /** How many levels of subquests a quest tree may have; 0 means no limit. */
+  public int getMaxQuestDepth() {
+    return maxQuestDepth;
   }
 
   public boolean isDebug() {

@@ -15,7 +15,6 @@ import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
 import com.mojang.blaze3d.platform.InputConstants;
 import io.wispforest.owo.ui.container.FlowLayout;
-import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.core.UIComponent;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import org.junit.jupiter.api.BeforeAll;
@@ -546,7 +545,7 @@ class TagJourney {
           if (!(client.gui.screen() instanceof DisquestsBaseScreen dScreen)) return false;
           var root = dScreen.getRootComponent();
           if (root == null) return false;
-          return root.childById(OverlayContainer.class, "tag-autocomplete-overlay") != null;
+          return root.childById(FlowLayout.class, "tag-autocomplete-overlay") != null;
         },
         TIMEOUT);
 

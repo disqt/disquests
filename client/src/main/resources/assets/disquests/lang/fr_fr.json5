@@ -20,7 +20,7 @@
     "accept": "Accepter",
     "deny": "Refuser",
     "remove": "Retirer",
-    "set_pos": "Position",
+    "set_pos": "Mettre à ma position",
     "view_bluemap": "Voir sur BlueMap",
     "join": "Rejoindre",
     "request": "Demander",
@@ -30,14 +30,107 @@
     "done": "Terminer",
     "cancel_map": "Annuler",
     "clear_location": "Effacer",
-    "edit_on_map": "Modifier sur la map",
     "complete": "Terminer",
     "reopen": "Rouvrir",
+    "manage_people": "Gérer les joueurs",
+    "restore_visibility": "Repasser en %s",
+    "keep_private": "Garder Privée",
   },
 
   // Notifications
   "gui.disquests.toast.{}": {
     "quest_archived": "Cette quête a été terminée par un coéquipier ; tes modifications n'ont pas été enregistrées.",
+    "no_longer_editable": "Tu ne peux plus modifier cette quête ; tes modifications n'ont pas été enregistrées.",
+    "owner_parts_not_saved": "Tu n'es plus Owner de cette quête ; la visibilité et les prérequis n'ont pas été enregistrés.",
+    "now_on": "Tu fais maintenant partie de « %s » : retrouve-la dans My Quests",
+  },
+
+  // Notifications du serveur
+  "gui.disquests.notice.{}": {
+    "unlocked": "Nouvelle quête : %s",
+    "set_private": "\"%s\" est passée en Privée : la quête qui la contenait a été supprimée. Ouvre-la pour décider.",
+    "refused_titled": "\"%s\" : %s",
+    "refused": "Ce changement est impossible : %s",
+  },
+
+  // Raisons d'un refus
+  "gui.disquests.refusal.{}": {
+    "self": "une quête ne peut pas se contenir ni s'attendre elle-même",
+    "loop": "ça ferait une boucle",
+    "too_deep": "trop profond, limite de %d niveaux",
+    "completed": "elle est terminée",
+    "target_completed": "cette quête est terminée",
+    "linked_by_prerequisite": "l'une se débloque après l'autre",
+    "need_owner": "tu dois être Owner dessus",
+    "need_write_on_target": "tu dois avoir Write sur la quête qui la reçoit",
+    "not_visible": "tu ne peux pas voir cette quête",
+    "too_many_prerequisites": "8 prérequis au maximum",
+    "already_there": "c'est déjà là",
+    "last_owner": "une quête garde toujours au moins un owner",
+    "unknown": "pas autorisé",
+  },
+
+  // Listes de recherche de quêtes (« ajouter une sous-quête... », « Prérequis »)
+  "gui.disquests.suggestion.{}": {
+    "reason": "(%s)",
+    "with_role": "%s, %s",
+    "role_read": "tu as Read",
+    "role_write": "tu as Write",
+    "role_none": "tu n'as aucun rôle",
+    "inside_another": "dans une autre quête",
+  },
+
+  // L'éditeur de quête : arbre et liens
+  "gui.disquests.edit.{}": {
+    "add_subquest": "ajouter une sous-quête...",
+    "new_quest": "Nouvelle quête",
+    "drop_out": "Dépose ici pour sortir une quête de l'arbre",
+    "tree_hint": "Glisse une quête sur une autre pour la mettre dedans. Rien ne change avant que tu appuies sur Save.",
+    "hidden_parent": "Cette quête se trouve dans une quête que tu ne peux pas voir",
+    "detach": "Détacher",
+    "visibility": "Visibilité",
+    "visibility_in_parent": "Cela vaut parmi ceux qui peuvent voir la quête qui la contient.",
+    "prerequisite_field": "tape pour ajouter une quête existante...",
+    "prerequisite_hidden": "quelque chose auquel tu n'as pas accès",
+    "open_only": "(quêtes Ouvertes seulement)",
+    "now_inside": "maintenant dans %s",
+  },
+
+  // Lignes de l'arbre des quêtes
+  "gui.disquests.tree.{}": {
+    "not_saved": "non enregistrée",
+    "taken_out": "sortie, non enregistrée",
+    "editing": "(en cours d'édition)",
+    "take_out_of": "Sortir de « %s »",
+  },
+
+  // Rôle du joueur sur une quête, à côté du badge de visibilité
+  "gui.disquests.role.{}": {
+    "owner": "Owner",
+    "write": "Write",
+    "read": "Read",
+    "none": "pas rejointe",
+  },
+
+  // Bandeaux sur la page d'une quête, pour ses owners
+  "gui.disquests.banner.{}": {
+    "privatized_titled": "Passée en Privée le %s. La quête qui la contenait, \"%s\", a été supprimée par %s. Elle était %s avant.",
+    "privatized": "Passée en Privée le %s. La quête qui la contenait a été supprimée. Elle était %s avant.",
+    "deleted_prerequisite": "Cette quête attend une quête supprimée et reste verrouillée. Clique sur Edit pour retirer ce lien.",
+  },
+
+  // Ce qu'attend une quête verrouillée
+  "gui.disquests.waiting.{}": {
+    "prerequisites": "PRÉREQUIS",
+    "something_else": "… et autre chose que tu ne peux pas encore voir",
+    "nothing_visible": "Cette quête n'est pas encore disponible. Autre chose doit d'abord être terminé.",
+  },
+
+  // Section Prérequis de la page d'une quête (Write et Owner)
+  "gui.disquests.prerequisite.{}": {
+    "hidden": "… et quelque chose auquel tu n'as pas accès",
+    "deleted": "une quête supprimée",
+    "auto_join": "Quand elle se débloque, ajouter les joueurs de ces quêtes",
   },
 
   // Onglets de l'accueil
@@ -50,6 +143,36 @@
   "gui.disquests.image.{}": {
     "loading": "Chargement de l’image…",
     "failed": "Échec du chargement de l’image",
+  },
+
+  // L'écran des joueurs (owners) : les rôles restent en brouillon jusqu'à Enregistrer
+  "gui.disquests.people.{}": {
+    "title": "Joueurs",
+    "pending": "Demandes en attente",
+    "you": "%s (toi)",
+    "removed": "retiré, non enregistré",
+    "undo": "Annuler le retrait",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "add_hint": "Nom du joueur...",
+    "unknown_player": "Aucun joueur nommé « %s » n'est connu ici. Il doit être en ligne ou sur une quête que tu peux voir.",
+    "apply_down": "Appliquer aux sous-quêtes",
+    "save_first": "Enregistre d'abord",
+    "apply_down_question_one": "Donner %2$s à %1$s sur ta sous-quête de %4$s ?",
+    "apply_down_question_many": "Donner %2$s à %1$s sur tes %3$d sous-quêtes de %4$s ?",
+    "apply_down_extra": "Une seule fois. Personne n'est rétrogradé, et les quêtes ajoutées plus tard ne sont pas concernées.",
+    "apply_down_sent": "%s reçoit %s sur tes sous-quêtes.",
+    "need_owner": "Une quête garde toujours au moins un Owner.",
+    "give_up_owner": "Tu renonces au rôle Owner sur cette quête. Tu ne pourras pas revenir en arrière toi-même.",
+    "roles_hint": "Read : voir, épingler, quitter. Write : aussi modifier le texte, le lieu, les tags, et y placer ses propres quêtes. Owner : aussi terminer, supprimer, visibilité, joueurs, liens.",
+    "save_hint": "Rien ne change tant que tu n'appuies pas sur Enregistrer.",
+    "remove_question": "Retirer %s ?",
+    "remove_this_only": "De cette quête seulement",
+    "remove_with_mine_one": "De cette quête et de ma sous-quête",
+    "remove_with_mine_many": "De cette quête et de mes %d sous-quêtes",
+    "dropped_meanwhile": "n'est plus sur cette quête, sera rajouté",
+    "no_longer_owner": "Tu n'es plus Owner de cette quête.",
+    "already_listed": "%s est déjà sur cette quête.",
   },
 
   "gui.disquests.contributor.{}": {
@@ -74,11 +197,12 @@
 
   // Infobulles de visibilité
   "gui.disquests.tooltip.{}": {
-    "private": "Toi seul peux voir cette quête",
-    "closed": "Visible sur le tableau des quêtes, les autres doivent demander l'accès",
-    "open": "N'importe qui peut rejoindre et voir cette quête",
+    "private": "Seules les personnes de cette quête peuvent la voir.",
+    "closed": "Visible ; les autres doivent demander l'accès.",
+    "open": "Visible ; tout le monde peut la rejoindre.",
     "already_requested": "Tu as déjà demandé l'accès",
     "view_only": "Tu as un accès en lecture seule",
+    "needs_attention": "Demande ton attention",
   },
 
   // Infobulles des filtres
@@ -99,6 +223,7 @@
     "region_summary": "Région : %d coins, X : %d à %d Z : %d à %d",
     "completed_by": "Terminée le %s par %s",
     "completed": "Terminée le %s",
+    "new": "NOUVEAU",
   },
 
   // Dialogues de confirmation
@@ -109,18 +234,29 @@
     "remove_contributor": "Retirer %s des contributeurs ?",
     "complete": "Marquer cette quête comme terminée ? Elle passera dans l'onglet Archivées pour tous ceux qui y ont participé.",
     "reopen": "Rouvrir cette quête ? Elle revient dans les listes actives, et sa date d'achèvement sera remplacée si elle est terminée à nouveau.",
+    "also_complete_one": "Terminer aussi ma sous-quête non terminée (%d)",
+    "also_complete_many": "Terminer aussi mes %d sous-quêtes non terminées",
+    "others_stay_active_one": "%d autre appartient à un autre joueur et reste active",
+    "others_stay_active_many": "%d autres appartiennent à d'autres joueurs et restent actives",
+    "also_delete_one": "Supprimer aussi ma sous-quête (%d)",
+    "also_delete_many": "Supprimer aussi mes %d sous-quêtes",
+    "others_kept_one": "%d autre appartient à un autre joueur et est conservée",
+    "others_kept_many": "%d autres appartiennent à d'autres joueurs et sont conservées",
   },
 
   // Sections repliables
   "gui.disquests.section.{}": {
     "tags": "Tags (%d)",
     "contributors": "Contributeurs (%d)",
+    "quest_tree": "ARBRE DE QUÊTES",
+    "prerequisites": "Prérequis",
   },
 
   // World map
   "gui.disquests.map.{}": {
     "tiles_unavailable": "Tuiles de la map indisponibles",
     "unplaced": "Sans emplacement",
+    "placed": "Sur la map",
     "centre_me": "Centrer sur moi",
     "zoom_tooltip": "Zoom %d / %d",
     "server_outdated": "Le serveur doit être mis à jour pour afficher la map",
@@ -131,7 +267,7 @@
     "list_off": "Liste : non",
     "edit_hint": "Clique pour ajouter des coins. Entrée ou clic sur le premier coin pour terminer. Clic droit retire le dernier. Glisse pour déplacer la map.",
     "self_intersecting": "Le contour se croise lui-même",
-    "need_three_corners": "Une région a besoin d'au moins 3 coins",
+    "click_to_edit": "Clique pour modifier sur la map",
     "too_many_vertices": "%d coins au maximum",
   },
   "gui.disquests.map.dim.{}": {
@@ -146,6 +282,7 @@
     "option.pinnedVisible": "Afficher les quêtes épinglées",
     "option.pinnedWidth": "Largeur des quêtes épinglées",
     "option.sidePanelWidth": "Largeur de la liste des quêtes",
+    "option.questPaneWidth": "Largeur du panneau de l'arbre des quêtes",
     "option.theme": "Thème",
     "option.worldMap": "Map du monde",
     "enum.theme.vanilla": "Vanilla",

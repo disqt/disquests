@@ -203,6 +203,46 @@ class QuestLocationTest {
     assertTrue(q.polygon().isEmpty());
   }
 
+  private static QuestData questWithPolygon(List<PointData> poly) {
+    return quest(null, false, null, "overworld", poly);
+  }
+
+  @Test
+  void pointOrPolygonKeepsLegalShapes() {
+    PointData a = new PointData(1, 2), b = new PointData(3, 4), c = new PointData(5, 6);
+    assertEquals(List.of(), QuestLocation.pointOrPolygon(List.of()));
+    assertEquals(List.of(a), QuestLocation.pointOrPolygon(List.of(a)));
+    assertEquals(List.of(a, b, c), QuestLocation.pointOrPolygon(List.of(a, b, c)));
+  }
+
+  @Test
+  void twoCornersBecomeTheFirstPoint() {
+    PointData a = new PointData(1, 2), b = new PointData(3, 4);
+    assertEquals(List.of(a), QuestLocation.pointOrPolygon(List.of(a, b)));
+  }
+
+  @Test
+  void normalizeStoresATwoCornerPolygonAsAPin() {
+    QuestData q = questWithPolygon(List.of(new PointData(10, 20), new PointData(30, 40)));
+    QuestData n = QuestLocation.normalize(q);
+    assertFalse(n.isRegion());
+    assertNull(n.coordinates2());
+    assertTrue(n.polygon().isEmpty());
+    assertEquals(10, n.coordinates().x());
+    assertEquals(64, n.coordinates().y());
+    assertEquals(20, n.coordinates().z());
+  }
+
+  @Test
+  void pointOrPolygonDoesNotFollowLaterChangesToItsInput() {
+    PointData a = new PointData(1, 2), b = new PointData(3, 4), c = new PointData(5, 6);
+    java.util.ArrayList<PointData> corners = new java.util.ArrayList<>(List.of(a, b, c));
+    List<PointData> shape = QuestLocation.pointOrPolygon(corners);
+    corners.add(new PointData(7, 8));
+    corners.set(0, new PointData(9, 9));
+    assertEquals(List.of(a, b, c), shape);
+  }
+
   @Test
   void normalize_mapKeyNormalised() {
     QuestData q = QuestLocation.normalize(quest(null, false, null, "nether", List.of()));

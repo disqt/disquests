@@ -25,6 +25,7 @@ public class QuestPolygonLayer implements MapLayer {
   private Quest hovered;
   private Quest tooltipQuest;
   private Component tooltip;
+  private boolean anyDimension;
 
   /** Keeps the quests that have a location; dimension filtering happens at draw time. */
   public void setQuests(List<Quest> quests) {
@@ -35,6 +36,15 @@ public class QuestPolygonLayer implements MapLayer {
       }
     }
     this.quests = placed;
+  }
+
+  /**
+   * Draws the quests whatever their stored map, for a map already showing the quest's own dimension
+   * (the location card), so a legacy quest with no map still shows its shape.
+   */
+  public QuestPolygonLayer anyDimension(boolean anyDimension) {
+    this.anyDimension = anyDimension;
+    return this;
   }
 
   public void onQuestClick(Consumer<Quest> callback) {
@@ -153,8 +163,8 @@ public class QuestPolygonLayer implements MapLayer {
     return tooltip;
   }
 
-  private static boolean inDimension(MapView view, Quest q) {
-    return view.getDimension() != null && view.getDimension().equals(q.getMap());
+  private boolean inDimension(MapView view, Quest q) {
+    return MapQuestFilter.drawnIn(view.getDimension(), q.getMap(), anyDimension);
   }
 
   /** Block {x, z} of a non-polygon quest, or null. */

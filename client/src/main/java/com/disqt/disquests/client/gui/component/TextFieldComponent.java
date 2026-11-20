@@ -27,8 +27,15 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
   private int offsetX;
   private int offsetY;
 
-  // Optional autocomplete dropdown
-  private AutocompleteDropdown dropdown;
+  // Room kept free at the left of the component (a leading glyph); the text starts after it
+  private int lead;
+
+  // How far the text is drawn above the delegate's own 5 px inset (to centre one line in a field)
+  private int raise;
+
+  // Optional suggestion dropdown: gets the keys first while open; onEdit runs after each key
+  private SuggestionDropdown<?> dropdown;
+  private Runnable onEdit;
 
   public TextFieldComponent(MultiLineTextFieldWidget delegate) {
     this.delegate = delegate;
@@ -44,8 +51,14 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
     return delegate.getText();
   }
 
-  public void setAutocomplete(AutocompleteDropdown dropdown) {
+  /**
+   * Attaches a dropdown: while it is open it gets the arrow keys, Enter and Escape first, and
+   * {@code onEdit} runs after every other key (except Escape) or character typed, to refresh the
+   * suggestions.
+   */
+  public void setAutocomplete(SuggestionDropdown<?> dropdown, Runnable onEdit) {
     this.dropdown = dropdown;
+    this.onEdit = onEdit;
   }
 
   @Override
@@ -58,14 +71,24 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
     return preferredHeight;
   }
 
+  /** Keeps {@code px} free at the left for something the subclass draws there. */
+  protected void lead(int px) {
+    this.lead = px;
+  }
+
+  /** Draws (and hit-tests) the text {@code px} higher than the delegate's own inset. */
+  protected void raise(int px) {
+    this.raise = px;
+  }
+
   private void computeOffset() {
-    offsetX = this.x() - delegate.x;
-    offsetY = this.y() - delegate.y;
+    offsetX = this.x() + lead - delegate.x;
+    offsetY = this.y() - raise - delegate.y;
   }
 
   @Override
   public void draw(OwoUIGraphics context, int mouseX, int mouseY, float partialTicks, float delta) {
-    delegate.resize(this.width(), this.height());
+    delegate.resize(Math.max(0, this.width() - lead), this.height());
 
     computeOffset();
     // Translate graphics so delegate renders at owo-ui position
@@ -125,10 +148,8 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
   @Override
   public boolean onKeyPress(KeyEvent keyInput) {
     // Intercept navigation keys for autocomplete dropdown before forwarding to delegate
-    if (dropdown != null && dropdown.isVisible()) {
-      if (dropdown.onKeyDown(keyInput)) {
-        return true;
-      }
+    if (dropdown != null && dropdown.onKey(keyInput)) {
+      return true;
     }
     if (keyInput.isCycleFocus() && delegate.isSingleLine()) {
       var handler = focusHandler();
@@ -140,7 +161,8 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
     }
     delegate.setFocused(true);
     boolean result = delegate.keyPressed(keyInput);
-    updateAutocomplete();
+    // Escape never reopens a dismissed dropdown; unconsumed, it closes the screen as usual
+    if (onEdit != null && !keyInput.isEscape()) onEdit.run();
     return result;
   }
 
@@ -148,43 +170,26 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
   public boolean onCharTyped(CharacterEvent charInput) {
     delegate.setFocused(true);
     boolean result = delegate.charTyped(charInput);
-    updateAutocomplete();
+    if (onEdit != null) onEdit.run();
     return result;
   }
 
   /**
-   * Checks if the cursor is inside a [[...]] context. If so, extracts the partial query and updates
-   * the dropdown. If not, hides the dropdown. Called after every keystroke or character input.
+   * The text typed after an unclosed {@code [[} before the cursor (the wiki-link being written), or
+   * null when the cursor is not inside one.
    */
-  private void updateAutocomplete() {
-    if (dropdown == null) return;
-    String text = delegate.getText();
-    if (text == null || text.isEmpty()) {
-      dropdown.hide();
-      return;
-    }
-    int cursorPos = delegate.getCursorAbsolute();
-    if (cursorPos < 2) {
-      dropdown.hide();
-      return;
-    }
-    // Find the last [[ before cursor
-    int openBracket = text.lastIndexOf("[[", cursorPos - 1);
-    if (openBracket < 0 || openBracket + 2 > cursorPos) {
-      dropdown.hide();
-      return;
-    }
-    // Ensure there is no closing ]] between the [[ and cursor
-    String afterOpen = text.substring(openBracket + 2, cursorPos);
-    if (afterOpen.contains("]]")) {
-      dropdown.hide();
-      return;
-    }
-    // afterOpen is the partial query typed after [[
-    // Position dropdown below the current cursor line within the text field
-    int cursorScreenX = this.x() + delegate.getCursorScreenX();
-    int cursorScreenY = this.y() + delegate.getCursorScreenY() + delegate.getLineHeight();
-    dropdown.update(afterOpen, cursorScreenX, cursorScreenY);
+  public String wikiLinkQuery() {
+    return WikiLinkQuery.at(delegate.getText(), delegate.getCursorAbsolute());
+  }
+
+  /** Screen x of the cursor. */
+  public int cursorScreenX() {
+    return this.x() + lead + delegate.getCursorScreenX();
+  }
+
+  /** Screen y of the top of the cursor's line. */
+  public int cursorScreenY() {
+    return this.y() - raise + delegate.getCursorScreenY();
   }
 
   @Override

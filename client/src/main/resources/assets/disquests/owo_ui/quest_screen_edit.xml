@@ -31,6 +31,23 @@
                 </margins>
             </label>
 
+            <!-- Body: QuestEditTreePane inserts the tree pane and its divider before quest-column
+                 when the server supports quest trees -->
+            <flow-layout direction="horizontal" id="quest-body">
+                <sizing>
+                    <horizontal method="fill">100</horizontal>
+                    <vertical method="expand">100</vertical>
+                </sizing>
+                <children>
+                    <!-- The form -->
+                    <flow-layout direction="vertical" id="quest-column">
+                        <sizing>
+                            <horizontal method="expand">100</horizontal>
+                            <vertical method="fill">100</vertical>
+                        </sizing>
+                        <horizontal-alignment>center</horizontal-alignment>
+                        <children>
+
             <!-- Title field row (title + help button) -->
             <flow-layout direction="horizontal" id="title-row">
                 <sizing>
@@ -67,7 +84,7 @@
             <flow-layout direction="horizontal" id="content-row">
                 <sizing>
                     <horizontal method="fill">85</horizontal>
-                    <vertical method="fill">35</vertical>
+                    <vertical method="expand">100</vertical>
                 </sizing>
                 <gap>4</gap>
                 <margins>
@@ -77,7 +94,7 @@
                     <!-- Editor panel -->
                     <flow-layout direction="vertical" id="editor-panel">
                         <sizing>
-                            <horizontal method="fill">70</horizontal>
+                            <horizontal method="expand">100</horizontal>
                             <vertical method="fill">100</vertical>
                         </sizing>
                         <surface>
@@ -188,7 +205,7 @@
                             </flow-layout>
                         </children>
                     </flow-layout>
-                    <flow-layout direction="horizontal" id="location-buttons">
+                    <flow-layout direction="ltr-text-flow" id="location-buttons">
                         <sizing>
                             <horizontal method="fill">100</horizontal>
                             <vertical method="content"/>
@@ -198,6 +215,32 @@
                         <children/>
                     </flow-layout>
                 </children>
+            </flow-layout>
+
+            <!-- Link controls (owners): hidden-parent line, visibility, prerequisites, auto-join;
+                 filled by QuestLinksForm, removed for other players. A dark panel like the
+                 location card, so its muted lines read against the world -->
+            <flow-layout direction="vertical" id="links-form">
+                <sizing>
+                    <horizontal method="fill">85</horizontal>
+                    <vertical method="content"/>
+                </sizing>
+                <surface>
+                    <panel dark="true"/>
+                </surface>
+                <!-- Thin top and bottom: the form must not push Save off a short window. No gap:
+                     QuestLinksForm spaces the rows that are shown, so empty ones take no room -->
+                <padding>
+                    <top>2</top>
+                    <bottom>2</bottom>
+                    <left>4</left>
+                    <right>4</right>
+                </padding>
+                <gap>0</gap>
+                <margins>
+                    <top>2</top>
+                </margins>
+                <children/>
             </flow-layout>
 
             <!-- Settings row (owner only, hidden via zero-sizing for non-owners) -->
@@ -211,13 +254,6 @@
                     <top>2</top>
                 </margins>
                 <children>
-                    <button id="btn-visibility">
-                        <text>Visibility</text>
-                        <sizing>
-                            <horizontal method="content"/>
-                            <vertical method="fixed">16</vertical>
-                        </sizing>
-                    </button>
                     <button id="btn-contributors">
                         <text>Contributors</text>
                         <sizing>
@@ -254,6 +290,11 @@
                             <vertical method="fixed">20</vertical>
                         </sizing>
                     </button>
+                </children>
+            </flow-layout>
+
+                        </children>
+                    </flow-layout>
                 </children>
             </flow-layout>
 

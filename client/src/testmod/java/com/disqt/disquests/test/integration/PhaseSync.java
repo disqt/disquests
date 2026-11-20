@@ -70,6 +70,14 @@ public class PhaseSync {
    * processing packets while we poll. Fast-fails if the other client has signaled an error.
    */
   public static void waitFor(String phaseName, ClientGameTestContext context) {
+    waitFor(phaseName, context, seconds(15));
+  }
+
+  /**
+   * As {@link #waitFor(String, ClientGameTestContext)}, for a phase the other client takes longer
+   * than 15 seconds to reach (several screens of UI work in between).
+   */
+  public static void waitFor(String phaseName, ClientGameTestContext context, int timeoutTicks) {
     Path marker = SYNC_DIR.resolve(phaseName + ".done");
     context.waitFor(
         client -> {
@@ -80,7 +88,7 @@ public class PhaseSync {
           }
           return Files.exists(marker);
         },
-        seconds(15));
+        timeoutTicks);
   }
 
   private static String checkOtherClientError() {

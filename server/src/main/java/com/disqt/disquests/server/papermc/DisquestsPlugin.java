@@ -17,7 +17,8 @@ public class DisquestsPlugin extends JavaPlugin {
     dataManager = new DataManager(getDataFolder().toPath());
     dataManager.initialize(disquestsConfig.getBluemapDefaultMap());
 
-    packetHandler = new ServerPacketHandler(this, dataManager, disquestsConfig);
+    packetHandler =
+        new ServerPacketHandler(this, dataManager, disquestsConfig, new BukkitOutbox(this));
 
     Messenger messenger = getServer().getMessenger();
     messenger.registerOutgoingPluginChannel(this, CHANNEL);

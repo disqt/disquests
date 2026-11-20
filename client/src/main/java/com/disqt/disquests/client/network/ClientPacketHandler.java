@@ -2,16 +2,20 @@ package com.disqt.disquests.client.network;
 
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
+import com.disqt.disquests.client.data.NoticeText;
 import com.disqt.disquests.client.data.Quest;
+import com.disqt.disquests.client.data.QuestRouting;
+import com.disqt.disquests.client.gui.helper.Messages;
+import com.disqt.disquests.client.gui.helper.Toasts;
 import com.disqt.disquests.client.gui.map.SharedTileCache;
 import com.disqt.disquests.client.gui.screen.MainScreen;
-import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.common.ByteBufReader;
 import com.disqt.disquests.common.PacketCodec;
 import com.disqt.disquests.common.PacketType;
 import com.disqt.disquests.common.ProtocolVersion;
 import com.disqt.disquests.common.QuestLocation;
 import com.disqt.disquests.common.model.CollaborationRequestData;
+import com.disqt.disquests.common.model.Notice;
 import com.disqt.disquests.common.model.QuestData;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +23,7 @@ import java.util.Map;
 import java.util.UUID;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 
 public class ClientPacketHandler {
 
@@ -50,12 +55,26 @@ public class ClientPacketHandler {
                   case COLLABORATION_RESPONSE -> handleCollaborationResponse(r);
                   case SYNC_PENDING_REQUESTS -> handleSyncPendingRequests(r);
                   case SYNC_TAGS -> handleSyncTags(r);
+                  case NOTICE -> handleNotice(r);
                   default -> {}
                 }
               } catch (Exception e) {
                 LOGGER.warn("Failed to handle S2C packet {}", type, e);
               }
             });
+  }
+
+  private static void handleNotice(ByteBufReader r) {
+    Notice notice = PacketCodec.readNotice(r);
+    if (notice.kind() == Notice.Kind.QUEST_UNLOCKED_FOLLOWED && notice.questId() != null) {
+      ClientSession.newMarks().mark(notice.questId());
+    }
+    Minecraft client = Minecraft.getInstance();
+    Component text = Messages.toComponent(NoticeText.of(notice, ClientSession.getMaxQuestDepth()));
+    Toasts.show(text);
+    if (client.gui.screen() instanceof MainScreen mainScreen) {
+      mainScreen.refreshListContents();
+    }
   }
 
   private static void showOrDeferToast(String message) {
@@ -66,6 +85,18 @@ public class ClientPacketHandler {
     } else {
       ClientSession.setPendingToast(message);
     }
+  }
+
+  /** Lang key of the toast for a quest that just reached My Quests. */
+  public static final String NOW_ON_KEY = "gui.disquests.toast.now_on";
+
+  /**
+   * "You are now on "X": see My Quests", for every way a quest reaches My Quests: a join, an
+   * accepted request, an owner adding the player, a role applied to subquests, an auto-join.
+   */
+  private static String nowOnText(Quest quest) {
+    return Component.translatable(NOW_ON_KEY, quest.getTitle() != null ? quest.getTitle() : "")
+        .getString();
   }
 
   private static void handleHandshake(ByteBufReader r) {
@@ -81,6 +112,7 @@ public class ClientPacketHandler {
     ClientSession.setServerProtocolVersion(payload.serverProtocolVersion());
     ClientSession.setServerWorldMapEnabled(payload.worldMapEnabled());
     ClientSession.setServerPlayerMarkerEnabled(payload.playerMarkerEnabled());
+    ClientSession.setMaxQuestDepth(payload.maxQuestDepth());
     if (ClientSession.supportsMap()
         && ClientSession.isServerWorldMapEnabled()
         && ClientSession.hasBluemap()) {
@@ -96,39 +128,49 @@ public class ClientPacketHandler {
    * bounding box (what a V1 server stores) is the original rectangle.
    */
   private static Quest toQuest(QuestData data) {
+    return Quest.fromNetwork(normalize(data));
+  }
+
+  private static QuestData normalize(QuestData data) {
     if (ClientSession.getServerProtocolVersion() < ProtocolVersion.V2) {
-      data = QuestLocation.normalize(data);
+      return QuestLocation.normalize(data);
     }
-    return Quest.fromNetwork(data);
+    return data;
+  }
+
+  private static QuestRouting.Split route(List<QuestData> dataList) {
+    List<QuestData> normalized = new ArrayList<>(dataList.size());
+    for (QuestData data : dataList) {
+      normalized.add(normalize(data));
+    }
+    return QuestRouting.split(normalized, ClientSession.getEffectivePlayerUuid());
   }
 
   private static void handleSyncMyQuests(ByteBufReader r) {
     List<QuestData> dataList =
         PacketCodec.readSyncMyQuests(r, ClientSession.getServerProtocolVersion());
     Map<UUID, Integer> counts = PacketCodec.readPendingCounts(r);
-    List<Quest> quests = new ArrayList<>(dataList.size());
-    for (QuestData data : dataList) {
-      quests.add(toQuest(data));
-    }
-    ClientCache.setMyQuests(quests);
+    QuestRouting.Split split = route(dataList);
+    ClientCache.setMyQuests(split.mine());
+    // A quest I hold no role on never belongs in My Quests, whichever sync carried it.
+    split.other().forEach(ClientCache::addOrUpdateServerQuest);
     ClientCache.setPendingCounts(counts);
   }
 
   private static void handleSyncServerQuests(ByteBufReader r) {
     List<QuestData> dataList =
         PacketCodec.readSyncServerQuests(r, ClientSession.getServerProtocolVersion());
-    List<Quest> quests = new ArrayList<>(dataList.size());
-    for (QuestData data : dataList) {
-      quests.add(toQuest(data));
-    }
-    ClientCache.setServerQuests(quests);
+    QuestRouting.Split split = route(dataList);
+    ClientCache.setServerQuests(split.other());
+    // A quest I hold a role on belongs in My Quests, whichever sync carried it.
+    split.mine().forEach(ClientCache::addOrUpdateMyQuest);
   }
 
   private static void handleUpdateQuest(ByteBufReader r) {
     QuestData data = PacketCodec.readUpdateQuest(r, ClientSession.getServerProtocolVersion());
     Quest quest = toQuest(data);
     final UUID myUuid = ClientSession.getEffectivePlayerUuid();
-    boolean isMine = quest.isOwner(myUuid) || quest.isContributor(myUuid);
+    boolean isMine = QuestRouting.isMine(quest, myUuid);
 
     // Detect join: quest is now mine but wasn't previously in my quests
     boolean wasInMyQuests =
@@ -147,21 +189,14 @@ public class ClientPacketHandler {
       ClientSession.removePinnedQuest(quest.getId());
     }
 
-    // Refresh the current screen if it shows the updated quest
+    // Refresh the main screen's list; an open QuestScreen rebuilds itself on its next tick when
+    // what it draws changed (QuestScreen#refreshIfPageChanged).
     Minecraft client = Minecraft.getInstance();
     if (client.gui.screen() instanceof MainScreen mainScreen) {
       mainScreen.refreshListContents();
-    } else if (client.gui.screen() instanceof QuestScreen questScreen
-        && !questScreen.isEditing()
-        && questScreen.getQuest().getId().equals(quest.getId())
-        && (!java.util.Objects.equals(questScreen.getQuest().getContent(), quest.getContent())
-            || questScreen.getQuest().getCompletedAt() != quest.getCompletedAt())) {
-      // Re-open view mode when content changed (e.g. server resolved wiki-link UUIDs)
-      // or the quest was completed/reopened, so the buttons match its state
-      client.gui.setScreen(new QuestScreen(questScreen.getParentScreen(), quest));
     }
     if (justJoined) {
-      showOrDeferToast("Joined \"" + quest.getTitle() + "\" \u2014 see My Quests");
+      showOrDeferToast(nowOnText(quest));
     }
   }
 
@@ -205,7 +240,7 @@ public class ClientPacketHandler {
       ClientCache.addOrUpdateMyQuest(quest);
       ClientCache.removeFromServerQuests(payload.questId());
 
-      showOrDeferToast("Joined \"" + quest.getTitle() + "\" \u2014 see My Quests");
+      showOrDeferToast(nowOnText(quest));
     }
   }
 }

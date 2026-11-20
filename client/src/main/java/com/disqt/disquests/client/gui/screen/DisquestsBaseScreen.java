@@ -5,18 +5,23 @@ import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.DisquestsClient;
 import com.disqt.disquests.client.KeyBinds;
 import com.disqt.disquests.client.data.Quest;
+import com.disqt.disquests.client.gui.component.SuggestionDropdown;
+import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.helper.Toasts;
 import com.mojang.blaze3d.platform.InputConstants;
 import io.wispforest.owo.ui.base.BaseUIModelScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
+import io.wispforest.owo.ui.component.SmallCheckboxComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.container.OverlayContainer;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
 import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
+import java.util.List;
 import java.util.UUID;
-import net.minecraft.client.gui.components.toasts.SystemToast;
+import java.util.function.Consumer;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
@@ -29,6 +34,8 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   public static final String CONFIRM_OVERLAY_ID = "confirm-overlay";
   public static final String CONFIRM_YES_ID = "btn-confirm-yes";
   public static final String CONFIRM_NO_ID = "btn-confirm-no";
+  public static final String CONFIRM_CHECKBOX_ID = "confirm-checkbox";
+  public static final String CONFIRM_EXTRA_ID = "confirm-extra";
 
   private static final java.util.Deque<NavEntry> backStack = new java.util.ArrayDeque<>();
   private static final java.util.Deque<NavEntry> forwardStack = new java.util.ArrayDeque<>();
@@ -54,8 +61,10 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
 
   public abstract NavEntry toNavEntry();
 
-  private static final SystemToast.SystemToastId ARCHIVED_TOAST =
-      new SystemToast.SystemToastId(8000L);
+  /** A toast like the server's notices, for a change refused on this screen. */
+  protected void showRefusedToast(Component text) {
+    Toasts.show(text);
+  }
 
   /**
    * The cached quest when it was completed after this screen took its copy, else null. Screens that
@@ -70,13 +79,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
 
   /** Tells the player their edit was dropped and shows the archived quest instead. */
   protected void showArchivedInstead(@Nullable Screen viewParent, Quest archived) {
-    if (this.minecraft != null) {
-      SystemToast.add(
-          this.minecraft.gui.toastManager(),
-          ARCHIVED_TOAST,
-          Component.literal("Disquests"),
-          Component.translatable("gui.disquests.toast.quest_archived"));
-    }
+    Toasts.show(Component.translatable("gui.disquests.toast.quest_archived"));
     navigateToScreen(new QuestScreen(viewParent, archived));
   }
 
@@ -85,7 +88,14 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     if (entry instanceof NavEntry.QuestNav qn) {
       Quest quest = ClientCache.getQuestById(qn.questId());
       if (quest == null) return null;
-      return new QuestScreen(this.parent, quest, qn.editing());
+      // Back into the editor only while the player may still edit and the quest is not locked
+      // for them; otherwise the reading view (the locked page for a locked quest).
+      boolean edit =
+          qn.editing()
+              && !quest.isLocked()
+              && quest.canEdit(ClientSession.getEffectivePlayerUuid());
+      // A quest rebuilt from history exists on the server: never a new quest
+      return edit ? QuestScreen.editorFor(this.parent, quest) : new QuestScreen(this.parent, quest);
     } else if (entry instanceof NavEntry.MainNav mn) {
       ClientSession.setActiveTab(mn.tab());
       ClientSession.setSearchTerm(mn.searchTerm());
@@ -106,17 +116,43 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
 
   @Override
   public boolean mouseClicked(MouseButtonEvent click, boolean simulated) {
+    // A click outside an open suggestion dropdown (and its field) closes it, then goes through.
+    if (this.uiAdapter != null) {
+      SuggestionDropdown.closeOnClickOutside(this.uiAdapter.rootComponent, click.x(), click.y());
+    }
     if (click.button() == InputConstants.MOUSE_BUTTON_4) {
-      goBack();
+      confirmLeave(this::goBack);
       return true;
     } else if (click.button() == InputConstants.MOUSE_BUTTON_5) {
-      goForward();
+      confirmLeave(this::goForward);
       return true;
     }
     return super.mouseClicked(click, simulated);
   }
 
-  private void goBack() {
+  /**
+   * Runs {@code leave}, which takes the player off this screen (back, forward, Escape). A screen
+   * holding unsaved changes overrides this to ask first.
+   */
+  protected void confirmLeave(Runnable leave) {
+    leave.run();
+  }
+
+  /**
+   * Back to {@code screen} as the back button would go back: the history entry this screen was
+   * opened from is used up and this screen becomes the forward entry. For a screen that must return
+   * to a particular instance rather than one rebuilt from history.
+   */
+  protected void goBackTo(Screen screen) {
+    if (this.minecraft == null) return;
+    if (!backStack.isEmpty()) backStack.pop();
+    forwardStack.push(this.toNavEntry());
+    if (forwardStack.size() > MAX_HISTORY) forwardStack.removeLast();
+    this.minecraft.gui.setScreen(screen);
+  }
+
+  /** Mouse back: the previous history entry, rebuilt. A screen may return elsewhere instead. */
+  protected void goBack() {
     if (this.minecraft == null) return;
     while (!backStack.isEmpty()) {
       NavEntry entry = backStack.pop();
@@ -146,6 +182,20 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
 
   @Override
   public boolean keyPressed(KeyEvent keyInput) {
+    // Escape closes an open confirm dialog, not the screen. The overlay's own Escape handler sits
+    // on the root and stops firing once a component inside it (the checkbox) has the focus.
+    if (keyInput.isEscape() && this.uiAdapter != null) {
+      if (this.uiAdapter.rootComponent.childById(OverlayContainer.class, CONFIRM_OVERLAY_ID)
+          != null) {
+        dismissOverlay();
+        return true;
+      }
+      // Escape while a dropdown's own scrollbar holds the focus closes the dropdown first
+      if (SuggestionDropdown.closeIfFocusedInside(
+          this.uiAdapter.rootComponent, this.uiAdapter.rootComponent.focusHandler().focused())) {
+        return true;
+      }
+    }
     // Toggle: pressing the open-GUI key while a Disquests screen is open closes it.
     // Check that no text field is focused (avoid closing while typing).
     if (KeyBinds.openGuiKey.matches(keyInput)) {
@@ -155,9 +205,11 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
         textFieldFocused = focused instanceof GreedyInputUIComponent;
       }
       if (!textFieldFocused) {
-        if (this.minecraft != null) {
-          this.minecraft.gui.setScreen(null);
-        }
+        // Same as Escape: a screen with unsaved changes asks first
+        confirmLeave(
+            () -> {
+              if (this.minecraft != null) this.minecraft.gui.setScreen(null);
+            });
         return true;
       }
     }
@@ -242,6 +294,34 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
   }
 
   protected void showConfirmOverlay(Component message, Runnable onConfirm, Runnable onCancel) {
+    buildConfirmOverlay(message, null, null, ticked -> onConfirm.run(), onCancel);
+  }
+
+  /**
+   * A confirm dialog with an optional checkbox ({@code confirm-checkbox}), unticked, under the
+   * question, and an optional muted line under that ({@code confirm-extra}); Yes passes whether it
+   * is ticked (false without one). Null or empty {@code extraLine} / {@code checkboxLabel} leave
+   * them out.
+   */
+  protected void showConfirmOverlay(
+      String text,
+      @Nullable String extraLine,
+      @Nullable String checkboxLabel,
+      Consumer<Boolean> onYes) {
+    buildConfirmOverlay(
+        Component.literal(text),
+        extraLine == null || extraLine.isEmpty() ? null : Component.literal(extraLine),
+        checkboxLabel == null || checkboxLabel.isEmpty() ? null : Component.literal(checkboxLabel),
+        onYes,
+        () -> {});
+  }
+
+  private void buildConfirmOverlay(
+      Component message,
+      @Nullable Component extraLine,
+      @Nullable Component checkboxLabel,
+      Consumer<Boolean> onConfirm,
+      Runnable onCancel) {
     if (this.uiAdapter == null) return;
 
     dismissOverlay();
@@ -251,12 +331,22 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     messageLabel.maxWidth(250);
     messageLabel.horizontalTextAlignment(HorizontalAlignment.CENTER);
 
+    SmallCheckboxComponent checkbox = null;
+    if (checkboxLabel != null) {
+      checkbox = UIComponents.smallCheckbox(checkboxLabel);
+      checkbox.id(CONFIRM_CHECKBOX_ID);
+      checkbox.checked(false);
+      checkbox.labelShadow(true);
+    }
+    SmallCheckboxComponent box = checkbox;
+
     ButtonComponent yesBtn =
         UIComponents.button(
             Component.translatable("gui.disquests.btn.yes"),
             b -> {
+              boolean ticked = box != null && box.checked();
               dismissOverlay();
-              onConfirm.run();
+              onConfirm.accept(ticked);
             });
     yesBtn.id(CONFIRM_YES_ID);
     yesBtn.sizing(Sizing.fixed(60), Sizing.fixed(20));
@@ -271,10 +361,52 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     noBtn.id(CONFIRM_NO_ID);
     noBtn.sizing(Sizing.fixed(60), Sizing.fixed(20));
 
+    mountOverlay(messageLabel, checkbox, extraLine, List.of(yesBtn, noBtn));
+  }
+
+  /** One answer of a {@link #showChoiceOverlay} dialog: its button id, label and action. */
+  public record Choice(String id, Component label, Runnable action) {}
+
+  /**
+   * A dialog with the question, an optional muted line ({@code confirm-extra}) and one button per
+   * choice, in order; every button closes the dialog before running its action, and Escape closes
+   * it without running any.
+   */
+  protected void showChoiceOverlay(
+      Component message, @Nullable Component extraLine, List<Choice> choices) {
+    if (this.uiAdapter == null) return;
+    dismissOverlay();
+
+    LabelComponent messageLabel = UIComponents.label(message);
+    messageLabel.shadow(true);
+    messageLabel.maxWidth(250);
+    messageLabel.horizontalTextAlignment(HorizontalAlignment.CENTER);
+
+    List<ButtonComponent> buttons = new java.util.ArrayList<>();
+    for (Choice choice : choices) {
+      ButtonComponent button =
+          UIComponents.button(
+              choice.label(),
+              b -> {
+                dismissOverlay();
+                choice.action().run();
+              });
+      button.id(choice.id());
+      button.horizontalSizing(Sizing.content(4));
+      button.verticalSizing(Sizing.fixed(20));
+      buttons.add(button);
+    }
+    mountOverlay(messageLabel, null, extraLine, buttons);
+  }
+
+  private void mountOverlay(
+      LabelComponent messageLabel,
+      @Nullable SmallCheckboxComponent checkbox,
+      @Nullable Component extraLine,
+      List<ButtonComponent> buttons) {
     FlowLayout buttonRow = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
     buttonRow.gap(8);
-    buttonRow.child(yesBtn);
-    buttonRow.child(noBtn);
+    buttons.forEach(buttonRow::child);
     buttonRow.horizontalAlignment(HorizontalAlignment.CENTER);
 
     FlowLayout panel = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
@@ -283,6 +415,18 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
     panel.surface(Surface.DARK_PANEL);
     panel.horizontalAlignment(HorizontalAlignment.CENTER);
     panel.child(messageLabel);
+    if (checkbox != null) {
+      panel.child(checkbox);
+    }
+    if (extraLine != null) {
+      LabelComponent extraLabel = UIComponents.label(extraLine);
+      extraLabel.id(CONFIRM_EXTRA_ID);
+      extraLabel.color(Color.ofArgb(Colors.TEXT_MUTED));
+      extraLabel.shadow(true);
+      extraLabel.maxWidth(250);
+      extraLabel.horizontalTextAlignment(HorizontalAlignment.CENTER);
+      panel.child(extraLabel);
+    }
     panel.child(buttonRow);
 
     OverlayContainer<FlowLayout> overlay = UIContainers.overlay(panel);

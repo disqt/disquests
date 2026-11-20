@@ -45,7 +45,8 @@ public class HarnessCommon {
     if (harness) {
       harnessLoop(context, role);
     } else {
-      String result = runJUnitSuite(null, playerRole);
+      // The run task writes run.signal (a class name or "*") before the client has connected
+      String result = runJUnitSuite(signalledFilter(), playerRole);
       writeResult(result, role);
       // Wait for the other player to finish before exiting (prevents disconnecting mid-test)
       PhaseSync.signal("player-" + role + "-done");
@@ -72,6 +73,16 @@ public class HarnessCommon {
       TileFixtureServer.start(port);
     } catch (IOException e) {
       LOG.warn("Tile fixture could not bind port {}: {}", port, e.toString());
+    }
+  }
+
+  /** The class named by {@code -PtestFilter} through run.signal; null for the whole package. */
+  private static String signalledFilter() {
+    try {
+      String content = Files.readString(PhaseSync.getSyncDir().resolve("run.signal")).trim();
+      return content.isEmpty() || content.equals("*") ? null : content;
+    } catch (IOException e) {
+      return null;
     }
   }
 

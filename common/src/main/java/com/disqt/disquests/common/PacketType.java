@@ -14,6 +14,9 @@ public enum PacketType {
   LEAVE_QUEST((byte) 0x0A),
   COMPLETE_QUEST((byte) 0x0B),
   REOPEN_QUEST((byte) 0x0C),
+  UPDATE_PEOPLE((byte) 0x0D),
+  APPLY_ROLE_DOWN((byte) 0x0E),
+  RESOLVE_PRIVATIZED((byte) 0x0F),
 
   // S2C
   HANDSHAKE((byte) 0x10),
@@ -24,7 +27,8 @@ public enum PacketType {
   COLLABORATION_REQUEST((byte) 0x15),
   COLLABORATION_RESPONSE((byte) 0x16),
   SYNC_PENDING_REQUESTS((byte) 0x17),
-  SYNC_TAGS((byte) 0x18);
+  SYNC_TAGS((byte) 0x18),
+  NOTICE((byte) 0x19);
 
   private final byte id;
 

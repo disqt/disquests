@@ -42,6 +42,48 @@ public final class HoverPreviewRenderer {
       int mouseY,
       int screenWidth,
       int screenHeight) {
+    Card card = layout(quest);
+    // Position with offset, clamp to screen edges
+    int x = mouseX + OFFSET_X;
+    int y = mouseY + OFFSET_Y;
+    if (x + card.width() > screenWidth) x = mouseX - card.width() - 4;
+    if (y + card.height() > screenHeight) y = mouseY - card.height() - 4;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    paint(context, quest, card, x, y);
+  }
+
+  /**
+   * The same card beside an anchor instead of under the pointer ({@link PreviewPlacement#beside}):
+   * right of {@code anchorRight}, or left of {@code anchorLeft} when it does not fit, its top at
+   * {@code rowTop}, clamped to the screen.
+   */
+  public static void drawBeside(
+      GuiGraphicsExtractor context,
+      Quest quest,
+      int anchorLeft,
+      int anchorRight,
+      int rowTop,
+      int screenWidth,
+      int screenHeight) {
+    Card card = layout(quest);
+    PreviewPlacement.Position at =
+        PreviewPlacement.beside(
+            anchorLeft,
+            anchorRight,
+            rowTop,
+            card.width(),
+            card.height(),
+            screenWidth,
+            screenHeight);
+    paint(context, quest, card, at.x(), at.y());
+  }
+
+  /** The card's measured contents. */
+  private record Card(
+      String title, List<RenderedLine> lines, boolean truncated, int width, int height) {}
+
+  private static Card layout(Quest quest) {
     Font textRenderer = Minecraft.getInstance().font;
     int lineHeight = textRenderer.lineHeight;
 
@@ -82,14 +124,18 @@ public final class HoverPreviewRenderer {
       totalHeight += 2 + tagsHeight; // gap + tags
     }
     totalHeight += PADDING;
+    return new Card(title, renderedLines, truncated, width, totalHeight);
+  }
 
-    // Position with offset, clamp to screen edges
-    int x = mouseX + OFFSET_X;
-    int y = mouseY + OFFSET_Y;
-    if (x + width > screenWidth) x = mouseX - width - 4;
-    if (y + totalHeight > screenHeight) y = mouseY - totalHeight - 4;
-    if (x < 0) x = 0;
-    if (y < 0) y = 0;
+  private static void paint(GuiGraphicsExtractor context, Quest quest, Card card, int x, int y) {
+    Font textRenderer = Minecraft.getInstance().font;
+    int lineHeight = textRenderer.lineHeight;
+    String title = card.title();
+    List<RenderedLine> renderedLines = card.lines();
+    boolean truncated = card.truncated();
+    List<String> tags = quest.getTags();
+    int width = card.width();
+    int totalHeight = card.height();
 
     // Draw background + border
     context.fill(x - 1, y - 1, x + width + 1, y + totalHeight + 1, BORDER_COLOR);

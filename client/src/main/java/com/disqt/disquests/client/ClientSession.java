@@ -1,8 +1,10 @@
 package com.disqt.disquests.client;
 
+import com.disqt.disquests.client.data.NewMarks;
 import com.disqt.disquests.client.gui.map.MapCameraMemory;
 import com.disqt.disquests.client.gui.map.MapMath;
 import com.disqt.disquests.client.gui.map.SharedTileCache;
+import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.common.ProtocolVersion;
 import java.util.Collections;
 import java.util.List;
@@ -13,6 +15,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ClientSession {
+
+  /** Used when the server's handshake carries no depth limit. */
+  public static final int DEFAULT_MAX_QUEST_DEPTH = 3;
 
   public enum Tab {
     MY_QUESTS,
@@ -31,6 +36,8 @@ public class ClientSession {
   private static int pendingRequestCount = 0;
   private static final List<UUID> pinnedQuestIds = new CopyOnWriteArrayList<>();
   private static final Set<UUID> requestedQuestIds = ConcurrentHashMap.newKeySet();
+  // Quests whose subquests the main screen's lists show; one set for every tab
+  private static final Set<UUID> expandedQuestIds = ConcurrentHashMap.newKeySet();
   private static UUID playerUuid = null;
   private static Map<String, String> bluemapMapNames = Map.of();
   private static String bluemapDefaultMap = "overworld";
@@ -39,6 +46,8 @@ public class ClientSession {
   private static int serverProtocolVersion = ProtocolVersion.V1;
   private static boolean serverWorldMapEnabled = true;
   private static boolean serverPlayerMarkerEnabled = true;
+  private static int maxQuestDepth = DEFAULT_MAX_QUEST_DEPTH;
+  private static final NewMarks newMarks = new NewMarks();
   private static final MapCameraMemory cameraMemory = new MapCameraMemory();
 
   // UI state
@@ -84,6 +93,7 @@ public class ClientSession {
     pendingRequestCount = 0;
     pinnedQuestIds.clear();
     requestedQuestIds.clear();
+    expandedQuestIds.clear();
     pendingToast = null;
     SharedTileCache.reset();
     playerUuid = null;
@@ -95,9 +105,13 @@ public class ClientSession {
     serverWorldMapEnabled = true;
     serverPlayerMarkerEnabled = true;
     cameraMemory.clear();
+    maxQuestDepth = DEFAULT_MAX_QUEST_DEPTH;
+    newMarks.clear();
     activeTab = Tab.MY_QUESTS;
     searchTerm = "";
     serverQuestsFilter = QuestFilter.ALL;
+    // The back and forward history names quests of the server just left
+    DisquestsBaseScreen.clearHistory();
   }
 
   public static int getServerProtocolVersion() {
@@ -115,6 +129,25 @@ public class ClientSession {
   /** True when the server understands quest completion (protocol V3 or later). */
   public static boolean supportsCompletion() {
     return getServerProtocolVersion() >= ProtocolVersion.V3;
+  }
+
+  /** True when the server understands roles, quest trees and prerequisites (protocol V4+). */
+  public static boolean supportsTrees() {
+    return getServerProtocolVersion() >= ProtocolVersion.V4;
+  }
+
+  /** The server's {@code max-quest-depth} (0 = no limit); 3 when the server sent none. */
+  public static int getMaxQuestDepth() {
+    return maxQuestDepth;
+  }
+
+  public static void setMaxQuestDepth(int depth) {
+    maxQuestDepth = depth;
+  }
+
+  /** Quests the player has not looked at yet; cleared on {@link #leaveServer}. */
+  public static NewMarks newMarks() {
+    return newMarks;
   }
 
   /** The server's {@code world-map} switch from the handshake (true when the server sent none). */
@@ -252,6 +285,22 @@ public class ClientSession {
 
   public static void removePinnedQuest(UUID questId) {
     pinnedQuestIds.remove(questId);
+  }
+
+  /** The quests expanded in the main screen's lists this session (collapsed by default). */
+  public static Set<UUID> getExpandedQuests() {
+    return Collections.unmodifiableSet(expandedQuestIds);
+  }
+
+  /** Expands a collapsed quest in the lists, or collapses an expanded one. */
+  public static void toggleExpanded(UUID questId) {
+    if (questId != null && !expandedQuestIds.remove(questId)) {
+      expandedQuestIds.add(questId);
+    }
+  }
+
+  public static void expand(UUID questId) {
+    if (questId != null) expandedQuestIds.add(questId);
   }
 
   public static void markRequested(UUID questId) {

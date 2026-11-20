@@ -195,6 +195,23 @@ tasks.named<net.fabricmc.loom.task.RunGameTask>("runClientGameTest") {
     }
 }
 
+// Player B's client writes its own exec file: two JVMs must not share one, and without an agent
+// everything only Player B does in a duo journey (a locked quest's page, for one) counts as
+// uncovered.
+val jacocoExecFileB = layout.buildDirectory.file("jacoco/gameTestB.exec")
+
+tasks.named<net.fabricmc.loom.task.RunGameTask>("runClientGameTestB") {
+    if (project.hasProperty("coverage")) {
+        doFirst {
+            val agentJar = jacocoRuntime.singleFile
+            val destFile = jacocoExecFileB.get().asFile
+            destFile.parentFile.mkdirs()
+            jvmArgs("-javaagent:$agentJar=destfile=$destFile,includes=com.disqt.disquests.*")
+            logger.lifecycle("JaCoCo agent attached, writing to: $destFile")
+        }
+    }
+}
+
 tasks.register<JacocoReport>("jacocoGameTestReport") {
     group = "verification"
     description = "Generate code coverage report from E2E game tests"
@@ -221,9 +238,12 @@ tasks.register<JacocoReport>("jacocoIntegrationTestReport") {
     description = "Generate combined coverage report from client + server E2E tests"
     dependsOn("compileJava", ":server:compileJava", ":common:compileJava")
 
-    // Merge all exec files: E2E client + E2E server + common unit tests + server unit tests
+    // Merge all exec files: E2E clients (Player A, Player B) + E2E server + unit tests of client, common and server.
+    // Client logic kept free of Minecraft is covered by unit tests, not by the journeys.
     val execFiles = files(
         layout.buildDirectory.file("jacoco/gameTest.exec").get().asFile,
+        layout.buildDirectory.file("jacoco/gameTestB.exec").get().asFile,
+        layout.buildDirectory.file("jacoco/test.exec").get().asFile,
         file("../server/run/jacoco-server.exec"),
         file("../common/build/jacoco/test.exec"),
         file("../server/build/jacoco/test.exec")
@@ -480,12 +500,22 @@ fun rconReset(logger: org.gradle.api.logging.Logger) {
     throw RuntimeException("RCON reset failed after 30s: ${lastError?.message}")
 }
 
-fun ensureClientOptions(runDir: File) {
+/**
+ * Prepares a test client's options before every launch: a new file gets guiScale:1, and unless
+ * muteAudio is false the master volume is set to 0 (Minecraft rewrites options.txt on exit, so
+ * this runs on each launch). -PtestAudio passes muteAudio = false and leaves the volume alone.
+ */
+fun ensureClientOptions(runDir: File, muteAudio: Boolean) {
     val optionsFile = File(runDir, "options.txt")
+    val mute = "soundCategory_master:0.0"
     if (!optionsFile.exists()) {
         runDir.mkdirs()
-        optionsFile.writeText("guiScale:1\n")
+        optionsFile.writeText(if (muteAudio) "guiScale:1\n$mute\n" else "guiScale:1\n")
+        return
     }
+    if (!muteAudio) return
+    val lines = optionsFile.readLines().filter { !it.startsWith("soundCategory_master:") }
+    optionsFile.writeText((lines + mute).joinToString("\n", postfix = "\n"))
 }
 
 fun launchClient(
@@ -587,7 +617,7 @@ tasks.register("runSoloTests") {
 
             // --- Step 3: Launch PlayerA only ---
             if (!noStart) {
-                ensureClientOptions(file("run"))
+                ensureClientOptions(file("run"), !project.hasProperty("testAudio"))
                 val clientAReady = File(syncDir, "client-a-ready.done").exists()
 
                 if (!clientAReady) {
@@ -617,7 +647,7 @@ tasks.register("runSoloTests") {
 
             // --- Step 5: Wait for results (Player A only) ---
             val resultA = File(syncDir, "results-a.txt")
-            val resultsDeadline = System.currentTimeMillis() + 300000 // 5 minutes
+            val resultsDeadline = System.currentTimeMillis() + 600000 // 10 minutes: the solo suite runs about 5.5 on CI
             while (System.currentTimeMillis() < resultsDeadline) {
                 if (resultA.exists()) break
                 if (startedClients && processes.all { !it.isAlive }) break
@@ -703,8 +733,8 @@ tasks.register("runDuoTests") {
                 val clientBReady = File(syncDir, "client-b-ready.done").exists()
 
                 if (!clientAReady || !clientBReady) {
-                    ensureClientOptions(file("run"))
-                    ensureClientOptions(file("run-b"))
+                    ensureClientOptions(file("run"), !project.hasProperty("testAudio"))
+                    ensureClientOptions(file("run-b"), !project.hasProperty("testAudio"))
 
                     val procA = launchClient(
                         gradlew, isWin, rootProject.projectDir,
@@ -760,7 +790,7 @@ tasks.register("runDuoTests") {
             // --- Step 5: Wait for results (both players) ---
             val resultA = File(syncDir, "results-a.txt")
             val resultB = File(syncDir, "results-b.txt")
-            val resultsDeadline = System.currentTimeMillis() + 300000 // 5 minutes
+            val resultsDeadline = System.currentTimeMillis() + 900000 // 15 minutes: four two-player journeys
             while (System.currentTimeMillis() < resultsDeadline) {
                 if (resultA.exists() && resultB.exists()) break
                 if (!harness && startedClients && processes.all { !it.isAlive }) break
@@ -816,6 +846,8 @@ tasks.register("runIntegrationTest") {
             if (project.hasProperty("coverage")) cmd.add("-Pcoverage")
             if (project.hasProperty("noStart")) cmd.add("-PnoStart")
             if (project.hasProperty("harness")) cmd.add("-Pharness")
+            // The sub-tasks write the clients' options.txt: they need the flag to keep sound
+            if (project.hasProperty("testAudio")) cmd.add("-PtestAudio")
             if (project.hasProperty("testFilter")) cmd.add("-PtestFilter=${project.findProperty("testFilter")}")
 
             logger.lifecycle("=== Running $taskName ===")

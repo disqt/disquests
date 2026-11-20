@@ -12,6 +12,7 @@ import com.disqt.disquests.client.image.ImageState;
 import com.disqt.disquests.client.image.Images;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.client.markdown.RenderedLine;
+import com.disqt.disquests.client.markdown.WikiLinks;
 import io.wispforest.owo.ui.base.BaseUIComponent;
 import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.Sizing;
@@ -19,7 +20,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -468,23 +468,18 @@ public class MarkdownWidget extends BaseUIComponent {
     previewVisible = false;
     for (WikiLinkHitbox wh : wikiLinkHitboxes) {
       if (hitTest(mouseX, mouseY, wh.x(), wh.y(), wh.width(), wh.height())) {
-        if (!MarkdownRenderer.WIKI_LINK_BROKEN.equals(wh.uuid())) {
-          try {
-            UUID questId = UUID.fromString(wh.uuid());
-            Quest quest = ClientCache.getQuestById(questId);
-            if (quest != null) {
-              Minecraft mc = Minecraft.getInstance();
-              HoverPreviewRenderer.draw(
-                  (net.minecraft.client.gui.GuiGraphicsExtractor) context,
-                  quest,
-                  mouseX,
-                  mouseY,
-                  mc.getWindow().getGuiScaledWidth(),
-                  mc.getWindow().getGuiScaledHeight());
-              previewVisible = true;
-            }
-          } catch (IllegalArgumentException ignored) {
-          }
+        // A locked or unknown quest shows no preview (its title stays the placeholder)
+        Quest quest = WikiLinks.target(wh.uuid(), ClientCache::getQuestById);
+        if (quest != null) {
+          Minecraft mc = Minecraft.getInstance();
+          HoverPreviewRenderer.draw(
+              (net.minecraft.client.gui.GuiGraphicsExtractor) context,
+              quest,
+              mouseX,
+              mouseY,
+              mc.getWindow().getGuiScaledWidth(),
+              mc.getWindow().getGuiScaledHeight());
+          previewVisible = true;
         }
         break;
       }
@@ -564,25 +559,17 @@ public class MarkdownWidget extends BaseUIComponent {
     }
     for (WikiLinkHitbox wh : wikiLinkHitboxes) {
       if (hitTest(mx, my, wh.x(), wh.y(), wh.width(), wh.height())) {
-        if (MarkdownRenderer.WIKI_LINK_BROKEN.equals(wh.uuid())) {
+        // A locked or unknown quest does not open: same as a broken link
+        Quest quest = WikiLinks.target(wh.uuid(), ClientCache::getQuestById);
+        if (quest == null) {
           ClientSession.setPendingToast(QUEST_INACCESSIBLE_MSG);
           return true;
         }
-        try {
-          UUID questId = UUID.fromString(wh.uuid());
-          var quest = ClientCache.getQuestById(questId);
-          if (quest != null) {
-            Screen currentScreen = Minecraft.getInstance().gui.screen();
-            if (currentScreen instanceof DisquestsBaseScreen baseScreen) {
-              baseScreen.navigateToScreen(new QuestScreen(baseScreen.getParentScreen(), quest));
-            } else {
-              Minecraft.getInstance().gui.setScreen(new QuestScreen(currentScreen, quest));
-            }
-          } else {
-            ClientSession.setPendingToast(QUEST_INACCESSIBLE_MSG);
-          }
-        } catch (IllegalArgumentException e) {
-          ClientSession.setPendingToast(QUEST_INACCESSIBLE_MSG);
+        Screen currentScreen = Minecraft.getInstance().gui.screen();
+        if (currentScreen instanceof DisquestsBaseScreen baseScreen) {
+          baseScreen.navigateToScreen(new QuestScreen(baseScreen.getParentScreen(), quest));
+        } else {
+          Minecraft.getInstance().gui.setScreen(new QuestScreen(currentScreen, quest));
         }
         return true;
       }

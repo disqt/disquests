@@ -9,11 +9,10 @@ import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.map.BannerLayer;
 import com.disqt.disquests.client.gui.map.MapCameraMemory;
+import com.disqt.disquests.client.gui.map.MapLayer;
 import com.disqt.disquests.client.gui.map.MapMath;
 import com.disqt.disquests.client.gui.map.MapView;
-import com.disqt.disquests.client.gui.map.PolygonEditLayer;
 import com.disqt.disquests.client.gui.map.QuestPolygonLayer;
-import com.disqt.disquests.client.gui.map.QuestStyle;
 import com.disqt.disquests.client.gui.map.SharedTileCache;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
 import com.disqt.disquests.common.QuestLocation;
@@ -38,8 +37,10 @@ import net.minecraft.network.chat.MutableComponent;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Builds the quest screen's location card: a mini map of the pin or outline, and in edit mode one
- * row of coordinate fields per vertex plus the location buttons.
+ * Builds the quest screen's location card: a mini map of the pin or outline, and in edit mode the
+ * location buttons. With the map available the edit card's mini map is the way in to the
+ * full-screen map editor (a click opens it); with the map off the card has one row of coordinate
+ * fields per vertex instead.
  */
 final class LocationCard {
   static final double DEFAULT_Y = 64;
@@ -102,51 +103,40 @@ final class LocationCard {
 
   // ===================== EDIT MODE =====================
 
-  /** Fills the edit-mode card and returns the vertex rows it built (empty when unlocated). */
+  /**
+   * Fills the edit-mode card and returns the vertex rows it built: none when the map is available
+   * or the quest is unlocated.
+   */
   static List<VertexRow> buildEdit(QuestScreen screen, FlowLayout root, Quest quest) {
     String dimension = screen.dimensionForEdit();
     int[] size = mapSize(EDIT_MAP_WIDTH, EDIT_MAP_HEIGHT, screen.height, EDIT_MAP_SCREEN_DIVISOR);
+    FlowLayout locationMain = root.childById(FlowLayout.class, "location-main");
     FlowLayout vertexList = root.childById(FlowLayout.class, "vertex-list");
-    List<VertexRow> rows = buildVertexRows(vertexList, quest);
-    capVertexList(
-        root.childById(FlowLayout.class, "location-main"), vertexList, rows.size(), size[1]);
 
-    // With the map off (pre-V2 server, switched off, or BlueMap unreachable) the vertex rows are
-    // the whole editor: no mini map and no full-screen map editor.
+    // With the map available the preview is the editor's way in: a click opens the full-screen
+    // map editor, and there are no coordinate rows. With the map off (pre-V2 server, switched
+    // off, or BlueMap unreachable) the vertex rows are the whole editor.
     boolean mapEditing = ClientSession.mapAvailable();
+    List<VertexRow> rows;
     if (mapEditing) {
-      // The preview drags existing corners in place; adding, removing and finishing stay in the
-      // full-screen editor. A drag updates the quest and the fields without rebuilding the screen.
-      PolygonEditLayer layer =
-          new PolygonEditLayer(locationVertices(quest))
-              .moveOnly(true)
-              .color(QuestStyle.outlineColor(quest.getId(), quest.getVisibility()));
-      layer.onVerticesChanged(
-          vertices -> {
-            List<PointData> before = locationVertices(quest);
-            screen.moveMapLocation(vertices);
-            refreshVertexFields(rows, before, vertices);
-          });
+      rows = List.of();
+      // Looked up from root: owo only sets parent() when the tree is mounted, after build().
+      locationMain.removeChild(vertexList);
       MapView map = addMiniMap(root, quest, dimension, size[0], size[1]);
-      map.addLayer(layer);
-      map.interactive(true);
+      map.addLayer(locationLayer(quest));
+      map.onPreviewClick(screen::openMapEditor);
+    } else {
+      rows = buildVertexRows(vertexList, quest);
+      capVertexList(locationMain, vertexList, rows.size(), size[1]);
     }
 
     FlowLayout buttons = root.childById(FlowLayout.class, "location-buttons");
-    if (mapEditing) {
-      buttons.child(
-          button(
-              "btn-edit-on-map",
-              Component.translatable("gui.disquests.btn.edit_on_map"),
-              screen::openMapEditor));
-    }
-    ButtonComponent setPos =
+    // Content-sized buttons in a wrapping row: on a narrow card they move to a second line.
+    buttons.child(
         button(
             "btn-set-pos",
             Component.translatable("gui.disquests.btn.set_pos"),
-            screen::setPlayerPosition);
-    setPos.horizontalSizing(Sizing.fixed(FIELD_WIDTH));
-    buttons.child(setPos);
+            screen::setPlayerPosition));
     buttons.child(
         button(
             "btn-clear-location",
@@ -213,30 +203,12 @@ final class LocationCard {
     return rows;
   }
 
-  /** The quest's outline corners, its pin as one corner, or nothing. */
-  private static List<PointData> locationVertices(Quest quest) {
-    if (quest.isPolygon()) {
-      return List.copyOf(quest.getPolygon());
-    }
-    CoordinatesData c = quest.getCoordinates();
-    return c != null ? List.of(new PointData(c.x(), c.z())) : List.of();
-  }
-
-  /**
-   * Rewrites the fields of the corners a preview drag moved. Other rows keep their text, so a value
-   * typed but not yet saved survives a drag of another corner; a pin keeps its Y field.
-   */
-  private static void refreshVertexFields(
-      List<VertexRow> rows, List<PointData> before, List<PointData> after) {
-    if (rows.size() != after.size()) return;
-    for (int i = 0; i < rows.size(); i++) {
-      PointData p = after.get(i);
-      if (i < before.size() && p.equals(before.get(i))) continue;
-      VertexRow row = rows.get(i);
-      boolean pin = row.y() != null;
-      row.x().getDelegate().setText(pin ? pinText(p.x()) : vertexText(p.x()));
-      row.z().getDelegate().setText(pin ? pinText(p.z()) : vertexText(p.z()));
-    }
+  /** The mini map's drawing of the quest's pin or outline, in the quest's colour. */
+  private static MapLayer locationLayer(Quest quest) {
+    // The card's map is in the quest's own dimension; draw a legacy quest with no map there too.
+    QuestPolygonLayer layer = new QuestPolygonLayer().anyDimension(true);
+    layer.setQuests(List.of(quest));
+    return layer;
   }
 
   /**
@@ -338,9 +310,7 @@ final class LocationCard {
     if (ClientSession.mapAvailable()) {
       int[] size = mapSize(VIEW_MAP_WIDTH, VIEW_MAP_HEIGHT, screen.height, VIEW_MAP_SCREEN_DIVISOR);
       MapView map = addMiniMap(root, quest, screen.dimensionForEdit(), size[0], size[1]);
-      QuestPolygonLayer layer = new QuestPolygonLayer();
-      layer.setQuests(List.of(quest));
-      map.addLayer(layer);
+      map.addLayer(locationLayer(quest));
     }
 
     root.childById(LabelComponent.class, "coords-label")

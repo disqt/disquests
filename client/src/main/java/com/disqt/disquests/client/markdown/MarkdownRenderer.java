@@ -54,29 +54,12 @@ public class MarkdownRenderer {
   }
 
   /**
-   * Converts server-resolved wiki-links back to raw form for editing. {@code [[uuid|title]]}
-   * becomes {@code [[Current Title]]} using cache lookup, or {@code [[title]]} if not found.
+   * Received content as the editor shows it (see {@link WikiLinks#toEditingForm}): links to quests
+   * the player sees fully become {@code [[Current Title]]}, links to any other quest keep their
+   * {@code [[uuid|text]]} form.
    */
   public static String reverseResolveWikiLinks(String content) {
-    if (content == null || content.isEmpty()) return content;
-    return WIKI_LINK_PATTERN
-        .matcher(content)
-        .replaceAll(
-            m -> {
-              String uuidStr = m.group(1);
-              String displayTitle = m.group(2);
-              if (uuidStr.isEmpty()) {
-                return java.util.regex.Matcher.quoteReplacement("[[" + displayTitle + "]]");
-              }
-              try {
-                java.util.UUID questId = java.util.UUID.fromString(uuidStr);
-                var quest = com.disqt.disquests.client.ClientCache.getQuestById(questId);
-                String title = quest != null ? quest.getTitle() : displayTitle;
-                return java.util.regex.Matcher.quoteReplacement("[[" + title + "]]");
-              } catch (IllegalArgumentException e) {
-                return java.util.regex.Matcher.quoteReplacement("[[" + displayTitle + "]]");
-              }
-            });
+    return WikiLinks.toEditingForm(content, com.disqt.disquests.client.ClientCache::getQuestById);
   }
 
   public static List<RenderedLine> render(String markdown) {
@@ -490,14 +473,11 @@ public class MarkdownRenderer {
     }
   }
 
-  /** A wiki-link is resolvable if the UUID is non-empty and the quest exists in the cache. */
+  /**
+   * A wiki-link resolves when its quest is in the cache and not held as a locked view ({@link
+   * WikiLinks#target}); any other link renders as broken, with the text the server sent.
+   */
   private static boolean isWikiLinkResolvable(String uuid) {
-    if (uuid == null || uuid.isEmpty()) return false;
-    try {
-      return com.disqt.disquests.client.ClientCache.getQuestById(java.util.UUID.fromString(uuid))
-          != null;
-    } catch (IllegalArgumentException e) {
-      return false;
-    }
+    return WikiLinks.target(uuid, com.disqt.disquests.client.ClientCache::getQuestById) != null;
   }
 }

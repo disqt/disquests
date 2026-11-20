@@ -20,7 +20,7 @@
     "accept": "Accept",
     "deny": "Deny",
     "remove": "Remove",
-    "set_pos": "Set Pos",
+    "set_pos": "Set to current position",
     "view_bluemap": "View on BlueMap",
     "join": "Join",
     "request": "Request",
@@ -30,14 +30,107 @@
     "done": "Done",
     "cancel_map": "Cancel",
     "clear_location": "Clear location",
-    "edit_on_map": "Edit on map",
     "complete": "Complete",
     "reopen": "Reopen",
+    "manage_people": "Manage people",
+    "restore_visibility": "Set back to %s",
+    "keep_private": "Keep Private",
   },
 
   // Toasts
   "gui.disquests.toast.{}": {
     "quest_archived": "This quest was completed by a teammate; your changes were not saved.",
+    "no_longer_editable": "You can no longer edit this quest; your changes were not saved.",
+    "owner_parts_not_saved": "You are no longer an owner of this quest; visibility and prerequisites were not saved.",
+    "now_on": "You are now on \"%s\": see My Quests",
+  },
+
+  // Server notices
+  "gui.disquests.notice.{}": {
+    "unlocked": "New quest: %s",
+    "set_private": "\"%s\" was set to Private: the quest it was in was deleted. Open it to decide.",
+    "refused_titled": "\"%s\": %s",
+    "refused": "That change isn't possible: %s",
+  },
+
+  // Why a change was refused
+  "gui.disquests.refusal.{}": {
+    "self": "a quest can't contain or wait on itself",
+    "loop": "it would make a loop",
+    "too_deep": "too deep, limit %d levels",
+    "completed": "it is completed",
+    "target_completed": "that quest is completed",
+    "linked_by_prerequisite": "one unlocks after the other",
+    "need_owner": "you need Owner on it",
+    "need_write_on_target": "you need Write on the quest it goes into",
+    "not_visible": "you can't see that quest",
+    "too_many_prerequisites": "at most 8 prerequisites",
+    "already_there": "it is already there",
+    "last_owner": "a quest always keeps at least one owner",
+    "unknown": "not allowed",
+  },
+
+  // Quest search dropdowns ("add a subquest...", "Prerequisites")
+  "gui.disquests.suggestion.{}": {
+    "reason": "(%s)",
+    "with_role": "%s, %s",
+    "role_read": "you have Read",
+    "role_write": "you have Write",
+    "role_none": "you have no role",
+    "inside_another": "inside another quest",
+  },
+
+  // The quest editor: tree pane and link controls
+  "gui.disquests.edit.{}": {
+    "add_subquest": "add a subquest...",
+    "new_quest": "New quest",
+    "drop_out": "Drop here to take a quest out of the tree",
+    "tree_hint": "Drag a quest onto another to put it inside. Nothing changes until you press Save.",
+    "hidden_parent": "This quest sits inside a quest you can't see",
+    "detach": "Detach",
+    "visibility": "Visibility",
+    "visibility_in_parent": "This applies among those who can see the quest it sits in.",
+    "prerequisite_field": "type to add an existing quest...",
+    "prerequisite_hidden": "something you don't have access to",
+    "open_only": "(Open quests only)",
+    "now_inside": "now inside %s",
+  },
+
+  // Quest tree rows
+  "gui.disquests.tree.{}": {
+    "not_saved": "not saved",
+    "taken_out": "taken out, not saved",
+    "editing": "(editing)",
+    "take_out_of": "Take out of %s",
+  },
+
+  // A player's role on a quest, next to the visibility badge
+  "gui.disquests.role.{}": {
+    "owner": "Owner",
+    "write": "Write",
+    "read": "Read",
+    "none": "not joined",
+  },
+
+  // Banners on a quest's page, for its owners
+  "gui.disquests.banner.{}": {
+    "privatized_titled": "Set to Private on %s. The quest it was in, \"%s\", was deleted by %s. It was %s before.",
+    "privatized": "Set to Private on %s. The quest it was in was deleted. It was %s before.",
+    "deleted_prerequisite": "This quest waits on a deleted quest and stays locked. Open Edit to remove that link.",
+  },
+
+  // What a locked quest is waiting on
+  "gui.disquests.waiting.{}": {
+    "prerequisites": "PREREQUISITES",
+    "something_else": "… and something else you can't see yet",
+    "nothing_visible": "This quest isn't available yet. Something else has to be finished first.",
+  },
+
+  // The Prerequisites section of a quest's page (Write and Owner)
+  "gui.disquests.prerequisite.{}": {
+    "hidden": "… and something you don't have access to",
+    "deleted": "a deleted quest",
+    "auto_join": "When this unlocks, add the players from those quests",
   },
 
   // Home tabs
@@ -49,6 +142,36 @@
   "gui.disquests.image.{}": {
     "loading": "Loading image…",
     "failed": "Image failed to load",
+  },
+
+  // The people screen (owners): roles held in a draft until Save
+  "gui.disquests.people.{}": {
+    "title": "People",
+    "pending": "Pending Requests",
+    "you": "%s (you)",
+    "removed": "removed, not saved",
+    "undo": "Undo",
+    "save": "Save",
+    "cancel": "Cancel",
+    "add_hint": "Player name...",
+    "unknown_player": "No player called \"%s\" is known here. They need to be online or on a quest you can see.",
+    "apply_down": "Apply to subquests",
+    "save_first": "Save first",
+    "apply_down_question_one": "Give %s %s on your %d subquest of %s?",
+    "apply_down_question_many": "Give %s %s on your %d subquests of %s?",
+    "apply_down_extra": "One time only. Nobody is lowered, and quests added later are not affected.",
+    "apply_down_sent": "%s gets %s on your subquests.",
+    "need_owner": "A quest always keeps at least one owner.",
+    "give_up_owner": "You are giving up Owner on this quest. You will not be able to change this back yourself.",
+    "roles_hint": "Read: see, pin, leave. Write: also edit text, location, tags, and put their own quests inside. Owner: also complete, delete, visibility, people, links.",
+    "save_hint": "Nothing changes until you press Save.",
+    "remove_question": "Remove %s?",
+    "remove_this_only": "From this quest only",
+    "remove_with_mine_one": "From this quest and my %d subquest",
+    "remove_with_mine_many": "From this quest and my %d subquests",
+    "dropped_meanwhile": "no longer on this quest, will be added back",
+    "no_longer_owner": "You are no longer an owner of this quest.",
+    "already_listed": "%s is already on this quest.",
   },
 
   // Contributor permissions
@@ -74,11 +197,12 @@
 
   // Visibility tooltips
   "gui.disquests.tooltip.{}": {
-    "private": "Only you can see this quest",
-    "closed": "Visible on Quest Board, others must request access",
-    "open": "Anyone can join and view this quest",
+    "private": "Only the people on this quest can see it.",
+    "closed": "Visible; others must request access.",
+    "open": "Visible; anyone can join.",
     "already_requested": "You have already requested access",
     "view_only": "You have view-only access",
+    "needs_attention": "Needs your attention",
   },
 
   // Filter tooltips
@@ -99,6 +223,7 @@
     "region_summary": "Region: %d corners, X:%d to %d Z:%d to %d",
     "completed_by": "Completed on %s by %s",
     "completed": "Completed on %s",
+    "new": "NEW",
   },
 
   // Confirm dialogs
@@ -109,18 +234,29 @@
     "remove_contributor": "Remove %s from contributors?",
     "complete": "Mark this quest as completed? It moves to the Archived tab for everyone who worked on it.",
     "reopen": "Reopen this quest? It goes back to the active lists, and its completion time will be replaced if it is completed again.",
+    "also_complete_one": "Also complete my %d unfinished subquest",
+    "also_complete_many": "Also complete my %d unfinished subquests",
+    "others_stay_active_one": "%d other belongs to another player and stays active",
+    "others_stay_active_many": "%d others belong to other players and stay active",
+    "also_delete_one": "Also delete my %d subquest",
+    "also_delete_many": "Also delete my %d subquests",
+    "others_kept_one": "%d other belongs to another player and is kept",
+    "others_kept_many": "%d others belong to other players and are kept",
   },
 
   // Collapsible sections
   "gui.disquests.section.{}": {
     "tags": "Tags (%d)",
     "contributors": "Contributors (%d)",
+    "quest_tree": "QUEST TREE",
+    "prerequisites": "Prerequisites",
   },
 
   // World map
   "gui.disquests.map.{}": {
     "tiles_unavailable": "Map tiles unavailable",
     "unplaced": "Unplaced",
+    "placed": "On the map",
     "centre_me": "Centre on me",
     "zoom_tooltip": "Zoom %d / %d",
     "server_outdated": "The server needs updating to show the map",
@@ -131,7 +267,7 @@
     "list_off": "List: Off",
     "edit_hint": "Click to add corners. Enter or click the first corner to finish. Right-click removes the last one. Drag to move the map.",
     "self_intersecting": "The outline crosses itself",
-    "need_three_corners": "A region needs at least 3 corners",
+    "click_to_edit": "Click to edit on the map",
     "too_many_vertices": "At most %d corners",
   },
   "gui.disquests.map.dim.{}": {
@@ -146,6 +282,7 @@
     "option.pinnedVisible": "Show Pinned Quests",
     "option.pinnedWidth": "Pinned Width",
     "option.sidePanelWidth": "Quest list width",
+    "option.questPaneWidth": "Quest tree pane width",
     "option.theme": "Theme",
     "option.worldMap": "World map",
     // owo builds enum keys as text.config.<config>.enum.<enumName>.<value>,

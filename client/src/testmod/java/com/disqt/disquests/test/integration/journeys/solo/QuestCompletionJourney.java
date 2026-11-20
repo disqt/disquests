@@ -7,9 +7,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.disqt.disquests.client.ClientSession;
 import com.disqt.disquests.client.data.Quest;
-import com.disqt.disquests.client.gui.component.QuestEntryComponent;
 import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
+import com.disqt.disquests.client.gui.screen.QuestListPanel;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
 import com.disqt.disquests.test.integration.harness.IntegrationTest;
@@ -162,11 +162,8 @@ class QuestCompletionJourney {
           FlowLayout list = root != null ? root.childById(FlowLayout.class, "quest-list") : null;
           if (list == null) return false;
           boolean found =
-              list.children().stream()
-                  .anyMatch(
-                      child ->
-                          child instanceof QuestEntryComponent entry
-                              && title.equals(entry.getQuest().getTitle()));
+              QuestListPanel.entries(list).stream()
+                  .anyMatch(entry -> title.equals(entry.getQuest().getTitle()));
           return found == listed;
         },
         TIMEOUT);

@@ -1,20 +1,29 @@
 package com.disqt.disquests.server.papermc;
 
 import com.disqt.disquests.common.QuestLocation;
+import com.disqt.disquests.common.graph.Plans.DeletePlan;
+import com.disqt.disquests.common.graph.Plans.PrivatizeInfo;
+import com.disqt.disquests.common.graph.QuestGraph;
 import com.disqt.disquests.common.model.CollaborationRequestData;
 import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.PointData;
+import com.disqt.disquests.common.model.Privatized;
 import com.disqt.disquests.common.model.QuestData;
+import com.disqt.disquests.common.model.Role;
 import com.disqt.disquests.common.model.Visibility;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -31,7 +40,48 @@ public class DataManager {
               FOREIGN KEY (quest_id) REFERENCES quests(id) ON DELETE CASCADE
           )""";
 
+  private static final String PEOPLE_DDL =
+      """
+          CREATE TABLE IF NOT EXISTS quest_people (
+              quest_id TEXT NOT NULL,
+              player_uuid TEXT NOT NULL,
+              role TEXT NOT NULL,
+              added_at INTEGER NOT NULL DEFAULT 0,
+              PRIMARY KEY (quest_id, player_uuid),
+              FOREIGN KEY (quest_id) REFERENCES quests(id) ON DELETE CASCADE
+          )""";
+
+  /**
+   * One row per link; kind is {@link #UNLOCKS_AFTER} (from_id waits on to_id), the only kind so
+   * far. to_id has no foreign key on purpose: a deleted prerequisite must stay as a dangling id.
+   */
+  private static final String LINKS_DDL =
+      """
+          CREATE TABLE IF NOT EXISTS quest_links (
+              from_id TEXT NOT NULL,
+              to_id TEXT NOT NULL,
+              kind TEXT NOT NULL,
+              PRIMARY KEY (from_id, to_id, kind),
+              FOREIGN KEY (from_id) REFERENCES quests(id) ON DELETE CASCADE
+          )""";
+
+  /** The kind of a prerequisite link: from_id unlocks after to_id is completed. */
+  private static final String UNLOCKS_AFTER = "UNLOCKS_AFTER";
+
+  private static final String QUEST_SELECT =
+      """
+          SELECT q.*, pn.name as owner_name, cn.name as completed_by_name, dn.name as priv_by_name
+          FROM quests q
+          LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid
+          LEFT JOIN player_names cn ON q.completed_by = cn.uuid
+          LEFT JOIN player_names dn ON q.priv_by = dn.uuid
+          """;
+
   private Connection connection;
+
+  /** Test seam: runs inside the roles migration after the schema changes, before the backfill. */
+  Runnable migrationFault;
+
   private final Path dataDir;
 
   public DataManager(Path dataDir) {
@@ -60,6 +110,7 @@ public class DataManager {
       if (!polygonsTableExisted) {
         migrateLocations(defaultMap);
       }
+      migrateRolesAndTree();
     } catch (SQLException | IOException e) {
       throw new RuntimeException("Failed to initialize database", e);
     }
@@ -142,6 +193,10 @@ public class DataManager {
   // Quests
   // -------------------------------------------------------------------------
 
+  /**
+   * Saves the quest. Warning: this makes {@code quest.ownerUuid()} the display owner and an OWNER
+   * on every save, so callers must pass the stored display owner.
+   */
   public synchronized void saveQuest(QuestData rawQuest) {
     QuestData quest = QuestLocation.normalize(rawQuest);
     boolean previousAutoCommit = true;
@@ -239,6 +294,14 @@ public class DataManager {
           insPoly.executeBatch();
         }
       }
+      // The display owner always holds an OWNER row; a brand-new quest's owner comes first.
+      update(
+          """
+              INSERT INTO quest_people (quest_id, player_uuid, role, added_at) VALUES (?, ?, 'OWNER', 0)
+              ON CONFLICT(quest_id, player_uuid) DO UPDATE SET role = 'OWNER'
+              """,
+          quest.id().toString(),
+          quest.ownerUuid().toString());
       connection.commit();
     } catch (SQLException e) {
       try {
@@ -256,24 +319,21 @@ public class DataManager {
     }
   }
 
-  public synchronized boolean deleteQuest(UUID id) {
-    try (PreparedStatement stmt = connection.prepareStatement("DELETE FROM quests WHERE id = ?")) {
-      stmt.setString(1, id.toString());
-      return stmt.executeUpdate() > 0;
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to delete quest", e);
-    }
+  /**
+   * Deletes the quest; its people, links from it, pins, requests, tags and polygon cascade. Links
+   * pointing at it stay, and quests that had it as their parent become top level.
+   */
+  private boolean deleteQuestRaw(UUID id) throws SQLException {
+    update("UPDATE quests SET parent_id = NULL WHERE parent_id = ?", id.toString());
+    return update("DELETE FROM quests WHERE id = ?", id.toString()) > 0;
   }
 
   public synchronized QuestData getQuest(UUID id) {
-    try (PreparedStatement stmt =
-        connection.prepareStatement(
-            "SELECT q.*, pn.name as owner_name, cn.name as completed_by_name FROM quests q LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid LEFT JOIN player_names cn ON q.completed_by = cn.uuid WHERE q.id = ?")) {
+    try (PreparedStatement stmt = connection.prepareStatement(QUEST_SELECT + "WHERE q.id = ?")) {
       stmt.setString(1, id.toString());
       ResultSet rs = stmt.executeQuery();
       if (rs.next()) {
-        QuestData quest = mapQuestRow(rs);
-        return withPolygon(withTags(withContributors(quest)));
+        return hydrate(List.of(mapQuestRow(rs))).get(0);
       }
       return null;
     } catch (SQLException e) {
@@ -281,176 +341,49 @@ public class DataManager {
     }
   }
 
-  public synchronized List<QuestData> getQuestsForPlayer(UUID playerUuid) {
+  /** Every quest as stored: all people with roles, parent, prerequisites, nothing redacted. */
+  public synchronized List<QuestData> getAllQuests() {
     List<QuestData> quests = new ArrayList<>();
-    try (PreparedStatement stmt =
-        connection.prepareStatement(
-            """
-                SELECT q.*, pn.name as owner_name, cn.name as completed_by_name FROM quests q
-                LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid LEFT JOIN player_names cn ON q.completed_by = cn.uuid
-                WHERE q.owner_uuid = ?
-                   OR q.id IN (SELECT quest_id FROM contributors WHERE player_uuid = ?)
-                """)) {
-      stmt.setString(1, playerUuid.toString());
-      stmt.setString(2, playerUuid.toString());
-      ResultSet rs = stmt.executeQuery();
+    try (Statement stmt = connection.createStatement();
+        ResultSet rs = stmt.executeQuery(QUEST_SELECT)) {
       while (rs.next()) {
         quests.add(mapQuestRow(rs));
       }
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to get quests for player", e);
+      throw new RuntimeException("Failed to get all quests", e);
     }
-    return withPolygonsAll(withTagsAll(withContributorsAll(quests)));
+    return hydrate(quests);
   }
 
-  public synchronized List<QuestData> getServerQuests(UUID excludePlayerUuid) {
-    List<QuestData> quests = new ArrayList<>();
-    try (PreparedStatement stmt =
-        connection.prepareStatement(
-            """
-                SELECT q.*, pn.name as owner_name, cn.name as completed_by_name FROM quests q
-                LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid LEFT JOIN player_names cn ON q.completed_by = cn.uuid
-                WHERE q.visibility IN ('OPEN', 'CLOSED')
-                  AND q.completed_at = 0
-                  AND q.owner_uuid != ?
-                  AND q.id NOT IN (SELECT quest_id FROM contributors WHERE player_uuid = ?)
-                """)) {
-      stmt.setString(1, excludePlayerUuid.toString());
-      stmt.setString(2, excludePlayerUuid.toString());
-      ResultSet rs = stmt.executeQuery();
-      while (rs.next()) {
-        quests.add(mapQuestRow(rs));
-      }
+  public synchronized QuestGraph loadGraph() {
+    return QuestGraph.of(getAllQuests());
+  }
+
+  /**
+   * Sets the visibility as an owner's choice: a visibility other than Private also forgets the
+   * quest's privatization, since the owner has dealt with it.
+   */
+  public synchronized void changeVisibility(UUID questId, Visibility visibility) {
+    try {
+      update(
+          """
+          UPDATE quests SET visibility = ?,
+              priv_previous = CASE WHEN ? = 'PRIVATE' THEN priv_previous END,
+              priv_title = CASE WHEN ? = 'PRIVATE' THEN priv_title END,
+              priv_by = CASE WHEN ? = 'PRIVATE' THEN priv_by END,
+              priv_at = CASE WHEN ? = 'PRIVATE' THEN priv_at END,
+              priv_saw = CASE WHEN ? = 'PRIVATE' THEN priv_saw END
+          WHERE id = ?
+          """,
+          visibility.name(),
+          visibility.name(),
+          visibility.name(),
+          visibility.name(),
+          visibility.name(),
+          visibility.name(),
+          questId.toString());
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to get server quests", e);
-    }
-    return withPolygonsAll(withTagsAll(withContributorsAll(quests)));
-  }
-
-  public synchronized Map<String, QuestData> findQuestsByTitlesIgnoreCase(List<String> titles) {
-    if (titles.isEmpty()) return Map.of();
-    Map<String, QuestData> result = new HashMap<>();
-    String placeholders = titles.stream().map(t -> "?").collect(Collectors.joining(","));
-    try (PreparedStatement stmt =
-        connection.prepareStatement(
-            "SELECT q.*, pn.name as owner_name, cn.name as completed_by_name FROM quests q "
-                + "LEFT JOIN player_names pn ON q.owner_uuid = pn.uuid LEFT JOIN player_names cn ON q.completed_by = cn.uuid "
-                + "WHERE LOWER(q.title) IN ("
-                + placeholders
-                + ")")) {
-      for (int i = 0; i < titles.size(); i++) {
-        stmt.setString(i + 1, titles.get(i).toLowerCase());
-      }
-      ResultSet rs = stmt.executeQuery();
-      while (rs.next()) {
-        QuestData quest = mapQuestRow(rs);
-        String lowerTitle = quest.title().toLowerCase();
-        if (!result.containsKey(lowerTitle)
-            || quest.id().toString().compareTo(result.get(lowerTitle).id().toString()) < 0) {
-          result.put(lowerTitle, quest);
-        }
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to find quests by titles", e);
-    }
-    return result;
-  }
-
-  public synchronized void updateVisibility(UUID questId, Visibility visibility) {
-    try (PreparedStatement stmt =
-        connection.prepareStatement("UPDATE quests SET visibility = ? WHERE id = ?")) {
-      stmt.setString(1, visibility.name());
-      stmt.setString(2, questId.toString());
-      stmt.executeUpdate();
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to update visibility", e);
-    }
-  }
-
-  // -------------------------------------------------------------------------
-  // Contributors
-  // -------------------------------------------------------------------------
-
-  public synchronized void addContributor(UUID questId, UUID playerUuid, boolean canEdit) {
-    try (PreparedStatement stmt =
-        connection.prepareStatement(
-            """
-                INSERT INTO contributors (quest_id, player_uuid, can_edit) VALUES (?, ?, ?)
-                ON CONFLICT(quest_id, player_uuid) DO UPDATE SET can_edit = excluded.can_edit
-                """)) {
-      stmt.setString(1, questId.toString());
-      stmt.setString(2, playerUuid.toString());
-      stmt.setInt(3, canEdit ? 1 : 0);
-      stmt.executeUpdate();
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to add contributor", e);
-    }
-  }
-
-  public synchronized void leaveQuest(UUID questId, UUID playerUuid) {
-    removeContributor(questId, playerUuid);
-    unpinQuest(playerUuid, questId);
-  }
-
-  public synchronized void removeContributor(UUID questId, UUID playerUuid) {
-    try (PreparedStatement stmt =
-        connection.prepareStatement(
-            "DELETE FROM contributors WHERE quest_id = ? AND player_uuid = ?")) {
-      stmt.setString(1, questId.toString());
-      stmt.setString(2, playerUuid.toString());
-      stmt.executeUpdate();
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to remove contributor", e);
-    }
-  }
-
-  public synchronized void updateContributor(UUID questId, UUID playerUuid, boolean canEdit) {
-    try (PreparedStatement stmt =
-        connection.prepareStatement(
-            "UPDATE contributors SET can_edit = ? WHERE quest_id = ? AND player_uuid = ?")) {
-      stmt.setInt(1, canEdit ? 1 : 0);
-      stmt.setString(2, questId.toString());
-      stmt.setString(3, playerUuid.toString());
-      stmt.executeUpdate();
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to update contributor", e);
-    }
-  }
-
-  public synchronized List<ContributorData> getContributors(UUID questId) {
-    List<ContributorData> contributors = new ArrayList<>();
-    try (PreparedStatement stmt =
-        connection.prepareStatement(
-            """
-                SELECT c.player_uuid, c.can_edit, pn.name FROM contributors c
-                LEFT JOIN player_names pn ON c.player_uuid = pn.uuid
-                WHERE c.quest_id = ?
-                """)) {
-      stmt.setString(1, questId.toString());
-      ResultSet rs = stmt.executeQuery();
-      while (rs.next()) {
-        contributors.add(
-            new ContributorData(
-                UUID.fromString(rs.getString("player_uuid")),
-                rs.getString("name"),
-                rs.getInt("can_edit") != 0));
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to get contributors", e);
-    }
-    return contributors;
-  }
-
-  public synchronized boolean isContributor(UUID questId, UUID playerUuid) {
-    try (PreparedStatement stmt =
-        connection.prepareStatement(
-            "SELECT 1 FROM contributors WHERE quest_id = ? AND player_uuid = ?")) {
-      stmt.setString(1, questId.toString());
-      stmt.setString(2, playerUuid.toString());
-      ResultSet rs = stmt.executeQuery();
-      return rs.next();
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to check contributor", e);
+      throw new RuntimeException("Failed to change visibility", e);
     }
   }
 
@@ -498,7 +431,8 @@ public class DataManager {
                 FROM collaboration_requests cr
                 JOIN quests q ON cr.quest_id = q.id
                 LEFT JOIN player_names pn ON cr.requester_uuid = pn.uuid
-                WHERE q.owner_uuid = ?
+                WHERE EXISTS (SELECT 1 FROM quest_people qp
+                              WHERE qp.quest_id = q.id AND qp.player_uuid = ? AND qp.role = 'OWNER')
                 """)) {
       stmt.setString(1, ownerUuid.toString());
       ResultSet rs = stmt.executeQuery();
@@ -526,7 +460,8 @@ public class DataManager {
                 SELECT cr.quest_id, COUNT(*) as cnt
                 FROM collaboration_requests cr
                 JOIN quests q ON cr.quest_id = q.id
-                WHERE q.owner_uuid = ?
+                WHERE EXISTS (SELECT 1 FROM quest_people qp
+                              WHERE qp.quest_id = q.id AND qp.player_uuid = ? AND qp.role = 'OWNER')
                 GROUP BY cr.quest_id
                 """)) {
       stmt.setString(1, ownerUuid.toString());
@@ -546,7 +481,8 @@ public class DataManager {
             """
                 SELECT COUNT(*) FROM collaboration_requests cr
                 JOIN quests q ON cr.quest_id = q.id
-                WHERE q.owner_uuid = ?
+                WHERE EXISTS (SELECT 1 FROM quest_people qp
+                              WHERE qp.quest_id = q.id AND qp.player_uuid = ? AND qp.role = 'OWNER')
                 """)) {
       stmt.setString(1, ownerUuid.toString());
       ResultSet rs = stmt.executeQuery();
@@ -678,6 +614,19 @@ public class DataManager {
     }
   }
 
+  /** Every player the server has recorded a name for. */
+  public synchronized List<UUID> getKnownPlayers() {
+    List<UUID> players = new ArrayList<>();
+    try (PreparedStatement stmt =
+        connection.prepareStatement("SELECT uuid FROM player_names ORDER BY uuid")) {
+      ResultSet rs = stmt.executeQuery();
+      while (rs.next()) players.add(UUID.fromString(rs.getString("uuid")));
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to list known players", e);
+    }
+    return players;
+  }
+
   public synchronized UUID getPlayerUuidByName(String name) {
     try (PreparedStatement stmt =
         connection.prepareStatement("SELECT uuid FROM player_names WHERE name = ?")) {
@@ -700,11 +649,17 @@ public class DataManager {
     }
   }
 
-  public synchronized void resetDatabase() {
+  /**
+   * Wipes every table (debug {@code /disquests reset}), then records {@code namesToKeep} again: the
+   * players still connected, who would otherwise be unknown and could not be added to a quest.
+   */
+  public synchronized void resetDatabase(Map<UUID, String> namesToKeep) {
     try (var stmt = connection.createStatement()) {
       stmt.executeUpdate("DELETE FROM pinned_quests");
       stmt.executeUpdate("DELETE FROM collaboration_requests");
       stmt.executeUpdate("DELETE FROM contributors");
+      stmt.executeUpdate("DELETE FROM quest_people");
+      stmt.executeUpdate("DELETE FROM quest_links");
       stmt.executeUpdate("DELETE FROM quest_tags");
       stmt.executeUpdate("DELETE FROM quest_polygons");
       stmt.executeUpdate("DELETE FROM quests");
@@ -712,6 +667,7 @@ public class DataManager {
     } catch (SQLException e) {
       throw new RuntimeException("Failed to reset database", e);
     }
+    namesToKeep.forEach(this::upsertPlayerName);
   }
 
   // -------------------------------------------------------------------------
@@ -784,38 +740,26 @@ public class DataManager {
   }
 
   /**
-   * Marks a quest completed and drops its pins and pending collaboration requests in one
+   * Marks each quest completed and drops its pins and pending collaboration requests, all in one
    * transaction.
    */
-  public synchronized void completeQuest(UUID questId, UUID completedBy, long completedAt) {
-    try {
-      connection.setAutoCommit(false);
-      try (PreparedStatement upd =
-              connection.prepareStatement(
-                  "UPDATE quests SET completed_at = ?, completed_by = ? WHERE id = ?");
-          PreparedStatement pins =
-              connection.prepareStatement("DELETE FROM pinned_quests WHERE quest_id = ?");
-          PreparedStatement reqs =
-              connection.prepareStatement(
-                  "DELETE FROM collaboration_requests WHERE quest_id = ?")) {
-        upd.setLong(1, completedAt);
-        upd.setString(2, completedBy.toString());
-        upd.setString(3, questId.toString());
-        upd.executeUpdate();
-        pins.setString(1, questId.toString());
-        pins.executeUpdate();
-        reqs.setString(1, questId.toString());
-        reqs.executeUpdate();
-        connection.commit();
-      } catch (SQLException e) {
-        connection.rollback();
-        throw e;
-      } finally {
-        connection.setAutoCommit(true);
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to complete quest", e);
-    }
+  public synchronized void completeQuests(Collection<UUID> questIds, UUID completedBy, long at) {
+    inTransaction(
+        "complete quests",
+        () -> {
+          for (UUID id : questIds) completeQuestRaw(id, completedBy, at);
+        });
+  }
+
+  private void completeQuestRaw(UUID questId, UUID completedBy, long completedAt)
+      throws SQLException {
+    update(
+        "UPDATE quests SET completed_at = ?, completed_by = ? WHERE id = ?",
+        completedAt,
+        completedBy.toString(),
+        questId.toString());
+    update("DELETE FROM pinned_quests WHERE quest_id = ?", questId.toString());
+    update("DELETE FROM collaboration_requests WHERE quest_id = ?", questId.toString());
   }
 
   public synchronized void reopenQuest(UUID questId) {
@@ -827,6 +771,379 @@ public class DataManager {
     } catch (SQLException e) {
       throw new RuntimeException("Failed to reopen quest", e);
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Tree, roles and privatization
+  // -------------------------------------------------------------------------
+
+  public synchronized void setParent(UUID quest, UUID parentOrNull) {
+    try {
+      update(
+          "UPDATE quests SET parent_id = ? WHERE id = ?",
+          parentOrNull == null ? null : parentOrNull.toString(),
+          quest.toString());
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to set parent", e);
+    }
+  }
+
+  /**
+   * Sets several parents in one transaction, in the map's order; a null value makes the quest top
+   * level.
+   */
+  public synchronized void setParents(Map<UUID, UUID> parents) {
+    inTransaction(
+        "set parents",
+        () -> {
+          for (Map.Entry<UUID, UUID> move : parents.entrySet()) {
+            update(
+                "UPDATE quests SET parent_id = ? WHERE id = ?",
+                move.getValue() == null ? null : move.getValue().toString(),
+                move.getKey().toString());
+          }
+        });
+  }
+
+  public synchronized void setPrerequisites(UUID quest, List<UUID> prerequisites) {
+    inTransaction(
+        "set prerequisites",
+        () -> {
+          update(
+              "DELETE FROM quest_links WHERE from_id = ? AND kind = ?",
+              quest.toString(),
+              UNLOCKS_AFTER);
+          for (UUID prerequisite : prerequisites) {
+            update(
+                "INSERT OR IGNORE INTO quest_links (from_id, to_id, kind) VALUES (?, ?, ?)",
+                quest.toString(),
+                prerequisite.toString(),
+                UNLOCKS_AFTER);
+          }
+        });
+  }
+
+  /**
+   * Some quest waits on this id, whether or not a quest with the id exists: the id of a deleted,
+   * unfinished prerequisite stays taken.
+   */
+  public synchronized boolean isPrerequisite(UUID id) {
+    try (PreparedStatement stmt =
+        connection.prepareStatement("SELECT 1 FROM quest_links WHERE to_id = ? AND kind = ?")) {
+      stmt.setString(1, id.toString());
+      stmt.setString(2, UNLOCKS_AFTER);
+      return stmt.executeQuery().next();
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to check prerequisite links", e);
+    }
+  }
+
+  public synchronized void setAutoJoin(UUID quest, boolean autoJoin) {
+    try {
+      update("UPDATE quests SET auto_join = ? WHERE id = ?", autoJoin ? 1 : 0, quest.toString());
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to set auto-join", e);
+    }
+  }
+
+  /**
+   * Replaces everyone on the quest: the display owner (stored as OWNER) and {@code people}, who
+   * keep the added-at of any role they already held. Does not check that an owner remains. {@code
+   * displayOwner} must be an OWNER: pass {@code Plans.PeopleResult.displayOwner()}. Throws {@link
+   * IllegalArgumentException} when {@code people} lists the display owner with another role.
+   */
+  public synchronized void setPeople(UUID quest, List<ContributorData> people, UUID displayOwner) {
+    for (ContributorData person : people) {
+      if (person.uuid().equals(displayOwner) && person.role() != Role.OWNER) {
+        throw new IllegalArgumentException(
+            "The display owner must be an OWNER, not " + person.role());
+      }
+    }
+    inTransaction(
+        "set people",
+        () -> {
+          Map<UUID, Long> addedAt = new HashMap<>();
+          try (PreparedStatement stmt =
+              connection.prepareStatement(
+                  "SELECT player_uuid, added_at FROM quest_people WHERE quest_id = ?")) {
+            stmt.setString(1, quest.toString());
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+              addedAt.put(UUID.fromString(rs.getString("player_uuid")), rs.getLong("added_at"));
+            }
+          }
+          long next = nextAddedAt(quest);
+          update("DELETE FROM quest_people WHERE quest_id = ?", quest.toString());
+          insertPerson(quest, displayOwner, Role.OWNER, addedAt.getOrDefault(displayOwner, next++));
+          for (ContributorData person : people) {
+            if (person.uuid().equals(displayOwner)) continue;
+            insertPerson(
+                quest, person.uuid(), person.role(), addedAt.getOrDefault(person.uuid(), next++));
+          }
+          update(
+              "UPDATE quests SET owner_uuid = ? WHERE id = ?",
+              displayOwner.toString(),
+              quest.toString());
+        });
+  }
+
+  /**
+   * Gives the player the role on the quest, adding them when they hold none. Throws {@link
+   * IllegalStateException}, changing nothing, when this would lower the quest's last OWNER row: a
+   * quest always keeps an owner.
+   */
+  public synchronized void setRole(UUID quest, UUID player, Role role) {
+    inTransaction(
+        "set role",
+        () -> {
+          if (role != Role.OWNER && isLastOwnerRow(quest, player)) {
+            throw new IllegalStateException(player + " is the last owner of " + quest);
+          }
+          int changed =
+              update(
+                  "UPDATE quest_people SET role = ? WHERE quest_id = ? AND player_uuid = ?",
+                  role.name(),
+                  quest.toString(),
+                  player.toString());
+          if (changed == 0) insertPerson(quest, player, role, nextAddedAt(quest));
+          moveDisplayOwnerIfNeeded(quest);
+        });
+  }
+
+  /**
+   * Takes the player off the quest. Throws {@link IllegalStateException}, changing nothing, when
+   * they hold the quest's last OWNER row: a quest always keeps an owner.
+   */
+  public synchronized void removePerson(UUID quest, UUID player) {
+    inTransaction(
+        "remove person",
+        () -> {
+          if (isLastOwnerRow(quest, player)) {
+            throw new IllegalStateException(player + " is the last owner of " + quest);
+          }
+          update(
+              "DELETE FROM quest_people WHERE quest_id = ? AND player_uuid = ?",
+              quest.toString(),
+              player.toString());
+          moveDisplayOwnerIfNeeded(quest);
+        });
+  }
+
+  /** The player holds an OWNER row on the quest and nobody else does. */
+  private boolean isLastOwnerRow(UUID quest, UUID player) throws SQLException {
+    try (PreparedStatement stmt =
+        connection.prepareStatement(
+            """
+            SELECT COUNT(*), SUM(player_uuid = ?) FROM quest_people
+            WHERE quest_id = ? AND role = 'OWNER'
+            """)) {
+      stmt.setString(1, player.toString());
+      stmt.setString(2, quest.toString());
+      ResultSet rs = stmt.executeQuery();
+      return rs.next() && rs.getInt(1) == 1 && rs.getInt(2) == 1;
+    }
+  }
+
+  /** When the display owner no longer holds OWNER, the earliest remaining owner takes the place. */
+  private void moveDisplayOwnerIfNeeded(UUID quest) throws SQLException {
+    update(
+        """
+        UPDATE quests SET owner_uuid = (
+            SELECT player_uuid FROM quest_people
+            WHERE quest_id = quests.id AND role = 'OWNER'
+            ORDER BY added_at, player_uuid LIMIT 1)
+        WHERE id = ?
+          AND NOT EXISTS (SELECT 1 FROM quest_people
+                          WHERE quest_id = quests.id AND player_uuid = quests.owner_uuid
+                            AND role = 'OWNER')
+          AND EXISTS (SELECT 1 FROM quest_people WHERE quest_id = quests.id AND role = 'OWNER')
+        """,
+        quest.toString());
+  }
+
+  private void insertPerson(UUID quest, UUID player, Role role, long addedAt) throws SQLException {
+    update(
+        "INSERT OR REPLACE INTO quest_people (quest_id, player_uuid, role, added_at)"
+            + " VALUES (?, ?, ?, ?)",
+        quest.toString(),
+        player.toString(),
+        role.name(),
+        addedAt);
+  }
+
+  /** An added-at later than everyone already on the quest, so insertion order is kept. */
+  private long nextAddedAt(UUID quest) throws SQLException {
+    try (PreparedStatement stmt =
+        connection.prepareStatement(
+            "SELECT COALESCE(MAX(added_at), -1) FROM quest_people WHERE quest_id = ?")) {
+      stmt.setString(1, quest.toString());
+      ResultSet rs = stmt.executeQuery();
+      long max = rs.next() ? rs.getLong(1) : -1;
+      return Math.max(System.currentTimeMillis(), max + 1);
+    }
+  }
+
+  private void setPrivatizedRaw(UUID quest, PrivatizeInfo info, long at) throws SQLException {
+    String saw =
+        info.ownersWhoSawIt().stream()
+            .map(UUID::toString)
+            .sorted()
+            .collect(Collectors.joining(","));
+    update(
+        """
+        UPDATE quests SET visibility = 'PRIVATE', priv_previous = ?, priv_title = ?,
+            priv_by = ?, priv_at = ?, priv_saw = ?
+        WHERE id = ?
+        """,
+        info.previous().name(),
+        info.deletedTitle(),
+        info.deletedBy() == null ? null : info.deletedBy().toString(),
+        at,
+        saw,
+        quest.toString());
+  }
+
+  /** Forgets the privatization; the visibility stays as it is. */
+  public synchronized void clearPrivatized(UUID quest) {
+    try {
+      update(
+          """
+          UPDATE quests SET priv_previous = NULL, priv_title = NULL, priv_by = NULL,
+              priv_at = NULL, priv_saw = NULL
+          WHERE id = ?
+          """,
+          quest.toString());
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to clear privatized", e);
+    }
+  }
+
+  /**
+   * Applies a delete plan in one transaction: moves the kept quests, privatizes, drops the listed
+   * prerequisite links, then deletes. Links to a deleted quest that are not listed stay dangling.
+   */
+  public synchronized void applyDeletePlan(DeletePlan plan, long at) {
+    inTransaction(
+        "apply delete plan",
+        () -> {
+          for (Map.Entry<UUID, Optional<UUID>> move : plan.reparent().entrySet()) {
+            update(
+                "UPDATE quests SET parent_id = ? WHERE id = ?",
+                move.getValue().map(UUID::toString).orElse(null),
+                move.getKey().toString());
+          }
+          for (Map.Entry<UUID, PrivatizeInfo> entry : plan.privatize().entrySet()) {
+            setPrivatizedRaw(entry.getKey(), entry.getValue(), at);
+          }
+          for (Map.Entry<UUID, List<UUID>> entry : plan.prerequisitesToRemove().entrySet()) {
+            for (UUID prerequisite : entry.getValue()) {
+              update(
+                  "DELETE FROM quest_links WHERE from_id = ? AND to_id = ? AND kind = ?",
+                  entry.getKey().toString(),
+                  prerequisite.toString(),
+                  UNLOCKS_AFTER);
+            }
+          }
+          for (UUID id : plan.deleted()) {
+            deleteQuestRaw(id);
+          }
+        });
+  }
+
+  // -------------------------------------------------------------------------
+  // SQL helpers
+  // -------------------------------------------------------------------------
+
+  @FunctionalInterface
+  private interface SqlWork {
+    void run() throws SQLException;
+  }
+
+  /** Runs the work in one transaction: all of it commits, or none of it does. */
+  private void inTransaction(String what, SqlWork work) {
+    try {
+      boolean previous = connection.getAutoCommit();
+      connection.setAutoCommit(false);
+      try {
+        work.run();
+        connection.commit();
+      } catch (SQLException | RuntimeException e) {
+        try {
+          connection.rollback();
+        } catch (SQLException rollbackError) {
+          e.addSuppressed(rollbackError);
+        }
+        throw e;
+      } finally {
+        connection.setAutoCommit(previous);
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to " + what, e);
+    }
+  }
+
+  /** Runs one statement; parameters are strings, longs, ints or null. */
+  private int update(String sql, Object... params) throws SQLException {
+    try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+      for (int i = 0; i < params.length; i++) {
+        Object p = params[i];
+        if (p == null) stmt.setNull(i + 1, Types.NULL);
+        else if (p instanceof Long l) stmt.setLong(i + 1, l);
+        else if (p instanceof Integer n) stmt.setInt(i + 1, n);
+        else stmt.setString(i + 1, p.toString());
+      }
+      return stmt.executeUpdate();
+    }
+  }
+
+  /**
+   * Adds roles, the quest tree and prerequisites. One transaction: either all of it applies or
+   * none, and the existence of quest_people marks it done, so a failure is retried on next start.
+   */
+  private void migrateRolesAndTree() throws SQLException {
+    boolean done = tableExists("quest_people");
+    Set<String> columns = new java.util.HashSet<>();
+    try (Statement stmt = connection.createStatement();
+        ResultSet rs = stmt.executeQuery("PRAGMA table_info(quests)")) {
+      while (rs.next()) columns.add(rs.getString("name"));
+    }
+    inTransaction(
+        "migrate roles and quest tree",
+        () -> {
+          try (Statement stmt = connection.createStatement()) {
+            for (String[] column :
+                new String[][] {
+                  {"parent_id", "TEXT"},
+                  {"auto_join", "INTEGER NOT NULL DEFAULT 0"},
+                  {"priv_previous", "TEXT"},
+                  {"priv_title", "TEXT"},
+                  {"priv_by", "TEXT"},
+                  {"priv_at", "INTEGER"},
+                  {"priv_saw", "TEXT"}
+                }) {
+              if (!columns.contains(column[0])) {
+                stmt.executeUpdate("ALTER TABLE quests ADD COLUMN " + column[0] + " " + column[1]);
+              }
+            }
+            stmt.executeUpdate(PEOPLE_DDL);
+            stmt.executeUpdate(LINKS_DDL);
+            if (migrationFault != null) migrationFault.run();
+            if (!done) {
+              // Plain INSERTs, not OR IGNORE: that would also swallow a bad row and hide a failure.
+              // Owners first so an owner who is also in contributors stays OWNER.
+              stmt.executeUpdate(
+                  "INSERT INTO quest_people (quest_id, player_uuid, role, added_at)"
+                      + " SELECT id, owner_uuid, 'OWNER', 0 FROM quests");
+              stmt.executeUpdate(
+                  "INSERT INTO quest_people (quest_id, player_uuid, role, added_at)"
+                      + " SELECT c.quest_id, c.player_uuid,"
+                      + " CASE WHEN c.can_edit = 1 THEN 'WRITE' ELSE 'READ' END, 1"
+                      + " FROM contributors c WHERE c.quest_id IN (SELECT id FROM quests)"
+                      + " AND NOT EXISTS (SELECT 1 FROM quest_people p"
+                      + " WHERE p.quest_id = c.quest_id AND p.player_uuid = c.player_uuid)");
+            }
+          }
+        });
   }
 
   private boolean tableExists(String table) throws SQLException {
@@ -917,6 +1234,17 @@ public class DataManager {
             : null;
 
     String completedBy = rs.getString("completed_by");
+    String parent = rs.getString("parent_id");
+    String privPrevious = rs.getString("priv_previous");
+    Privatized privatized =
+        privPrevious == null
+            ? null
+            : new Privatized(
+                Visibility.valueOf(privPrevious),
+                rs.getString("priv_title"),
+                rs.getString("priv_by_name"),
+                rs.getLong("priv_at"),
+                parseUuidSet(rs.getString("priv_saw")));
     return new QuestData(
         UUID.fromString(rs.getString("id")),
         rs.getString("title"),
@@ -934,26 +1262,49 @@ public class DataManager {
         List.of(),
         rs.getLong("completed_at"),
         completedBy == null ? null : UUID.fromString(completedBy),
-        rs.getString("completed_by_name"));
+        rs.getString("completed_by_name"),
+        parent == null ? null : UUID.fromString(parent),
+        List.of(),
+        false,
+        false,
+        false,
+        rs.getInt("auto_join") != 0,
+        false,
+        privatized);
   }
 
-  private QuestData withContributors(QuestData quest) {
-    return quest.withContributors(getContributors(quest.id()));
+  private static Set<UUID> parseUuidSet(String csv) {
+    Set<UUID> out = new LinkedHashSet<>();
+    if (csv == null || csv.isBlank()) return out;
+    for (String part : csv.split(",")) {
+      if (!part.isBlank()) out.add(UUID.fromString(part.trim()));
+    }
+    return out;
   }
 
-  private Map<UUID, List<ContributorData>> getContributorsBatch(List<UUID> questIds) {
-    if (questIds.isEmpty()) return Map.of();
+  /** Loads people, links, tags and polygons for the quests, in one query each. */
+  private List<QuestData> hydrate(List<QuestData> quests) {
+    return withPolygonsAll(withTagsAll(withPeopleAll(withLinksAll(quests))));
+  }
+
+  /**
+   * Everyone with a role on each quest except its display owner (the map's value), ordered by when
+   * they were added, then by uuid.
+   */
+  private Map<UUID, List<ContributorData>> getPeopleBatch(Map<UUID, UUID> displayOwners) {
+    if (displayOwners.isEmpty()) return Map.of();
     Map<UUID, List<ContributorData>> result = new HashMap<>();
+    List<UUID> questIds = new ArrayList<>(displayOwners.keySet());
     for (UUID id : questIds) {
       result.put(id, new ArrayList<>());
     }
     String placeholders = String.join(",", questIds.stream().map(id -> "?").toList());
     String sql =
-        "SELECT c.quest_id, c.player_uuid, c.can_edit, pn.name FROM contributors c "
-            + "LEFT JOIN player_names pn ON c.player_uuid = pn.uuid "
-            + "WHERE c.quest_id IN ("
+        "SELECT qp.quest_id, qp.player_uuid, qp.role, pn.name FROM quest_people qp "
+            + "LEFT JOIN player_names pn ON qp.player_uuid = pn.uuid "
+            + "WHERE qp.quest_id IN ("
             + placeholders
-            + ")";
+            + ") ORDER BY qp.added_at, qp.player_uuid";
     try (PreparedStatement stmt = connection.prepareStatement(sql)) {
       for (int i = 0; i < questIds.size(); i++) {
         stmt.setString(i + 1, questIds.get(i).toString());
@@ -961,43 +1312,65 @@ public class DataManager {
       ResultSet rs = stmt.executeQuery();
       while (rs.next()) {
         UUID questId = UUID.fromString(rs.getString("quest_id"));
+        UUID player = UUID.fromString(rs.getString("player_uuid"));
+        if (player.equals(displayOwners.get(questId))) continue;
         result
             .computeIfAbsent(questId, k -> new ArrayList<>())
             .add(
                 new ContributorData(
-                    UUID.fromString(rs.getString("player_uuid")),
-                    rs.getString("name"),
-                    rs.getInt("can_edit") != 0));
+                    player, rs.getString("name"), Role.valueOf(rs.getString("role"))));
       }
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to batch-load contributors", e);
+      throw new RuntimeException("Failed to batch-load people", e);
     }
     return result;
   }
 
-  private List<QuestData> withContributorsAll(List<QuestData> quests) {
-    List<UUID> questIds = quests.stream().map(QuestData::id).toList();
-    Map<UUID, List<ContributorData>> contributorMap = getContributorsBatch(questIds);
-    List<QuestData> result = new ArrayList<>(quests.size());
-    for (QuestData quest : quests) {
-      result.add(quest.withContributors(contributorMap.getOrDefault(quest.id(), List.of())));
-    }
-    return result;
-  }
-
-  private List<String> getTagsForQuest(UUID questId) {
-    List<String> tags = new ArrayList<>();
-    try (PreparedStatement stmt =
-        connection.prepareStatement("SELECT tag FROM quest_tags WHERE quest_id = ?")) {
-      stmt.setString(1, questId.toString());
+  private Map<UUID, List<UUID>> getPrerequisitesBatch(List<UUID> questIds) {
+    if (questIds.isEmpty()) return Map.of();
+    Map<UUID, List<UUID>> result = new HashMap<>();
+    String placeholders = String.join(",", questIds.stream().map(id -> "?").toList());
+    String sql =
+        "SELECT from_id, to_id FROM quest_links WHERE kind = '"
+            + UNLOCKS_AFTER
+            + "' AND from_id IN ("
+            + placeholders
+            + ") ORDER BY rowid";
+    try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+      for (int i = 0; i < questIds.size(); i++) {
+        stmt.setString(i + 1, questIds.get(i).toString());
+      }
       ResultSet rs = stmt.executeQuery();
       while (rs.next()) {
-        tags.add(rs.getString("tag"));
+        result
+            .computeIfAbsent(UUID.fromString(rs.getString("from_id")), k -> new ArrayList<>())
+            .add(UUID.fromString(rs.getString("to_id")));
       }
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to get tags for quest", e);
+      throw new RuntimeException("Failed to batch-load prerequisites", e);
     }
-    return tags;
+    return result;
+  }
+
+  private List<QuestData> withLinksAll(List<QuestData> quests) {
+    Map<UUID, List<UUID>> links =
+        getPrerequisitesBatch(quests.stream().map(QuestData::id).toList());
+    List<QuestData> result = new ArrayList<>(quests.size());
+    for (QuestData quest : quests) {
+      result.add(quest.withPrerequisites(links.getOrDefault(quest.id(), List.of())));
+    }
+    return result;
+  }
+
+  private List<QuestData> withPeopleAll(List<QuestData> quests) {
+    Map<UUID, UUID> displayOwners = new HashMap<>();
+    for (QuestData quest : quests) displayOwners.put(quest.id(), quest.ownerUuid());
+    Map<UUID, List<ContributorData>> people = getPeopleBatch(displayOwners);
+    List<QuestData> result = new ArrayList<>(quests.size());
+    for (QuestData quest : quests) {
+      result.add(quest.withContributors(people.getOrDefault(quest.id(), List.of())));
+    }
+    return result;
   }
 
   private Map<UUID, List<String>> getTagsBatch(List<UUID> questIds) {
@@ -1021,10 +1394,6 @@ public class DataManager {
       throw new RuntimeException("Failed to batch-load tags", e);
     }
     return result;
-  }
-
-  private QuestData withTags(QuestData quest) {
-    return quest.withTags(getTagsForQuest(quest.id()));
   }
 
   private List<QuestData> withTagsAll(List<QuestData> quests) {
@@ -1062,12 +1431,6 @@ public class DataManager {
     return result;
   }
 
-  private QuestData withPolygon(QuestData quest) {
-    List<PointData> polygon =
-        getPolygonsBatch(List.of(quest.id())).getOrDefault(quest.id(), List.of());
-    return quest.withPolygon(polygon);
-  }
-
   private List<QuestData> withPolygonsAll(List<QuestData> quests) {
     List<UUID> questIds = quests.stream().map(QuestData::id).toList();
     Map<UUID, List<PointData>> polygonMap = getPolygonsBatch(questIds);
@@ -1085,22 +1448,5 @@ public class DataManager {
     } catch (SQLException e) {
       throw new RuntimeException("Failed to count polygon rows", e);
     }
-  }
-
-  /** Returns all distinct tags from the DB merged with config seed tags, alphabetically sorted. */
-  public synchronized List<String> getAllDistinctTags(List<String> seedTags) {
-    java.util.TreeSet<String> tags = new java.util.TreeSet<>();
-    for (String seed : seedTags) {
-      tags.add(seed.toLowerCase());
-    }
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery("SELECT DISTINCT tag FROM quest_tags")) {
-      while (rs.next()) {
-        tags.add(rs.getString("tag"));
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to get distinct tags", e);
-    }
-    return new ArrayList<>(tags);
   }
 }

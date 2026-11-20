@@ -102,6 +102,7 @@ Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with physical input via
 - **ModMenu incompatible with `runClient`** — ModMenu's TitleScreen mixin crashes in dev. Use F6 keybind to open config screen instead.
 - **`server/run/server.properties` `max-players`** — must be >= 4 (two test clients + reconnect headroom)
 - **CI Xvfb** — `854x480x24` with `guiScale:1` via `ensureClientOptions()`. Do NOT increase Xvfb resolution -- 1920x1080 causes 4x software-rendering overhead, making tests 2x slower.
+- **Test clients are muted by default** — `ensureClientOptions()` sets `soundCategory_master:0.0` in `run/` and `run-b/` `options.txt` on every launch; `-PtestAudio` keeps sound.
 - **`catch(Throwable)` not `catch(Exception)` for `waitFor`** — Fabric's `waitFor` throws `AssertionError` (extends `Error`). `catch(Exception)` won't catch it.
 - **Server handshake retry** — `ServerPacketHandler.onPlayerJoin` retries every 20 ticks (up to 10 attempts) because client channel registration can be delayed on slow CI.
 - **`CoordinatesJourney` is now `LocationJourney`** — filter with `-PtestFilter=LocationJourney`; map journeys are `MapBoardJourney` and `MapEditJourney`.
@@ -114,12 +115,12 @@ Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with physical input via
 
 Channel: `disquests:main`. First byte = PacketType ID.
 
-**C2S**: REQUEST_SYNC, SAVE_QUEST, DELETE_QUEST, JOIN_QUEST, REQUEST_COLLABORATION, RESPOND_COLLABORATION, UPDATE_CONTRIBUTORS, UPDATE_VISIBILITY, PIN_QUEST, LEAVE_QUEST, COMPLETE_QUEST (0x0B), REOPEN_QUEST (0x0C)
+**C2S**: REQUEST_SYNC, SAVE_QUEST, DELETE_QUEST, JOIN_QUEST, REQUEST_COLLABORATION, RESPOND_COLLABORATION, UPDATE_CONTRIBUTORS (legacy clients), UPDATE_VISIBILITY (legacy clients), PIN_QUEST, LEAVE_QUEST, COMPLETE_QUEST (0x0B), REOPEN_QUEST (0x0C), UPDATE_PEOPLE (0x0D), APPLY_ROLE_DOWN (0x0E), RESOLVE_PRIVATIZED (0x0F)
 
-**S2C**: HANDSHAKE, SYNC_MY_QUESTS, SYNC_SERVER_QUESTS, UPDATE_QUEST, DELETE_QUEST_S2C, COLLABORATION_REQUEST, COLLABORATION_RESPONSE, SYNC_PENDING_REQUESTS, SYNC_TAGS
+**S2C**: HANDSHAKE, SYNC_MY_QUESTS, SYNC_SERVER_QUESTS, UPDATE_QUEST, DELETE_QUEST_S2C, COLLABORATION_REQUEST, COLLABORATION_RESPONSE, SYNC_PENDING_REQUESTS, SYNC_TAGS, NOTICE (0x19)
 
 ### Protocol Versioning
-- `ProtocolVersion.java`: V0 (legacy, pre-tags), V1 (tags), V2 (polygon), V3 (current, completion). Client sends version in REQUEST_SYNC.
+- `ProtocolVersion.java`: V0 (legacy, pre-tags), V1 (tags), V2 (polygon), V3 (completion), V4 (current: roles, quest tree, prerequisites). Client sends version in REQUEST_SYNC.
 - Server tracks per-player version in `ServerPacketHandler`. V0 clients get packets without tag fields.
 - **All new packet fields must be trailing-optional** with `buf.remaining() > 0` guards on the reader side.
 - When adding new fields: append at end, never insert mid-packet. Update `ProtocolVersion.CURRENT`.
@@ -127,7 +128,11 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **V3 completion block** — quests carry `long completedAt` (0 = active), nullable UUID `completedBy`, nullable string `completedByName`, after the polygon block. SAVE_QUEST does not carry them: completion changes only through COMPLETE_QUEST / REOPEN_QUEST (payload = quest UUID).
 - **HANDSHAKE always writes the full form** (tags, default map) followed by a trailing `varint serverProtocolVersion` (V1 assumed when absent), then a trailing `boolean worldMapEnabled` (true when absent, so older servers read as enabled), then a trailing `boolean playerMarkerEnabled` (true when absent). The client keeps it in `ClientSession.getServerProtocolVersion()` and reads every quest packet with that version (`PacketCodec.readQuest(buf, version)` and the version overloads), because `remaining()` guards cannot work for quests inside a list. `ClientSession.supportsMap()` = `>= V2`.
 - **V1 downgrade** — `writeQuest` for `< V2` and `DataManager.saveQuest` use `QuestLocation.normalize`: polygon of >= 2 vertices becomes `coordinates`/`coordinates2` = bounding-box min/max (y 64 unless a pin y exists) with `isRegion` true; 1 vertex becomes a pin. A V1 client re-saving a polygon quest with an unchanged rectangle keeps the polygon.
-- **Save broadcast scoping** — `handleSaveQuest` sends `UPDATE_QUEST` only to owner + contributors (not all mod players). Other handlers like `handleUpdateVisibility` still use `broadcastQuestUpdate()` which sends to all mod players for Open/Closed quests.
+- **V4 quest block** — after the completion block: one role byte per contributor, nullable `parentId`, prerequisite ids (max 8), booleans `hiddenPrerequisites`, `deletedPrerequisite`, `hiddenParent`, `autoJoin`, `locked`, then the optional `Privatized` record. Below V4 it is not written and contributors carry `canEdit` only (Write and Owner both read as can-edit). `ownerUuid` is the display owner; further owners are contributors with role OWNER.
+- **V4 SAVE_QUEST links block** — trailing-optional `LinkChanges` (visibility, tree ops ATTACH/DETACH/SWAP, prerequisites to add and remove, `dropHidden`, `dropDeleted`, `autoJoin`); nulls mean unchanged. A save without the block changes no link, so an old client's save never clears parent, prerequisites or auto-join. COMPLETE_QUEST and DELETE_QUEST take a trailing-optional `alsoMySubquests` boolean; HANDSHAKE ends with a trailing varint `maxQuestDepth` (3 when absent).
+- **One delivery path** — nothing sends `UPDATE_QUEST`, `DELETE_QUEST_S2C` or a sync list except `Delivery`, and it only sends `QuestView.forRecipient` results. Every handler loads the graph before its writes and calls `Outcomes.writeThenDeliver` / `deliverWithUnlocks`, which send each online player the difference in their own view (`Audience.changes`). Never send a stored `QuestData` directly, and never add a per-handler recipient loop.
+- **Version rules live in `Delivery.held`** — V4+ clients hold every non-null view (locked and completed included); below V4 a locked view is withheld (sent as a delete, then as an update once unlocked); V3 holds a completed quest only with a role; below V3 never.
+- **Locked view** — title, visibility, link flags and the recipient's own contributor entry only; owner is `QuestView.NO_OWNER` with name `""`, `lastModified` 0, no content.
 
 ## Key Files
 
@@ -135,29 +140,37 @@ Channel: `disquests:main`. First byte = PacketType ID.
 |------|---------|
 | `common/src/main/java/com/disqt/disquests/common/PacketCodec.java` | All packet encode/decode methods |
 | `common/src/main/java/com/disqt/disquests/common/PacketType.java` | Packet type enum with byte IDs |
-| `common/src/main/java/com/disqt/disquests/common/ProtocolVersion.java` | Protocol version enum (V0-V3) |
+| `common/src/main/java/com/disqt/disquests/common/ProtocolVersion.java` | Protocol version enum (V0-V4) |
 | `common/src/main/java/com/disqt/disquests/common/QuestLocation.java` | Pin/polygon geometry, bounding box and V1 `normalize` downgrade |
 | `common/src/main/java/com/disqt/disquests/common/DimensionKeys.java` | `normalize` maps `nether`/`end` to `the_nether`/`the_end` (config keys, saves, migration) |
 | `common/src/main/java/com/disqt/disquests/common/BlueMapUrlBuilder.java` | BlueMap URL construction with coords |
-| `common/src/main/java/com/disqt/disquests/common/model/` | QuestData, Visibility, ContributorData, ContributorOp, CoordinatesData, CollaborationRequestData |
+| `common/src/main/java/com/disqt/disquests/common/model/` | QuestData, Visibility, Role, ContributorData, ContributorOp, PersonOp, TreeOp, LinkChanges, Notice, Privatized, CoordinatesData, CollaborationRequestData |
+| `common/src/main/java/com/disqt/disquests/common/graph/` | Pure rules, no Bukkit or Minecraft: `QuestGraph` (canSee, locked, lockedFor), `LinkRules` (attach, detach, swap, prerequisite) with `Refusal`, `QuestView` (what a recipient learns), `Audience` (view changes), `Plans` (delete, complete, unlock, people, role-down) |
 | `client/src/main/java/com/disqt/disquests/client/DisquestsClient.java` | Fabric mod entrypoint, keybinds, channel registration |
 | `client/src/main/java/com/disqt/disquests/client/ClientSession.java` | Tracks connection state, dispatches S2C packets |
 | `client/src/main/java/com/disqt/disquests/client/ClientCache.java` | Client-side quest cache |
 | `client/.../gui/screen/` | All screens (MainScreen, QuestScreen, ContributorScreen, TagPickerScreen). Base: `DisquestsBaseScreen`. Confirm dialogs use overlay. |
-| `client/.../gui/component/` | Custom owo-ui components: QuestEntryComponent, TagChipComponent, TextFieldComponent |
+| `client/.../gui/component/` | Custom owo-ui components: QuestEntryComponent, TagChipComponent, TextFieldComponent; trees: `TreeRowComponent` (+ Minecraft-free `TreeRowGeometry`), `DropTracker`, `TreeToggleComponent`, `QuestSearchField` + `SuggestionDropdown`, `SplitterComponent` |
+| `client/.../gui/tree/` | Minecraft-free tree logic: `QuestTreeRows` (list, reading-view quest tree and edit-pane rows), `TreeDraft` (tree moves until Save), `QuestEditDraft` (tree, visibility, prerequisites, auto-join), `PeopleDraft`, `Suggestions`/`SuggestionText`, `WaitingText`, `NewMarkRows`, `ListedQuests` |
+| `client/.../gui/screen/QuestListPanel.java` | Main screen's nested quest list: `quest-row-<id>` rows with `toggle-<id>` and the entry, expansion in `ClientSession` |
+| `client/.../gui/screen/QuestPage.java` | Reading-view rules (buttons, dialogs, banners, page signature), Minecraft-free; helpers `QuestTreePane` (`where-this-sits`), `LockedQuestView`, `PrerequisiteLinks`, `QuestBanners`, `PaneSplit` |
+| `client/.../gui/screen/QuestEditTreePane.java` | Editor's tree pane (`edit-tree-pane`, `add-subquest-field`, `tree-drop-out`); `QuestLinksForm` holds `vis-*`, `prerequisite-field`, `prereq-chip-*`, `auto-join`, `btn-detach-hidden-parent`; texts in `EditorText` |
+| `client/.../gui/screen/ContributorScreen.java` | People screen: `PeopleDraft` until Save, `PlayerChooser` (Add row), `PeopleText` (Minecraft-free texts and decisions), `LegacyContributorList` (pre-V4 servers) |
 | `client/.../gui/map/` | World map: MapMath, TileCache/SharedTileCache, MapView, layers (quest polygons, player marker, polygon edit), QuestStyle |
-| `client/.../gui/screen/LocationCard.java` | Location card (mini map, vertex fields, map button) shared by edit and view mode of QuestScreen |
+| `client/.../gui/screen/LocationCard.java` | Location card (mini map, vertex fields when the map is off, map button) shared by edit and view mode of QuestScreen |
 | `client/.../gui/screen/MapEditScreen.java` | Full-screen polygon editor for a quest location |
 | `client/.../gui/helper/` | Colors, Theme, TagColors, HoverPreviewRenderer, DisquestsConfigModel (owo-config) |
 | `client/src/main/resources/assets/disquests/owo_ui/*.xml` | XML UI models for all screens (hot-reloadable) |
 | `server/src/main/java/com/disqt/disquests/server/papermc/DisquestsPlugin.java` | Plugin entry, channel registration |
-| `server/src/main/java/com/disqt/disquests/server/papermc/ServerPacketHandler.java` | Handles C2S, broadcasts S2C |
+| `server/src/main/java/com/disqt/disquests/server/papermc/ServerPacketHandler.java` | C2S dispatcher; work is in `SaveHandler`, `PeopleHandler`, `CompletionHandler`, `Outcomes` |
+| `server/src/main/java/com/disqt/disquests/server/papermc/Delivery.java` | The only sender of quest data: per-recipient views, sync lists, pins, tags, version rules |
+| `server/src/main/java/com/disqt/disquests/server/papermc/Outbox.java` | Bukkit-free seam for sending packets (`BukkitOutbox` in production, `FakeOutbox` in tests) |
 | `server/src/main/java/com/disqt/disquests/server/papermc/DataManager.java` | SQLite persistence |
 | `server/src/main/java/com/disqt/disquests/server/papermc/PlayerNameTracker.java` | Tracks online player display names |
 | `server/src/main/java/com/disqt/disquests/server/papermc/Commands.java` | `/disquests reload` and `/disquests reset` (debug mode) |
 | `client/src/testmod/.../integration/harness/` | JUnit 5 harness: HarnessCommon, TestContext, IntegrationTestExtension, RconClient |
 | `client/src/testmod/.../integration/harness/TileFixtureServer.java` | Local HTTP server serving one BlueMap tile for map E2E |
-| `client/src/testmod/.../integration/journeys/` | Solo and duo journey test classes |
+| `client/src/testmod/.../integration/journeys/` | Solo and duo journey test classes (trees: solo `QuestTreeJourney`; duo `RolesAndTreesJourney`, `SubquestOwnersJourney`, `QuestLineJourney`) |
 
 ## Dependencies
 
@@ -222,6 +235,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 
 ### Wiki-links
 - **Dirty tracking has two entry points** — `enterEditMode()` passes `origContent` to the constructor, `buildEditMode()` has a fallback snapshot guarded by `if (originalTitle == null)`. Both must reverse-resolve wiki-link UUIDs. The constructor path is the one used in practice (view→edit mode switch).
+- **A locked view is not a link target** — `WikiLinks.target` (Minecraft-free) resolves a link only to a cached quest that is not `isLocked()`; rendering, hover and click all ask it, so a locked quest keeps the server's "Private Quest" placeholder. `WikiLinks.toEditingForm` turns only such links into `[[Title]]` and keeps `[[uuid|text]]` for the rest, so editing never destroys a link the editor cannot see.
 - **Server resolution is per-recipient** — `WikiLinkResolver.resolveForRecipient()` converts `[[Quest Name]]` → `[[uuid|title]]` when sending to clients. `reverseResolve()` converts back on save. DB stores raw `[[Quest Name]]` form, clients receive UUID form.
 
 ### World map
@@ -230,16 +244,31 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **`MapView` takes mouse-click focus while interactive** — owo delivers drag and key events only to the focused component.
 - **`SharedTileCache.reset()` on `leaveServer`** — the production tile cache is a singleton; disk cache lives under `<gameDir>/disquests/tiles/`.
 - **VPS `config.yml` dimension keys** — `nether` still works (`DimensionKeys.normalize`) but should become `the_nether` when next edited.
-- **`MainScreen` layouts** — `main_screen.xml` (map + side panel) when `ClientSession.mapAvailable()`, else `main_screen_legacy.xml`; its `server-notice` label shows only for an outdated server (`server_outdated`) or an unreachable BlueMap (`map_unavailable`), not when the map is switched off. `LocationCard` drops the mini map and `btn-edit-on-map` under the same rule.
+- **`MainScreen` layouts** — `main_screen.xml` (map + side panel) when `ClientSession.mapAvailable()`, else `main_screen_legacy.xml`; its `server-notice` label shows only for an outdated server (`server_outdated`) or an unreachable BlueMap (`map_unavailable`), not when the map is switched off. `LocationCard` drops the mini map under the same rule.
+- **Edit card preview opens the map editor** — in edit mode the `mini-map` is a click target (left press and release in place; a drag over 3 px is ignored) that opens `MapEditScreen`; there is no `btn-edit-on-map`.
+- **Coordinate rows only without the map** — `vertex-x-*`/`vertex-y-*`/`vertex-z-*` exist only when `ClientSession.mapAvailable()` is false (the E2E fallback switches the client `worldMap` setting off).
+- **Two corners are a point** — `QuestLocation.pointOrPolygon` turns two corners into a pin on the first; `MapEditScreen` Done, `QuestScreen.applyMapLocation` and the server's `normalize` all apply it.
 - **Server config `world-map`** (default `true`) — `Config.isWorldMapEnabled()` = `world-map` && non-empty `bluemap-url`, sent in the HANDSHAKE; `/disquests reload` resends handshakes. The client also has an owo-config `worldMap` setting. `mapAvailable()` = `supportsMap()` && server flag && client setting && `hasBluemap()` && the default map's `settings.json` probe (started in `handleHandshake`, `TileCache.settingsFailed`) has not failed.
 - **Server config `player-marker`** (default `true`) — `Config.isPlayerMarkerEnabled()`, sent in the HANDSHAKE, read as `ClientSession.isPlayerMarkerEnabled()`. When false: no `PlayerMarkerLayer` on `MainScreen`/`MapEditScreen`, `btn-centre-me` is removed, and maps open on the camera remembered this session (`ClientSession.rememberCamera`/`rememberedCamera`, a per-dimension `MapCameraMemory`, saved in `removed()` of both map screens, cleared on `leaveServer`) else `MapCameraMemory.WORLD_VIEW` ((0,0) zoom 0) in the default map's dimension. When true the board still opens on the player. `btn-set-pos` is unaffected.
 
 ### Quest completion
-- **Archive lock is server-side** — every edit handler (save, contributors, visibility, join, request, pin, leave) returns early when `quest.isCompleted()`; COMPLETE/REOPEN need `canEdit`. Completing drops the quest's pins and pending requests. Only REOPEN unlocks it.
-- **Clients < V3 never receive completed quests** — syncs filter them out, and a completion sends those clients DELETE_QUEST_S2C; reopen sends the quest back. Completed Open/Closed quests leave every board.
+- **Archive lock is server-side** — every edit handler (save, contributors, visibility, join, request, pin, leave) returns early when `quest.isCompleted()`; COMPLETE/REOPEN need the OWNER role (since V4 rules; a can-edit contributor can no longer complete). Completing drops the quest's pins and pending requests. Only REOPEN unlocks it.
+- **Clients < V3 never receive completed quests** — syncs filter them out, and a completion sends those clients DELETE_QUEST_S2C; reopen sends the quest back. V3 clients get a completed quest only when they hold a role on it; V4+ clients get every completed quest they can see and keep it off the board themselves.
+- **Lost-write guard** — `QuestScreen` Save asks `SaveGuard.check` with the cached quest: completed shows it archived, no longer Write (or locked) toasts `no_longer_editable` and shows the reading view without sending, gone closes; lowered from Owner to Write, `SaveGuard.linksToSend` keeps only the tree moves and toasts `owner_parts_not_saved` when it left something out. Cancel restores the content as received (`EditorOriginals`), not the editing form.
 - **Stale-editor guard** — `DisquestsBaseScreen.archivedMeanwhile(id)` returns the cached quest when it was completed after a screen took its copy. `QuestScreen` save and `ContributorScreen` edits check it and call `showArchivedInstead` (toast + view of the archived quest) instead of sending an edit the server would silently drop.
-- **Archived tab** — `tab-archived` (`ClientSession.Tab.ARCHIVED`) lists `QuestListOrder.archived(ClientCache.getMyQuests())`, newest completion first; completed quests stay in `myQuests`, so filter with `Quest.isCompleted()`. View ids: `btn-complete` (active), `btn-reopen` + `completed-label` (completed; no `btn-edit`/`btn-leave`). Complete navigates back to the parent; Reopen rebuilds the open `QuestScreen` via `ClientPacketHandler`, so wait for `btn-complete`, not `waitForScreen`.
+- **Archived tab** — `tab-archived` (`ClientSession.Tab.ARCHIVED`) lists the rows of `QuestTreeRows` for `Tab.ARCHIVED`: every completed quest the player holds a role on (not locked), flat, newest completion first; completed quests stay in `myQuests`, so filter with `Quest.isCompleted()`. View ids: `btn-complete` (active), `btn-reopen` + `completed-label` (completed; no `btn-edit`/`btn-leave`). Complete navigates back to the parent; Reopen's answer changes the page signature and `QuestScreen.refreshIfPageChanged` rebuilds the open page in place, so wait for `btn-complete`, not `waitForScreen`.
 - **`ClientSession.activeTab` persists across journey classes** — reset it (and the search term) at the start of a journey that relies on My Quests.
+
+### Quest trees and roles
+- **Locked views** — a quest locked for the player arrives with title, links and `locked` only (no content, tags, location, people; `lastModified` 0). `QuestScreen` then builds `LockedQuestView`: `title-lock` and `waiting-text` (each visible prerequisite a `prerequisite-<id>` link, then "… and something else you can't see yet", or the "isn't available yet" sentence when none is visible); only Leave remains.
+- **Reading view rebuilds itself** — `QuestScreen.tick` compares `QuestPage.signature` (quest without `lastModified`, pane quests, prerequisites, expanded set) on each cache version and reopens the page in place, carrying both scroll offsets; it waits while a confirm overlay is open and never touches the editor. In journeys, wait on a component of the new page, not on the screen class.
+- **Drafts apply only on Save** — `QuestEditDraft` (tree, visibility, prerequisites, auto-join) and `PeopleDraft` are sent as changes (`LinkChanges` tree ops, `PersonOp`s), never as a whole tree or list; a move and back leaves `TreeDraft.ops()` empty, so Cancel closes without asking. The edit pane keeps the tree the quest was in when the editor opened.
+- **`SuggestionDropdown` is mounted on the screen root** (absolute position, not an `OverlayContainer`); rows are `suggestion-<n>` in `<fieldId>-suggestions` (`add-name-suggestions` for the people chooser). An open list under `add-subquest-field` covers the rows below it: click elsewhere (`tree-hint`) before dragging.
+- **Drag and drop** — `TreeRowComponent` is one leaf per row (owo sends drags only to the focused component); past a 4 px threshold it reports to the pane (`DragTarget`), which hit-tests rows and the `tree-drop-out` strip with `DropTracker`. Drop on a row = attach, on a descendant = swap; `TreeRowComponent.pointFor(Part)` gives the body, toggle and remove (x) points for tests.
+- **Two sets of enums** — `QuestTreeRows.Tab`/`BoardFilter` mirror `ClientSession.Tab`/`QuestFilter` so `gui/tree` stays Minecraft-free; map them at the call site (`QuestListPanel.treeTab`, `SERVER_QUESTS` -> `QUEST_BOARD`).
+- **Journey helpers** — `UIActions`: `createQuest(title, vis-id)`, `openQuest(tab, title)`, `enterEditor`/`saveEditor`, `pickSuggestion`/`typeAndFindSuggestion`, `dragTreeRowOnto`/`dragTreeRowOut` (real mouse: hold, move in steps, release), `clickTreeRowRemove`, `clickChipRemove`, `choose` (pressed-state buttons), `tickCheckbox`/`tickConfirmCheckbox`, `openPeople`/`addPerson`/`savePeople`, `waitForTreeRow`, `waitForListed`, `waitForCachedQuest`/`waitForNotCached`, `resetServerForDuo(journey)`; `UIAssertions`: `textOf`/`textUnder`, `waitForText`/`waitForTextUnder`, `assertListed`.
+- **Duo journey classes need a barrier** — both clients run every duo class; start with `resetServerForDuo("<journey>")` (B arrives, A resets, B resyncs), prefix every phase name with the journey, and end with a step where one player waits for the other. Use `PhaseSync.waitFor(phase, context, seconds(120))` when the other side does several screens of work (the default is 15 s).
+- **`-PtestFilter` reaches the clients through `run.signal`** — the run task writes it before the clients connect, and `HarnessCommon` reads it in both modes. Harness mode (`-Pharness`) re-runs as long as `run.signal` exists; prefer plain filtered runs.
 
 ### Testing & E2E
 - **QuestScreen auto-close** — `tick()` closes the screen if the quest is not in `ClientCache`. E2E tests must add quests to cache before opening screens.
@@ -248,7 +277,7 @@ Channel: `disquests:main`. First byte = PacketType ID.
 - **Logger names use `.` not `/`** — `LoggerFactory.getLogger("Disquests.MainScreen")` not `"Disquests/MainScreen"`. Log4j2 uses `.` for hierarchy.
 - **`javax.annotation` not on testmod classpath** — Don't use `@Nullable` etc. in testmod code. JUnit is also unresolvable in IDE (cosmetic, compiles fine via Gradle).
 - **`childById(Class, id)` is type-strict** — changing a component's container type (e.g., `OverlayContainer` to `FlowLayout`) breaks any test using `childById(OverlayContainer.class, id)`. Search testmod for the component ID before changing container types.
-- **Same-class screen rebuilds** — `waitForScreen(QuestScreen.class)` returns immediately when one `QuestScreen` replaces another; wait on a component only the new screen has (`btn-edit` = view mode, `btn-edit-on-map` = edit mode, `vertex-x-2`).
+- **Same-class screen rebuilds** — `waitForScreen(QuestScreen.class)` returns immediately when one `QuestScreen` replaces another; wait on a component only the new screen has (`btn-edit` = view mode, `btn-set-pos` = edit mode), or poll the open editor's `QuestScreen.getQuest()` for the expected location.
 
 ## Release
 

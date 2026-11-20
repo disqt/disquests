@@ -30,6 +30,19 @@ import net.minecraft.util.FormattedCharSequence;
 public class QuestEntryComponent extends BaseUIComponent {
 
   public static final int ENTRY_HEIGHT = 38;
+
+  /**
+   * What a list row adds to the entry: {@code locked} greys a locked view and draws a lock (never
+   * clickable); {@code isNew} draws the "NEW" mark; {@code needsAttention} draws the owner's
+   * warning mark, with its tooltip; {@code childCount} > 0 draws the subquest count after the
+   * title.
+   */
+  public record Marks(boolean locked, boolean isNew, boolean needsAttention, int childCount) {
+    public static final Marks NONE = new Marks(false, false, false, 0);
+  }
+
+  private static final String WARNING_TEXT = "!";
+
   private static final Identifier PIN_ICON =
       Identifier.fromNamespaceAndPath("disquests", "icon/pin");
   private static final Identifier PIN_ACTIVE_ICON =
@@ -46,6 +59,13 @@ public class QuestEntryComponent extends BaseUIComponent {
   // Members may pin active quests; the server refuses pins on completed ones.
   private final boolean canPin;
   private final boolean hideContent;
+  private final Marks marks;
+  private final String countText;
+
+  // The marks' text and widths, 0 when not drawn
+  private final Component newText;
+  private final int newWidth;
+  private final int warningWidth;
 
   // Cached visibility badge (fix 1)
   private final Component cachedVisibilityText;
@@ -74,15 +94,33 @@ public class QuestEntryComponent extends BaseUIComponent {
   private Consumer<QuestEntryComponent> onPinToggle;
 
   public QuestEntryComponent(Quest quest) {
+    this(quest, Marks.NONE);
+  }
+
+  public QuestEntryComponent(Quest quest, Marks marks) {
     this.quest = quest;
+    this.marks = marks;
 
     UUID playerUuid = ClientSession.getEffectivePlayerUuid();
     this.isOwnedByPlayer = quest.isOwner(playerUuid);
     this.isContributor = quest.isContributor(playerUuid);
-    this.canPin = (isOwnedByPlayer || isContributor) && !quest.isCompleted();
-    this.hideContent = quest.isContentHidden(playerUuid);
+    // A locked view has nothing to pin: its lock and title are all the row shows.
+    this.canPin = (isOwnedByPlayer || isContributor) && !quest.isCompleted() && !marks.locked();
+    this.hideContent = quest.isContentHidden(playerUuid) && !marks.locked();
 
-    if (hideContent) {
+    Font font = Minecraft.getInstance().font;
+    this.countText = marks.childCount() > 0 ? "(" + marks.childCount() + ")" : "";
+    this.newText =
+        marks.isNew()
+            ? Component.translatable("gui.disquests.label.new").withStyle(ChatFormatting.BOLD)
+            : null;
+    this.newWidth = newText != null ? font.width(newText) : 0;
+    this.warningWidth = marks.needsAttention() ? font.width(WARNING_TEXT) : 0;
+    if (marks.needsAttention()) {
+      tooltip(Component.translatable("gui.disquests.tooltip.needs_attention"));
+    }
+
+    if (hideContent || marks.locked()) {
       this.styledFirstLine = null;
     } else {
       String content = quest.getContent();
@@ -119,7 +157,7 @@ public class QuestEntryComponent extends BaseUIComponent {
     this.theme = DisquestsClient.CONFIG.theme();
 
     // Cache owner text + width (fix 2)
-    if (!isOwnedByPlayer && quest.getOwnerName() != null) {
+    if (!isOwnedByPlayer && quest.getOwnerName() != null && !quest.getOwnerName().isBlank()) {
       this.cachedOwnerText =
           Component.literal(" by " + quest.getOwnerName()).withStyle(ChatFormatting.GRAY);
       this.cachedOwnerWidth = Minecraft.getInstance().font.width(cachedOwnerText);
@@ -188,6 +226,44 @@ public class QuestEntryComponent extends BaseUIComponent {
     return quest;
   }
 
+  public Marks getMarks() {
+    return marks;
+  }
+
+  /** The warning mark's tooltip shows only over the mark itself. */
+  @Override
+  public boolean shouldDrawTooltip(double mouseX, double mouseY) {
+    return marks.needsAttention()
+        && layout().onWarning(mouseX - this.x(), mouseY - this.y(), warningWidth);
+  }
+
+  private QuestEntryLayout layout() {
+    return QuestEntryLayout.of(
+        this.width(), marks.locked(), rightSideWidth(), pendingWidth(), newWidth, warningWidth);
+  }
+
+  /** The owner's "(n pending)" badge width, 0 without one; caches its text (fix 8). */
+  private int pendingWidth() {
+    if (!isOwnedByPlayer) return 0;
+    int pendingCount = ClientCache.getPendingCount(quest.getId());
+    if (pendingCount <= 0) return 0;
+    // Rebuild only when the count changes
+    if (pendingCount != lastPendingCount) {
+      cachedPendingText = Component.literal(" (" + pendingCount + " pending)");
+      cachedPendingWidth = Minecraft.getInstance().font.width(cachedPendingText);
+      lastPendingCount = pendingCount;
+    }
+    return cachedPendingWidth;
+  }
+
+  /** The visibility and owner text at the right of the first line, with their gap. */
+  private int rightSideWidth() {
+    int width = 0;
+    if (cachedVisibilityText != null) width += cachedVisibilityWidth;
+    if (cachedOwnerText != null) width += cachedOwnerWidth;
+    return width > 0 ? width + 7 : 0;
+  }
+
   // --- Size ---
 
   @Override
@@ -247,39 +323,58 @@ public class QuestEntryComponent extends BaseUIComponent {
 
     // --- Row 1: Title + visibility badge + pending + owner ---
 
-    int rightSideWidth = 0;
-    if (cachedVisibilityText != null) rightSideWidth += cachedVisibilityWidth;
-    if (cachedOwnerText != null) rightSideWidth += cachedOwnerWidth;
-    if (rightSideWidth > 0) rightSideWidth += 7;
-
-    int availableTitleWidth = entryWidth - 8;
-    if (rightSideWidth > 0) availableTitleWidth -= rightSideWidth;
+    QuestEntryLayout layout = layout();
+    int availableTitleWidth = layout.titleRoom();
 
     // Cache truncated title (fix 6): recompute only when available width changes
     if (availableTitleWidth != cachedTitleAvailableWidth) {
-      cachedTruncatedTitle = textRenderer.plainSubstrByWidth(quest.getTitle(), availableTitleWidth);
+      String title = quest.getTitle() != null ? quest.getTitle() : "";
+      cachedTruncatedTitle =
+          countText.isEmpty()
+              ? textRenderer.plainSubstrByWidth(title, availableTitleWidth)
+              // The count is kept whole; the title gives way
+              : TextFit.title(title, countText, availableTitleWidth, textRenderer::width);
       cachedTitleAvailableWidth = availableTitleWidth;
     }
+    int titleX = entryX + layout.titleX();
+    int titleY = entryY + QuestEntryLayout.TITLE_Y;
+    if (marks.locked()) {
+      TreeRowComponent.drawLock(context, entryX + QuestEntryLayout.PAD, titleY - 1);
+    }
     context.text(
-        textRenderer, cachedTruncatedTitle, entryX + 4, entryY + 4, Colors.TEXT_PRIMARY, false);
+        textRenderer,
+        cachedTruncatedTitle,
+        titleX,
+        titleY,
+        marks.locked() ? Colors.TEXT_DISABLED : Colors.TEXT_PRIMARY,
+        false);
+    if (!countText.isEmpty()) {
+      int countX =
+          titleX
+              + (cachedTruncatedTitle.isEmpty()
+                  ? 0
+                  : textRenderer.width(cachedTruncatedTitle + " "));
+      if (countX + textRenderer.width(countText) <= titleX + availableTitleWidth) {
+        context.text(textRenderer, countText, countX, titleY, Colors.TEXT_MUTED, false);
+      }
+    }
+    if (newText != null) {
+      context.text(textRenderer, newText, entryX + layout.newX(), titleY, Colors.AMBER, false);
+    }
+    if (marks.needsAttention()) {
+      context.text(
+          textRenderer, WARNING_TEXT, entryX + layout.warningX(), titleY, Colors.BADGE_RED, false);
+    }
 
     int rightX = entryX + entryWidth - 4;
     if (cachedOwnerText != null) {
       rightX -= cachedOwnerWidth;
       context.text(textRenderer, cachedOwnerText, rightX, entryY + 4, Colors.TEXT_MUTED, false);
     }
-    if (isOwnedByPlayer) {
-      int pendingCount = ClientCache.getPendingCount(quest.getId());
-      if (pendingCount > 0) {
-        // Cache pending text (fix 8): rebuild only when count changes
-        if (pendingCount != lastPendingCount) {
-          cachedPendingText = Component.literal(" (" + pendingCount + " pending)");
-          cachedPendingWidth = textRenderer.width(cachedPendingText);
-          lastPendingCount = pendingCount;
-        }
-        rightX -= cachedPendingWidth;
-        context.text(textRenderer, cachedPendingText, rightX, entryY + 4, Colors.AMBER, false);
-      }
+    int pendingWidth = pendingWidth();
+    if (pendingWidth > 0) {
+      rightX -= pendingWidth;
+      context.text(textRenderer, cachedPendingText, rightX, entryY + 4, Colors.AMBER, false);
     }
     if (cachedVisibilityText != null) {
       rightX -= cachedVisibilityWidth;
