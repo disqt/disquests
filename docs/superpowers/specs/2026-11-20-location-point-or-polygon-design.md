@@ -90,6 +90,4 @@ reads as a third way of entering a shape.
 
 ## Delivery
 
-Its own pull request, on a branch stacked on `feat/quest-trees-client`, opened against `main`
-once PR #99 is merged (Claude's call: the owner approved the design without choosing, and
-PR #99 is waiting on the playtest).
+Part of PR #99 (the owner's choice on 2026-11-20), on top of the quest-tree work.
