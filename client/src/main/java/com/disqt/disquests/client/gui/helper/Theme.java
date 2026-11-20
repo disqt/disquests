@@ -203,7 +203,9 @@ public enum Theme {
       case VANILLA -> Surface.VANILLA_TRANSLUCENT;
       case FLAT -> Surface.flat(0xC00E0E0E);
       case INSET -> Surface.flat(0xC0181818);
-      case FROSTED -> Surface.BLANK;
+      // Dark but see-through: the world stays visible, the hotbar and hearts no longer compete
+      // with text drawn outside a panel
+      case FROSTED -> Surface.flat(0xA00A0A0F);
       case ACCENT_LINE -> Surface.flat(0xC00C0C0C);
     };
   }
