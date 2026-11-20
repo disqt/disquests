@@ -94,6 +94,15 @@ public final class QuestLocation {
     return true;
   }
 
+  /**
+   * A location is one point or a polygon of three or more points: two corners are not a shape, so
+   * they collapse to the first point. Always returns an immutable copy.
+   */
+  public static List<PointData> pointOrPolygon(List<PointData> corners) {
+    if (corners.size() == 2) return List.of(corners.get(0));
+    return List.copyOf(corners);
+  }
+
   /** Applies the canonical location rules; see the world-map design. */
   public static QuestData normalize(QuestData q) {
     String map = DimensionKeys.normalize(q.map());
@@ -117,7 +126,7 @@ public final class QuestLocation {
             q.completedBy(),
             q.completedByName());
     double y = q.coordinates() != null ? q.coordinates().y() : DEFAULT_Y;
-    List<PointData> poly = q.polygon();
+    List<PointData> poly = pointOrPolygon(q.polygon());
     if (poly.size() == 1) {
       PointData p = poly.get(0);
       return base.withLocation(new CoordinatesData(p.x(), y, p.z()), false, null, List.of());
