@@ -7,6 +7,7 @@ import com.disqt.disquests.client.KeyBinds;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.gui.component.SuggestionDropdown;
 import com.disqt.disquests.client.gui.helper.Colors;
+import com.disqt.disquests.client.gui.helper.Toasts;
 import com.mojang.blaze3d.platform.InputConstants;
 import io.wispforest.owo.ui.base.BaseUIModelScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
@@ -21,7 +22,6 @@ import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
-import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
@@ -61,19 +61,9 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
 
   public abstract NavEntry toNavEntry();
 
-  private static final SystemToast.SystemToastId ARCHIVED_TOAST =
-      new SystemToast.SystemToastId(8000L);
-
-  /** The toast of {@link #showRefusedToast}; public so the E2E journeys can find it. */
-  public static final SystemToast.SystemToastId REFUSED_TOAST =
-      new SystemToast.SystemToastId(8002L);
-
   /** A toast like the server's notices, for a change refused on this screen. */
   protected void showRefusedToast(Component text) {
-    if (this.minecraft != null) {
-      SystemToast.add(
-          this.minecraft.gui.toastManager(), REFUSED_TOAST, Component.literal("Disquests"), text);
-    }
+    Toasts.show(text);
   }
 
   /**
@@ -89,13 +79,7 @@ public abstract class DisquestsBaseScreen extends BaseUIModelScreen<FlowLayout> 
 
   /** Tells the player their edit was dropped and shows the archived quest instead. */
   protected void showArchivedInstead(@Nullable Screen viewParent, Quest archived) {
-    if (this.minecraft != null) {
-      SystemToast.add(
-          this.minecraft.gui.toastManager(),
-          ARCHIVED_TOAST,
-          Component.literal("Disquests"),
-          Component.translatable("gui.disquests.toast.quest_archived"));
-    }
+    Toasts.show(Component.translatable("gui.disquests.toast.quest_archived"));
     navigateToScreen(new QuestScreen(viewParent, archived));
   }
 

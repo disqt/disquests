@@ -6,6 +6,7 @@ import com.disqt.disquests.client.data.NoticeText;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.data.QuestRouting;
 import com.disqt.disquests.client.gui.helper.Messages;
+import com.disqt.disquests.client.gui.helper.Toasts;
 import com.disqt.disquests.client.gui.map.SharedTileCache;
 import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.common.ByteBufReader;
@@ -22,7 +23,6 @@ import java.util.Map;
 import java.util.UUID;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.network.chat.Component;
 
 public class ClientPacketHandler {
@@ -64,9 +64,6 @@ public class ClientPacketHandler {
             });
   }
 
-  private static final SystemToast.SystemToastId NOTICE_TOAST =
-      new SystemToast.SystemToastId(8001L);
-
   private static void handleNotice(ByteBufReader r) {
     Notice notice = PacketCodec.readNotice(r);
     if (notice.kind() == Notice.Kind.QUEST_UNLOCKED_FOLLOWED && notice.questId() != null) {
@@ -74,7 +71,7 @@ public class ClientPacketHandler {
     }
     Minecraft client = Minecraft.getInstance();
     Component text = Messages.toComponent(NoticeText.of(notice, ClientSession.getMaxQuestDepth()));
-    SystemToast.add(client.gui.toastManager(), NOTICE_TOAST, Component.literal("Disquests"), text);
+    Toasts.show(text);
     if (client.gui.screen() instanceof MainScreen mainScreen) {
       mainScreen.refreshListContents();
     }

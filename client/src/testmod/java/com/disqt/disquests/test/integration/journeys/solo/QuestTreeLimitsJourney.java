@@ -95,10 +95,7 @@ class QuestTreeLimitsJourney {
     dragTreeRowOnto(context, middle, side);
 
     then("a toast says it would be too deep");
-    waitForToast(
-        context,
-        DisquestsBaseScreen.REFUSED_TOAST,
-        t -> t.contains(MIDDLE) && t.contains("too deep, limit 3 levels"));
+    waitForToast(context, t -> t.contains(MIDDLE) && t.contains("too deep, limit 3 levels"));
 
     and("the tree is as it was, and no row says 'not saved'");
     waitForTreeRow(context, middle, l -> l.depth() == 1);

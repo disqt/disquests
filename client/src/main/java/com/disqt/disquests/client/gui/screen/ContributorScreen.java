@@ -6,6 +6,7 @@ import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.data.QuestGraphs;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.helper.Messages;
+import com.disqt.disquests.client.gui.helper.Toasts;
 import com.disqt.disquests.client.gui.screen.PeopleText.ApplyDown;
 import com.disqt.disquests.client.gui.screen.PeopleText.RemoveChoice;
 import com.disqt.disquests.client.gui.tree.PeopleDraft;
@@ -28,7 +29,6 @@ import io.wispforest.owo.ui.core.VerticalAlignment;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
-import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
@@ -47,9 +47,6 @@ public class ContributorScreen extends DisquestsBaseScreen {
 
   /** The dark panel holding the two explanation lines. */
   static final String HINTS_ID = "people-hints";
-
-  private static final SystemToast.SystemToastId PEOPLE_TOAST =
-      new SystemToast.SystemToastId(8003L);
 
   private final Quest quest;
   private final UUID questId;
@@ -498,10 +495,7 @@ public class ContributorScreen extends DisquestsBaseScreen {
   }
 
   void showToast(Component text) {
-    if (this.minecraft != null) {
-      SystemToast.add(
-          this.minecraft.gui.toastManager(), PEOPLE_TOAST, Component.literal("Disquests"), text);
-    }
+    Toasts.show(text);
   }
 
   /**

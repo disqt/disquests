@@ -154,17 +154,11 @@ public final class UIAssertions {
   }
 
   /**
-   * The text of the shown (or queued) system toast with this id, its lines joined by spaces, or
-   * null when there is none. The message is private to {@code SystemToast}: read by reflection.
+   * The text of the shown (or queued) Disquests toast, its lines joined by spaces, or null when
+   * there is none. The message is private to {@code SystemToast}: read by reflection.
    */
-  public static String toastText(
-      net.minecraft.client.Minecraft client,
-      net.minecraft.client.gui.components.toasts.SystemToast.SystemToastId id) {
-    var toast =
-        client
-            .gui
-            .toastManager()
-            .getToast(net.minecraft.client.gui.components.toasts.SystemToast.class, id);
+  public static String toastText(net.minecraft.client.Minecraft client) {
+    var toast = com.disqt.disquests.client.gui.helper.Toasts.current();
     if (toast == null) return null;
     try {
       var field =
@@ -187,16 +181,13 @@ public final class UIAssertions {
     }
   }
 
-  /** Waits until a system toast with this id shows and its text satisfies the condition. */
-  public static void waitForToast(
-      ClientGameTestContext context,
-      net.minecraft.client.gui.components.toasts.SystemToast.SystemToastId id,
-      Predicate<String> condition) {
+  /** Waits until a Disquests toast shows and its text satisfies the condition. */
+  public static void waitForToast(ClientGameTestContext context, Predicate<String> condition) {
     String[] last = {null};
     try {
       context.waitFor(
           client -> {
-            last[0] = toastText(client, id);
+            last[0] = toastText(client);
             return last[0] != null && condition.test(last[0]);
           },
           UIActions.TIMEOUT);
