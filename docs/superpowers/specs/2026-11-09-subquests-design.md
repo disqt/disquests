@@ -216,9 +216,11 @@ The main screen stays the map with the quest list. Nothing here replaces it.
 ### Reading a quest
 
 - Two panes with a **draggable divider**, like the map's side panel; the width is remembered.
-- **Left, "where this sits"**: the quest's visible ancestors, the quest itself highlighted,
-  the other quests under the same parent (Claude's call), and its own subquests, nested and
-  collapsible. Every line opens that quest. A tick shows a completed quest and a lock a locked
+- **Left, "Quest tree"**: the whole tree the quest belongs to, from its top visible ancestor
+  down, the quest itself highlighted. The quests it sits in and the quest itself are open; every
+  other branch is listed collapsed until expanded (owner's playtest feedback, 2026-11-20; the
+  pane first showed only the path and the quest's own level, under the title "Where this
+  sits"). No subquest count after the titles. Every line opens that quest. A tick shows a completed quest and a lock a locked
   one; **ticks are never clickable**. The pane is absent for a quest with no parent and no
   subquests.
 - Completed subquests stay listed, ticked, for every player who would see them if they were

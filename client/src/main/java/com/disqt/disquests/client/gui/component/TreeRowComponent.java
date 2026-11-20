@@ -19,11 +19,11 @@ import net.minecraft.network.chat.Component;
  * focused component and a row made of labels would never receive them.
  *
  * <p>From the left: the expand toggle (read mode, when the quest has listed subquests) or the drag
- * handle (edit mode, when the row drags), a lock or a tick, the title and the subquest count, then
- * "(editing)" on the edited quest's own row; at the right, the "not saved" marker and, when
- * removable, the remove hit zone with its "Take out of X" tooltip. The current quest's row is
- * filled and marked with an accent bar, more than a hovered row. Locks and ticks are drawn only,
- * never clickable. Layout and hit zones come from {@link TreeRowGeometry}.
+ * handle (edit mode, when the row drags), a lock or a tick, the title, then "(editing)" on the
+ * edited quest's own row; at the right, the "not saved" marker and, when removable, the remove hit
+ * zone with its "Take out of X" tooltip. The current quest's row is filled and marked with an
+ * accent bar, more than a hovered row. Locks and ticks are drawn only, never clickable. Layout and
+ * hit zones come from {@link TreeRowGeometry}.
  *
  * <p>Read mode: a click opens the quest, the toggle expands or collapses it. Edit mode: nothing
  * navigates; the remove zone removes, and a left press on a draggable row that moves more than
@@ -36,14 +36,14 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
   public static final int ROW_HEIGHT = 12;
   public static final int DRAG_THRESHOLD = 4;
   private static final int GAP = 6;
-  private static final int COUNT_GAP = 4;
+  private static final int TRAILING_GAP = 4;
   private static final int TEXT_Y = 2;
 
   /**
    * What the row shows. {@code depth} is the indent level; {@code current} highlights the quest
    * being read or edited; {@code changed} draws "not saved", {@code takenOut} "taken out, not
    * saved"; {@code removable} draws the remove zone (edit mode); {@code childCount} > 0 draws the
-   * toggle, open when {@code expanded}, and the count.
+   * toggle, open when {@code expanded}.
    */
   public record Line(
       UUID questId,
@@ -79,7 +79,8 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
   private final Line line;
   private final String title;
   private final Component marker;
-  private String count;
+  // The "(editing)" label after the title, on the edited quest's own row; "" otherwise
+  private String trailing = "";
   private Component removeTooltip;
 
   private boolean editMode;
@@ -105,7 +106,6 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
         line.takenOut()
             ? Component.translatable("gui.disquests.tree.taken_out")
             : line.changed() ? Component.translatable("gui.disquests.tree.not_saved") : null;
-    this.count = TreeRowGeometry.trailing(line.childCount(), "");
     this.id("tree-row-" + line.questId());
     this.sizing(Sizing.fill(100), Sizing.fixed(ROW_HEIGHT));
   }
@@ -126,8 +126,7 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
     this.onRemove = onRemove;
     this.dragTarget = target;
     // The edited quest's own row says so
-    String editing = line.current() ? Component.translatable(EDITING_KEY).getString() : "";
-    this.count = TreeRowGeometry.trailing(line.childCount(), editing);
+    this.trailing = line.current() ? Component.translatable(EDITING_KEY).getString() : "";
     this.fittedFor = -1;
     return this;
   }
@@ -294,18 +293,18 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
     int titleLeft = x + g.titleX();
     int available = right - titleLeft;
     if (available != fittedFor) {
-      // The count is kept whole; the title gives way, down to nothing
-      fittedTitle = TextFit.title(title, count, available, font::width);
+      // The label is kept whole; the title gives way, down to nothing
+      fittedTitle = TextFit.title(title, trailing, available, font::width);
       fittedFor = available;
     }
     int titleColor = line.locked() || line.completed() ? Colors.TEXT_MUTED : Colors.TEXT_PRIMARY;
     int textEnd = titleLeft;
     if (!fittedTitle.isEmpty()) {
       context.text(font, fittedTitle, titleLeft, y + TEXT_Y, titleColor, false);
-      textEnd += font.width(fittedTitle) + COUNT_GAP;
+      textEnd += font.width(fittedTitle) + TRAILING_GAP;
     }
-    if (!count.isEmpty() && font.width(count) <= right - textEnd) {
-      context.text(font, count, textEnd, y + TEXT_Y, Colors.TEXT_MUTED, false);
+    if (!trailing.isEmpty() && font.width(trailing) <= right - textEnd) {
+      context.text(font, trailing, textEnd, y + TEXT_Y, Colors.TEXT_MUTED, false);
     } // The dragged row stays in place, dimmed; its ghost follows the cursor
     if (dragging) context.fill(x, y, x + w, y + ROW_HEIGHT, Colors.TREE_SOURCE_DIM);
   }

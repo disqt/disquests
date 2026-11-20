@@ -332,44 +332,60 @@ class QuestTreeRowsTest {
 
     @Test
     void emptyForAQuestWithNoParentAndNoSubquests() {
-      assertEquals(List.of(), QuestTreeRows.whereThisSits(TREE, LEO, id("alone"), Set.of()));
+      assertEquals(List.of(), QuestTreeRows.readingTree(TREE, LEO, id("alone"), Set.of()));
     }
 
     @Test
-    void ancestorsThenSiblingsWithTheQuestThenItsSubquests() {
-      // top counts only mid, the one line shown under it here, not uncle.
+    void theWholeTreeWithThePathToTheQuestAndTheQuestOpen() {
       assertEquals(
           List.of(
-              mine("top", 0, 1, true),
+              mine("top", 0, 2, true),
               mine("mid", 1, 3, true),
               row("sibling", 2, 1, false),
               mine("quest", 2, 1, true),
               mine("child", 3, 1, false),
-              mine("done", 2, 0, false)),
-          QuestTreeRows.whereThisSits(TREE, LEO, id("quest"), Set.of()));
+              mine("done", 2, 0, false),
+              mine("uncle", 1, 0, false)),
+          QuestTreeRows.readingTree(TREE, LEO, id("quest"), Set.of()));
     }
 
     @Test
     void deeperLevelsAndSiblingsOpenWhenExpanded() {
       assertEquals(
           List.of(
-              mine("top", 0, 1, true),
+              mine("top", 0, 2, true),
               mine("mid", 1, 3, true),
               row("sibling", 2, 1, true),
               mine("cousin", 3, 0, false),
               mine("quest", 2, 1, true),
               mine("child", 3, 1, true),
               mine("grandchild", 4, 0, false),
-              mine("done", 2, 0, false)),
-          QuestTreeRows.whereThisSits(
+              mine("done", 2, 0, false),
+              mine("uncle", 1, 0, false)),
+          QuestTreeRows.readingTree(
               TREE, LEO, id("quest"), expanded("child", "sibling", "grandchild")));
+    }
+
+    @Test
+    void aQuestBesideThePathStaysListedButCollapsed() {
+      // Seen from cousin: "quest", next to cousin's parent, has subquests and shows collapsed.
+      assertEquals(
+          List.of(
+              mine("top", 0, 2, true),
+              mine("mid", 1, 3, true),
+              row("sibling", 2, 1, true),
+              mine("cousin", 3, 0, false),
+              mine("quest", 2, 1, false),
+              mine("done", 2, 0, false),
+              mine("uncle", 1, 0, false)),
+          QuestTreeRows.readingTree(TREE, LEO, id("cousin"), Set.of()));
     }
 
     @Test
     void aTopLevelQuestWithSubquestsShowsItselfAndThem() {
       assertEquals(
           List.of(mine("top", 0, 2, true), mine("mid", 1, 3, false), mine("uncle", 1, 0, false)),
-          QuestTreeRows.whereThisSits(TREE, LEO, id("top"), Set.of()));
+          QuestTreeRows.readingTree(TREE, LEO, id("top"), Set.of()));
     }
 
     @Test

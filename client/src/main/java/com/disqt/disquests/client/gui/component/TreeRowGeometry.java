@@ -87,16 +87,6 @@ public record TreeRowGeometry(
     return rects;
   }
 
-  /**
-   * What follows the title, drawn muted and always kept whole: the subquest count ("(2)") and, on
-   * the edited quest's own row in the editor, the "(editing)" label; "" when there is neither.
-   */
-  public static String trailing(int childCount, String editingLabel) {
-    String count = childCount > 0 ? "(" + childCount + ")" : "";
-    if (editingLabel == null || editingLabel.isEmpty()) return count;
-    return count.isEmpty() ? editingLabel : count + " " + editingLabel;
-  }
-
   public int toggleX() {
     return LEFT + depth * INDENT;
   }

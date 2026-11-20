@@ -4,7 +4,6 @@ import com.disqt.disquests.common.graph.QuestGraph;
 import com.disqt.disquests.common.model.QuestData;
 import com.disqt.disquests.common.model.Visibility;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -17,9 +16,9 @@ import java.util.UUID;
 import java.util.function.Predicate;
 
 /**
- * The indented quest lists: the My Quests, Quest Board and Archived tabs, the "where this sits"
- * pane of the reading view and the tree of the edit pane. Works on the graph of what the server
- * sent this player, so every quest in it is one the player can see.
+ * The indented quest lists: the My Quests, Quest Board and Archived tabs, the quest tree pane of
+ * the reading view and the tree of the edit pane. Works on the graph of what the server sent this
+ * player, so every quest in it is one the player can see.
  *
  * <p>Siblings keep today's list order: on My Quests pinned quests first, then the most recently
  * changed first; on the board the most recently changed first; on the map layout unplaced quests
@@ -127,34 +126,23 @@ public final class QuestTreeRows {
   }
 
   /**
-   * The "where this sits" pane: the quest's ancestors, top first, then the quests under the same
-   * parent with the quest among them and its subquests below it, completed quests included. The
-   * quest's own subquests always show; deeper levels and the siblings' subquests only when
-   * expanded. Empty for a quest with no visible parent and no visible subquests.
+   * The reading view's quest tree pane: the whole tree the quest belongs to, from its top visible
+   * ancestor down, completed quests included. The quest's ancestors and the quest itself always
+   * show what is under them; every other quest only when expanded. Empty for a quest with no
+   * visible parent and no visible subquests.
    */
-  public static List<Row> whereThisSits(QuestGraph graph, UUID me, UUID quest, Set<UUID> expanded) {
+  public static List<Row> readingTree(QuestGraph graph, UUID me, UUID quest, Set<UUID> expanded) {
     QuestData q = graph.get(quest);
     if (q == null) return List.of();
-    QuestData parent = graph.get(q.parentId());
-    if (parent == null && graph.children(quest).isEmpty()) return List.of();
+    List<QuestData> ancestors = graph.ancestors(quest);
+    if (ancestors.isEmpty() && graph.children(quest).isEmpty()) return List.of();
 
-    Comparator<QuestData> order = siblingOrder(null, ListOptions.DEFAULT);
-    Builder builder = new Builder(me, childrenOf(graph), order);
-    List<QuestData> ancestors = new ArrayList<>(graph.ancestors(quest));
-    Collections.reverse(ancestors);
-    List<QuestData> level =
-        new ArrayList<>(parent == null ? List.of(q) : graph.children(parent.id()));
-    // Each ancestor shows only the next one down, and the parent shows the quest's level.
-    int depth = 0;
-    for (QuestData ancestor : ancestors) {
-      int shown = depth == ancestors.size() - 1 ? level.size() : 1;
-      builder.line(ancestor, depth++, true, shown);
-    }
-
-    level.sort(order);
     Set<UUID> open = new HashSet<>(expanded);
     open.add(quest);
-    for (QuestData sibling : level) builder.subtree(sibling, depth, open);
+    for (QuestData ancestor : ancestors) open.add(ancestor.id());
+    QuestData top = ancestors.isEmpty() ? q : ancestors.get(ancestors.size() - 1);
+    Builder builder = new Builder(me, childrenOf(graph), siblingOrder(null, ListOptions.DEFAULT));
+    builder.subtree(top, 0, open);
     return builder.rows;
   }
 
@@ -261,10 +249,7 @@ public final class QuestTreeRows {
     }
 
     void line(QuestData q, int depth, boolean expanded) {
-      line(q, depth, expanded, children.getOrDefault(q.id(), List.of()).size());
-    }
-
-    void line(QuestData q, int depth, boolean expanded, int childCount) {
+      int childCount = children.getOrDefault(q.id(), List.of()).size();
       seen.add(q.id());
       rows.add(
           new Row(

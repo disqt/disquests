@@ -142,24 +142,6 @@ class TreeRowGeometryTest {
   }
 
   @Nested
-  class Trailing {
-    static Stream<Arguments> cases() {
-      return Stream.of(
-          Arguments.of("nothing", 0, "", ""),
-          Arguments.of("count only", 2, "", "(2)"),
-          Arguments.of("editing only", 0, "(editing)", "(editing)"),
-          Arguments.of("count then editing", 3, "(editing)", "(3) (editing)"),
-          Arguments.of("null label", 1, null, "(1)"));
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("cases")
-    void follows(String name, int children, String editing, String expected) {
-      assertEquals(expected, TreeRowGeometry.trailing(children, editing));
-    }
-  }
-
-  @Nested
   class Toggle {
     @Test
     void theSlotIsWideEnoughToAimAt() {

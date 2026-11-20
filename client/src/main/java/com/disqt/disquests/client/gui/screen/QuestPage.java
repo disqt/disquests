@@ -25,7 +25,7 @@ import java.util.UUID;
 public final class QuestPage {
 
   /** Lang keys the reading view uses without arguments decided here. */
-  public static final String WHERE_THIS_SITS = "gui.disquests.section.where_this_sits";
+  public static final String QUEST_TREE = "gui.disquests.section.quest_tree";
 
   public static final String PREREQUISITES = "gui.disquests.section.prerequisites";
   public static final String WAITING_PREREQUISITES = "gui.disquests.waiting.prerequisites";
@@ -40,7 +40,7 @@ public final class QuestPage {
   /** Every fixed key above, for the lang-file test. */
   public static final List<String> FIXED_KEYS =
       List.of(
-          WHERE_THIS_SITS,
+          QUEST_TREE,
           PREREQUISITES,
           WAITING_PREREQUISITES,
           WAITING_SOMETHING_ELSE,
@@ -186,7 +186,7 @@ public final class QuestPage {
         q.autoJoin());
   }
 
-  /** One line of the "where this sits" pane as drawn. */
+  /** One line of the reading view's quest tree pane as drawn. */
   public record PaneLine(QuestTreeRows.Row row, String title, boolean completed) {}
 
   /**
@@ -203,7 +203,7 @@ public final class QuestPage {
       QuestData quest, QuestGraph graph, UUID me, Set<UUID> expanded, boolean trees) {
     List<PaneLine> pane = new ArrayList<>();
     if (trees) {
-      for (QuestTreeRows.Row row : QuestTreeRows.whereThisSits(graph, me, quest.id(), expanded)) {
+      for (QuestTreeRows.Row row : QuestTreeRows.readingTree(graph, me, quest.id(), expanded)) {
         QuestData q = graph.get(row.id());
         if (q != null) pane.add(new PaneLine(row, q.title(), q.isCompleted()));
       }

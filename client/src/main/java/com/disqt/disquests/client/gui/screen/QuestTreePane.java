@@ -23,8 +23,8 @@ import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The reading view's left pane, "where this sits": the rows of {@link QuestTreeRows#whereThisSits},
- * each opening its quest, next to a divider that resizes the pane (config {@code questPaneWidth}).
+ * The reading view's left pane, the quest tree: the rows of {@link QuestTreeRows#readingTree}, each
+ * opening its quest, next to a divider that resizes the pane (config {@code questPaneWidth}).
  * Absent for a quest with no visible parent and no visible subquests, and against servers without
  * quest trees.
  *
@@ -77,7 +77,7 @@ final class QuestTreePane {
         shell(
             screen,
             root.childById(FlowLayout.class, "quest-body"),
-            Component.translatable(QuestPage.WHERE_THIS_SITS),
+            Component.translatable(QuestPage.QUEST_TREE),
             PANE_ID,
             LIST_ID);
     QuestTreePane treePane =
@@ -140,7 +140,7 @@ final class QuestTreePane {
   }
 
   private static List<QuestTreeRows.Row> rows(UUID questId) {
-    return QuestTreeRows.whereThisSits(
+    return QuestTreeRows.readingTree(
         QuestGraphs.current(),
         ClientSession.getEffectivePlayerUuid(),
         questId,
@@ -216,11 +216,15 @@ final class QuestTreePane {
   }
 
   /**
-   * Expands or collapses a row. The current quest's subquests always show, so its toggle is ignored
-   * rather than changing the shared expanded set for nothing.
+   * Expands or collapses a row. The current quest and the quests it sits in always show what is
+   * under them, so their toggles are ignored rather than changing the shared expanded set for
+   * nothing.
    */
   private void toggle(UUID id) {
     if (id.equals(questId)) return;
+    for (QuestData ancestor : QuestGraphs.current().ancestors(questId)) {
+      if (ancestor.id().equals(id)) return;
+    }
     ClientSession.toggleExpanded(id);
     fill();
     screen.rememberShownPage();

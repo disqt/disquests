@@ -248,7 +248,6 @@
   "gui.disquests.section.{}": {
     "tags": "Tags (%d)",
     "contributors": "Contributeurs (%d)",
-    "where_this_sits": "OÙ ELLE SE TROUVE",
     "quest_tree": "ARBRE DE QUÊTES",
     "prerequisites": "Prérequis",
   },
