@@ -11,6 +11,7 @@ import com.disqt.disquests.client.gui.component.TreeToggleComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.tree.ListedQuests;
 import com.disqt.disquests.client.gui.tree.NewMarkRows;
+import com.disqt.disquests.client.gui.tree.PlacedSections;
 import com.disqt.disquests.client.gui.tree.QuestTreeRows;
 import com.disqt.disquests.client.gui.tree.QuestTreeRows.Row;
 import com.disqt.disquests.common.graph.QuestGraph;
@@ -27,6 +28,7 @@ import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.UIComponent;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -109,7 +111,8 @@ public final class QuestListPanel {
             graph, me, treeTab(tab), search, ClientSession.getExpandedQuests(), listOptions());
 
     list.clearChildren();
-    addUnplacedHeader(graph);
+    OptionalInt placedStart = placedStart(graph);
+    if (placedStart.isPresent()) list.child(sectionHeader("unplaced-header", "unplaced"));
     boolean toggles = rows.stream().anyMatch(r -> r.childCount() > 0);
     boolean selectedListed = false;
     NewMarks newMarks = ClientSession.newMarks();
@@ -119,7 +122,11 @@ public final class QuestListPanel {
             graph,
             ListedQuests.fullyExpanded(graph, me, treeTab(tab), search, listOptions()),
             newMarks::isNew);
-    for (Row row : rows) {
+    for (int i = 0; i < rows.size(); i++) {
+      Row row = rows.get(i);
+      if (placedStart.isPresent() && placedStart.getAsInt() == i) {
+        list.child(sectionHeader("placed-header", "placed"));
+      }
       Quest quest = ClientCache.getQuestById(row.id());
       if (quest == null) continue;
       boolean selected = row.id().equals(selectedId);
@@ -134,26 +141,25 @@ public final class QuestListPanel {
   }
 
   /**
-   * The header only separates unplaced from placed top-level quests: when every one is unplaced (or
-   * every one is placed) there is nothing to separate. Never on Archived.
+   * Where the "On the map" header goes, when the list has both unplaced and placed top-level
+   * quests; the "Unplaced" header then heads the list. The headers only separate the two kinds:
+   * with one kind there is nothing to separate. Never on Archived, and only on the map layout.
    */
-  private void addUnplacedHeader(QuestGraph graph) {
-    if (!mapMode || tab == ClientSession.Tab.ARCHIVED) return;
-    boolean anyUnplaced = false;
-    boolean anyPlaced = false;
-    for (Row row : rows) {
-      QuestData q = graph.get(row.id());
-      if (row.depth() != 0 || q == null) continue;
-      if (q.coordinates() != null || !q.polygon().isEmpty()) anyPlaced = true;
-      else anyUnplaced = true;
-    }
-    if (anyUnplaced && anyPlaced) {
-      LabelComponent header =
-          UIComponents.label(Component.translatable("gui.disquests.map.unplaced"));
-      header.color(Color.ofArgb(Colors.TEXT_MUTED));
-      header.id("unplaced-header");
-      list.child(header);
-    }
+  private OptionalInt placedStart(QuestGraph graph) {
+    if (!mapMode || tab == ClientSession.Tab.ARCHIVED) return OptionalInt.empty();
+    return PlacedSections.firstPlacedRow(
+        rows,
+        id -> {
+          QuestData q = graph.get(id);
+          return q != null && (q.coordinates() != null || !q.polygon().isEmpty());
+        });
+  }
+
+  private static LabelComponent sectionHeader(String id, String key) {
+    LabelComponent header = UIComponents.label(Component.translatable("gui.disquests.map." + key));
+    header.color(Color.ofArgb(Colors.TEXT_MUTED));
+    header.id(id);
+    return header;
   }
 
   private FlowLayout rowFor(

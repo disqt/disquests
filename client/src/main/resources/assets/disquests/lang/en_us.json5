@@ -257,6 +257,7 @@
   "gui.disquests.map.{}": {
     "tiles_unavailable": "Map tiles unavailable",
     "unplaced": "Unplaced",
+    "placed": "On the map",
     "centre_me": "Centre on me",
     "zoom_tooltip": "Zoom %d / %d",
     "server_outdated": "The server needs updating to show the map",

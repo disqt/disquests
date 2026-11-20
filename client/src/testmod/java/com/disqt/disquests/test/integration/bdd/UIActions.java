@@ -213,7 +213,7 @@ public final class UIActions {
 
   /**
    * Click a QuestEntryComponent by index in the quest list. Each child of the "quest-list"
-   * FlowLayout is a row holding one entry (or the unplaced header); the entry itself is clicked.
+   * FlowLayout is a row holding one entry (or a section header); the entry itself is clicked.
    */
   public static void clickEntry(ClientGameTestContext context, int index) {
     var questList =

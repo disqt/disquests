@@ -212,7 +212,7 @@ class MapBoardJourney {
   @Test
   @Order(4)
   @PlayerA
-  @DisplayName("An unplaced quest is listed first, under its header")
+  @DisplayName("An unplaced quest is listed first, under its header; placed quests under theirs")
   void unplacedQuestListedFirst(ClientGameTestContext context) {
     given("player is on MainScreen");
     openMainScreen(context);
@@ -228,17 +228,30 @@ class MapBoardJourney {
     // Reopen a fresh MainScreen (the parent screen may be stale)
     openMainScreen(context);
 
-    then("the list starts with the unplaced header, then the unplaced quest");
+    then(
+        "the list starts with the unplaced header, then the unplaced quest, and the placed"
+            + " quests follow the 'On the map' header");
     FlowLayout questList = findComponent(context, FlowLayout.class, "quest-list");
     try {
       context.waitFor(
           client -> {
             var children = questList.children();
-            return children.size() >= 3
+            if (!(children.size() >= 4
                 && children.get(0) instanceof LabelComponent header
                 && "unplaced-header".equals(header.id())
                 && QuestListPanel.entryOf(children.get(1)) instanceof QuestEntryComponent entry
-                && NO_PLACE.equals(entry.getQuest().getTitle());
+                && NO_PLACE.equals(entry.getQuest().getTitle()))) {
+              return false;
+            }
+            int placedHeader = -1;
+            for (int i = 2; i < children.size(); i++) {
+              if ("placed-header".equals(children.get(i).id())) placedHeader = i;
+            }
+            return placedHeader > 1
+                && placedHeader + 1 < children.size()
+                && QuestListPanel.entryOf(children.get(placedHeader + 1))
+                    instanceof QuestEntryComponent placed
+                && placed.getQuest().hasLocation();
           },
           TIMEOUT);
     } catch (Throwable t) {
