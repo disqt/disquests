@@ -229,7 +229,18 @@ class QuestLocationTest {
     assertNull(n.coordinates2());
     assertTrue(n.polygon().isEmpty());
     assertEquals(10, n.coordinates().x());
+    assertEquals(64, n.coordinates().y());
     assertEquals(20, n.coordinates().z());
+  }
+
+  @Test
+  void pointOrPolygonDoesNotFollowLaterChangesToItsInput() {
+    PointData a = new PointData(1, 2), b = new PointData(3, 4), c = new PointData(5, 6);
+    java.util.ArrayList<PointData> corners = new java.util.ArrayList<>(List.of(a, b, c));
+    List<PointData> shape = QuestLocation.pointOrPolygon(corners);
+    corners.add(new PointData(7, 8));
+    corners.set(0, new PointData(9, 9));
+    assertEquals(List.of(a, b, c), shape);
   }
 
   @Test

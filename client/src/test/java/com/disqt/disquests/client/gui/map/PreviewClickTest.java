@@ -22,6 +22,15 @@ class PreviewClickTest {
   }
 
   @Test
+  void aVerticalMoveOfMoreThanTheSlopIsNotAClick() {
+    PreviewClick c = new PreviewClick();
+    c.press(10, 10, true);
+    assertFalse(c.release(10, 14, true, true));
+    c.press(10, 10, true);
+    assertTrue(c.release(10, 13, true, true));
+  }
+
+  @Test
   void releasingOutsideOrWithAnotherButtonIsNotAClick() {
     PreviewClick c = new PreviewClick();
     c.press(10, 10, true);

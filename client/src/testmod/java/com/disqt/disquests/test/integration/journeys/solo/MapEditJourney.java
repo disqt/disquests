@@ -144,6 +144,7 @@ class MapEditJourney {
     click(context, "mini-map");
     then("the map editor opens");
     waitForScreen(context, MapEditScreen.class);
+    assertEquals(0, vertexCount(context), "an empty preview should open an empty drawing");
 
     when("player cancels");
     click(context, "btn-map-cancel");

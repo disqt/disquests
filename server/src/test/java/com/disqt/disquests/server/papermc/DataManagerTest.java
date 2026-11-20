@@ -940,6 +940,23 @@ class DataManagerTest {
   }
 
   @Test
+  void savePolygon_twoCornersAreStoredAsAPinOnTheFirst() {
+    UUID id = UUID.randomUUID();
+    dm.upsertPlayerName(OWNER, "Alice");
+    List<PointData> two = List.of(new PointData(10, 20), new PointData(30, 40));
+    dm.saveQuest(
+        makeQuest(id, OWNER, "Two", Visibility.PRIVATE)
+            .withLocation(
+                new CoordinatesData(10, 64, 20), true, new CoordinatesData(30, 64, 40), two));
+
+    QuestData q = dm.getQuest(id);
+    assertEquals(new CoordinatesData(10, 64, 20), q.coordinates());
+    assertFalse(q.isRegion());
+    assertNull(q.coordinates2());
+    assertTrue(q.polygon().isEmpty());
+  }
+
+  @Test
   void savePolygon_replacesPreviousVertices() {
     UUID id = UUID.randomUUID();
     dm.upsertPlayerName(OWNER, "Alice");
