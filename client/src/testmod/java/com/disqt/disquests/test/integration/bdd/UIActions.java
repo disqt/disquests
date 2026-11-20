@@ -8,8 +8,10 @@ import com.disqt.disquests.client.gui.component.SuggestionDropdown;
 import com.disqt.disquests.client.gui.component.TreeRowComponent;
 import com.disqt.disquests.client.gui.component.TreeRowGeometry;
 import com.disqt.disquests.client.gui.map.MapView;
+import com.disqt.disquests.client.gui.map.OpeningGuard;
 import com.disqt.disquests.client.gui.screen.DisquestsBaseScreen;
 import com.disqt.disquests.client.gui.screen.MainScreen;
+import com.disqt.disquests.client.gui.screen.MapEditScreen;
 import com.disqt.disquests.client.gui.screen.QuestListPanel;
 import com.disqt.disquests.test.integration.harness.RconClient;
 import com.disqt.disquests.test.integration.harness.TestContext;
@@ -171,6 +173,18 @@ public final class UIActions {
       ClientGameTestContext context, Class<T> screenClass) {
     context.waitFor(client -> screenClass.isInstance(client.gui.screen()), TIMEOUT);
     context.waitTicks(2);
+  }
+
+  /**
+   * Waits for the full-screen map editor, then until its {@link OpeningGuard} window has passed:
+   * the editor drops left clicks that arrive sooner (the second half of a double-click on the
+   * preview), and game-test ticks are not paced in real time. The wait reads the guard's clock and
+   * starts once the screen is seen, which is after it opened.
+   */
+  public static void waitForMapEditor(ClientGameTestContext context) {
+    waitForScreen(context, MapEditScreen.class);
+    long seen = System.currentTimeMillis();
+    context.waitFor(client -> System.currentTimeMillis() - seen >= OpeningGuard.WINDOW_MS, TIMEOUT);
   }
 
   // --- Component interaction ---

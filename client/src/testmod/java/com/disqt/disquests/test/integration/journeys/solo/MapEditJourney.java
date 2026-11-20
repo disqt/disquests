@@ -143,7 +143,7 @@ class MapEditJourney {
     and("player clicks the empty location preview");
     click(context, "mini-map");
     then("the map editor opens");
-    waitForScreen(context, MapEditScreen.class);
+    waitForMapEditor(context);
     assertEquals(0, vertexCount(context), "an empty preview should open an empty drawing");
 
     when("player cancels");
@@ -164,7 +164,7 @@ class MapEditJourney {
     when("player clicks the location preview");
     click(context, "mini-map");
     then("the map editor opens");
-    waitForScreen(context, MapEditScreen.class);
+    waitForMapEditor(context);
   }
 
   @Test
@@ -284,7 +284,7 @@ class MapEditJourney {
 
     when("player opens the map editor from the preview and clears the location");
     click(context, "mini-map");
-    waitForScreen(context, MapEditScreen.class);
+    waitForMapEditor(context);
     click(context, "btn-map-clear");
     // Clear rebuilds the editor; MapEditScreen has no btn-set-pos
     waitForComponent(context, "btn-set-pos");
@@ -298,7 +298,7 @@ class MapEditJourney {
 
     when("player reopens the map editor and draws a bowtie");
     click(context, "mini-map");
-    waitForScreen(context, MapEditScreen.class);
+    waitForMapEditor(context);
     clickMapAtBlock(context, px - 30, pz - 30);
     clickMapAtBlock(context, px + 30, pz + 30);
     clickMapAtBlock(context, px + 30, pz - 30);
@@ -332,7 +332,7 @@ class MapEditJourney {
 
     when("player opens the map editor from the preview and places two corners");
     click(context, "mini-map");
-    waitForScreen(context, MapEditScreen.class);
+    waitForMapEditor(context);
     clickMapAtBlock(context, px - 30, pz - 30);
     clickMapAtBlock(context, px + 30, pz + 30);
     assertEquals(2, vertexCount(context), "corner count after two clicks");
