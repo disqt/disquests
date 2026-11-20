@@ -40,6 +40,12 @@ final class QuestTreePane {
   private static final int MIN_WIDTH = 100;
   private static final int SCROLLBAR_WIDTH = 3;
 
+  /**
+   * The pane's inset from the screen's left edge: the screen's own outer margin (the root's top
+   * padding in {@code quest_screen_view.xml} and {@code quest_screen_edit.xml}).
+   */
+  private static final int SCREEN_MARGIN = 4;
+
   private final QuestScreen screen;
   private final UUID questId;
   private final FlowLayout pane;
@@ -98,6 +104,7 @@ final class QuestTreePane {
     FlowLayout pane = UIContainers.verticalFlow(Sizing.fixed(MIN_WIDTH), Sizing.fill(100));
     pane.id(paneId);
     pane.padding(Insets.of(4));
+    pane.margins(Insets.left(SCREEN_MARGIN));
     pane.gap(4);
     screen.applyThemePanel(pane);
 
