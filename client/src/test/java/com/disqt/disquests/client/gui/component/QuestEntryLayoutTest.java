@@ -80,7 +80,7 @@ class QuestEntryLayoutTest {
   class RowInset {
 
     @ParameterizedTest(name = "depth {0}, toggles in list {1}: indent {2}, slot {3}")
-    @CsvSource({"0, false, 0, 0", "0, true, 0, 9", "1, true, 10, 9", "3, true, 30, 9"})
+    @CsvSource({"0, false, 0, 0", "0, true, 0, 12", "1, true, 10, 12", "3, true, 30, 12"})
     void depthIndentsAndTheToggleSlotIsReservedOnlyWhenTheListHasToggles(
         int depth, boolean toggles, int indent, int slot) {
       assertEquals(indent, QuestEntryLayout.indent(depth));

@@ -21,7 +21,13 @@ public record TreeRowGeometry(
 
   public static final int LEFT = 2;
   public static final int INDENT = 10;
-  public static final int TOGGLE_WIDTH = 9;
+
+  /** The expand toggle's slot, wide enough to aim at; its hit area is the slot by the row. */
+  public static final int TOGGLE_WIDTH = 12;
+
+  /** The chevron: a filled triangle about as tall as the font's capitals. */
+  public static final int CHEVRON_SIZE = 7;
+
   public static final int ICON_WIDTH = 10;
   public static final int REMOVE_WIDTH = 12;
 
@@ -57,6 +63,28 @@ public record TreeRowGeometry(
   /** Left edge of the handle's grip, centred in the toggle slot. */
   public int handleX() {
     return toggleX() + (TOGGLE_WIDTH - HANDLE_WIDTH) / 2;
+  }
+
+  /** Left edge of the chevron, centred in a toggle slot starting at {@code slotX}. */
+  public static int chevronX(int slotX) {
+    return slotX + (TOGGLE_WIDTH - CHEVRON_SIZE) / 2;
+  }
+
+  /**
+   * The chevron as fill rectangles {x0, y0, x1, y1} (end exclusive) in a {@link #CHEVRON_SIZE}
+   * square from its top-left: pointing right when collapsed, down when expanded. Each column (or
+   * row) of the triangle is one rectangle, two px shorter than the one before.
+   */
+  public static int[][] chevron(boolean expanded) {
+    int steps = (CHEVRON_SIZE + 1) / 2;
+    int[][] rects = new int[steps][];
+    for (int i = 0; i < steps; i++) {
+      rects[i] =
+          expanded
+              ? new int[] {i, i, CHEVRON_SIZE - i, i + 1}
+              : new int[] {i, i, i + 1, CHEVRON_SIZE - i};
+    }
+    return rects;
   }
 
   /**

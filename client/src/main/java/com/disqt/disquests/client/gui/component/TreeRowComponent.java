@@ -249,13 +249,13 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
     }
 
     if (g.hasToggle()) {
-      context.text(
-          font,
-          line.expanded() ? "▾" : "▸",
-          x + g.toggleX() + 1,
+      // The same chevron as the lists' toggle, level with the title's capitals
+      TreeToggleComponent.drawChevron(
+          context,
+          x + TreeRowGeometry.chevronX(g.toggleX()),
           y + TEXT_Y,
-          hoveredPart == Part.TOGGLE ? Colors.TEXT_PRIMARY : Colors.TEXT_MUTED,
-          false);
+          line.expanded(),
+          TreeToggleComponent.chevronColor(true, hoveredPart == Part.TOGGLE));
     }
     if (g.hasHandle()) {
       drawHandle(

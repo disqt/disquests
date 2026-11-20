@@ -1,5 +1,6 @@
 package com.disqt.disquests.client.gui.component;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -72,17 +73,17 @@ class TreeRowGeometryTest {
     static Stream<Arguments> cases() {
       return Stream.of(
           Arguments.of(
-              "top level", row(0, false, 0, false, false, false, false), new Xs(2, 11, 11, 100)),
+              "top level", row(0, false, 0, false, false, false, false), new Xs(2, 14, 14, 100)),
           Arguments.of(
               "locked, two levels down",
               row(2, false, 0, true, false, false, false),
-              new Xs(22, 31, 41, 100)),
+              new Xs(22, 34, 44, 100)),
           Arguments.of(
-              "completed, edit", row(1, true, 0, false, true, true, true), new Xs(12, 21, 31, 100)),
+              "completed, edit", row(1, true, 0, false, true, true, true), new Xs(12, 24, 34, 100)),
           Arguments.of(
               "removable, edit",
               row(1, true, 0, false, false, true, true),
-              new Xs(12, 21, 21, 88)));
+              new Xs(12, 24, 24, 88)));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -100,8 +101,8 @@ class TreeRowGeometryTest {
       return Stream.of(
           Arguments.of("left of the toggle", read, 11.0, Part.BODY),
           Arguments.of("toggle start", read, 12.0, Part.TOGGLE),
-          Arguments.of("toggle end", read, 20.9, Part.TOGGLE),
-          Arguments.of("after the toggle", read, 21.0, Part.BODY),
+          Arguments.of("toggle end", read, 23.9, Part.TOGGLE),
+          Arguments.of("after the toggle", read, 24.0, Part.BODY),
           Arguments.of("no toggle in edit mode", edit, 15.0, Part.BODY),
           Arguments.of("before the remove zone", edit, 87.9, Part.BODY),
           Arguments.of("remove zone", edit, 88.0, Part.REMOVE),
@@ -121,8 +122,8 @@ class TreeRowGeometryTest {
     void aDraggableRowHasAGripInTheToggleSlot() {
       TreeRowGeometry g = row(1, true, 0, false, false, true, true);
       assertTrue(g.hasHandle());
-      // Toggle slot starts at 12 and is 9 wide; the 5 px grip is centred in it
-      assertEquals(14, g.handleX());
+      // Toggle slot starts at 12 and is 12 wide; the 5 px grip is centred in it
+      assertEquals(15, g.handleX());
       assertEquals(Part.BODY, g.partAt(g.handleX() + 1.0));
     }
 
@@ -155,6 +156,40 @@ class TreeRowGeometryTest {
     @MethodSource("cases")
     void follows(String name, int children, String editing, String expected) {
       assertEquals(expected, TreeRowGeometry.trailing(children, editing));
+    }
+  }
+
+  @Nested
+  class Toggle {
+    @Test
+    void theSlotIsWideEnoughToAimAt() {
+      assertTrue(TreeRowGeometry.TOGGLE_WIDTH >= 12);
+      TreeRowGeometry read = row(0, false, 2, false, false, false, false);
+      assertEquals(Part.TOGGLE, read.partAt(read.toggleX()));
+      assertEquals(Part.TOGGLE, read.partAt(read.toggleX() + TreeRowGeometry.TOGGLE_WIDTH - 0.1));
+    }
+
+    @Test
+    void theChevronIsCentredInTheSlot() {
+      // 12 px slot, 7 px chevron: 2 px in
+      assertEquals(12, TreeRowGeometry.chevronX(10));
+    }
+
+    @Test
+    void collapsedPointsRight() {
+      int[][] r = TreeRowGeometry.chevron(false);
+      assertEquals(4, r.length);
+      // Columns, each 2 px shorter: full height first, a point last
+      assertArrayEquals(new int[] {0, 0, 1, 7}, r[0]);
+      assertArrayEquals(new int[] {3, 3, 4, 4}, r[3]);
+    }
+
+    @Test
+    void expandedPointsDown() {
+      int[][] r = TreeRowGeometry.chevron(true);
+      assertEquals(4, r.length);
+      assertArrayEquals(new int[] {0, 0, 7, 1}, r[0]);
+      assertArrayEquals(new int[] {3, 3, 4, 4}, r[3]);
     }
   }
 }

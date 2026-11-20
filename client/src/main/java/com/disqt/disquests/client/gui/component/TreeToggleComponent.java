@@ -7,13 +7,14 @@ import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.Sizing;
 import java.util.UUID;
 import java.util.function.Consumer;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.input.MouseButtonEvent;
 
 /**
- * The expand toggle left of a quest list entry that has subquests: "▸" collapsed, "▾" expanded,
- * level with the entry's title. Its id is {@code toggle-<questId>}. An inactive toggle (while a
- * search forces the expansion) shows its state without a hover highlight and ignores clicks.
+ * The expand toggle left of a quest list entry that has subquests: a filled chevron pointing right
+ * collapsed and down expanded, level with the entry's title, clickable over the whole slot ({@link
+ * TreeRowGeometry#TOGGLE_WIDTH} wide, the entry's height). Its id is {@code toggle-<questId>}. An
+ * inactive toggle (while a search forces the expansion) shows its state without a hover highlight
+ * and ignores clicks.
  */
 public class TreeToggleComponent extends BaseUIComponent {
 
@@ -53,13 +54,28 @@ public class TreeToggleComponent extends BaseUIComponent {
 
   @Override
   public void draw(OwoUIGraphics context, int mouseX, int mouseY, float partialTicks, float delta) {
-    context.text(
-        Minecraft.getInstance().font,
-        expanded ? "▾" : "▸",
-        x() + 1,
+    // Level with the title's capitals; the whole entry-high slot takes the click
+    boolean hovered = active && isInBoundingBox(mouseX, mouseY);
+    if (hovered) context.fill(x(), y(), x() + width(), y() + height(), Colors.ENTRY_HOVER);
+    drawChevron(
+        context,
+        TreeRowGeometry.chevronX(x()),
         y() + QuestEntryLayout.TITLE_Y,
-        active && isInBoundingBox(mouseX, mouseY) ? Colors.TEXT_PRIMARY : Colors.TEXT_MUTED,
-        false);
+        expanded,
+        chevronColor(active, hovered));
+  }
+
+  /** Primary text colour, slightly softened at rest and full on hover; muted while inactive. */
+  public static int chevronColor(boolean active, boolean hovered) {
+    if (!active) return Colors.TEXT_MUTED;
+    return hovered ? Colors.TEXT_PRIMARY : (Colors.TEXT_PRIMARY & 0x00FFFFFF) | 0xC0000000;
+  }
+
+  /** The filled chevron of {@link TreeRowGeometry#chevron}, its box's top-left at (x, y). */
+  public static void drawChevron(OwoUIGraphics context, int x, int y, boolean expanded, int color) {
+    for (int[] r : TreeRowGeometry.chevron(expanded)) {
+      context.fill(x + r[0], y + r[1], x + r[2], y + r[3], color);
+    }
   }
 
   @Override
