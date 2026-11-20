@@ -221,9 +221,11 @@ tasks.register<JacocoReport>("jacocoIntegrationTestReport") {
     description = "Generate combined coverage report from client + server E2E tests"
     dependsOn("compileJava", ":server:compileJava", ":common:compileJava")
 
-    // Merge all exec files: E2E client + E2E server + common unit tests + server unit tests
+    // Merge all exec files: E2E client + E2E server + unit tests of client, common and server.
+    // Client logic kept free of Minecraft is covered by unit tests, not by the journeys.
     val execFiles = files(
         layout.buildDirectory.file("jacoco/gameTest.exec").get().asFile,
+        layout.buildDirectory.file("jacoco/test.exec").get().asFile,
         file("../server/run/jacoco-server.exec"),
         file("../common/build/jacoco/test.exec"),
         file("../server/build/jacoco/test.exec")
