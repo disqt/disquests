@@ -363,4 +363,42 @@ class QuestTest {
       assertFalse(q.getContributors().get(2).canEdit());
     }
   }
+
+  @Nested
+  class PointOrPolygonBeforeSave {
+    @Test
+    void twoCornersBecomeAPinOnTheFirstAtTheStoredHeight() {
+      Quest q = makeQuest(Visibility.PRIVATE);
+      q.setPolygon(
+          new java.util.ArrayList<>(List.of(new PointData(10, 20), new PointData(30, 40))));
+      q.setCoordinates(new CoordinatesData(10, 70, 20));
+      q.setCoordinates2(new CoordinatesData(30, 70, 40));
+      q.setRegion(true);
+      q.applyPointOrPolygon();
+      assertEquals(new CoordinatesData(10, 70, 20), q.getCoordinates());
+      assertNull(q.getCoordinates2());
+      assertFalse(q.isRegion());
+      assertTrue(q.getPolygon().isEmpty());
+    }
+
+    @Test
+    void threeCornersAndPinsAreLeftAlone() {
+      Quest q = makeQuest(Visibility.PRIVATE);
+      List<PointData> three =
+          List.of(new PointData(0, 0), new PointData(5, 0), new PointData(5, 5));
+      q.setPolygon(new java.util.ArrayList<>(three));
+      q.setCoordinates(new CoordinatesData(0, 64, 0));
+      q.setCoordinates2(new CoordinatesData(5, 64, 5));
+      q.setRegion(true);
+      q.applyPointOrPolygon();
+      assertEquals(three, q.getPolygon());
+      assertTrue(q.isRegion());
+
+      Quest pin = makeQuest(Visibility.PRIVATE);
+      pin.setPolygon(List.of());
+      pin.setCoordinates(new CoordinatesData(1, 2, 3));
+      pin.applyPointOrPolygon();
+      assertEquals(new CoordinatesData(1, 2, 3), pin.getCoordinates());
+    }
+  }
 }

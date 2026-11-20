@@ -377,6 +377,8 @@ public class QuestScreen extends DisquestsBaseScreen {
             quest.setContent(updated);
             List<RenderedLine> rerendered = MarkdownRenderer.render(updated);
             markdownWidget.setContent(rerendered);
+            // Two stored corners go out as the pin the server will keep.
+            quest.applyPointOrPolygon();
             PacketSender.saveQuest(
                 quest.getId(),
                 quest.getTitle(),
@@ -980,6 +982,8 @@ public class QuestScreen extends DisquestsBaseScreen {
     }
     // Shown at once, as before; the server's answer corrects it if it refuses.
     if (links.visibility() != null) quest.setVisibility(links.visibility());
+    // Two stored corners go out as the pin the server will keep.
+    quest.applyPointOrPolygon();
     ClientCache.addOrUpdateMyQuest(quest);
     PacketSender.saveQuest(
         quest.getId(),

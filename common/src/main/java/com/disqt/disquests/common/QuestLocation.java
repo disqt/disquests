@@ -8,7 +8,9 @@ import java.util.List;
 /** Geometry helpers and canonical normalisation for quest locations. */
 public final class QuestLocation {
   public static final int MAX_VERTICES = 64;
-  private static final double DEFAULT_Y = 64;
+
+  /** Height of a pin or outline with no stored y. */
+  public static final double DEFAULT_Y = 64;
 
   private QuestLocation() {}
 

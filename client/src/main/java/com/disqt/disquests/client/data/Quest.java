@@ -1,5 +1,6 @@
 package com.disqt.disquests.client.data;
 
+import com.disqt.disquests.common.QuestLocation;
 import com.disqt.disquests.common.model.ContributorData;
 import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.PointData;
@@ -218,6 +219,24 @@ public class Quest {
 
   public void setPolygon(List<PointData> polygon) {
     this.polygon = polygon != null ? polygon : new ArrayList<>();
+  }
+
+  /**
+   * Applies {@link QuestLocation#pointOrPolygon} the way the server's {@link
+   * QuestLocation#normalize} stores it: an outline of one or two corners becomes a pin on the first
+   * corner, at the stored height (64 without one). Called before a save, so this copy matches what
+   * the server keeps.
+   */
+  public void applyPointOrPolygon() {
+    if (polygon.isEmpty()) return;
+    List<PointData> shape = QuestLocation.pointOrPolygon(polygon);
+    if (shape.size() != 1) return;
+    PointData p = shape.get(0);
+    double y = coordinates != null ? coordinates.y() : QuestLocation.DEFAULT_Y;
+    coordinates = new CoordinatesData(p.x(), y, p.z());
+    coordinates2 = null;
+    isRegion = false;
+    polygon = new ArrayList<>();
   }
 
   public long getCompletedAt() {
