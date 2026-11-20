@@ -647,7 +647,7 @@ tasks.register("runSoloTests") {
 
             // --- Step 5: Wait for results (Player A only) ---
             val resultA = File(syncDir, "results-a.txt")
-            val resultsDeadline = System.currentTimeMillis() + 300000 // 5 minutes
+            val resultsDeadline = System.currentTimeMillis() + 600000 // 10 minutes: the solo suite runs about 5.5 on CI
             while (System.currentTimeMillis() < resultsDeadline) {
                 if (resultA.exists()) break
                 if (startedClients && processes.all { !it.isAlive }) break
