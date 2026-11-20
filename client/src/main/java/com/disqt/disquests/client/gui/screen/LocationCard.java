@@ -131,13 +131,12 @@ final class LocationCard {
     }
 
     FlowLayout buttons = root.childById(FlowLayout.class, "location-buttons");
-    ButtonComponent setPos =
+    // Content-sized buttons in a wrapping row: on a narrow card they move to a second line.
+    buttons.child(
         button(
             "btn-set-pos",
             Component.translatable("gui.disquests.btn.set_pos"),
-            screen::setPlayerPosition);
-    setPos.horizontalSizing(Sizing.fixed(FIELD_WIDTH));
-    buttons.child(setPos);
+            screen::setPlayerPosition));
     buttons.child(
         button(
             "btn-clear-location",

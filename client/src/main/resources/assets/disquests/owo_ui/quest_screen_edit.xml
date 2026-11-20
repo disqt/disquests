@@ -205,7 +205,7 @@
                             </flow-layout>
                         </children>
                     </flow-layout>
-                    <flow-layout direction="horizontal" id="location-buttons">
+                    <flow-layout direction="ltr-text-flow" id="location-buttons">
                         <sizing>
                             <horizontal method="fill">100</horizontal>
                             <vertical method="content"/>

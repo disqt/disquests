@@ -20,7 +20,7 @@
     "accept": "Accept",
     "deny": "Deny",
     "remove": "Remove",
-    "set_pos": "Set Pos",
+    "set_pos": "Set to current position",
     "view_bluemap": "View on BlueMap",
     "join": "Join",
     "request": "Request",
