@@ -67,4 +67,12 @@ public final class MapQuestFilter {
     for (QuestData d : graph.descendants(top.id())) tree.add(d.id());
     return tree;
   }
+
+  /**
+   * Whether a quest stored on {@code questMap} is drawn on a map of {@code viewDimension}: only on
+   * its own dimension, unless {@code anyDimension} (a map already showing the quest's dimension).
+   */
+  public static boolean drawnIn(String viewDimension, String questMap, boolean anyDimension) {
+    return anyDimension || (viewDimension != null && viewDimension.equals(questMap));
+  }
 }

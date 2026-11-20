@@ -206,7 +206,8 @@ final class LocationCard {
 
   /** The mini map's drawing of the quest's pin or outline, in the quest's colour. */
   private static MapLayer locationLayer(Quest quest) {
-    QuestPolygonLayer layer = new QuestPolygonLayer();
+    // The card's map is in the quest's own dimension; draw a legacy quest with no map there too.
+    QuestPolygonLayer layer = new QuestPolygonLayer().anyDimension(true);
     layer.setQuests(List.of(quest));
     return layer;
   }

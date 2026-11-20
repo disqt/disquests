@@ -186,11 +186,17 @@ public class MapView extends BaseUIComponent {
       Font font = Minecraft.getInstance().font;
       g.text(font, TILES_UNAVAILABLE, x + 4, y + h - 4 - font.lineHeight, Colors.TEXT_MUTED, false);
     }
-    if (isPreview() && isInBoundingBox(mouseX, mouseY)) {
+    if (isPreview() && isTopmostAt(mouseX, mouseY)) {
       g.drawRectOutline(x, y, w, h, Colors.TEXT_PRIMARY);
       hoverTooltip = CLICK_TO_EDIT;
     }
     updateTooltip();
+  }
+
+  /** This view is what owo finds under the point: no overlay covers it there. */
+  private boolean isTopmostAt(int mouseX, int mouseY) {
+    var root = root();
+    return root != null && root.childAt(mouseX, mouseY) == this;
   }
 
   /** Tiles (when reachable) and the tile-boundary grid, which also shows when tiles are not. */

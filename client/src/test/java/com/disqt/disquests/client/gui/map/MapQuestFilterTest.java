@@ -7,6 +7,8 @@ import static com.disqt.disquests.client.gui.tree.TreeFixtures.id;
 import static com.disqt.disquests.client.gui.tree.TreeFixtures.ids;
 import static com.disqt.disquests.client.gui.tree.TreeFixtures.quest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.disqt.disquests.client.gui.tree.QuestTreeRows.BoardFilter;
 import com.disqt.disquests.client.gui.tree.QuestTreeRows.ListOptions;
@@ -173,6 +175,21 @@ class MapQuestFilterTest {
               quest("Tour").owner(MAX).modified(1));
       assertEquals(ids("Gare", "hub"), MapQuestFilter.visible(g, LEO, null, Tab.MY_QUESTS));
       assertEquals(ids("Tour"), MapQuestFilter.visible(g, LEO, null, Tab.QUEST_BOARD));
+    }
+  }
+
+  @Nested
+  class DrawnIn {
+    @Test
+    void theBoardDrawsAQuestOnlyOnItsOwnDimension() {
+      assertTrue(MapQuestFilter.drawnIn("overworld", "overworld", false));
+      assertFalse(MapQuestFilter.drawnIn("overworld", "the_nether", false));
+      assertFalse(MapQuestFilter.drawnIn("overworld", null, false));
+    }
+
+    @Test
+    void theLocationCardDrawsAQuestWithNoStoredMap() {
+      assertTrue(MapQuestFilter.drawnIn("overworld", null, true));
     }
   }
 }
