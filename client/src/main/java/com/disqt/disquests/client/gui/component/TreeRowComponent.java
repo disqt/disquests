@@ -230,7 +230,9 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
     int w = width();
     // While a row is dragged only the drop target lights up, not what the cursor passes over
     boolean otherDrag = dragTarget != null && dragTarget.dragging();
-    boolean hovered = isInBoundingBox(mouseX, mouseY) && !otherDrag;
+    // Hover effects (fill, brighter handle and x, the x's tooltip) only where this row is the
+    // topmost component: not under a dropdown or an overlay, not past the scroll's clipped edge
+    boolean hovered = isInBoundingBox(mouseX, mouseY) && !otherDrag && isTopmostAt(mouseX, mouseY);
     Part hoveredPart = hovered ? g.partAt(mouseX - x) : null;
 
     if (highlighted) {
@@ -306,6 +308,12 @@ public class TreeRowComponent extends BaseUIComponent implements DropTracker.Zon
       context.text(font, count, textEnd, y + TEXT_Y, Colors.TEXT_MUTED, false);
     } // The dragged row stays in place, dimmed; its ghost follows the cursor
     if (dragging) context.fill(x, y, x + w, y + ROW_HEIGHT, Colors.TREE_SOURCE_DIM);
+  }
+
+  /** This row is what owo finds under the point (nothing covers it there, it is not clipped). */
+  private boolean isTopmostAt(int x, int y) {
+    var root = root();
+    return root != null && root.childAt(x, y) == this;
   }
 
   /** The drag handle: a grip of two columns of three dots. */

@@ -228,10 +228,15 @@
                 <surface>
                     <panel dark="true"/>
                 </surface>
+                <!-- Thin top and bottom: the form must not push Save off a short window. No gap:
+                     QuestLinksForm spaces the rows that are shown, so empty ones take no room -->
                 <padding>
-                    <all>4</all>
+                    <top>2</top>
+                    <bottom>2</bottom>
+                    <left>4</left>
+                    <right>4</right>
                 </padding>
-                <gap>2</gap>
+                <gap>0</gap>
                 <margins>
                     <top>2</top>
                 </margins>

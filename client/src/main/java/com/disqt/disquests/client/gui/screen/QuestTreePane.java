@@ -42,14 +42,20 @@ final class QuestTreePane {
 
   private final QuestScreen screen;
   private final UUID questId;
+  private final FlowLayout pane;
   private final FlowLayout list;
   private final MinHeightScroll<FlowLayout> scroll;
   private boolean revealPending = true;
 
   private QuestTreePane(
-      QuestScreen screen, UUID questId, FlowLayout list, MinHeightScroll<FlowLayout> scroll) {
+      QuestScreen screen,
+      UUID questId,
+      FlowLayout pane,
+      FlowLayout list,
+      MinHeightScroll<FlowLayout> scroll) {
     this.screen = screen;
     this.questId = questId;
+    this.pane = pane;
     this.list = list;
     this.scroll = scroll;
   }
@@ -70,7 +76,11 @@ final class QuestTreePane {
             LIST_ID);
     QuestTreePane treePane =
         new QuestTreePane(
-            screen, questId, shell.list(), (MinHeightScroll<FlowLayout>) shell.scroll());
+            screen,
+            questId,
+            shell.pane(),
+            shell.list(),
+            (MinHeightScroll<FlowLayout>) shell.scroll());
     treePane.fill();
     return treePane;
   }
@@ -156,8 +166,8 @@ final class QuestTreePane {
               row.childCount(),
               row.expanded());
       TreeRowComponent component = new TreeRowComponent(line).readMode(this::open, this::toggle);
-      // Hovering another quest's row previews it (a locked one shows nothing)
-      if (!row.id().equals(questId)) screen.previewOnHover(component, row.id());
+      // Resting on another quest's row previews it right of the pane (a locked one shows nothing)
+      if (!row.id().equals(questId)) screen.previewBeside(component, row.id(), pane);
       list.child(component);
     }
   }

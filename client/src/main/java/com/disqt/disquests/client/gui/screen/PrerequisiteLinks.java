@@ -15,6 +15,8 @@ import io.wispforest.owo.ui.core.Color;
 import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.Sizing;
 import java.util.UUID;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 
@@ -106,8 +108,11 @@ final class PrerequisiteLinks {
     label.id(LINE_PREFIX + link.id());
     label.horizontalSizing(Sizing.fill(100));
     label.shadow(true);
-    // The same preview as a wiki-link; none for a quest locked for the player
-    screen.previewOnHover(label, link.id());
+    // The same preview as a wiki-link, over the title only (the line is full width); none for a
+    // quest locked for the player
+    Font font = Minecraft.getInstance().font;
+    int titleFrom = link.completed() ? font.width("✔ ") : 0;
+    screen.previewOnHover(label, link.id(), titleFrom, titleFrom + font.width(title));
     label
         .mouseDown()
         .subscribe(

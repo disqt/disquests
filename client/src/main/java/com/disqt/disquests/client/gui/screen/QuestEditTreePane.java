@@ -303,6 +303,11 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
 
   /** Once laid out, scrolls the edited quest's row into view when it is below the visible part. */
   void tick() {
+    // No release arrived (alt-tab, button let go where the screen never heard it): drop the drag
+    if (dragSource != null
+        && (!screen.leftButtonHeld() || !Minecraft.getInstance().isWindowActive())) {
+      cancelDrag();
+    }
     // A new quest's own line follows the title field as the player types
     if (isNewQuest && !java.util.Objects.equals(shownTitle, currentTitle.get())) fill();
     if (!revealPending) return;
@@ -363,6 +368,14 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
   public void dragCancelled(TreeRowComponent source) {
     dragSource = null;
     tracker.clear();
+  }
+
+  /** Stops a drag in progress without dropping anything (Escape, a lost release). */
+  void cancelDrag() {
+    TreeRowComponent source = dragSource;
+    dragSource = null;
+    tracker.clear();
+    if (source != null) source.cancelDrag();
   }
 
   /** A row is being dragged: still dragging and still in the pane (a rebuild drops it). */

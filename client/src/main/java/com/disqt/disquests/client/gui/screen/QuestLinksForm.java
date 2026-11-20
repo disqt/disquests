@@ -83,11 +83,13 @@ final class QuestLinksForm {
     visibilityHint = label(Component.empty(), true);
     visibilityHint.id("visibility-hint");
     visibilityHint.horizontalSizing(Sizing.fill(100));
+    visibilityHint.margins(Insets.top(1));
     form.child(visibilityHint);
 
     if (trees) {
       FlowLayout prerequisiteRow = row();
       prerequisiteRow.id("prerequisite-row");
+      prerequisiteRow.margins(Insets.top(2));
       prerequisiteRow.child(label(Component.translatable(EditorText.PREREQUISITES), false));
       UUID me = ClientSession.getEffectivePlayerUuid();
       QuestSearchField field =
@@ -230,12 +232,13 @@ final class QuestLinksForm {
 
   private void fillChips() {
     chips.clearChildren();
+    chips.margins(Insets.none());
     if (!trees) return;
     for (UUID id : draft.prerequisites()) {
       QuestData q = draft.tree().effective().get(id);
       String title = q != null && q.title() != null ? q.title() : "?";
       TagChipComponent chip = chip(CHIP_PREFIX + id, title, () -> draft.removePrerequisite(id));
-      screen.previewOnHover(chip, id);
+      screen.previewBeside(chip, id, null);
       chips.child(chip);
     }
     if (draft.showsHiddenPrerequisites()) {
@@ -252,6 +255,8 @@ final class QuestLinksForm {
               Component.translatable(EditorText.PREREQUISITE_DELETED).getString(),
               draft::dropDeleted));
     }
+    // The form has no gap: only a row of chips that is there takes room
+    if (!chips.children().isEmpty()) chips.margins(Insets.top(2));
   }
 
   private TagChipComponent chip(String id, String text, Runnable remove) {
@@ -268,7 +273,9 @@ final class QuestLinksForm {
 
   private void fillAutoJoin() {
     autoJoinRow.clearChildren();
+    autoJoinRow.margins(Insets.none());
     if (!trees || !draft.autoJoinShown()) return;
+    autoJoinRow.margins(Insets.top(2));
     boolean usable = draft.autoJoinUsable();
     MutableComponent text = Component.translatable(EditorText.AUTO_JOIN);
     if (!usable) {

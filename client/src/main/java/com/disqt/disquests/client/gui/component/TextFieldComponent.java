@@ -30,6 +30,9 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
   // Room kept free at the left of the component (a leading glyph); the text starts after it
   private int lead;
 
+  // How far the text is drawn above the delegate's own 5 px inset (to centre one line in a field)
+  private int raise;
+
   // Optional suggestion dropdown: gets the keys first while open; onEdit runs after each key
   private SuggestionDropdown<?> dropdown;
   private Runnable onEdit;
@@ -73,9 +76,14 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
     this.lead = px;
   }
 
+  /** Draws (and hit-tests) the text {@code px} higher than the delegate's own inset. */
+  protected void raise(int px) {
+    this.raise = px;
+  }
+
   private void computeOffset() {
     offsetX = this.x() + lead - delegate.x;
-    offsetY = this.y() - delegate.y;
+    offsetY = this.y() - raise - delegate.y;
   }
 
   @Override
@@ -181,7 +189,7 @@ public class TextFieldComponent extends BaseUIComponent implements GreedyInputUI
 
   /** Screen y of the top of the cursor's line. */
   public int cursorScreenY() {
-    return this.y() + delegate.getCursorScreenY();
+    return this.y() - raise + delegate.getCursorScreenY();
   }
 
   @Override

@@ -14,6 +14,7 @@ import com.disqt.disquests.client.gui.component.TextFieldComponent;
 import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.helper.HoverPreviewRenderer;
 import com.disqt.disquests.client.gui.helper.Messages;
+import com.disqt.disquests.client.gui.helper.PreviewDwell;
 import com.disqt.disquests.client.gui.tree.QuestEditDraft;
 import com.disqt.disquests.client.gui.widget.MarkdownWidget;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
@@ -32,6 +33,7 @@ import com.disqt.disquests.common.model.LinkChanges;
 import com.disqt.disquests.common.model.Notice;
 import com.disqt.disquests.common.model.PointData;
 import com.disqt.disquests.common.model.Visibility;
+import com.mojang.blaze3d.platform.InputConstants;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.UIComponents;
@@ -60,6 +62,8 @@ import java.util.stream.Stream;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.Identifier;
@@ -96,7 +100,25 @@ public class QuestScreen extends DisquestsBaseScreen {
 
   // Components that preview a quest on hover (prerequisite links and chips, the pane's rows); weak,
   // so the rows and chips a rebuild drops go with it
-  private final Map<UIComponent, UUID> previews = new WeakHashMap<>();
+  private final Map<UIComponent, Preview> previews = new WeakHashMap<>();
+
+  // Anchored previews (tree rows, chips) wait until the pointer rests on one
+  private final PreviewDwell<UIComponent> dwell = new PreviewDwell<>();
+
+  /**
+   * How a component previews its quest. Immediate (wiki-link style, at the pointer) or anchored
+   * (after {@link PreviewDwell#DELAY_MS}, beside {@code anchor}, or beside the component itself
+   * when {@code anchorSelf}). {@code hitFrom}/{@code hitTo} narrow the trigger to a span of the
+   * component, in px from its left edge ({@code hitTo} -1 for its whole width).
+   */
+  private record Preview(
+      UUID questId,
+      boolean anchored,
+      @Nullable UIComponent anchor,
+      boolean anchorSelf,
+      int hitFrom,
+      int hitTo) {}
+
   @Nullable private QuestLinksForm linksForm;
 
   // Permission cache
@@ -826,6 +848,37 @@ public class QuestScreen extends DisquestsBaseScreen {
         });
   }
 
+  // The left button as this screen heard it. MouseHandler.isLeftPressed() is only updated while no
+  // screen is open, so it cannot tell whether a drag inside a screen is still held.
+  private boolean leftHeld;
+
+  /** The left mouse button is down, as this screen's own press and release events say. */
+  boolean leftButtonHeld() {
+    return leftHeld;
+  }
+
+  @Override
+  public boolean mouseClicked(MouseButtonEvent click, boolean simulated) {
+    if (click.button() == InputConstants.MOUSE_BUTTON_LEFT) leftHeld = true;
+    return super.mouseClicked(click, simulated);
+  }
+
+  @Override
+  public boolean mouseReleased(MouseButtonEvent click) {
+    if (click.button() == InputConstants.MOUSE_BUTTON_LEFT) leftHeld = false;
+    return super.mouseReleased(click);
+  }
+
+  /** Escape during a tree-row drag cancels the drag only; the next Escape leaves as usual. */
+  @Override
+  public boolean keyPressed(KeyEvent keyInput) {
+    if (keyInput.isEscape() && editPane != null && editPane.dragging()) {
+      editPane.cancelDrag();
+      return true;
+    }
+    return super.keyPressed(keyInput);
+  }
+
   /** Escape: in the editor, asks before dropping unsaved changes. */
   @Override
   public void onClose() {
@@ -1276,11 +1329,21 @@ public class QuestScreen extends DisquestsBaseScreen {
   // ===================== OVERLAYS =====================
 
   /**
-   * Hovering {@code component} previews the quest {@code questId} like a wiki-link does, when the
-   * player sees that quest fully ({@link WikiLinks#target}); a locked quest shows nothing.
+   * Hovering {@code component} between {@code hitFrom} and {@code hitTo} px from its left edge (the
+   * title of a link line) previews the quest {@code questId} at the pointer, like a wiki-link, when
+   * the player sees that quest fully ({@link WikiLinks#target}); a locked quest shows nothing.
    */
-  void previewOnHover(UIComponent component, UUID questId) {
-    previews.put(component, questId);
+  void previewOnHover(UIComponent component, UUID questId, int hitFrom, int hitTo) {
+    previews.put(component, new Preview(questId, false, null, false, hitFrom, hitTo));
+  }
+
+  /**
+   * Resting on {@code component} for {@link PreviewDwell#DELAY_MS} previews {@code questId} beside
+   * {@code anchor} (the tree pane), or beside the component itself when {@code anchor} is null (a
+   * chip), so the card never covers the rows under the pointer.
+   */
+  void previewBeside(UIComponent component, UUID questId, @Nullable UIComponent anchor) {
+    previews.put(component, new Preview(questId, true, anchor, anchor == null, 0, -1));
   }
 
   /**
@@ -1293,10 +1356,11 @@ public class QuestScreen extends DisquestsBaseScreen {
   public void extractRenderState(
       GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
     super.extractRenderState(context, mouseX, mouseY, delta);
-    boolean dragging = editPane != null && editPane.dragging();
-    if (!dragging) drawHoverPreview(context, mouseX, mouseY);
-    if (editPane != null) {
+    if (editPane != null && editPane.dragging()) {
+      dwell.update(null, 0);
       editPane.drawGhost(OwoUIGraphics.of(context), mouseX, mouseY, this.width, this.height);
+    } else {
+      drawHoverPreview(context, mouseX, mouseY);
     }
   }
 
@@ -1307,16 +1371,41 @@ public class QuestScreen extends DisquestsBaseScreen {
    */
   private void drawHoverPreview(GuiGraphicsExtractor context, int mouseX, int mouseY) {
     FlowLayout root = getRootComponent();
-    if (root == null || previews.isEmpty()) return;
-    for (UIComponent c = root.childAt(mouseX, mouseY); c != null; c = c.parent()) {
-      UUID id = previews.get(c);
-      if (id == null) continue;
-      Quest target = WikiLinks.target(id, ClientCache::getQuestById);
-      if (target != null) {
-        HoverPreviewRenderer.draw(context, target, mouseX, mouseY, this.width, this.height);
+    UIComponent hovered = null;
+    Preview preview = null;
+    if (root != null && !previews.isEmpty()) {
+      for (UIComponent c = root.childAt(mouseX, mouseY); c != null; c = c.parent()) {
+        Preview p = previews.get(c);
+        if (p == null) continue;
+        int relX = mouseX - c.x();
+        int hitTo = p.hitTo() < 0 ? c.width() : Math.min(p.hitTo(), c.width());
+        if (relX >= p.hitFrom() && relX < hitTo) {
+          hovered = c;
+          preview = p;
+        }
+        break;
       }
+    }
+    long now = System.currentTimeMillis();
+    if (preview == null || !preview.anchored()) dwell.update(null, now);
+    if (preview == null) return;
+    Quest target = WikiLinks.target(preview.questId(), ClientCache::getQuestById);
+    if (target == null) return;
+    if (!preview.anchored()) {
+      HoverPreviewRenderer.draw(context, target, mouseX, mouseY, this.width, this.height);
       return;
     }
+    if (dwell.update(hovered, now) != hovered) return;
+    UIComponent anchor = preview.anchorSelf() ? hovered : preview.anchor();
+    if (anchor == null) return;
+    HoverPreviewRenderer.drawBeside(
+        context,
+        target,
+        anchor.x(),
+        anchor.x() + anchor.width(),
+        hovered.y(),
+        this.width,
+        this.height);
   }
 
   // ===================== AUTO-CLOSE =====================

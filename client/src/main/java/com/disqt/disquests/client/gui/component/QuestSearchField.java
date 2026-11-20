@@ -65,6 +65,8 @@ public class QuestSearchField extends TextFieldComponent {
     this.source = source;
     this.id(id);
     getDelegate().setMutedPlaceholder(true);
+    // The delegate puts its line 5 px down, too low in a 14 px frame: centre the 9 px line
+    raise(raisedBy());
     this.dropdown =
         new SuggestionDropdown<>(root, id + "-suggestions", QuestSearchField::entry, this::picked);
     setAutocomplete(dropdown, this::refreshIfChanged);
@@ -79,6 +81,10 @@ public class QuestSearchField extends TextFieldComponent {
 
   private static final int GLYPH_GAP = 1;
   private static final int TEXT_INSET = 5;
+
+  private static int raisedBy() {
+    return TEXT_INSET - (HEIGHT - Minecraft.getInstance().font.lineHeight + 1) / 2;
+  }
 
   @Override
   public void draw(OwoUIGraphics context, int mouseX, int mouseY, float partialTicks, float delta) {
@@ -95,8 +101,8 @@ public class QuestSearchField extends TextFieldComponent {
         getDelegate().isFocused() ? Colors.FIELD_OUTLINE_FOCUSED : Colors.FIELD_OUTLINE);
     if (glyph != null) {
       var font = Minecraft.getInstance().font;
-      // On the delegate's first line (it draws its text 5 px in from the top and the left)
-      context.text(font, glyph, x + 4, y + TEXT_INSET, Colors.TEXT_MUTED, false);
+      // On the text's line: the delegate's 5 px inset, raised like the text
+      context.text(font, glyph, x + 4, y + TEXT_INSET - raisedBy(), Colors.TEXT_MUTED, false);
     }
     super.draw(context, mouseX, mouseY, partialTicks, delta);
   }
