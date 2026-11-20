@@ -6,6 +6,7 @@ import com.disqt.disquests.client.gui.map.BannerLayer;
 import com.disqt.disquests.client.gui.map.MapCameraMemory;
 import com.disqt.disquests.client.gui.map.MapMath;
 import com.disqt.disquests.client.gui.map.MapView;
+import com.disqt.disquests.client.gui.map.OpeningGuard;
 import com.disqt.disquests.client.gui.map.PlayerMarkerLayer;
 import com.disqt.disquests.client.gui.map.PolygonEditLayer;
 import com.disqt.disquests.client.gui.map.QuestStyle;
@@ -22,6 +23,7 @@ import io.wispforest.owo.ui.core.Sizing;
 import java.util.List;
 import java.util.Objects;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -44,6 +46,7 @@ public class MapEditScreen extends DisquestsBaseScreen {
   private PolygonEditLayer layer;
   private LabelComponent hintLabel;
   private String shownNotice;
+  private OpeningGuard openingGuard = new OpeningGuard(System.currentTimeMillis());
 
   public MapEditScreen(QuestScreen editor, String dimension, List<PointData> initial) {
     super(
@@ -65,6 +68,7 @@ public class MapEditScreen extends DisquestsBaseScreen {
   @Override
   protected void build(FlowLayout root) {
     applyThemeRoot(root);
+    openingGuard = new OpeningGuard(System.currentTimeMillis());
 
     this.layer = new PolygonEditLayer(initial);
     Quest quest = editor.getQuest();
@@ -144,6 +148,27 @@ public class MapEditScreen extends DisquestsBaseScreen {
       hintLabel.text(notice != null ? Component.literal(notice) : EDIT_HINT);
       shownNotice = notice;
     }
+  }
+
+  /**
+   * A left press right after opening is the second half of the double-click that opened this screen
+   * from the location preview; it and its release are dropped so they add no corner.
+   */
+  @Override
+  public boolean mouseClicked(MouseButtonEvent click, boolean doubled) {
+    if (click.button() == InputConstants.MOUSE_BUTTON_LEFT
+        && !openingGuard.acceptPress(System.currentTimeMillis())) {
+      return true;
+    }
+    return super.mouseClicked(click, doubled);
+  }
+
+  @Override
+  public boolean mouseReleased(MouseButtonEvent click) {
+    if (click.button() == InputConstants.MOUSE_BUTTON_LEFT && !openingGuard.acceptRelease()) {
+      return true;
+    }
+    return super.mouseReleased(click);
   }
 
   @Override
