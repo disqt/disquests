@@ -1,6 +1,7 @@
 package com.disqt.disquests.client.gui.helper;
 
 import com.disqt.disquests.client.data.Quest;
+import com.disqt.disquests.client.gui.component.TextFit;
 import com.disqt.disquests.client.markdown.MarkdownRenderer;
 import com.disqt.disquests.client.markdown.RenderedLine;
 import java.util.List;
@@ -105,7 +106,8 @@ public final class HoverPreviewRenderer {
     // Compute width to fit content (clamped between MIN_WIDTH and MAX_WIDTH)
     String title = quest.getTitle() != null ? quest.getTitle() : "Untitled";
     int contentArea = PADDING * 2;
-    int neededWidth = textRenderer.width(title) + contentArea;
+    // The title is drawn bold, which is wider than the plain text
+    int neededWidth = textRenderer.width(boldTitle(title)) + contentArea;
     for (RenderedLine line : renderedLines) {
       neededWidth =
           Math.max(neededWidth, textRenderer.width(line.text().getString()) + contentArea);
@@ -127,6 +129,10 @@ public final class HoverPreviewRenderer {
     return new Card(title, renderedLines, truncated, width, totalHeight);
   }
 
+  private static Component boldTitle(String text) {
+    return Component.literal(text).setStyle(Style.EMPTY.withBold(true).withColor(TITLE_COLOR));
+  }
+
   private static void paint(GuiGraphicsExtractor context, Quest quest, Card card, int x, int y) {
     Font textRenderer = Minecraft.getInstance().font;
     int lineHeight = textRenderer.lineHeight;
@@ -144,11 +150,9 @@ public final class HoverPreviewRenderer {
     int drawY = y + PADDING;
 
     // Title (bold)
-    String rawTitle = textRenderer.plainSubstrByWidth(title, width - PADDING * 2);
-    if (rawTitle.length() < title.length()) rawTitle = rawTitle + "...";
-    Component titleText =
-        Component.literal(rawTitle).setStyle(Style.EMPTY.withBold(true).withColor(TITLE_COLOR));
-    context.text(textRenderer, titleText, x + PADDING, drawY, TITLE_COLOR, false);
+    String rawTitle =
+        TextFit.title(title, "", width - PADDING * 2, s -> textRenderer.width(boldTitle(s)));
+    context.text(textRenderer, boldTitle(rawTitle), x + PADDING, drawY, TITLE_COLOR, false);
     drawY += lineHeight + 2;
 
     // Content lines. Scale and indent from RenderedLine are intentionally ignored -- this is a
