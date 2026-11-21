@@ -15,6 +15,7 @@ import com.disqt.disquests.client.gui.screen.MainScreen;
 import com.disqt.disquests.client.gui.screen.QuestListPanel;
 import com.disqt.disquests.client.gui.screen.QuestScreen;
 import com.disqt.disquests.test.integration.PhaseSync;
+import com.disqt.disquests.test.integration.bdd.AbortOnFailureExtension;
 import com.disqt.disquests.test.integration.harness.IntegrationTest;
 import com.disqt.disquests.test.integration.harness.PlayerA;
 import com.disqt.disquests.test.integration.harness.PlayerB;
@@ -33,6 +34,16 @@ import org.junit.jupiter.api.*;
 @IntegrationTest
 @DisplayName("Two-Player Journeys")
 class TwoPlayerJourneys {
+
+  /**
+   * Starts from an empty server like every other two-player journey: this class used to rely on
+   * running first, which no longer holds once the suite is split into shards.
+   */
+  @BeforeAll
+  static void resetServer() throws Exception {
+    resetServerForDuo("twoplayer");
+    AbortOnFailureExtension.clearFailures();
+  }
 
   // =========================================================================
   // Collaboration: request, accept, permissions, remove
