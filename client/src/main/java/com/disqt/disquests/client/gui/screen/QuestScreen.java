@@ -2,6 +2,7 @@ package com.disqt.disquests.client.gui.screen;
 
 import com.disqt.disquests.client.ClientCache;
 import com.disqt.disquests.client.ClientSession;
+import com.disqt.disquests.client.DisquestsClient;
 import com.disqt.disquests.client.data.NoticeText;
 import com.disqt.disquests.client.data.Quest;
 import com.disqt.disquests.client.data.QuestGraphs;
@@ -546,6 +547,7 @@ public class QuestScreen extends DisquestsBaseScreen {
       editDraft = newEditDraft();
     }
     installContentRow(root);
+    wireFormattingToggle(root);
 
     // Title field
     FlowLayout titleRow = root.childById(FlowLayout.class, "title-row");
@@ -760,6 +762,38 @@ public class QuestScreen extends DisquestsBaseScreen {
     int index = column.children().indexOf(fromXml);
     column.removeChild(fromXml);
     column.child(index, row);
+  }
+
+  /**
+   * {@code btn-formatting} shows or hides the formatting help (config {@code formattingHelp}).
+   * Hidden, the panel is taken out of {@code content-row}, so the text editor gets its width; the
+   * screen is not rebuilt, so the draft and the caret stay as they are.
+   */
+  private static void wireFormattingToggle(FlowLayout root) {
+    FlowLayout row = root.childById(FlowLayout.class, "content-row");
+    UIComponent panel = root.childById(UIComponent.class, "formatting-panel");
+    ButtonComponent button = root.childById(ButtonComponent.class, "btn-formatting");
+    button.setMessage(Component.translatable(EditorText.FORMATTING));
+    boolean shown = DisquestsClient.CONFIG.formattingHelp();
+    if (!shown) row.removeChild(panel);
+    button.tooltip(formattingTooltip(shown));
+    button.onPress(
+        pressed -> {
+          boolean show = !DisquestsClient.CONFIG.formattingHelp();
+          DisquestsClient.CONFIG.formattingHelp(show);
+          // The generated setter does not write the file
+          DisquestsClient.CONFIG.save();
+          if (show) {
+            row.child(panel);
+          } else {
+            row.removeChild(panel);
+          }
+          button.tooltip(formattingTooltip(show));
+        });
+  }
+
+  private static Component formattingTooltip(boolean shown) {
+    return Component.translatable(shown ? EditorText.FORMATTING_HIDE : EditorText.FORMATTING_SHOW);
   }
 
   private void buildTagEditor(FlowLayout root) {

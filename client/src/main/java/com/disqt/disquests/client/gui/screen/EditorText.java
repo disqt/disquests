@@ -25,6 +25,9 @@ public final class EditorText {
   public static final String AUTO_JOIN = QuestPage.PREREQUISITE_AUTO_JOIN;
   public static final String OPEN_ONLY = "gui.disquests.edit.open_only";
   public static final String NOW_INSIDE = "gui.disquests.edit.now_inside";
+  public static final String FORMATTING = "gui.disquests.edit.formatting";
+  public static final String FORMATTING_HIDE = "gui.disquests.edit.formatting_hide";
+  public static final String FORMATTING_SHOW = "gui.disquests.edit.formatting_show";
   public static final String NOT_SAVED = "gui.disquests.tree.not_saved";
   public static final String TAKEN_OUT = "gui.disquests.tree.taken_out";
   public static final String EDITING = "gui.disquests.tree.editing";
@@ -74,6 +77,9 @@ public final class EditorText {
             AUTO_JOIN,
             OPEN_ONLY,
             NOW_INSIDE,
+            FORMATTING,
+            FORMATTING_HIDE,
+            FORMATTING_SHOW,
             NOT_SAVED,
             TAKEN_OUT,
             EDITING,

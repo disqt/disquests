@@ -72,6 +72,7 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
   private final boolean isNewQuest;
   private final Supplier<String> currentTitle;
   private final Runnable onChanged;
+  private final FlowLayout pane;
   private final FlowLayout list;
   private final ScrollContainer<FlowLayout> scroll;
   private final FlowLayout takenOutList;
@@ -100,6 +101,7 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
     this.isNewQuest = isNewQuest;
     this.currentTitle = currentTitle;
     this.onChanged = onChanged;
+    this.pane = shell.pane();
     this.list = shell.list();
     this.scroll = shell.scroll();
     this.field = addSubquestField();
@@ -310,7 +312,8 @@ final class QuestEditTreePane implements TreeRowComponent.DragTarget {
     }
     // A new quest's own line follows the title field as the player types
     if (isNewQuest && !java.util.Objects.equals(shownTitle, currentTitle.get())) fill();
-    if (!revealPending) return;
+    // A collapsed pane is not laid out: the reveal waits until it is shown
+    if (!revealPending || !pane.hasParent()) return;
     TreeRowComponent current =
         list.childById(TreeRowComponent.class, "tree-row-" + draft.questId());
     if (current == null || !current.hasParent()) return;
