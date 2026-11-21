@@ -6,6 +6,7 @@ import com.disqt.disquests.client.gui.helper.Colors;
 import com.disqt.disquests.client.gui.helper.HoverPreviewRenderer;
 import com.disqt.disquests.client.gui.widget.undoredo.TextAction;
 import com.disqt.disquests.client.gui.widget.undoredo.UndoManager;
+import com.disqt.disquests.common.LineEndings;
 import com.google.common.collect.Lists;
 import com.mojang.blaze3d.platform.InputConstants;
 import java.util.ArrayList;
@@ -319,7 +320,8 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
 
   public void setText(String text) {
     this.lines.clear();
-    this.lines.addAll(Arrays.asList(Objects.requireNonNullElse(text, "").split("\n", -1)));
+    this.lines.addAll(
+        Arrays.asList(LineEndings.normalize(Objects.requireNonNullElse(text, "")).split("\n", -1)));
     if (this.lines.isEmpty()) this.lines.add("");
     this.setCursorToEnd();
     this.clearSelection();
@@ -563,7 +565,8 @@ public class MultiLineTextFieldWidget implements Renderable, GuiEventListener, N
     if (hasSelection()) deleteSelection();
 
     final int start = getCursorAbsolute();
-    final String text = textToInsert;
+    // A Windows clipboard pastes \r\n; the font would draw each \r as a boxed "CR"
+    final String text = LineEndings.normalize(textToInsert);
 
     TextAction action =
         new TextAction() {
