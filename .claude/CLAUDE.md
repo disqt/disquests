@@ -67,9 +67,10 @@ UX-driven journey tests in `client/src/testmod/java/com/disqt/disquests/test/int
 ```bash
 ./gradlew :client:runIntegrationTest                                          # full suite (auto-starts Paper)
 ./gradlew :client:runIntegrationTest -Pcoverage                               # with JaCoCo coverage
-./gradlew :client:runIntegrationTest -PtestFilter=QuestLifecycleJourney       # single journey
+./gradlew :client:runSoloTests -PtestFilter=QuestLifecycleJourney             # single solo journey (duo: runDuoTests)
+./gradlew :client:runSoloTests -PtestFilter=shard:1/2                         # one slice of the suite, as CI runs it
 ./gradlew :client:runIntegrationTest -Pharness                                # keep clients alive for re-runs
-./gradlew :client:runIntegrationTest -PnoStart -PtestFilter=ConfigJourney     # re-run on existing clients
+./gradlew :client:runSoloTests -PnoStart -PtestFilter=ConfigJourney           # re-run on existing clients
 ./gradlew :client:jacocoIntegrationTestReport                                 # generate HTML report
 ```
 
@@ -80,7 +81,7 @@ UX-driven journey tests in `client/src/testmod/java/com/disqt/disquests/test/int
 ./gradlew :client:runDuoTests -PtestFilter=TwoPlayerJourneys                  # specific test class
 ```
 
-**CI status:** The `e2e-test.yml` workflow runs on every PR and push to main. `ensureServer()` auto-downloads paper.jar from the Paper API and bootstraps `server/run/` (eula, server.properties) on first run.
+**CI status:** The `e2e-test.yml` workflow runs on every PR and push to main. Its `pre` job (`fkirc/skip-duplicate-actions`) skips the journeys when the same files already passed in an earlier run of the workflow (main after merging an up-to-date PR) or when only `**/*.md`, `docs/**` or `.claude/**` changed; lint and build always run. The journeys run as four parallel jobs (`solo-1`, `solo-2`, `duo-1`, `duo-2`, shards by class name, see `TestShard`), and the `coverage` job merges their JaCoCo data with the unit tests' (`-PcoverageShards=<dir>`). `release.yml` skips the journeys when the tagged commit already has a green CI run on main. `ensureServer()` auto-downloads paper.jar from the Paper API and bootstraps `server/run/` (eula, server.properties) on first run.
 
 Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with physical input via `TestInput`. All tests connect to a live Paper server -- no mocking.
 
@@ -96,6 +97,7 @@ Tests use a custom BDD DSL (`given`/`when`/`then`/`and`) with physical input via
 - **`@PlayerA`/`@PlayerB` filtering** — `IntegrationTestExtension` (ExecutionCondition) skips methods tagged for the other player.
 - **PhaseSync coordination** — file-based signals, MUST use `context.waitFor()` not `Thread.sleep()` (sleeping blocks packet processing). Has cross-client error propagation for fast-fail.
 - **RCON reset** — `/disquests reset` (debug mode only) clears DB + resends handshakes. Used between test runs via `resetServerAndSync()`.
+- **A class filter needs the right half** — `runIntegrationTest -PtestFilter=<Class>` fails: it runs both halves and the one without that class reports "Test class not found". Use `runSoloTests` or `runDuoTests` with the filter.
 - **`-PtestFilter` not `-Ptest`** — Gradle reserves `-Ptest` for its built-in test task.
 - **Loom property passing** — use `-P` (Gradle property) not `-D` (JVM system property) for subprocess invocation.
 - **Prism mods incompatible with `runClient`** — production jars use intermediary mappings, dev environment uses named mappings. Mixin crashes guaranteed.

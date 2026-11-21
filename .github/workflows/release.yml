@@ -13,13 +13,33 @@ permissions:
   pull-requests: write
   id-token: write
   attestations: write
+  actions: write
 
 jobs:
+  # A tag is normally put on a commit of main whose CI already passed: the journeys then do not
+  # run again. When no such run is found (or the lookup fails) they run here first.
+  already-green:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      found: ${{ steps.check.outputs.found }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count=$(gh api "repos/${{ github.repository }}/actions/workflows/e2e-test.yml/runs?head_sha=${{ github.sha }}&status=success&event=push" --jq '.workflow_runs | length' || echo 0)
+          echo "Successful CI runs on main for ${{ github.sha }}: $count"
+          if [ "$count" -gt 0 ]; then echo "found=true" >> "$GITHUB_OUTPUT"; else echo "found=false" >> "$GITHUB_OUTPUT"; fi
+
   e2e:
+    needs: already-green
+    if: needs.already-green.outputs.found != 'true'
     uses: ./.github/workflows/e2e-test.yml
 
   release:
-    needs: e2e
+    needs: [already-green, e2e]
+    if: ${{ !cancelled() && (needs.e2e.result == 'success' || (needs.e2e.result == 'skipped' && needs.already-green.outputs.found == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 

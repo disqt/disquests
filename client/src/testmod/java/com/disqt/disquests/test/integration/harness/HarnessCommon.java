@@ -5,8 +5,11 @@ import static com.disqt.disquests.test.integration.bdd.UIActions.*;
 import com.disqt.disquests.test.integration.PhaseSync;
 import java.io.IOException;
 import java.nio.file.*;
+import java.util.ArrayList;
+import java.util.List;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
+import org.junit.platform.engine.support.descriptor.ClassSource;
 import org.junit.platform.launcher.*;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
@@ -120,7 +123,14 @@ public class HarnessCommon {
     try {
       var requestBuilder = LauncherDiscoveryRequestBuilder.request();
 
-      if (testClassFilter != null) {
+      TestShard shard = TestShard.parse(testClassFilter);
+      if (shard != null) {
+        // Both players list the same package, so they pick the same classes
+        List<String> picked = shard.pick(journeyClasses());
+        if (picked.isEmpty()) return "FAIL: Shard " + testClassFilter + " holds no test class";
+        LOG.info("Shard {} runs {}", testClassFilter, picked);
+        for (String name : picked) requestBuilder.selectors(DiscoverySelectors.selectClass(name));
+      } else if (testClassFilter != null) {
         try {
           Class<?> testClass = Class.forName(TESTS_PACKAGE + "." + testClassFilter);
           requestBuilder.selectors(DiscoverySelectors.selectClass(testClass));
@@ -166,6 +176,26 @@ public class HarnessCommon {
       PhaseSync.signalError(playerRole, e.getMessage());
       return "FAIL: " + e.getMessage();
     }
+  }
+
+  /** The fully qualified names of the journey classes in this client's test package. */
+  private static List<String> journeyClasses() {
+    LauncherDiscoveryRequest request =
+        LauncherDiscoveryRequestBuilder.request()
+            .selectors(DiscoverySelectors.selectPackage(TESTS_PACKAGE))
+            .build();
+    TestPlan plan = LauncherFactory.create().discover(request);
+    List<String> names = new ArrayList<>();
+    for (TestIdentifier root : plan.getRoots()) {
+      for (TestIdentifier child : plan.getChildren(root)) {
+        child
+            .getSource()
+            .filter(ClassSource.class::isInstance)
+            .map(source -> ((ClassSource) source).getClassName())
+            .ifPresent(names::add);
+      }
+    }
+    return names;
   }
 
   private static void writeResult(String result, String role) {

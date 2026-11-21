@@ -250,9 +250,18 @@ tasks.register<JacocoReport>("jacocoIntegrationTestReport") {
     ).filter { it.exists() }
     executionData(execFiles)
 
+    // CI runs the journeys in parallel jobs (shards). -PcoverageShards=<dir> names the folder their
+    // artifacts were downloaded into: every .exec file under it joins the report.
+    val shardsDir = providers.gradleProperty("coverageShards").orNull?.let { rootProject.file(it) }
+    if (shardsDir != null && shardsDir.isDirectory) {
+        executionData(fileTree(shardsDir) { include("**/*.exec") })
+    }
+
     // Use classdump dir for server classes (Paper transforms bytecode on load,
     // so compiled classes don't match the exec data -- classdumpdir captures the actual runtime classes)
-    val serverClassDump = file("../server/run/jacoco-classdump")
+    // Every shard dumps the same classes: any one of them will do.
+    val shardClassDump = shardsDir?.walkTopDown()?.firstOrNull { it.isDirectory && it.name == "jacoco-classdump" }
+    val serverClassDump = shardClassDump ?: file("../server/run/jacoco-classdump")
 
     sourceDirectories.from(
         files("src/main/java"),
