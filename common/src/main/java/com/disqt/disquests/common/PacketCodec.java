@@ -680,7 +680,8 @@ public final class PacketCodec {
   public static QuestData readQuest(ByteBufReader buf, int protocolVersion) {
     UUID id = buf.readUUID();
     String title = buf.readString();
-    String content = buf.readString();
+    // Text saved before 0.9.1 may hold Windows line ends
+    String content = LineEndings.normalize(buf.readString());
     UUID ownerUuid = buf.readUUID();
     String ownerName = buf.readString();
     Visibility visibility = readEnum(buf, Visibility.class);
@@ -810,7 +811,8 @@ public final class PacketCodec {
   public static SaveQuestPayload readSaveQuest(ByteBufReader buf) {
     UUID questId = buf.readUUID();
     String title = buf.readString();
-    String content = buf.readString();
+    // Whatever the client sent, only \n line ends are stored
+    String content = LineEndings.normalize(buf.readString());
     CoordinatesData coords = readNullableCoords(buf);
     boolean isRegion = buf.readBoolean();
     CoordinatesData coords2 = readNullableCoords(buf);
