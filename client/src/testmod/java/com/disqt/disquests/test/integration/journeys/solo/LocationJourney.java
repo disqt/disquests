@@ -141,14 +141,14 @@ class LocationJourney {
   @Test
   @Order(5)
   @PlayerA
-  @DisplayName("Save and verify the map label")
+  @DisplayName("Save: the default map gets no label")
   void saveAndVerifyMap(ClientGameTestContext context) {
     when("player clicks Save");
     click(context, "btn-save");
     then("view mode shows the quest");
     waitForComponent(context, "btn-edit");
-    and("map label shows overworld");
-    assertLabelText(context, "map-label", "Map: overworld");
+    and("the default map is not spelled out");
+    assertComponentMissing(context, "map-label");
   }
 
   @Test

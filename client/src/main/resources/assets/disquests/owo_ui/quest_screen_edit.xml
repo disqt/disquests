@@ -67,17 +67,34 @@
                 </children>
             </flow-layout>
 
-            <!-- Tag editor row (populated programmatically) -->
-            <flow-layout direction="ltr-text-flow" id="tag-editor">
+            <!-- Tag row: the tags (populated programmatically) and, at the right, the button that
+                 shows or hides the formatting help -->
+            <flow-layout direction="horizontal" id="tag-row">
                 <sizing>
                     <horizontal method="fill">85</horizontal>
                     <vertical method="content"/>
                 </sizing>
-                <gap>3</gap>
+                <gap>4</gap>
                 <margins>
                     <bottom>4</bottom>
                 </margins>
-                <children/>
+                <children>
+                    <flow-layout direction="ltr-text-flow" id="tag-editor">
+                        <sizing>
+                            <horizontal method="expand">100</horizontal>
+                            <vertical method="content"/>
+                        </sizing>
+                        <gap>3</gap>
+                        <children/>
+                    </flow-layout>
+                    <button id="btn-formatting">
+                        <text>Formatting</text>
+                        <sizing>
+                            <horizontal method="content"/>
+                            <vertical method="fixed">12</vertical>
+                        </sizing>
+                    </button>
+                </children>
             </flow-layout>
 
             <!-- Content area (editor + formatting help) -->
@@ -108,7 +125,8 @@
                         </children>
                     </flow-layout>
 
-                    <!-- Formatting help panel (hidden via zero-sizing when toggled off) -->
+                    <!-- Formatting help panel: its lines scroll when the panel is shorter than
+                         them. QuestScreen removes it from content-row when the help is hidden -->
                     <flow-layout direction="vertical" id="formatting-panel">
                         <sizing>
                             <horizontal method="fixed">160</horizontal>
@@ -120,44 +138,64 @@
                         <padding>
                             <all>5</all>
                         </padding>
-                        <gap>2</gap>
                         <children>
-                            <label id="fmt-title">
-                                <text>Formatting</text>
-                                <shadow>true</shadow>
-                            </label>
-                            <label id="fmt-bold">
-                                <text>**text** = bold</text>
-                                <shadow>true</shadow>
-                            </label>
-                            <label id="fmt-italic">
-                                <text>*text* = italic</text>
-                                <shadow>true</shadow>
-                            </label>
-                            <label id="fmt-strike">
-                                <text>~~text~~ = strikethrough</text>
-                                <shadow>true</shadow>
-                            </label>
-                            <label id="fmt-heading">
-                                <text># Heading</text>
-                                <shadow>true</shadow>
-                            </label>
-                            <label id="fmt-checkbox">
-                                <text>- [ ] task / - [x] done</text>
-                                <shadow>true</shadow>
-                            </label>
-                            <label id="fmt-quote">
-                                <text>> quote</text>
-                                <shadow>true</shadow>
-                            </label>
-                            <label id="fmt-link">
-                                <text>[text](url)</text>
-                                <shadow>true</shadow>
-                            </label>
-                            <label id="fmt-wikilink">
-                                <text>[[Quest Name]] = quest link</text>
-                                <shadow>true</shadow>
-                            </label>
+                            <!-- The child MUST be the first element of the scroll container -->
+                            <scroll direction="vertical" id="formatting-scroll">
+                                <flow-layout direction="vertical" id="formatting-lines">
+                                    <sizing>
+                                        <horizontal method="fill">100</horizontal>
+                                        <vertical method="content"/>
+                                    </sizing>
+                                    <!-- Clear of the scrollbar -->
+                                    <padding>
+                                        <right>5</right>
+                                    </padding>
+                                    <gap>2</gap>
+                                    <children>
+                                        <label id="fmt-title">
+                                            <text>Formatting</text>
+                                            <shadow>true</shadow>
+                                        </label>
+                                        <label id="fmt-bold">
+                                            <text>**text** = bold</text>
+                                            <shadow>true</shadow>
+                                        </label>
+                                        <label id="fmt-italic">
+                                            <text>*text* = italic</text>
+                                            <shadow>true</shadow>
+                                        </label>
+                                        <label id="fmt-strike">
+                                            <text>~~text~~ = strikethrough</text>
+                                            <shadow>true</shadow>
+                                        </label>
+                                        <label id="fmt-heading">
+                                            <text># Heading</text>
+                                            <shadow>true</shadow>
+                                        </label>
+                                        <label id="fmt-checkbox">
+                                            <text>- [ ] task / - [x] done</text>
+                                            <shadow>true</shadow>
+                                        </label>
+                                        <label id="fmt-quote">
+                                            <text>> quote</text>
+                                            <shadow>true</shadow>
+                                        </label>
+                                        <label id="fmt-link">
+                                            <text>[text](url)</text>
+                                            <shadow>true</shadow>
+                                        </label>
+                                        <label id="fmt-wikilink">
+                                            <text>[[Quest Name]] = quest link</text>
+                                            <shadow>true</shadow>
+                                        </label>
+                                    </children>
+                                </flow-layout>
+                                <sizing>
+                                    <horizontal method="fill">100</horizontal>
+                                    <vertical method="fill">100</vertical>
+                                </sizing>
+                                <scrollbar-thiccness>3</scrollbar-thiccness>
+                            </scroll>
                         </children>
                     </flow-layout>
                 </children>

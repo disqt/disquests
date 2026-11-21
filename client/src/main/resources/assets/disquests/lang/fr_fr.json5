@@ -94,6 +94,17 @@
     "prerequisite_hidden": "quelque chose auquel tu n'as pas accès",
     "open_only": "(quêtes Ouvertes seulement)",
     "now_inside": "maintenant dans %s",
+    "formatting": "Mise en forme",
+    "formatting_hide": "Masquer l'aide de mise en forme",
+    "formatting_show": "Afficher l'aide de mise en forme",
+    "fmt_text": "texte",
+    "fmt_heading": "Titre",
+    "fmt_todo": "à faire",
+    "fmt_done": "fait",
+    "fmt_quote": "citation",
+    "fmt_link": "lien",
+    "fmt_quest_name": "Nom de la quête",
+    "fmt_quest_link": "lien de quête",
   },
 
   // Lignes de l'arbre des quêtes
@@ -203,6 +214,8 @@
     "already_requested": "Tu as déjà demandé l'accès",
     "view_only": "Tu as un accès en lecture seule",
     "needs_attention": "Demande ton attention",
+    "tree_hide": "Masquer l'arbre de quêtes",
+    "tree_show": "Afficher l'arbre de quêtes",
   },
 
   // Infobulles des filtres
@@ -283,6 +296,8 @@
     "option.pinnedWidth": "Largeur des quêtes épinglées",
     "option.sidePanelWidth": "Largeur de la liste des quêtes",
     "option.questPaneWidth": "Largeur du panneau de l'arbre des quêtes",
+    "option.questPaneOpen": "Afficher le panneau de l'arbre des quêtes",
+    "option.formattingHelp": "Afficher l'aide de mise en forme dans l'éditeur",
     "option.theme": "Thème",
     "option.worldMap": "Map du monde",
     "enum.theme.vanilla": "Vanilla",

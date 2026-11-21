@@ -250,12 +250,9 @@ class MapEditJourney {
                 && q.getPolygon().get(0).x() == px - 30
                 && q.getPolygon().get(0).z() == pz - 30);
 
-    and("view mode shows the region summary");
-    LabelComponent coords = findComponent(context, LabelComponent.class, "coords-label");
-    String coordsText = context.computeOnClient(c -> coords.text().getString());
-    assertTrue(
-        coordsText.startsWith("Region: 3 corners"),
-        "coords-label should start with 'Region: 3 corners' but was '" + coordsText + "'");
+    and("view mode shows the outline on the map, without a line of corner coordinates");
+    waitForComponent(context, "mini-map");
+    assertComponentMissing(context, "coords-label");
 
     when("player goes back to the board");
     click(context, "btn-back");

@@ -15,6 +15,7 @@ import com.disqt.disquests.client.gui.map.MapView;
 import com.disqt.disquests.client.gui.map.QuestPolygonLayer;
 import com.disqt.disquests.client.gui.map.SharedTileCache;
 import com.disqt.disquests.client.gui.widget.MultiLineTextFieldWidget;
+import com.disqt.disquests.common.DimensionKeys;
 import com.disqt.disquests.common.QuestLocation;
 import com.disqt.disquests.common.model.CoordinatesData;
 import com.disqt.disquests.common.model.PointData;
@@ -307,17 +308,31 @@ final class LocationCard {
       card.sizing(Sizing.fixed(0), Sizing.fixed(0));
       return;
     }
-    if (ClientSession.mapAvailable()) {
+    boolean mapShown = ClientSession.mapAvailable();
+    FlowLayout labels = root.childById(FlowLayout.class, "location-labels");
+    if (mapShown) {
       int[] size = mapSize(VIEW_MAP_WIDTH, VIEW_MAP_HEIGHT, screen.height, VIEW_MAP_SCREEN_DIVISOR);
       MapView map = addMiniMap(root, quest, screen.dimensionForEdit(), size[0], size[1]);
       map.addLayer(locationLayer(quest));
+      // The map is the card: it takes the width the side column leaves
+      map.horizontalSizing(Sizing.fill(100));
+      root.childById(FlowLayout.class, "mini-map-slot").horizontalSizing(Sizing.expand(100));
+      labels.horizontalSizing(Sizing.content());
     }
 
-    root.childById(LabelComponent.class, "coords-label")
-        .text(buildCoordsText(quest).withColor(Colors.TEXT_MUTED));
-    if (quest.getMap() != null) {
-      root.childById(LabelComponent.class, "map-label")
-          .text(Component.literal("Map: " + quest.getMap()).withColor(Colors.TEXT_MUTED));
+    // The map already shows an outline: its corners are spelled out only without the map
+    LabelComponent coords = root.childById(LabelComponent.class, "coords-label");
+    if (mapShown && quest.isPolygon()) {
+      labels.removeChild(coords);
+    } else {
+      coords.text(buildCoordsText(quest).withColor(Colors.TEXT_MUTED));
+    }
+    // The dimension is named only when it is not the server's default map
+    LabelComponent mapLabel = root.childById(LabelComponent.class, "map-label");
+    if (namesMap(quest.getMap(), ClientSession.getBluemapDefaultMap())) {
+      mapLabel.text(Component.literal("Map: " + quest.getMap()).withColor(Colors.TEXT_MUTED));
+    } else {
+      labels.removeChild(mapLabel);
     }
 
     String bluemapUrl = BlueMapHelper.buildUrl(quest);
@@ -329,6 +344,13 @@ final class LocationCard {
       bmBtn.sizing(Sizing.content(), Sizing.fixed(ROW_HEIGHT));
       root.childById(FlowLayout.class, "location-labels").child(bmBtn);
     }
+  }
+
+  /** True when the quest's map is worth a line: set, and not the server's default map. */
+  static boolean namesMap(@Nullable String questMap, @Nullable String defaultMap) {
+    if (questMap == null || questMap.isBlank()) return false;
+    String fallback = defaultMap == null || defaultMap.isBlank() ? "overworld" : defaultMap;
+    return !DimensionKeys.normalize(questMap).equals(DimensionKeys.normalize(fallback));
   }
 
   /** "X:.. Y:.. Z:.." for a pin; the corner count and bounding box for an outline. */

@@ -17,6 +17,12 @@ public class DisquestsConfigModel {
   /** Width of the quest screen's tree pane, set by dragging its divider; clamped to the screen. */
   public int questPaneWidth = 220;
 
+  /** Whether the quest screen's tree pane is shown; off leaves a strip with an expand button. */
+  public boolean questPaneOpen = true;
+
+  /** Whether the editor shows the formatting help beside the text. */
+  public boolean formattingHelp = true;
+
   @SectionHeader("hud")
   public boolean pinnedVisible = true;
 

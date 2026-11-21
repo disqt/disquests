@@ -36,6 +36,8 @@ public final class QuestPage {
   public static final String PREREQUISITE_AUTO_JOIN = "gui.disquests.prerequisite.auto_join";
   public static final String MANAGE_PEOPLE = "gui.disquests.btn.manage_people";
   public static final String KEEP_PRIVATE = "gui.disquests.btn.keep_private";
+  public static final String TREE_HIDE = "gui.disquests.tooltip.tree_hide";
+  public static final String TREE_SHOW = "gui.disquests.tooltip.tree_show";
 
   /** Every fixed key above, for the lang-file test. */
   public static final List<String> FIXED_KEYS =
@@ -49,7 +51,9 @@ public final class QuestPage {
           PREREQUISITE_DELETED,
           PREREQUISITE_AUTO_JOIN,
           MANAGE_PEOPLE,
-          KEEP_PRIVATE);
+          KEEP_PRIVATE,
+          TREE_HIDE,
+          TREE_SHOW);
 
   /**
    * What the reading view offers. {@code joinOrRequest}: the Join or Request button (the screen
