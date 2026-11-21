@@ -16,6 +16,28 @@ permissions:
   pull-requests: write
 
 jobs:
+  # Decides whether the journeys need to run at all. They are skipped when the same files already
+  # passed in an earlier run of this workflow (main after a merge of an up-to-date PR, a re-push
+  # with identical content) and when only docs changed. Lint and build always run: they are quick,
+  # and the build on main is what refreshes the Gradle cache.
+  pre:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    outputs:
+      should_skip: ${{ steps.skip.outputs.should_skip }}
+      skipped_by: ${{ steps.skip.outputs.skipped_by }}
+    steps:
+      - id: skip
+        uses: fkirc/skip-duplicate-actions@b974a9395958c231af965b70070979a577efa578 # v5.3.2
+        with:
+          concurrent_skipping: never
+          skip_after_successful_duplicate: 'true'
+          paths_ignore: '["**/*.md", "docs/**", ".claude/**"]'
+          do_not_skip: '["workflow_dispatch", "schedule", "merge_group"]'
+
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -61,10 +83,30 @@ jobs:
       - name: Build and test
         run: ./gradlew build
 
+  # The journeys, as four parallel jobs: the solo and the two-player suites, each dealt into two
+  # shards by class name (see TestShard). Each job boots its own Paper server and game clients.
   e2e-test:
+    needs: pre
+    if: needs.pre.outputs.should_skip != 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    needs: build
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: solo-1
+            task: runSoloTests
+            shard: 1/2
+          - name: solo-2
+            task: runSoloTests
+            shard: 2/2
+          - name: duo-1
+            task: runDuoTests
+            shard: 1/2
+          - name: duo-2
+            task: runDuoTests
+            shard: 2/2
+    name: e2e-test (${{ matrix.name }})
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
@@ -75,10 +117,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
-      - name: Build
-        run: ./gradlew build
-
-      - name: Run integration tests
+      - name: Run journeys
         # 26.3 creates its OpenGL context through SDL3, which asks GLX for an 8-bit alpha, sRGB-capable
         # visual that Xvfb's 24-bit screen cannot provide ("Couldn't find matching GLX visual"; GLFW
         # tolerated the bare Xvfb). Going through Mesa EGL instead (SDL_VIDEO_FORCE_EGL) lets a 24-bit
@@ -88,12 +127,53 @@ jobs:
           Xvfb :99 -ac -screen 0 854x480x24 +extension GLX +render -noreset &
           sleep 2
           DISPLAY=:99 glxinfo -B || true
-          DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 SDL_VIDEODRIVER=x11 SDL_VIDEO_FORCE_EGL=1 ./gradlew :client:runIntegrationTest -Pcoverage
+          DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 SDL_VIDEODRIVER=x11 SDL_VIDEO_FORCE_EGL=1 \
+            ./gradlew :client:${{ matrix.task }} -Pcoverage -PtestFilter=shard:${{ matrix.shard }}
         timeout-minutes: 20
 
-      - name: Generate coverage report
+      # Logs for a failed run, and the coverage data the coverage job merges.
+      - name: Upload shard results
         if: always()
-        run: ./gradlew :client:jacocoIntegrationTestReport
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-shard-${{ matrix.name }}
+          path: |
+            client/run/logs/
+            client/run-b/logs/
+            server/run/logs/
+            integration-sync/
+            client/build/jacoco/gameTest.exec
+            client/build/jacoco/gameTestB.exec
+            server/run/jacoco-server.exec
+            server/run/jacoco-classdump/
+          retention-days: 14
+
+  # One report from the four shards plus the unit tests.
+  coverage:
+    needs: e2e-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+
+      - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+
+      # The unit tests' coverage data, and the class files the report reads
+      - name: Build and test
+        run: ./gradlew build
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: e2e-shard-*
+          path: coverage-shards
+
+      - name: Generate coverage report
+        run: ./gradlew :client:jacocoIntegrationTestReport -PcoverageShards=coverage-shards
 
       - name: Add coverage to PR
         if: github.event_name == 'pull_request'
@@ -106,33 +186,39 @@ jobs:
           title: Test Coverage
           update-comment: true
 
-      - name: Upload test artifacts
-        if: always()
+      - name: Upload coverage report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: e2e-results
-          path: |
-            client/run/logs/
-            client/run-b/logs/
-            server/run/logs/
-            integration-sync/
-            client/build/reports/jacoco/integrationTest/
+          path: client/build/reports/jacoco/integrationTest/
           retention-days: 14
 
+  # On main, the badges come from this run's report, or, when the journeys were skipped as a
+  # duplicate, from the report of the run that tested the same files (usually the PR's last run).
   badges:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: e2e-test
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && github.event_name == 'push' && (needs.coverage.result == 'success' || needs.pre.outputs.should_skip == 'true') }}
+    needs: [pre, coverage]
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
+      # No report to fetch when the skip was for a docs-only change, or when the duplicate was
+      # itself a skipped run: the badges then stay as they are.
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        id: report
+        continue-on-error: true
         with:
           name: e2e-results
-          path: .
+          path: client/build/reports/jacoco/integrationTest
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.coverage.result == 'success' && github.run_id || fromJSON(needs.pre.outputs.skipped_by || '{}').id || github.run_id }}
 
       - name: Generate coverage badges
+        if: steps.report.outcome == 'success'
         uses: cicirello/jacoco-badge-generator@72266185b7ee48a6fd74eaf0238395cc8b14fef8 # v2
         with:
           jacoco-csv-file: client/build/reports/jacoco/integrationTest/report.csv
@@ -145,6 +231,7 @@ jobs:
       # GH013. The branch holds only generated SVGs and is force-replaced each run;
       # README references them by raw URL.
       - name: Publish coverage badges
+        if: steps.report.outcome == 'success'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
