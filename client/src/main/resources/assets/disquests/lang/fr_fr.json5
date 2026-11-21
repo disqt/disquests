@@ -97,6 +97,14 @@
     "formatting": "Mise en forme",
     "formatting_hide": "Masquer l'aide de mise en forme",
     "formatting_show": "Afficher l'aide de mise en forme",
+    "fmt_text": "texte",
+    "fmt_heading": "Titre",
+    "fmt_todo": "à faire",
+    "fmt_done": "fait",
+    "fmt_quote": "citation",
+    "fmt_link": "lien",
+    "fmt_quest_name": "Nom de la quête",
+    "fmt_quest_link": "lien de quête",
   },
 
   // Lignes de l'arbre des quêtes

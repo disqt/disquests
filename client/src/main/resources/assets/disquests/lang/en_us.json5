@@ -97,6 +97,14 @@
     "formatting": "Formatting",
     "formatting_hide": "Hide formatting help",
     "formatting_show": "Show formatting help",
+    "fmt_text": "text",
+    "fmt_heading": "Heading",
+    "fmt_todo": "todo",
+    "fmt_done": "done",
+    "fmt_quote": "quote",
+    "fmt_link": "link",
+    "fmt_quest_name": "Quest Name",
+    "fmt_quest_link": "quest link",
   },
 
   // Quest tree rows

@@ -67,6 +67,7 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
@@ -666,55 +667,55 @@ public class QuestScreen extends DisquestsBaseScreen {
     root.childById(ButtonComponent.class, "btn-save").onPress(ignored -> saveAndView());
     root.childById(ButtonComponent.class, "btn-cancel").onPress(ignored -> cancelEdit());
 
-    // Style formatting panel labels with rendered examples
-    LabelComponent fmtBold = root.childById(LabelComponent.class, "fmt-bold");
-    if (fmtBold != null)
-      fmtBold.text(
-          Component.literal("**text**: ")
-              .append(Component.literal("text").withStyle(s -> s.withBold(true))));
-    LabelComponent fmtItalic = root.childById(LabelComponent.class, "fmt-italic");
-    if (fmtItalic != null)
-      fmtItalic.text(
-          Component.literal("*text*: ")
-              .append(Component.literal("text").withStyle(s -> s.withItalic(true))));
-    LabelComponent fmtStrike = root.childById(LabelComponent.class, "fmt-strike");
-    if (fmtStrike != null)
-      fmtStrike.text(
-          Component.literal("~~text~~: ")
-              .append(Component.literal("text").withStyle(s -> s.withStrikethrough(true))));
-    LabelComponent fmtHeading = root.childById(LabelComponent.class, "fmt-heading");
-    if (fmtHeading != null)
-      fmtHeading.text(
-          Component.literal("# ")
-              .append(Component.literal("Heading").withStyle(s -> s.withBold(true))));
-    LabelComponent fmtCheckbox = root.childById(LabelComponent.class, "fmt-checkbox");
-    if (fmtCheckbox != null)
-      fmtCheckbox.text(
-          Component.literal("- [ ] todo  - [x] ")
-              .append(
-                  Component.literal("done")
-                      .withStyle(s -> s.withStrikethrough(true).withColor(0x55FF55))));
-    LabelComponent fmtQuote = root.childById(LabelComponent.class, "fmt-quote");
-    if (fmtQuote != null)
-      fmtQuote.text(
-          Component.literal("> ")
-              .append(
-                  Component.literal("quote")
-                      .withStyle(s -> s.withItalic(true).withColor(0xAAAAAA))));
-    LabelComponent fmtLink = root.childById(LabelComponent.class, "fmt-link");
-    if (fmtLink != null)
-      fmtLink.text(
-          Component.literal("[text](url): ")
-              .append(
-                  Component.literal("link")
-                      .withStyle(s -> s.withUnderlined(true).withColor(0x5555FF))));
-    LabelComponent fmtWikiLink = root.childById(LabelComponent.class, "fmt-wikilink");
-    if (fmtWikiLink != null)
-      fmtWikiLink.text(
-          Component.literal("[[Quest Name]]: ")
-              .append(
-                  Component.literal("quest link")
-                      .withStyle(s -> s.withUnderlined(true).withColor(0xe8a86d))));
+    // Style formatting panel labels with rendered examples, in the player's language
+    String text = Component.translatable(EditorText.FMT_TEXT).getString();
+    setLabel(root, "fmt-title", Component.translatable(EditorText.FORMATTING));
+    setLabel(root, "fmt-bold", example("**" + text + "**: ", text, s -> s.withBold(true)));
+    setLabel(root, "fmt-italic", example("*" + text + "*: ", text, s -> s.withItalic(true)));
+    setLabel(
+        root, "fmt-strike", example("~~" + text + "~~: ", text, s -> s.withStrikethrough(true)));
+    setLabel(
+        root, "fmt-heading", example("# ", word(EditorText.FMT_HEADING), s -> s.withBold(true)));
+    setLabel(
+        root,
+        "fmt-checkbox",
+        example(
+            "- [ ] " + word(EditorText.FMT_TODO) + "  - [x] ",
+            word(EditorText.FMT_DONE),
+            s -> s.withStrikethrough(true).withColor(0x55FF55)));
+    setLabel(
+        root,
+        "fmt-quote",
+        example("> ", word(EditorText.FMT_QUOTE), s -> s.withItalic(true).withColor(0xAAAAAA)));
+    setLabel(
+        root,
+        "fmt-link",
+        example(
+            "[" + text + "](url): ",
+            word(EditorText.FMT_LINK),
+            s -> s.withUnderlined(true).withColor(0x5555FF)));
+    setLabel(
+        root,
+        "fmt-wikilink",
+        example(
+            "[[" + word(EditorText.FMT_QUEST_NAME) + "]]: ",
+            word(EditorText.FMT_QUEST_LINK),
+            s -> s.withUnderlined(true).withColor(0xe8a86d)));
+  }
+
+  private static String word(String key) {
+    return Component.translatable(key).getString();
+  }
+
+  /** What to type, then how it renders. */
+  private static Component example(
+      String typed, String rendered, java.util.function.UnaryOperator<Style> style) {
+    return Component.literal(typed).append(Component.literal(rendered).withStyle(style));
+  }
+
+  private static void setLabel(FlowLayout root, String id, Component text) {
+    LabelComponent label = root.childById(LabelComponent.class, id);
+    if (label != null) label.text(text);
   }
 
   /**

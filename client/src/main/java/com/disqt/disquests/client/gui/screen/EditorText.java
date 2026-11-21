@@ -28,6 +28,17 @@ public final class EditorText {
   public static final String FORMATTING = "gui.disquests.edit.formatting";
   public static final String FORMATTING_HIDE = "gui.disquests.edit.formatting_hide";
   public static final String FORMATTING_SHOW = "gui.disquests.edit.formatting_show";
+
+  /** The words of the formatting help's examples. */
+  public static final String FMT_TEXT = "gui.disquests.edit.fmt_text";
+
+  public static final String FMT_HEADING = "gui.disquests.edit.fmt_heading";
+  public static final String FMT_TODO = "gui.disquests.edit.fmt_todo";
+  public static final String FMT_DONE = "gui.disquests.edit.fmt_done";
+  public static final String FMT_QUOTE = "gui.disquests.edit.fmt_quote";
+  public static final String FMT_LINK = "gui.disquests.edit.fmt_link";
+  public static final String FMT_QUEST_NAME = "gui.disquests.edit.fmt_quest_name";
+  public static final String FMT_QUEST_LINK = "gui.disquests.edit.fmt_quest_link";
   public static final String NOT_SAVED = "gui.disquests.tree.not_saved";
   public static final String TAKEN_OUT = "gui.disquests.tree.taken_out";
   public static final String EDITING = "gui.disquests.tree.editing";
@@ -80,6 +91,14 @@ public final class EditorText {
             FORMATTING,
             FORMATTING_HIDE,
             FORMATTING_SHOW,
+            FMT_TEXT,
+            FMT_HEADING,
+            FMT_TODO,
+            FMT_DONE,
+            FMT_QUOTE,
+            FMT_LINK,
+            FMT_QUEST_NAME,
+            FMT_QUEST_LINK,
             NOT_SAVED,
             TAKEN_OUT,
             EDITING,
